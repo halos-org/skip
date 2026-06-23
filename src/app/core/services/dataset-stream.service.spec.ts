@@ -399,3 +399,59 @@ describe('DatasetStreamService', () => {
         expect(resolve('environment.wind.angleApparent', 'rad')).toBe('signed');
     }));
 });
+
+describe('DatasetStreamService cleanupDatasets data-chart retention (#1070 guard)', () => {
+    function makeService(datasets: unknown[], widgetIds: string[]): DatasetStreamService {
+        const appSettingsMock: Partial<SettingsService> = {
+            getDataSets: () => [],
+            configUpgrade: signal(false),
+            getAppConfig: () => ({ configVersion: 12 } as IAppConfig),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            getDashboardConfig: () => [{ configuration: widgetIds.map(id => ({ id })) }] as any,
+            saveDataSets: vi.fn()
+        };
+        const dataServiceMock: Partial<DataService> = {
+            getPathUnitType: () => 'number',
+            subscribePath: () => of({ data: { value: 1, timestamp: null }, state: 'normal' })
+        };
+        TestBed.configureTestingModule({
+            providers: [
+                DatasetStreamService,
+                { provide: SettingsService, useValue: appSettingsMock },
+                { provide: DataService, useValue: dataServiceMock },
+                { provide: HistoryApiClientService, useValue: { getValues: vi.fn().mockResolvedValue(null) } }
+            ]
+        });
+        const service = TestBed.inject(DatasetStreamService);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (service as any)._svcDatasetConfigs = datasets;
+        return service;
+    }
+
+    const dsWith = (uuid: string, label: string) => ({
+        uuid, path: 'environment.wind.shift', pathSource: 'default', baseUnit: 'rad',
+        timeScaleFormat: 'minute' as TimeScaleFormat, period: 10, label, editable: false
+    });
+
+    it('retains a data-chart dataset whose signature label includes the angle-range field', () => {
+        // 6-field signature (5 pipes) produced by the new datachartAngleRange element.
+        const label = 'environment.wind.shift|deg|default|minute|10|signed';
+        const ds = dsWith('w1', label);
+        const service = makeService([ds], ['w1']);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (service as any).cleanupDatasets();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((service as any)._svcDatasetConfigs).toContainEqual(ds);
+    });
+
+    it('still retains a legacy 5-field data-chart label and prunes orphaned datasets', () => {
+        const owned = dsWith('w1', 'environment.wind.shift|deg|default|minute|10'); // 4 pipes (legacy)
+        const orphan = dsWith('w2', 'environment.wind.shift|deg|default|minute|10|signed'); // not on any dashboard
+        const service = makeService([owned, orphan], ['w1']);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (service as any).cleanupDatasets();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const kept = (service as any)._svcDatasetConfigs as { uuid: string }[];
+        expect(kept.map(d => d.uuid)).toEqual(['w1']);
+    });
+});
