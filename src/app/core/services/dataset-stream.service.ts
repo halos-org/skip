@@ -127,7 +127,10 @@ export class DatasetStreamService implements OnDestroy {
         keep = !!(trendsUuid && widgetIds.has(trendsUuid));
       } else if (label.startsWith("simple-chart-")) {
         keep = widgetIds.has(ds.uuid);
-      } else if ((label.match(/\|/g) || []).length === 4) {
+      } else if ((label.match(/\|/g) || []).length >= 4) {
+        // Data chart datasets use the widget pathSignature as their label (pipe-delimited).
+        // Match on "at least 4 pipes" rather than an exact count so adding signature fields
+        // (e.g. the angle-range option) does not make cleanup prune live datasets (#1070).
         keep = widgetIds.has(ds.uuid);
       }
 
