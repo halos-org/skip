@@ -34,6 +34,7 @@ export interface IDatasetServiceDatasetConfig {
   period: number;           // Window size expressed in units of timeScaleFormat (ignored for "Last *" presets).
   label: string;           // label of the historicalData
   editable?: boolean;       // Whether the dataset is editable, or created with Widgets and not editable by user
+  angleDomainOverride?: 'signed' | 'direction'; // Optional override for how radian angles are wrapped: signed (-PI..PI) or direction (0..2PI). Undefined uses the path allowlist.
 };
 
 export interface IDatasetServiceDataSourceInfo {
@@ -285,7 +286,7 @@ export class DatasetStreamService implements OnDestroy {
     );
 
     // Decide how to interpret the dataset values (scalar vs radian domains)
-    const angleDomain = this.resolveAngleDomain(configuration.path, configuration.baseUnit);
+    const angleDomain = this.resolveAngleDomain(configuration.path, configuration.baseUnit, configuration.angleDomainOverride);
 
     // Attempt to seed dataset with history if eligible
     const historyResolutionSeconds = Math.max(1, Math.round(newDataSourceConfig.sampleTime / 1000));
@@ -471,7 +472,7 @@ export class DatasetStreamService implements OnDestroy {
    * @returns {string} The ID of the newly created dataset configuration
   * @memberof DatasetStreamService
    */
-  public create(path: string, source: string, timeScaleFormat: TimeScaleFormat, period: number, label: string, serialize = true, editable = true, forced_id?: string): string | null {
+  public create(path: string, source: string, timeScaleFormat: TimeScaleFormat, period: number, label: string, serialize = true, editable = true, forced_id?: string, angleDomainOverride?: 'signed' | 'direction'): string | null {
     if (!path || !source || !timeScaleFormat || !period || !label) return null;
     const uuid = forced_id || UUID.create();
 
@@ -483,7 +484,8 @@ export class DatasetStreamService implements OnDestroy {
       timeScaleFormat: timeScaleFormat,
       period: period,
       label: label,
-      editable: editable
+      editable: editable,
+      angleDomainOverride: angleDomainOverride
     };
 
     console.log(`[DatasetStreamService] Creating ${serialize ? '' : 'non-'}persistent ${editable ? '' : 'hidden '}dataset: ${newSvcDataset.uuid}, Path: ${newSvcDataset.path}, Source: ${newSvcDataset.pathSource} Scale: ${newSvcDataset.timeScaleFormat}, Period: ${newSvcDataset.period}`);
@@ -720,8 +722,9 @@ export class DatasetStreamService implements OnDestroy {
   // Domain resolution helpers
   private resolveAngleDomain(path: string, unit: string, override?: 'signed' | 'direction'): AngleDomain {
     if (unit !== 'rad') return 'scalar';
-    // RED: override is not yet honored - added in the fix for #1070.
-    void override;
+    // A per-chart override wins over the path allowlist so any angular path (e.g. a plugin's
+    // wind-shift) can be shown in its native signed range instead of wrapping to 0..360 (#1070).
+    if (override === 'signed' || override === 'direction') return override;
     const incoming = this.normalizePathKey(path);
     for (const candidate of this.signedAnglePaths) {
       if (incoming === this.normalizePathKey(candidate)) {
