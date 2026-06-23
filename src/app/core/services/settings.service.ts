@@ -40,6 +40,7 @@ export class SettingsService {
   private nightModeBrightness: BehaviorSubject<number> = new BehaviorSubject<number>(1);
   private isRemoteControl: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   private instanceName: BehaviorSubject<string> = new BehaviorSubject<string>('');
+  private browserTabTitle: BehaviorSubject<string> = new BehaviorSubject<string>('KIP');
   private splitShellEnabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   private splitShellSide: BehaviorSubject<'left' | 'right'> = new BehaviorSubject<'left' | 'right'>('left');
   private splitShellSwipeDisabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
@@ -246,6 +247,12 @@ export class SettingsService {
       this._dashboards = [];
     } else {
       this._dashboards = this.activeConfig.dashboards;
+    }
+
+    if (this.activeConfig.app.browserTabTitle === undefined) {
+      this.browserTabTitle.next('KIP');
+    } else {
+      this.browserTabTitle.next(this.activeConfig.app.browserTabTitle);
     }
 
     if (this.activeConfig.app.splitShellEnabled === undefined) {
@@ -455,6 +462,26 @@ export class SettingsService {
     this.connectionIdentityDirty = true;
     // Remote-control identity is per-device: persist to connectionConfig, never the profile.
     this.saveConnectionConfigToLocalStorage();
+  }
+
+  // Browser tab title (document.title)
+  public getBrowserTabTitleAsO() {
+    return this.browserTabTitle.asObservable();
+  }
+
+  public getBrowserTabTitle(): string {
+    return this.browserTabTitle.getValue();
+  }
+
+  public setBrowserTabTitle(title: string) {
+    this.browserTabTitle.next(title);
+    const appConf = this.buildAppStorageObject();
+
+    if (this.useSharedConfig) {
+      this.storage.patchConfig('IAppConfig', appConf);
+    } else {
+      this.saveAppConfigToLocalStorage();
+    }
   }
 
   public getDisablePathValidation(): boolean {
@@ -710,7 +737,8 @@ export class SettingsService {
       splitShellSide: this.splitShellSide.getValue() ?? 'right',
       splitShellWidth: this.splitShellWidth.getValue() ?? 0.5,
       splitShellSwipeDisabled: this.splitShellSwipeDisabled.getValue(),
-      widgetHistoryDisabled: this.widgetHistoryDisabled.getValue()
+      widgetHistoryDisabled: this.widgetHistoryDisabled.getValue(),
+      browserTabTitle: this.browserTabTitle.getValue()
     }
     return storageObject;
   }
