@@ -381,4 +381,21 @@ describe('DatasetStreamService', () => {
         expect(final.lastMinimum).toBeCloseTo(6.1959188446, 6); // 355°
         expect(final.lastMaximum).toBeCloseTo(0.0872664626, 6); // 5°
     }));
+
+    it('honors an explicit angle-domain override for non-allowlisted rad paths (#1070)', inject([DatasetStreamService], (service: DatasetStreamService) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const resolve = (path: string, unit: string, override?: 'signed' | 'direction') => (service as any).resolveAngleDomain(path, unit, override);
+
+        // A custom angular path (e.g. advancedwind wind shift, published in -PI..PI) is not in the
+        // signed allowlist, so by default it wraps into the 0..2PI direction domain.
+        expect(resolve('environment.wind.shift', 'rad')).toBe('direction');
+        // With an explicit 'signed' override the value keeps its native -PI..PI range.
+        expect(resolve('environment.wind.shift', 'rad', 'signed')).toBe('signed');
+        // A 'direction' override forces compass range for an otherwise-signed path.
+        expect(resolve('environment.wind.angleApparent', 'rad', 'direction')).toBe('direction');
+        // Non-rad units stay scalar regardless of override.
+        expect(resolve('navigation.speedOverGround', 'number', 'signed')).toBe('scalar');
+        // Back-compat: no override keeps the allowlist behavior.
+        expect(resolve('environment.wind.angleApparent', 'rad')).toBe('signed');
+    }));
 });

@@ -718,8 +718,10 @@ export class DatasetStreamService implements OnDestroy {
   }
 
   // Domain resolution helpers
-  private resolveAngleDomain(path: string, unit: string): AngleDomain {
+  private resolveAngleDomain(path: string, unit: string, override?: 'signed' | 'direction'): AngleDomain {
     if (unit !== 'rad') return 'scalar';
+    // RED: override is not yet honored - added in the fix for #1070.
+    void override;
     const incoming = this.normalizePathKey(path);
     for (const candidate of this.signedAnglePaths) {
       if (incoming === this.normalizePathKey(candidate)) {
