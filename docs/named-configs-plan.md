@@ -163,12 +163,15 @@ co-located `*.spec.ts`). Theme via KIP theme roles / CSS variables.
   `seed` = a guarded clone (only when settings are loaded) or a blank default.
 - **Write-safety is a `StorageService`-boundary invariant (Unit 2).** Every mutating call validates
   its effective slot name and refuses to write to an empty/undefined target.
-- **Profile-name validation is a security invariant (Unit 3).** Names are URL path segments *and*
-  JSON-Patch keys (`/{name}/…`) *and* must avoid the `::` list-key separator. Allow-list charset
-  (e.g. `[A-Za-z0-9 _-]`), bound length, reject empty / `default` / `/` / `..` / `~` / `::`. Apply
-  `encodeURIComponent` **inside `StorageService`** so all callers (not just `ProfileService`) are
-  covered. Imported-profile names run through the identical validation. Server acceptance probed in
-  Unit 1.
+- **Profile-name validation is a security invariant (Unit 3), confirmed by the Unit 1 probe.**
+  Names are URL path segments *and* JSON-Patch keys (`/{name}/…`) *and* must avoid the `::`
+  list-key separator. Use an **allow-list** `[A-Za-z0-9 _-]`, bound length, reject empty /
+  `default`. The probe proved why allow-list (not blocklist) is mandatory: a `.` **truncates** the
+  stored name (the server splits on dot: `foo.bar` → `foo`) and a `/` is treated as a path
+  separator **even when sent as `%2F`** (the server decodes it) — so `encodeURIComponent` does
+  *not* protect against `.` or `/`; they must be rejected outright. Apply `encodeURIComponent`
+  inside `StorageService` anyway (covers spaces/unicode for all callers); imported-profile names
+  run through the identical validation.
 - **`default` is the reserved fallback profile name.** `useSharedConfig` defaults to `false`, so a
   fresh device boots into local mode and the `user/default` *slot* is not created until the first
   shared write — not guaranteed to exist or appear in `listConfigs` for a brand-new shared user.
@@ -192,6 +195,20 @@ co-located `*.spec.ts`). Theme via KIP theme roles / CSS variables.
   `kipUUID`); but `isRemoteControl`/`instanceName` were per-profile → R8 hoist (Unit 5).
 - Name validation pinned as a Unit 3 invariant.
 - Import creates a new profile (R7); never silently overwrites.
+- **Unit 1 pre-flight — DONE** (2026-06-23, halosdev.local, Signal K 2.27.0, user scope):
+  - Arbitrary user-scope named slots: create / read / list (`?keys=true`) / delete all return 200.
+  - **Read-after-write is immediate** (GET right after POST returns the value) → create-then-switch
+    is safe; no eventual-consistency gap observed.
+  - Charset: `.` truncates a name; `/` splits the path even when sent `%2F` (server decodes);
+    spaces/unicode/160-char round-trip only with consistent `encodeURIComponent`. → allow-list
+    `[A-Za-z0-9 _-]`, reject `.` and `/` outright (Unit 3).
+  - JSON-Patch `replace` on a missing key → **HTTP 500** ("does not exist"); `add` auto-creates;
+    a full-object POST to a named path creates → **create-first is mandatory** (matches the plan).
+  - GET a missing slot → clean **404**. (True transient-404 needs a server restart; not tested —
+    Unit 6 still re-verifies before clobbering.)
+  - Device tokens write **user** scope (bucket keyed by the device username) but **not global**
+    (global needs admin) → reinforces "profiles are user-scope; device tokens → profiles
+    unavailable."
 
 ### Deferred to implementation
 
@@ -249,7 +266,7 @@ sequenceDiagram
 
 ## Implementation Units
 
-- [ ] **Unit 1: Pre-flight — verify named-slot behavior on a live Signal K server**
+- [x] **Unit 1: Pre-flight — verify named-slot behavior on a live Signal K server** *(DONE 2026-06-23 — results in Open Questions → Resolved)*
 
 **Goal:** Confirm the external assumptions before building. Lightweight probe, not a build unit, but
 a hard gate.
