@@ -393,7 +393,7 @@ device token retained (not stranded).
 
 **Verification:** matrix candidates covered; no token latched by early subscribers in cookie mode.
 
-- [ ] **Unit 3: loginStatus session state — isLoggedIn$, isUserSession, canWriteUserData**
+- [x] **Unit 3: loginStatus session state — isLoggedIn$, isUserSession, canWriteUserData**
 
 **Goal:** In cookie mode, derive session state from `GET /skServer/loginStatus` (credentialed),
 capturing `readOnlyAccess`/OIDC descriptors; fail closed.
