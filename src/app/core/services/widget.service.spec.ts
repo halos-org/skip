@@ -20,5 +20,11 @@ describe('WidgetService', () => {
     // widget-alternator/-inverter/-ac are commented out in widget.service.ts pending readiness.
     expect(selectors).toContain('widget-solar-charger');
     expect(selectors).toContain('widget-charger');
+    // The Alternator, Inverter and AC Monitor widget definitions are currently commented out in
+    // widget.service.ts (see the /* ... */ block around the electrical family entries), so they are
+    // not registered yet. Re-enable these assertions when those definitions are uncommented.
+    // expect(selectors).toContain('widget-inverter');
+    // expect(selectors).toContain('widget-alternator');
+    // expect(selectors).toContain('widget-ac');
   });
 });
