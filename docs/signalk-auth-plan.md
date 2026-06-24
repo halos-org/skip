@@ -334,7 +334,7 @@ sequenceDiagram
 
 ## Implementation Units
 
-- [ ] **Unit 1: Stop persisting the login password; fix the bootstrap gate**
+- [x] **Unit 1: Stop persisting the login password; fix the bootstrap gate**
 
 **Goal:** Remove plaintext `loginPassword` persistence; keep it transient; ensure the bootstrap login
 gate does not silently route every shared-config user to `/login` once the password is gone.
@@ -369,7 +369,7 @@ credentials and routes to re-login; a transient password completes a login witho
 
 **Verification:** suites green; no password in persisted config; renewal references no stored password.
 
-- [ ] **Unit 2: Auth mode detection + constructor token suppression**
+- [x] **Unit 2: Auth mode detection + constructor token suppression**
 
 **Goal:** Synchronous origin-first `authMode` (pre-discovery); skip the constructor device-token
 re-emit in cookie mode; conditional device-token clearing.
