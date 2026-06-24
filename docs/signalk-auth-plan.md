@@ -416,7 +416,7 @@ mode does not call loginStatus.
 
 **Verification:** suite green; session state + write-capability reflect loginStatus, fail-closed.
 
-- [ ] **Unit 4: Credential carriage — interceptor, WS, Freeboard iframe**
+- [x] **Unit 4: Credential carriage — interceptor, WS, Freeboard iframe**
 
 **Goal:** Carry the session cookie on all three same-origin carriers; suppress token params in cookie
 mode; drive WS reconnect off session state.
@@ -438,7 +438,7 @@ double-connect during bootstrap.
 
 **Verification:** suites green; deploy-time test confirms live cookie on REST, WS, iframe.
 
-- [ ] **Unit 5: Decouple config-storage routing from `useSharedConfig`**
+- [x] **Unit 5: Decouple config-storage routing from `useSharedConfig`**
 
 **Goal:** Make config persistence honor cookie mode (server storage) independent of the stored
 `useSharedConfig` flag — the pass-2 split-brain fix.
