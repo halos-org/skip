@@ -463,7 +463,7 @@ persists to the server slot and reloads from it.
 **Verification:** in cookie mode, settings + profile CRUD both target the server; no localStorage
 split-brain.
 
-- [ ] **Unit 6: Bootstrap rework + redirect (safety + transitional/recovery UI)**
+- [x] **Unit 6: Bootstrap rework + redirect (safety + transitional/recovery UI)**
 
 **Goal:** Cookie-mode bootstrap uses loginStatus; replaces `/login` navigations with a validated,
 budget-guarded SSO redirect; handles the anonymous-read branch; shows transitional and per-cause
@@ -491,7 +491,7 @@ budget + uses `noAutoLogin`; redirect param with `//`/scheme/host/control-char �
 
 **Verification:** suite green; deploy-time SSO round-trip returns logged in without loop.
 
-- [ ] **Unit 7: `/login` route + Connectivity tab UX**
+- [x] **Unit 7: `/login` route + Connectivity tab UX**
 
 **Goal:** Same-origin entry points redirect to SK login (transitional state) instead of the dialog;
 cross-origin keeps the dialog. Connectivity tab shows session identity, read-only state, anonymous
@@ -540,15 +540,17 @@ profiles (deploy-time acceptance — the prerequisite's success gate). The auth-
 "done" until this rebase lands and the check passes; if it slips, auth ships as a security+SSO
 improvement with the prerequisite explicitly marked unproven.
 
-- [ ] **Unit 9: Documentation, design doc, changelog, deploy-time acceptance test**
+- [x] **Unit 9: Documentation, design doc, changelog, deploy-time acceptance test**
+  (docs/changelog delivered; the on-device acceptance checklist below is the remaining manual gate)
 
 **Goal:** Document dual-mode auth and record the design + verification.
 
 **Requirements:** R6, R10, R11 — **Dependencies:** Units 1–8.
 
-**Files:** Create `docs/signalk-auth-plan.md` (this plan, moved from `_local/`); modify KIP help
-content; modify `CHANGELOG.md` / release notes (call out password-storage removal **and** that cross
--origin shared-config users now re-login on expiry / on each reload, not just "on expiry").
+**Files:** `docs/signalk-auth-plan.md` (this design doc, on the branch); `CHANGELOG.md` (call out
+password-storage removal **and** that cross-origin token users re-login **on expiry** — the session
+JWT persists across reloads via Option A; there is no `auth/validate` refresh). KIP help content has
+no connection/auth section, so there is nothing relevant to modify there.
 
 **Approach:** the deploy-time acceptance test (build locally, deploy to the device webapp dir; never
 build on device) covers: loginStatus drives state; redirect triggers OIDC and returns without loop;
@@ -593,7 +595,7 @@ profiles (post-rebase) read/write user scope.
 | CSRF on cookie-authenticated writes | Med | Med | Gating deploy check (R10): forged write must be blocked; else re-plan a token |
 | Same-origin device-token install stranded | Low | Med | Drop device token only once a cookie session is obtainable (Unit 2) |
 | Profiles unproven until rebase | Med | Med | Unit 8 owned by this plan's DoD; window benign (profiles not on master) |
-| Token-mode re-login on expiry/reload (no auth/validate) | High (by design) | Med | Cross-origin only now; CHANGELOG calls out reload re-login too (Unit 9) |
+| Token-mode re-login on expiry (no auth/validate) | Med (by design) | Med | Cross-origin only now; the session JWT persists across reloads (Option A), so re-login is on expiry, not each reload; CHANGELOG calls this out (Unit 9) |
 | Same-origin password-only users lose in-app modal | Med | Med | Accepted: admin-login redirect is SK's own pattern; minority vs OIDC target |
 | Version collision with `named_configs` v13 | Low | Med | Stay v12; Unit 1/5 edits overlap the v13 migration — reconcile in one rebase pass |
 | Upstream rejects auto-detect default | Med | Med | Chosen deliberately; fallback is default-on toggle, not a redesign |
