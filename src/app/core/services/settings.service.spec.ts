@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsService } from './settings.service';
 import { StorageService } from './storage.service';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
@@ -244,9 +245,50 @@ describe('SettingsService', () => {
       const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
       const storage = TestBed.inject(StorageService);
       storage.storageServiceReady$.next(true);
-      const setSpy = vi.spyOn(storage, 'setConfig').mockImplementation(() => undefined);
+      const setSpy = vi.spyOn(storage, 'setConfig').mockResolvedValue(undefined);
+      vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
       service.loadDemoConfig();
       expect(setSpy).toHaveBeenCalledWith('user', 'profileA', expect.objectContaining({ app: expect.anything() }));
+    });
+
+    it('reloads only after the demo config save resolves', async () => {
+      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const storage = TestBed.inject(StorageService);
+      storage.storageServiceReady$.next(true);
+      let resolveSave!: (value: unknown) => void;
+      vi.spyOn(storage, 'setConfig').mockReturnValue(
+        new Promise((resolve) => { resolveSave = resolve; })
+      );
+      const reloadSpy = vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
+
+      service.loadDemoConfig();
+      await Promise.resolve();
+
+      // Reload must wait for the write, not race it.
+      expect(reloadSpy).not.toHaveBeenCalled();
+
+      resolveSave(null);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reload and surfaces an error when the demo config save fails', async () => {
+      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const storage = TestBed.inject(StorageService);
+      storage.storageServiceReady$.next(true);
+      vi.spyOn(storage, 'setConfig').mockRejectedValue(new Error('network down'));
+      const reloadSpy = vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
+      const snack = TestBed.inject(MatSnackBar);
+      const snackSpy = vi.spyOn(snack, 'open').mockImplementation(() => undefined as never);
+
+      service.loadDemoConfig();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(reloadSpy).not.toHaveBeenCalled();
+      expect(snackSpy).toHaveBeenCalled();
     });
   });
 });
