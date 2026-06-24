@@ -341,13 +341,27 @@ gate does not silently route every shared-config user to `/login` once the passw
 
 **Requirements:** R6 — **Dependencies:** None (independently shippable security fix).
 
-**Files:** Modify `authentication.service.ts` (renewal drops stored-password re-login; user-token
-expiry → `deleteToken()` → existing route path), `settings.service.ts` (`buildConnectionStorageObject`
-excludes `loginPassword`; idempotent purge on load; no version bump), `app-initNetwork.service.ts`
-(login gate no longer requires a persisted password), `interfaces/app-settings.interfaces.ts`
-(`loginPassword` documented transient), `options/signalk/signalk.component.ts` and
-`widgets/widget-login/widget-login.component.ts` (pass password transiently; the dialog prefill is now
-always empty). Test: `authentication.service.spec.ts`, `settings.service.spec.ts`.
+**Approach (Option A — JWT becomes the persisted credential):** Implementation revealed the persisted
+password is load-bearing for post-login: login stores a JWT then `reloadApp()`, and the constructor
+*deletes* the user-session token on startup, so today the persisted password is what re-establishes
+the session after reload. Removing the password without changing that would loop login→reload→login.
+Fix: the constructor **keeps an unexpired user-session token** (mirroring device tokens), so the
+expiring JWT — not the plaintext password — is the cross-reload credential (strictly more secure;
+consistent with the token-mode accepted-residual). `connectToServer` must do an **in-memory
+`auth.login()` before reload** (it currently relies on the persisted password + bootstrap re-login);
+`widget-login`'s `serverLogin` already logs in in-memory. `app-initNetwork`'s password-gated bootstrap
+login then self-disables (password never persisted) and needs no change. Tradeoff: a user JWT now
+persists across browser restarts until expiry (session-residue on shared displays — same class as the
+cookie-mode sign-out limitation).
+
+**Files:** Modify `authentication.service.ts` (constructor keeps unexpired user token; renewal drops
+stored-password re-login → `deleteToken()` on user-token expiry), `settings.service.ts`
+(`buildConnectionStorageObject` excludes `loginPassword`; idempotent purge on load; no version bump),
+`interfaces/app-settings.interfaces.ts` (`loginPassword` optional/transient),
+`options/signalk/signalk.component.ts` (`connectToServer` logs in in-memory before reload). No change
+needed in `app-initNetwork.service.ts` (login gate self-disables) or `widget-login.component.ts`
+(already in-memory; prefill is now empty, expected). Test: `authentication.service.spec.ts`,
+`settings.service.spec.ts`.
 
 **Test scenarios:** serialized config has no `loginPassword`; legacy config with `loginPassword` is
 stripped and re-persisted (no version change); renewal with no stored password/cookie does not POST
