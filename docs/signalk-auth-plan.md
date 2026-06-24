@@ -210,8 +210,12 @@ OIDC-aware" — KIP needs no OIDC code, only cookie + loginStatus + redirect.
   `applicationData` supported, full cookie mode engages, regardless of the stored flags. Resolves
   out-of-box reachability (R7) and the flag-coupling contradiction.
 - **Two derived signals, both owned by Unit 3** (they need `loginStatus`): `isUserSession` =
-  cookie-mode-logged-in OR (token present AND not device); `canWriteUserData` = `isUserSession` AND
-  not `loginStatus.readOnlyAccess`. `isLoggedIn$` is set from `loginStatus` in cookie mode (no token).
+  cookie-mode-logged-in OR (token present AND not device); `canWriteUserData` = `isUserSession` AND a
+  write-capable `loginStatus.userLevel` (`admin` or `readwrite`). **Corrected at deploy time:** the
+  write gate keys off `userLevel` (the signed-in user's `skPrincipal.permissions`), **not**
+  `loginStatus.readOnlyAccess` — that field is the server's `allow_readonly` (anonymous-read) config and
+  is `true` on any server permitting anonymous read, which would wrongly mark an admin read-only.
+  `isLoggedIn$` is set from `loginStatus` in cookie mode (no token).
   Storage readiness/bootstrap keep keying off `isLoggedIn$`; profiles availability off `isUserSession`;
   write affordances off `canWriteUserData`. Unit 2 exposes only synchronous `authMode`.
 - **Storage routing decoupled from `useSharedConfig` (R12).** A resolved "use server storage" signal
@@ -312,7 +316,8 @@ sequenceDiagram
 - **`loginPassword`** — transient in-memory, never persisted.
 - **`connectionConfig` version** — stay 12; idempotent purge.
 - **`isUserSession`/`canWriteUserData`** — owned by Unit 3; profiles use the booleans, no username.
-- **Read-only sessions** — captured via `loginStatus.readOnlyAccess`; write affordances gated.
+- **Read-only sessions** — write capability is `loginStatus.userLevel` ∈ {`admin`, `readwrite`}
+  (deploy-confirmed against signalk-server v2.27.0); write affordances gated on `canWriteUserData`.
 
 ### Deferred to implementation (deploy-time; not exercisable by `ng serve`)
 
@@ -406,7 +411,8 @@ capture `oidcEnabled`/`oidcAutoLogin`/`oidcLoginUrl`/`authenticationRequired`/`r
 `authentication.service.spec.ts`.
 
 **Approach:** `isLoggedIn$` true **only** on parsed `status==='loggedIn'`; any error, timeout, non
--JSON, or unexpected shape → not-logged-in. `canWriteUserData` = logged-in AND not `readOnlyAccess`.
+-JSON, or unexpected shape → not-logged-in. `canWriteUserData` = logged-in AND `userLevel` ∈ {`admin`,
+`readwrite`} (not `readOnlyAccess`, which is the server's anonymous-read config flag — see Key Decisions).
 Pick a consistent shape (Observable/signal) for the session signals so Units 6/7/8 consume uniformly.
 
 **Test scenarios:** `loggedIn` write → `isLoggedIn$`/`isUserSession`/`canWriteUserData` true, no
@@ -640,3 +646,24 @@ profiles (post-rebase) read/write user scope.
   `options/signalk/signalk.component.ts`, `options/configuration/config.component.ts` (profiles)
 - SK docs: webapps auth, security spec, `loginRedirect.ts`, OIDC docs (`returnTo`/`noAutoLogin`)
 - Advisory: GHSA-fq56-hvg6-wvm5
+
+## Review follow-ups (deferred from PR #1)
+
+Deferred from the multi-persona review of PR #1 (the fork has issues disabled, so tracked here +
+the PR thread). Fix-now items landed on `feat/signalk-standard-auth`; these are intentionally deferred:
+
+- **Read-only write-control gating across the settings UI** — gate general settings write controls on
+  `canWriteUserData$`, not just the Connectivity identity label. Broad; overlaps Unit 8's profile
+  write-gating. Mitigated: the read-only state is shown and the patch queue no longer dies on a 401.
+- **Cookie mid-session resilience** — on a confirmed mid-session `loginStatus` → `notLoggedIn` (cookie
+  expiry post-bootstrap), route through the budget-guarded `attemptCookieRedirect` to self-heal via
+  SSO; throttle the WS-drop `refreshLoginStatus` re-check and don't treat a transient error/429 as an
+  authoritative `notLoggedIn`. (The plan deferred the "401 mid-session" wire shape to deploy-time; this
+  is the in-code recovery path. Manual reload recovers today.)
+- **Cookie anonymous-read config fallback** — on a same-origin no-security SK server
+  (`authenticationRequired:false`), fall back to localStorage when cookie mode is not logged in (today
+  `startup()` early-returns and loads nothing). HaLOS (auth-required) is unaffected.
+- **Unit 7 component behavioral tests** — stub-based specs for `widget-login` and `signalk.component`
+  that avoid the pre-existing jsdom-localStorage component-spec gap.
+- **Auth maintainability cluster** — memoize `authMode`, single owning signal for the `useServerStorage`
+  routing decision, shared `connectionConfig` storage-key constant. Non-behavioral.
