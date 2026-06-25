@@ -4,6 +4,50 @@ import { SettingsService } from './settings.service';
 import { StorageService } from './storage.service';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
 
+interface SeedOpts {
+  sharedConfigName?: string;
+  useSharedConfig?: boolean;
+  isRemoteControl?: boolean;
+  instanceName?: string;
+}
+
+function seedConfig(opts: SeedOpts = {}): void {
+  localStorage.setItem('authorization_token', JSON.stringify(null));
+  localStorage.setItem('connectionConfig', JSON.stringify({
+    configVersion: 13,
+    kipUUID: 'test-uuid',
+    // Cross-origin so authMode resolves to token: storage then routes purely on useSharedConfig,
+    // keeping "local mode" (useSharedConfig:false) genuinely local under the auth-era routing.
+    signalKUrl: 'https://boat.example:3443',
+    proxyEnabled: false,
+    signalKSubscribeAll: false,
+    useDeviceToken: false,
+    loginName: '',
+    loginPassword: '',
+    useSharedConfig: opts.useSharedConfig ?? false,
+    sharedConfigName: opts.sharedConfigName ?? 'profileA',
+    isRemoteControl: opts.isRemoteControl ?? false,
+    instanceName: opts.instanceName ?? ''
+  }));
+  localStorage.setItem('appConfig', JSON.stringify({
+    configVersion: 12,
+    autoNightMode: false,
+    redNightMode: false,
+    nightModeBrightness: 1,
+    dataSets: [],
+    unitDefaults: {},
+    notificationConfig: {
+      disableNotifications: true,
+      menuGrouping: false,
+      security: { disableSecurity: true },
+      devices: { disableDevices: true, showNormalState: false, showNominalState: false },
+      sound: { disableSound: true, muteNormal: true, muteNominal: true, muteWarn: true, muteAlert: true, muteAlarm: true, muteEmergency: true }
+    }
+  }));
+  localStorage.setItem('dashboardsConfig', JSON.stringify([{ id: 'dash-1' }]));
+  localStorage.setItem('themeConfig', JSON.stringify({ themeName: 'light' }));
+}
+
 function seedConnectionConfig(extra: Record<string, unknown> = {}): void {
   localStorage.setItem('authorization_token', JSON.stringify(null));
   localStorage.setItem(
@@ -23,9 +67,14 @@ function seedConnectionConfig(extra: Record<string, unknown> = {}): void {
   );
 }
 
-function createService(): SettingsService {
-  // localStorage is installed+cleared in beforeEach; the test seeds before calling this.
-  // Provide both services so the transitive chain resolves to the global stubs
+function createService(opts?: SeedOpts): SettingsService {
+  // opts provided (profile suite): clear + seed inside. Omitted (credential/routing suites): the
+  // describe's beforeEach already cleared and the test seeds via seedConnectionConfig first.
+  if (opts) {
+    ensureLocalStorage();
+    seedConfig(opts);
+  }
+  // Provide both services in the module so transitive deps resolve to the global stubs
   // (AuthenticationService / SignalKConnectionService) rather than the real root services.
   TestBed.configureTestingModule({ providers: [SettingsService, StorageService] });
   return TestBed.inject(SettingsService);
@@ -105,5 +154,99 @@ describe('SettingsService — storage routing by mode (Unit 5)', () => {
 
     expect(patchSpy).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem('themeConfig') as string)).toEqual({ themeName: 'local-theme' });
+  });
+});
+
+describe('SettingsService', () => {
+  it('should be created', () => {
+    expect(createService({})).toBeTruthy();
+  });
+
+  describe('active profile (local mode)', () => {
+    let service: SettingsService;
+
+    beforeEach(() => {
+      service = createService({ useSharedConfig: false, sharedConfigName: 'profileA' });
+    });
+
+    it('getActiveProfileName returns the booted slot name', () => {
+      expect(service.getActiveProfileName()).toBe('profileA');
+    });
+
+    it('setActiveProfile updates the name and persists it to connectionConfig', () => {
+      service.setActiveProfile('cockpit');
+      expect(service.getActiveProfileName()).toBe('cockpit');
+      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      expect(cc.sharedConfigName).toBe('cockpit');
+    });
+
+    it('setActiveProfile keeps StorageService.sharedConfigName coherent', () => {
+      const storage = TestBed.inject(StorageService);
+      service.setActiveProfile('cockpit');
+      expect(storage.sharedConfigName).toBe('cockpit');
+    });
+  });
+
+  describe('remote-control identity (per-device, Unit 5)', () => {
+    it('reads isRemoteControl / instanceName from connectionConfig at boot', () => {
+      const service = createService({ isRemoteControl: true, instanceName: 'Helm' });
+      expect(service.getIsRemoteControl()).toBe(true);
+      expect(service.getInstanceName()).toBe('Helm');
+    });
+
+    it('setIsRemoteControl persists to connectionConfig, not the profile/appConfig', () => {
+      const service = createService({ isRemoteControl: false });
+      service.setIsRemoteControl(true);
+      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      expect(cc.isRemoteControl).toBe(true);
+      const appConf = JSON.parse(localStorage.getItem('appConfig') as string);
+      expect(appConf.isRemoteControl).toBeUndefined();
+    });
+
+    it('setInstanceName persists to connectionConfig', () => {
+      const service = createService({ instanceName: '' });
+      service.setInstanceName('Mast');
+      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      expect(cc.instanceName).toBe('Mast');
+    });
+
+    it('switching the active profile leaves remote-control identity unchanged', () => {
+      const service = createService({ isRemoteControl: true, instanceName: 'Helm' });
+      service.setActiveProfile('cockpit');
+      expect(service.getIsRemoteControl()).toBe(true);
+      expect(service.getInstanceName()).toBe('Helm');
+      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      expect(cc.isRemoteControl).toBe(true);
+      expect(cc.instanceName).toBe('Helm');
+    });
+
+    it('getAppConfig no longer carries remote-control fields', () => {
+      const service = createService();
+      const app = service.getAppConfig() as unknown as Record<string, unknown>;
+      expect(app['isRemoteControl']).toBeUndefined();
+      expect(app['instanceName']).toBeUndefined();
+    });
+  });
+
+  describe('loadDemoConfig storage-readiness guard (server mode)', () => {
+    beforeEach(() => { (window as unknown as Record<string, unknown>)['__KIP_TEST__'] = true; });
+
+    it('does not write the demo config to the server when storage is not ready', () => {
+      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const storage = TestBed.inject(StorageService);
+      storage.storageServiceReady$.next(false);
+      const setSpy = vi.spyOn(storage, 'setConfig').mockImplementation(() => undefined);
+      service.loadDemoConfig();
+      expect(setSpy).not.toHaveBeenCalled();
+    });
+
+    it('writes the demo config to the server when storage is ready', () => {
+      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const storage = TestBed.inject(StorageService);
+      storage.storageServiceReady$.next(true);
+      const setSpy = vi.spyOn(storage, 'setConfig').mockImplementation(() => undefined);
+      service.loadDemoConfig();
+      expect(setSpy).toHaveBeenCalledWith('user', 'profileA', expect.objectContaining({ app: expect.anything() }));
+    });
   });
 });

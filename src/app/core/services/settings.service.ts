@@ -6,7 +6,7 @@ import { IWidget } from '../interfaces/widgets-interface';
 import { IUnitDefaults } from './units.service';
 import { UUID } from '../utils/uuid.util';
 
-import { IConfig, IAppConfig, IConnectionConfig, IThemeConfig, INotificationConfig, ISignalKUrl } from "../interfaces/app-settings.interfaces";
+import { IConfig, IAppConfig, IConnectionConfig, IThemeConfig, INotificationConfig, ISignalKUrl, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from "../interfaces/app-settings.interfaces";
 import { DefaultAppConfig, DefaultConnectionConfig as DefaultConnectionConfig, DefaultThemeConfig } from '../../../default-config/config.blank.const';
 import { DefaultUnitsConfig } from '../../../default-config/config.blank.units.const'
 import { DefaultNotificationConfig } from '../../../default-config/config.blank.notification.const';
@@ -53,6 +53,10 @@ export class SettingsService {
   private loginPassword = '';
   public useSharedConfig = true;
   private sharedConfigName = 'default';
+  // True once the user explicitly changes the remote-control identity this session; until then a
+  // connection write preserves the stored (possibly migration-written) identity rather than the
+  // in-memory default loaded before the migration ran.
+  private connectionIdentityDirty = false;
   private activeConfig: IConfig = { app: null, theme: null, dashboards: [] };
 
   private kipUUID = '';
@@ -119,8 +123,8 @@ export class SettingsService {
 
     switch (config.configVersion) {
       case 11:
-        break;
       case 12:
+      case 13:
         break;
       default:
         console.error(`[AppSettings Service] Invalid connectionConfig version ${config.configVersion}. Resetting and loading connection configuration default`);
@@ -144,6 +148,10 @@ export class SettingsService {
       delete config.loginPassword;
       localStorage.setItem("connectionConfig", JSON.stringify(config));
     }
+
+    // Remote-control identity is per-device: read from connectionConfig, not the profile.
+    this.isRemoteControl.next(config.isRemoteControl ?? false);
+    this.instanceName.next(config.instanceName ?? '');
   }
 
   public resetConnection() {
@@ -194,7 +202,7 @@ export class SettingsService {
     }
 
     if(type === 'connectionConfig') {
-      if (config.configVersion !== latestConfigVersion) {
+      if (!SUPPORTED_CONNECTION_CONFIG_VERSIONS.includes(config.configVersion)) {
         console.log(`[AppSettings Service] Invalid ${type} version. Force loading defaults`);
 
         switch (type) {
@@ -238,18 +246,6 @@ export class SettingsService {
       this._dashboards = [];
     } else {
       this._dashboards = this.activeConfig.dashboards;
-    }
-
-    if (this.activeConfig.app.isRemoteControl === undefined) {
-      this.setIsRemoteControl(false);
-    } else {
-      this.isRemoteControl.next(this.activeConfig.app.isRemoteControl);
-    }
-
-    if (this.activeConfig.app.instanceName === undefined) {
-      this.setInstanceName('');
-    } else {
-      this.instanceName.next(this.activeConfig.app.instanceName);
     }
 
     if (this.activeConfig.app.splitShellEnabled === undefined) {
@@ -346,6 +342,24 @@ export class SettingsService {
     return this.buildThemeStorageObject();
   }
 
+  // --- Active profile (named config slot) ---
+  public getActiveProfileName(): string {
+    return this.sharedConfigName;
+  }
+
+  /**
+   * Points this device at a different profile (named config slot) and reloads so the bootstrap
+   * loads it. The active profile is per-device: persisted in the always-local connectionConfig.
+   *
+   * @param {string} name Profile (config slot) name to make active on this device.
+   */
+  public setActiveProfile(name: string): void {
+    this.sharedConfigName = name;
+    this.storage.sharedConfigName = name; // keep the storage write-path slot name coherent
+    this.saveConnectionConfigToLocalStorage();
+    this.reloadApp();
+  }
+
   public get KipUUID(): string {
     return this.kipUUID;
   }
@@ -422,13 +436,9 @@ export class SettingsService {
 
   public setIsRemoteControl(enabled: boolean) {
     this.isRemoteControl.next(enabled);
-    const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.connectionIdentityDirty = true;
+    // Remote-control identity is per-device: persist to connectionConfig, never the profile.
+    this.saveConnectionConfigToLocalStorage();
   }
 
   // Remote Control Instance Name
@@ -442,13 +452,9 @@ export class SettingsService {
 
   public setInstanceName(name: string) {
     this.instanceName.next(name);
-    const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.connectionIdentityDirty = true;
+    // Remote-control identity is per-device: persist to connectionConfig, never the profile.
+    this.saveConnectionConfigToLocalStorage();
   }
 
   public getDisablePathValidation(): boolean {
@@ -659,6 +665,10 @@ export class SettingsService {
 
   public loadDemoConfig() {
     if (this.useServerStorage) {
+      if (!this.storage.storageServiceReady$.getValue()) {
+        console.warn("[AppSettings Service] Storage not ready; cannot load demo configuration.");
+        return;
+      }
       const demoConfig: IConfig = {
         app: DemoAppConfig,
         dashboards: DemoDashboardsConfig,
@@ -693,8 +703,6 @@ export class SettingsService {
       autoNightMode: this.autoNightMode.getValue(),
       redNightMode: this.redNightMode.getValue(),
       nightModeBrightness: this.nightModeBrightness.getValue(),
-      isRemoteControl: this.isRemoteControl.getValue(),
-      instanceName: this.instanceName.getValue(),
       dataSets: this.dataSets,
       unitDefaults: this.unitDefaults.getValue(),
       notificationConfig: this.kipKNotificationConfig.getValue(),
@@ -708,8 +716,12 @@ export class SettingsService {
   }
 
   private buildConnectionStorageObject() {
+    const stored = this.readStoredConnectionConfig();
     const storageObject: IConnectionConfig = {
-      configVersion: this.configVersion ?? latestConfigVersion,
+      // Preserve the stored connectionConfig version; only the one-time migration in
+      // AppNetworkInitService advances it. Stamping the latest here would prematurely mark the
+      // migration done and lose the not-yet-lifted remote-control identity.
+      configVersion: stored?.configVersion ?? CONNECTION_CONFIG_VERSION,
       kipUUID: this.kipUUID,
       signalKUrl: this.signalkUrl?.url ?? '',
       proxyEnabled: this.proxyEnabled,
@@ -718,9 +730,21 @@ export class SettingsService {
       loginName: this.loginName,
       // loginPassword intentionally omitted: never persisted (transient in-memory only).
       useSharedConfig: this.useSharedConfig,
-      sharedConfigName: this.sharedConfigName
+      sharedConfigName: this.sharedConfigName,
+      // Preserve the stored (possibly migration-written) identity unless the user changed it this
+      // session, so a connection write around the migration cannot revert the lifted value.
+      isRemoteControl: this.connectionIdentityDirty ? this.isRemoteControl.getValue() : (stored?.isRemoteControl ?? this.isRemoteControl.getValue()),
+      instanceName: this.connectionIdentityDirty ? this.instanceName.getValue() : (stored?.instanceName ?? this.instanceName.getValue())
     }
     return storageObject;
+  }
+
+  private readStoredConnectionConfig(): Partial<IConnectionConfig> | null {
+    try {
+      return JSON.parse(localStorage.getItem('connectionConfig') ?? 'null');
+    } catch {
+      return null;
+    }
   }
 
   private buildDashboardStorageObject() {
