@@ -174,7 +174,7 @@ export class SettingsService {
    * @memberof SettingsService
    */
   public loadConfigFromLocalStorage(type: string) {
-    let config = JSON.parse(localStorage.getItem(type) ?? '');
+    let config = JSON.parse(localStorage.getItem(type) ?? 'null');
 
     if (config === null) {
       console.log(`[AppSettings Service] Error loading ${type} config. Force loading ${type} defaults`);
