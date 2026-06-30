@@ -1,6 +1,9 @@
 {
-  "name": "@mxtommy/kip",
+  "name": "@halos-org/skip",
   "version": "4.8.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "An advanced and versatile marine instrumentation package to display Signal K data.",
   "license": "MIT",
   "author": {
@@ -14,13 +17,17 @@
     {
       "name": "Thomas St.Pierre",
       "email": "thomas@samoht.ca"
+    },
+    {
+      "name": "Hat Labs Ltd.",
+      "url": "https://hatlabs.fi"
     }
   ],
-  "homepage": "https://github.com/mxtommy/Kip",
-  "bugs": "https://github.com/mxtommy/Kip/issues",
+  "homepage": "https://github.com/halos-org/skip",
+  "bugs": "https://github.com/halos-org/skip/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mxtommy/Kip.git"
+    "url": "git+https://github.com/halos-org/skip.git"
   },
   "keywords": [
     "signalk-webapp",
@@ -37,7 +44,7 @@
   ],
   "signalk": {
     "appIcon": "assets/icon-72x72.png",
-    "displayName": "KIP Instrument MFD"
+    "displayName": "SKip Instrument MFD"
   },
   "main": "plugin/index.js",
   "files": [
@@ -56,7 +63,7 @@
     "test:interactive": "ng test",
     "test:headless": "CI=1 ng test --watch=false",
     "lint": "ng lint",
-    "dev": "ng serve --configuration=dev --serve-path=/@mxtommy/kip/",
+    "dev": "ng serve --configuration=dev --serve-path=/@halos-org/skip/",
     "build:plugin": "tsc -p ./kip-plugin/tsconfig.plugin.json",
     "build:dev": "ng build --configuration=dev",
     "build:prod": "ng build --configuration=production",

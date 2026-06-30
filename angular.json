@@ -11,7 +11,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "baseHref": "/@mxtommy/kip/",
+            "baseHref": "/@halos-org/skip/",
             "aot": true,
             "outputPath": {
               "base": "public",

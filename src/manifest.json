@@ -1,12 +1,12 @@
 {
-  "id": "/@mxtommy/kip/",
+  "id": "/@halos-org/skip/",
   "theme_color": "#424242",
   "background_color": "#424242",
   "display": "fullscreen",
-  "scope": "/@mxtommy/kip/",
-  "start_url": "/@mxtommy/kip/",
-  "name": "KIP Instrument MFD",
-  "short_name": "KIP",
+  "scope": "/@halos-org/skip/",
+  "start_url": "/@halos-org/skip/",
+  "name": "SKip Instrument MFD",
+  "short_name": "SKip",
   "description": "An advanced and versatile marine instrumentation package to display Signal K data.",
   "orientation": "landscape",
   "icons": [
