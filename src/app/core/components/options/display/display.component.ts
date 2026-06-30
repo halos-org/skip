@@ -57,7 +57,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected isLightTheme = model<boolean>(false);
   protected isRemoteControl = model<boolean>(false);
   protected instanceName = model<string>('');
-  protected browserTabTitle = model<string>('KIP');
+  protected browserTabTitle = model<string>('SKip');
   protected splitShellEnabled = model<boolean>(false);
   protected splitShellSide = model<'left' | 'right'>('left');
   protected splitShellSwipeDisabled = model<boolean>(false);

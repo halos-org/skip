@@ -40,7 +40,7 @@ export class SettingsService {
   private nightModeBrightness: BehaviorSubject<number> = new BehaviorSubject<number>(1);
   private isRemoteControl: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   private instanceName: BehaviorSubject<string> = new BehaviorSubject<string>('');
-  private browserTabTitle: BehaviorSubject<string> = new BehaviorSubject<string>('KIP');
+  private browserTabTitle: BehaviorSubject<string> = new BehaviorSubject<string>('SKip');
   private splitShellEnabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   private splitShellSide: BehaviorSubject<'left' | 'right'> = new BehaviorSubject<'left' | 'right'>('left');
   private splitShellSwipeDisabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
@@ -250,7 +250,7 @@ export class SettingsService {
     }
 
     if (this.activeConfig.app.browserTabTitle === undefined) {
-      this.browserTabTitle.next('KIP');
+      this.browserTabTitle.next('SKip');
     } else {
       this.browserTabTitle.next(this.activeConfig.app.browserTabTitle);
     }

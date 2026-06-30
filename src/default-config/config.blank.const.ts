@@ -15,7 +15,7 @@ export const DefaultAppConfig: IAppConfig = {
   "splitShellSide": "left",
   "splitShellSwipeDisabled": false,
   "splitShellWidth": 0.5,
-  "browserTabTitle": "KIP"
+  "browserTabTitle": "SKip"
 }
 
 export const DefaultThemeConfig: IThemeConfig = {
