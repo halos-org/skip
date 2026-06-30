@@ -1,7 +1,7 @@
 ## Raspberry Pi Kiosk Mode (Chromium)
 
 This guide launches Chromium in kiosk mode to display KIP at:
-http://<sk_server_IP>:3000/@mxtommy/kip/#/page/0
+http://<sk_server_IP>:3000/@halos-org/skip/#/page/0
 
 It supports Raspberry Pi OS Bullseye (X11/LXDE) and Bookworm (Wayland).
 
@@ -54,7 +54,7 @@ Paste:
 set -euo pipefail
 
 # URL for KIP (adjust as needed)
-URL="${URL:-http://<sk_server_IP>:3000/@mxtommy/kip/#/page/0}"
+URL="${URL:-http://<sk_server_IP>:3000/@halos-org/skip/#/page/0}"
 
 # Pick Chromium binary
 BROWSER="$(command -v chromium-browser || true)"
@@ -123,7 +123,7 @@ sudo chmod +x /home/pi/kiosk.sh
 
 Tip: You can override the URL without editing the script using:
 ```
-URL="http://signalk.local:3000/@mxtommy/kip/#/page/0" /home/pi/kiosk.sh
+URL="http://signalk.local:3000/@halos-org/skip/#/page/0" /home/pi/kiosk.sh
 ```
 
 ## 3A) Autostart via Desktop (.desktop) – simplest
@@ -167,7 +167,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-Environment=URL=http://<sk_server_IP>:3000/@mxtommy/kip/#/page/0
+Environment=URL=http://<sk_server_IP>:3000/@halos-org/skip/#/page/0
 ExecStart=/home/pi/kiosk.sh
 Restart=on-failure
 RestartSec=5
@@ -197,12 +197,12 @@ sudo reboot
 ```
 
 Chromium should open full-screen at:
-http://<sk_server_IP>:3000/@mxtommy/kip/#/page/0
+http://<sk_server_IP>:3000/@halos-org/skip/#/page/0
 
 ## Troubleshooting
 
 - Blank screen on Bookworm: confirm Screen Blanking is disabled in raspi-config (Wayland ignores xset).
 - Chromium not found: install package `chromium-browser` or `chromium` (varies by OS version).
-- Wrong URL: KIP is served under /@mxtommy/kip/. Ensure the full path is used.
+- Wrong URL: KIP is served under /@halos-org/skip/. Ensure the full path is used.
 - Certificates: prefer HTTP or trusted TLS. Avoid `--ignore-certificate-errors` in kiosk.
 - systemd service not starting: check `journalctl --user -u kiosk.service -f

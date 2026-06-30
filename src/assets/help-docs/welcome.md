@@ -32,7 +32,7 @@ KIP supports multiple input modes for seamless navigation across devices.
 **Only if visible if automatic day and night is not enabled. See <Home / Settings / Display>.
 
 ## Loading KIP on Phones, Tablets, Raspberry Pi, and Computers
-Simply navigate to `http://<Signal K Server URL>:<port>/@mxtommy/kip/` to load KIP and enjoy its features remotely on any device.
+Simply navigate to `http://<Signal K Server URL>:<port>/@halos-org/skip/` to load KIP and enjoy its features remotely on any device.
 
 ## Mobile App
 Run KIP in full screen, without browser controls, just like a regular mobile app. This feature is supported on most mobile operating systems. Each browser has its own way of handling Progressive Web App (PWA) installations.

@@ -40,7 +40,7 @@ Before merging updates to this file:
 4. Do not reintroduce selector-specific dataset cleanup branches.
 
 ## Contributor Notes
-- Use `npm run dev` for local development and verify base path `/@mxtommy/kip/`.
+- Use `npm run dev` for local development and verify base path `/@halos-org/skip/`.
 - Run `ng lint` before submitting changes.
 - Run `npm run test:all` before submitting changes.
 - Keep Host2 widget patterns and architecture guardrails aligned with `.github/instructions/project.instructions.md` and routed skills from `.github/copilot-instructions.md`.

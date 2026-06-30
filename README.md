@@ -1,4 +1,6 @@
-# KIP – Signal K Multi-Function Display (MFD) and Marine Instrument Panel
+# SKip – Signal K Multi-Function Display (MFD) and Marine Instrument Panel
+
+> **SKip** is a [Hat Labs](https://hatlabs.fi) fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin, maintained for [HaLOS](https://halos.fi). It adds standard Signal K session/SSO authentication and account-independent named profiles. The webapp is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)); upstream Kip remains the basis and SKip rebases on it.
 [![Help Docs](https://img.shields.io/badge/Help-Docs-blue)](src/assets/help-docs/welcome.md)
 [![Community Videos](https://img.shields.io/badge/Community-Videos-purple)](src/assets/help-docs/community.md)
 [![Contact](https://img.shields.io/badge/Contact-Get_in_touch-success)](src/assets/help-docs/contact-us.md)
@@ -239,8 +241,8 @@ In short: use KIP to see & act on live sailing information; use the complementar
 
 **Code and Test**
 1. Fire up your local KIP development instance with `npm run dev`.
-2. Hit Run/Start Debugging in Visual Studio Code or manually point your favorite browser to `http://localhost:4200/@mxtommy/kip`. Alternatively, to start the development server and allow remote devices connections, such as with your phone or RPi (blocked for security reasons by default):  
-   `ng serve --configuration=dev --serve-path=/@mxtommy/kip/ --host=<your computer's IP> --port=4200`
+2. Hit Run/Start Debugging in Visual Studio Code or manually point your favorite browser to `http://localhost:4200/@halos-org/skip`. Alternatively, to start the development server and allow remote devices connections, such as with your phone or RPi (blocked for security reasons by default):  
+   `ng serve --configuration=dev --serve-path=/@halos-org/skip/ --host=<your computer's IP> --port=4200`
 3. Voila!
 
 *As you work on source code and save files, the app will automatically reload in the browser with your latest changes.*  

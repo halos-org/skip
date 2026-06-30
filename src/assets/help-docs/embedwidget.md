@@ -21,22 +21,22 @@ If the URL you are embedding in the Embed Page Viewer widget uses the same hostn
 #### Examples:
 
 1. **Same Origin (No CORS Restrictions)**:
-   - KIP Dashboard URL: `http://localhost:3000/@mxtommy/kip/`
+   - KIP Dashboard URL: `http://localhost:3000/@halos-org/skip/`
    - Embedded Content URL: `http://localhost:3000/some-page/`
    - Since both KIP and the embedded URL share the same protocol (`http`), hostname (`localhost`), and port (`3000`), CORS does not apply.
 
 2. **Different Origin (CORS Restrictions Apply)**:
-   - KIP Dashboard URL: `http://localhost:3000/@mxtommy/kip/`
+   - KIP Dashboard URL: `http://localhost:3000/@halos-org/skip/`
    - Embedded Content URL: `http://localhost:4000/some-page/`
    - In this case, the ports are different (`3000` vs. `4000`), so the browser considers them to be different origins, and CORS restrictions will apply.
 
 3. **Different Hostname (CORS Restrictions Apply)**:
-   - KIP Dashboard URL: `http://dashboard.local/@mxtommy/kip/`
+   - KIP Dashboard URL: `http://dashboard.local/@halos-org/skip/`
    - Embedded Content URL: `http://example.com/some-page`
    - Even if the ports are the same, the hostnames are different (`dashboard.local` vs. `example.com`), so CORS restrictions will apply.
 
 4. **Different Protocol (CORS Restrictions Apply)**:
-   - KIP Dashboard URL: `http://localhost:3000/@mxtommy/kip/`
+   - KIP Dashboard URL: `http://localhost:3000/@halos-org/skip/`
    - Embedded Content URL: `https://localhost:3000/some-page/`
    - Even though the hostname and port are the same, the protocols are different (`http` vs. `https`), so CORS restrictions will apply.
 
@@ -44,7 +44,7 @@ If the URL you are embedding in the Embed Page Viewer widget uses the same hostn
 
 - Embedding webapp and websites is far from perfect. Their are tradeoffs and limitations. If you find yourself unhappy with the result, keep your smile and give back to the community by build a dedicated KIP widget. We will help and many have done so.
 - By default you cannot interact with the Embed content. Activate the **Enable Input** widget option if you need to interact with the content.
-- If you are hosting custom web pages or applications on the same server as your KIP dashboard, ideally you've created a Signal K webapp and shared it with the community, ensure they use the same hostname and port. Use a relative URL path in the Embed configuration. For example, if your KIP dashboard is running on `http://localhost:3000/@mxtommy/kip/` and your custom content is under the same origin, such as `http://localhost:3000/signalk-anchoralarm-plugin/` simply enter a relative URL in the widget options, like `/signalk-anchoralarm-plugin/`. KIP will automatically add the proper protocol, hostname, port and load the content. This will prevent issues loading the embedded content when launching KIP from different devices such as: the server, on your phone, tablet, laptop, etc.
+- If you are hosting custom web pages or applications on the same server as your KIP dashboard, ideally you've created a Signal K webapp and shared it with the community, ensure they use the same hostname and port. Use a relative URL path in the Embed configuration. For example, if your KIP dashboard is running on `http://localhost:3000/@halos-org/skip/` and your custom content is under the same origin, such as `http://localhost:3000/signalk-anchoralarm-plugin/` simply enter a relative URL in the widget options, like `/signalk-anchoralarm-plugin/`. KIP will automatically add the proper protocol, hostname, port and load the content. This will prevent issues loading the embedded content when launching KIP from different devices such as: the server, on your phone, tablet, laptop, etc.
 
 ### Summary
 

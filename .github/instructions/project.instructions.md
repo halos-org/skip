@@ -5,7 +5,7 @@ Do not place generic Angular framework style rules here.
 
 ## Project Anchors
 
-- App base path: `/@mxtommy/kip/`.
+- App base path: `/@halos-org/skip/`.
 - Primary runtime data flow:
   `SignalKConnectionService` -> `SignalKDeltaService` -> `DataService` -> widgets.
 - Canonical architecture reference: `COPILOT.md`.
