@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { EMPTY } from 'rxjs';
 import { UntypedFormControl, UntypedFormGroup } from '@angular/forms';
 import { IDynamicControl } from '../../core/interfaces/widgets-interface';
 
@@ -16,7 +17,7 @@ describe('PathControlConfigComponent', () => {
     await TestBed.configureTestingModule({
       imports: [PathControlConfigComponent],
       providers: [
-        { provide: SignalKConnectionService, useValue: { skServerVersion: '2.14.0' } },
+        { provide: SignalKConnectionService, useValue: { skServerVersion: '2.14.0', serverServiceEndpoint$: EMPTY, serverVersion$: EMPTY } },
         {
           provide: DataService,
           useValue: {

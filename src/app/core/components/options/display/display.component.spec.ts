@@ -41,6 +41,8 @@ class SettingsServiceMock {
     public getSplitShellSide() { return 'left' as const; }
     public getSplitShellSwipeDisabled() { return false; }
     public getWidgetHistoryDisabled() { return false; }
+    public getDisablePathValidation() { return false; }
+    public setDisablePathValidation(): void { }
     public setAutoNightMode(): void { }
     public setRedNightMode(): void { }
     public setNightModeBrightness(): void { }
