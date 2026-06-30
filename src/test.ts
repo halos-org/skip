@@ -448,6 +448,12 @@ class SettingsServiceStub {
   public getConnectionConfig() { return this._connectionConfig; }
   public setConnectionConfig(v: typeof this._connectionConfig) { this._connectionConfig = { ...v }; }
   public getNightModeBrightness(): number { return this.nightModeBrightnessSubject.value; }
+  public setNightModeBrightness(v: number): void { this.nightModeBrightnessSubject.next(v); }
+  public getDisablePathValidation(): boolean { return false; }
+  public setDisablePathValidation(): void { /* noop */ }
+  public getWidgetHistoryDisabled(): boolean { return false; }
+  public setWidgetHistoryDisabled(): void { /* noop */ }
+  public setSplitShellSwipeDisabled(v: boolean): void { this.splitShellSwipeDisabledSubject.next(v); }
   public getNotificationServiceConfigAsO(): Observable<import('./app/core/interfaces/app-settings.interfaces').INotificationConfig> { return this._notificationConfig.asObservable(); }
   public getNotificationConfig(): import('./app/core/interfaces/app-settings.interfaces').INotificationConfig { return this._notificationConfig.value; }
 }
