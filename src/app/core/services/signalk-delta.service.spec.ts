@@ -311,5 +311,84 @@ describe('SignalKDeltaService', () => {
       expect(selves).toEqual(['vessels.urn:mrn:signalk:uuid:self']);
       expect(setServerInfo).toHaveBeenCalledWith('sk', '2.0.0', ['main', 'master']);
     });
+
+    it('drops an empty object value entirely — no emissions (latent data loss)', () => {
+      // canFlattenCompletely({}) is true, flattenObjectValue({}) returns [], so nothing is emitted.
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'some.path', value: {} }])] });
+      expect(out).toEqual([]);
+    });
+
+    it('flattens an array value into indexed child paths', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'foo.list', value: [10, 20] }])] });
+      expect(out.map(v => [v.path, v.value])).toEqual([
+        ['foo.list.0', 10],
+        ['foo.list.1', 20],
+      ]);
+    });
+
+    it('fully flattens nesting whose values sit at depth 2 (inside the depth limit)', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'x', value: { a: { b: 1 } } }])] });
+      expect(out.map(v => [v.path, v.value])).toEqual([['x.a.b', 1]]);
+    });
+
+    it('falls back to single-level split once a value sits at depth 3 (the exact cutoff)', () => {
+      // The depth guard fires at currentDepth >= maxDepth (3) before the scalar check, so a value at depth 3 fails.
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'x', value: { a: { b: { c: 1 } } } }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'x.a', source: 'src.1', timestamp: TS, value: { b: { c: 1 } } },
+      ]);
+    });
+
+    it('skips flattening for any path CONTAINING "displays." (substring, not prefix)', () => {
+      // DO_NOT_FLATTEN_PATHS is matched with .includes(), so the guard triggers mid-path too.
+      const { service } = setup();
+      const out = collectData(service);
+      const value = { a: 1, b: 2 };
+      parse(service, { context: CTX, updates: [update([{ path: 'foo.displays.bar', value }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'foo.displays.bar', source: 'src.1', timestamp: TS, value },
+      ]);
+    });
+
+    it('processes updates and ignores requestId when a message carries both (updates win)', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      const reqs: ISignalKDeltaMessage[] = [];
+      service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
+      parse(service, { requestId: 'req-1', updates: [update([{ path: 'navigation.speedOverGround', value: 1 }])] });
+      expect(out).toHaveLength(1);
+      expect(reqs).toEqual([]);
+    });
+
+    it('treats an errorMessage as a no-op (no emissions on any stream)', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      const reqs: ISignalKDeltaMessage[] = [];
+      service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
+      parse(service, { errorMessage: 'stream error' });
+      expect(out).toEqual([]);
+      expect(reqs).toEqual([]);
+    });
+
+    it('associates each update\'s own $source and timestamp with its values', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [
+        { $source: 'gps.1', timestamp: '2024-01-01T00:00:00Z', values: [{ path: 'navigation.speedOverGround', value: 1 }] },
+        { $source: 'wind.2', timestamp: '2024-01-02T00:00:00Z', values: [{ path: 'environment.wind.speedApparent', value: 2 }] },
+      ] });
+      expect(out).toEqual([
+        { context: CTX, path: 'navigation.speedOverGround', source: 'gps.1', timestamp: '2024-01-01T00:00:00Z', value: 1 },
+        { context: CTX, path: 'environment.wind.speedApparent', source: 'wind.2', timestamp: '2024-01-02T00:00:00Z', value: 2 },
+      ]);
+    });
   });
 });
