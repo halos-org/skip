@@ -57,6 +57,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected isLightTheme = model<boolean>(false);
   protected isRemoteControl = model<boolean>(false);
   protected instanceName = model<string>('');
+  protected browserTabTitle = model<string>('SKip');
   protected splitShellEnabled = model<boolean>(false);
   protected splitShellSide = model<'left' | 'right'>('left');
   protected splitShellSwipeDisabled = model<boolean>(false);
@@ -78,6 +79,7 @@ export class SettingsDisplayComponent implements OnInit {
     this.isRedNightMode.set(this.settings.getRedNightMode());
     this.isRemoteControl.set(this.settings.getIsRemoteControl());
     this.instanceName.set(this.settings.getInstanceName());
+    this.browserTabTitle.set(this.settings.getBrowserTabTitle());
     this.splitShellEnabled.set(this.settings.getSplitShellEnabled());
     this.splitShellSide.set(this.settings.getSplitShellSide());
     this.splitShellSwipeDisabled.set(this.settings.getSplitShellSwipeDisabled());
@@ -100,10 +102,10 @@ export class SettingsDisplayComponent implements OnInit {
       return;
     }
 
-    this.applyAndSaveSettings();
+    void this.applyAndSaveSettings();
   }
 
-  private applyAndSaveSettings(): void {
+  private async applyAndSaveSettings(): Promise<void> {
     this.settings.setAutoNightMode(this.autoNightMode());
     this.settings.setRedNightMode(this.isRedNightMode());
     this.settings.setNightModeBrightness(this.nightBrightness());
@@ -127,11 +129,17 @@ export class SettingsDisplayComponent implements OnInit {
     this.settings.setSplitShellSide(this.splitShellSide());
     this.settings.setSplitShellSwipeDisabled(this.splitShellSwipeDisabled());
     this.settings.setWidgetHistoryDisabled(this.widgetHistoryDisabled());
+    this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());
-    if (!this.setKipPluginConfig()) {
-      this.toast.show('Failed to save KIP plugin configuration on server.', 0, false, 'error');
-    }
+    // Await the server write; setKipPluginConfig() returns a Promise, so the old
+    // `if (!this.setKipPluginConfig())` was always false (a Promise is truthy) —
+    // the error branch was dead and "Configuration saved" lied on failure.
+    const ok = await this.setKipPluginConfig();
     this.displayForm()?.form.markAsPristine();
+    if (!ok) {
+      this.toast.show('Failed to save KIP plugin configuration on server.', 0, false, 'error');
+      return;
+    }
     this.toast.show("Configuration saved", 1000, true, 'message');
   }
 
@@ -140,7 +148,7 @@ export class SettingsDisplayComponent implements OnInit {
     if (seq !== this._pluginCheckSeq) return;
 
     if (isValid) {
-      this.applyAndSaveSettings();
+      await this.applyAndSaveSettings();
     } else {
       // Reset toggle and abort save
       this.autoNightMode.set(false);

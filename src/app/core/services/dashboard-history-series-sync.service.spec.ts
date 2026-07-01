@@ -172,6 +172,7 @@ describe('DashboardHistorySeriesSyncService', () => {
     };
     let widgetServiceMock: {
         getComponentType: Mock;
+        getDefaultConfig: Mock;
     };
     let reconcileSpy: Mock;
 
@@ -192,7 +193,8 @@ describe('DashboardHistorySeriesSyncService', () => {
         });
 
         widgetServiceMock = {
-            getComponentType: vi.fn().mockReturnValue(undefined)
+            getComponentType: vi.fn().mockResolvedValue(undefined),
+            getDefaultConfig: vi.fn().mockReturnValue(undefined)
         };
 
         TestBed.configureTestingModule({
@@ -237,6 +239,38 @@ describe('DashboardHistorySeriesSyncService', () => {
         await vi.advanceTimersByTimeAsync(800);
 
         expect(reconcileSpy).not.toHaveBeenCalled();
+    });
+
+    it('loads in-use widget DEFAULT_CONFIG before reconciling (deterministic across dashboards)', async () => {
+        vi.useFakeTimers();
+        TestBed.inject(DashboardHistorySeriesSyncService);
+        connectionStub.serverServiceEndpoint$.next({
+            operation: 2,
+            message: 'Connected',
+            serverDescription: 'Signal K',
+            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
+            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
+        });
+
+        dashboardStub.dashboards.set([
+            {
+                id: 'dash-1',
+                name: 'Dashboard 1',
+                icon: 'dashboard-dashboard',
+                configuration: [
+                    createAutomaticNode('widget-numeric-1', 'widget-numeric', {
+                        numericPath: 'navigation.speedThroughWater'
+                    })
+                ]
+            }
+        ]);
+
+        await vi.advanceTimersByTimeAsync(800);
+
+        // The reconcile warms each in-use widget type's DEFAULT_CONFIG (via getComponentType),
+        // independently of which dashboard is rendered, before extracting series.
+        expect(widgetServiceMock.getComponentType).toHaveBeenCalledWith('widget-numeric');
+        expect(reconcileSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should extract numeric path series and reconcile once after debounce', async () => {
@@ -337,6 +371,49 @@ describe('DashboardHistorySeriesSyncService', () => {
 
         const windSpeed = submitted.find(series => series.seriesId === 'widget-wind-1:wind-speed');
         expect(windSpeed?.path).toBe('self.environment.wind.speedTrue');
+    });
+
+    it('retries on the next cycle when a reconcile fails (resolves null instead of throwing)', async () => {
+        vi.useFakeTimers();
+        TestBed.inject(DashboardHistorySeriesSyncService);
+        connectionStub.serverServiceEndpoint$.next({
+            operation: 2,
+            message: 'Connected',
+            serverDescription: 'Signal K',
+            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
+            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
+        });
+
+        // First reconcile attempt "fails": reconcileSeries returns null (it does not throw).
+        reconcileSpy.mockResolvedValueOnce(null);
+
+        dashboardStub.dashboards.set([
+            {
+                id: 'dash-1',
+                name: 'Dashboard 1',
+                icon: 'dashboard-dashboard',
+                configuration: [
+                    createAutomaticNode('widget-numeric-1', 'widget-numeric', { source: 'default', period: 10 })
+                ]
+            }
+        ]);
+        await vi.advanceTimersByTimeAsync(800);
+        expect(reconcileSpy).toHaveBeenCalledTimes(1);
+
+        // Re-emit the SAME series content (new array reference). Because the prior attempt
+        // failed, the signature must NOT have been marked submitted, so this retries.
+        dashboardStub.dashboards.set([
+            {
+                id: 'dash-1',
+                name: 'Dashboard 1',
+                icon: 'dashboard-dashboard',
+                configuration: [
+                    createAutomaticNode('widget-numeric-1', 'widget-numeric', { source: 'default', period: 10 })
+                ]
+            }
+        ]);
+        await vi.advanceTimersByTimeAsync(800);
+        expect(reconcileSpy).toHaveBeenCalledTimes(2);
     });
 
     it('should skip reconcile when history series service mode is disabled', async () => {
@@ -893,33 +970,31 @@ describe('DashboardHistorySeriesSyncService', () => {
     });
 
     it('resolves numeric paths from widget DEFAULT_CONFIG when saved config is partial', () => {
-        widgetServiceMock.getComponentType.mockImplementation((selector: string) => {
+        widgetServiceMock.getDefaultConfig.mockImplementation((selector: string) => {
             if (selector !== 'widget-horizon') {
                 return undefined;
             }
 
             return {
-                DEFAULT_CONFIG: {
-                    supportAutomaticHistoricalSeries: true,
-                    timeScale: 'minute',
-                    period: 30,
-                    paths: {
-                        gaugePitchPath: {
-                            description: 'Pitch',
-                            path: 'self.navigation.attitude.pitch',
-                            source: 'default',
-                            pathType: 'number',
-                            isPathConfigurable: true,
-                            sampleTime: 1000
-                        },
-                        gaugeRollPath: {
-                            description: 'Roll',
-                            path: 'self.navigation.attitude.roll',
-                            source: 'default',
-                            pathType: 'number',
-                            isPathConfigurable: true,
-                            sampleTime: 1000
-                        }
+                supportAutomaticHistoricalSeries: true,
+                timeScale: 'minute',
+                period: 30,
+                paths: {
+                    gaugePitchPath: {
+                        description: 'Pitch',
+                        path: 'self.navigation.attitude.pitch',
+                        source: 'default',
+                        pathType: 'number',
+                        isPathConfigurable: true,
+                        sampleTime: 1000
+                    },
+                    gaugeRollPath: {
+                        description: 'Roll',
+                        path: 'self.navigation.attitude.roll',
+                        source: 'default',
+                        pathType: 'number',
+                        isPathConfigurable: true,
+                        sampleTime: 1000
                     }
                 }
             };
