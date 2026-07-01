@@ -151,3 +151,33 @@ test('enforces the library total-bytes quota (#sec)', async () => {
   const big = await png(200, 200);
   await assert.rejects(() => store.ingest(big, 'big.png'), /storage limit/i);
 });
+
+
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('getServable coalesces concurrent identical variant requests into one decode (#sec)', async () => {
+  let calls = 0;
+  const proc = { process: async (req) => { calls++; await delay(60); return { buffer: Buffer.from([1, 2, 3]), width: req.width, height: req.height }; } };
+  const { dir } = freshStore();
+  const store = new ImageStore(dir, proc);
+  const meta = await store.ingest(await png(40, 30), 'a.png');
+  const [a, b, c] = await Promise.all([
+    store.getServable(meta.id, 320),
+    store.getServable(meta.id, 320),
+    store.getServable(meta.id, 320)
+  ]);
+  assert.equal(calls, 1, 'one decode shared across concurrent identical requests');
+  assert.ok(a.buffer.equals(b.buffer) && b.buffer.equals(c.buffer));
+});
+
+test('getServable sheds distinct-variant load past the concurrency cap with a busy error (#sec)', async () => {
+  const proc = { process: async (req) => { await delay(120); return { buffer: Buffer.from([9]), width: req.width, height: req.height }; } };
+  const { dir } = freshStore();
+  const store = new ImageStore(dir, proc, { maxConcurrentGenerations: 1, maxGenerationWaiters: 0 });
+  const m1 = await store.ingest(await png(8, 6), 'a.png');
+  const m2 = await store.ingest(await png(10, 8), 'b.png');
+  const settled = await Promise.allSettled([store.getServable(m1.id, 320), store.getServable(m2.id, 320)]);
+  const rejected = settled.filter((r) => r.status === 'rejected');
+  assert.equal(rejected.length, 1, 'exactly one concurrent distinct generation is shed');
+  assert.equal(rejected[0].reason.name, 'ImageProcessorBusyError');
+});

@@ -24,7 +24,20 @@ interface WorkerReply {
   error?: string;
 }
 
+/** Thrown when the pool (or the serve-path generation limiter) is saturated; maps to HTTP 503. */
+export class ImageProcessorBusyError extends Error {
+  constructor(message = 'Image processing is busy') {
+    super(message);
+    this.name = 'ImageProcessorBusyError';
+  }
+}
+
 const DEFAULT_JOB_TIMEOUT_MS = 30_000;
+// Cap the backlog so an image-serving flood cannot park unbounded jobs (each holding a full original
+// buffer) in memory and OOM the Signal K host process. Callers get a fast rejection instead. The
+// serve path additionally bounds concurrent generation upstream (see ImageStore), so in practice the
+// queue stays far below this; it is a hard backstop for the ingest/transcode path. (security review)
+const DEFAULT_MAX_QUEUE = 256;
 
 /**
  * Runs image-processing jobs across a pool of worker threads so the Signal K server's main thread
@@ -46,6 +59,7 @@ export class WorkerPoolImageProcessor implements ImageProcessor {
   private readonly inflight = new Map<string, Promise<ProcessResult>>();
   private readonly targetSize: number;
   private readonly jobTimeoutMs: number;
+  private readonly maxQueue: number;
   private readonly workerScript: string;
   private nextId = 1;
   private dispatched = 0;
@@ -54,11 +68,13 @@ export class WorkerPoolImageProcessor implements ImageProcessor {
   constructor(
     size: number = computeWorkerCount(os.cpus().length),
     workerScript: string = path.join(__dirname, 'image-worker.js'),
-    jobTimeoutMs: number = DEFAULT_JOB_TIMEOUT_MS
+    jobTimeoutMs: number = DEFAULT_JOB_TIMEOUT_MS,
+    maxQueue: number = DEFAULT_MAX_QUEUE
   ) {
     this.targetSize = Math.max(1, size);
     this.workerScript = workerScript;
     this.jobTimeoutMs = jobTimeoutMs;
+    this.maxQueue = Math.max(1, maxQueue);
     for (let i = 0; i < this.targetSize; i++) {
       this.spawnWorker();
     }
@@ -72,6 +88,9 @@ export class WorkerPoolImageProcessor implements ImageProcessor {
     if (this.destroyed) return Promise.reject(new Error('Image processor has been shut down'));
     if (coalesceKey && this.inflight.has(coalesceKey)) {
       return this.inflight.get(coalesceKey)!;
+    }
+    if (this.queue.length >= this.maxQueue) {
+      return Promise.reject(new ImageProcessorBusyError());
     }
     const promise = new Promise<ProcessResult>((resolve, reject) => {
       this.queue.push({ req, resolve, reject, id: this.nextId++ });
@@ -163,7 +182,16 @@ export class WorkerPoolImageProcessor implements ImageProcessor {
 
   async destroy(): Promise<void> {
     this.destroyed = true;
-    for (const { timer } of this.jobsByWorker.values()) clearTimeout(timer);
+    // Settle every outstanding promise so awaiting HTTP handlers don't hang until their socket times
+    // out and request-scoped buffers aren't retained after shutdown. (security review)
+    const err = new Error('Image processor has been shut down');
+    for (const { timer, job } of this.jobsByWorker.values()) {
+      clearTimeout(timer);
+      job.reject(err);
+    }
+    this.jobsByWorker.clear();
+    for (const job of this.queue) job.reject(err);
+    this.queue.length = 0;
     await Promise.all(this.workers.map((w) => w.terminate().catch(() => undefined)));
   }
 }

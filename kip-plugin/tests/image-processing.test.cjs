@@ -202,3 +202,34 @@ test('worker pool times out a hung worker and recovers', async () => {
     await pool.destroy();
   }
 });
+
+
+test('worker pool sheds load when the queue is full (bounded backlog) (#sec)', async () => {
+  const pool = new WorkerPoolImageProcessor(1, FLAKY, 3000, 1); // 1 worker, maxQueue 1
+  try {
+    const buf = await png(120, 90);
+    const hang = pool.process({ buffer: buf, format: 'png', width: 777, animated: false }); // dispatched, worker hangs
+    hang.catch(() => {});
+    const queued = pool.process({ buffer: buf, format: 'png', width: 320, animated: false }); // fills the single queue slot
+    queued.catch(() => {});
+    await assert.rejects(
+      () => pool.process({ buffer: buf, format: 'png', width: 640, animated: false }),
+      (e) => e.name === 'ImageProcessorBusyError'
+    );
+  } finally {
+    await pool.destroy();
+  }
+});
+
+test('destroy() rejects queued and in-flight jobs instead of leaking them (#sec)', async () => {
+  const pool = new WorkerPoolImageProcessor(1, FLAKY, 5000, 100);
+  const buf = await png(120, 90);
+  const inflight = pool.process({ buffer: buf, format: 'png', width: 777, animated: false }); // dispatched, hangs
+  const queued = pool.process({ buffer: buf, format: 'png', width: 320, animated: false });   // waits in the queue
+  // Attach the rejection expectations BEFORE destroy() so its synchronous rejections are handled.
+  const inflightRejected = assert.rejects(() => inflight, /shut down/i);
+  const queuedRejected = assert.rejects(() => queued, /shut down/i);
+  await pool.destroy();
+  await queuedRejected;
+  await inflightRejected;
+});

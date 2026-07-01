@@ -126,3 +126,34 @@ test('routes return 503 when the store is not ready', async () => {
   await res.done;
   assert.equal(res.statusCode, 503);
 });
+
+
+test('GET /images and /images/cache require login when security is on', async () => {
+  const { router } = await setup();
+  for (const p of ['/images', '/images/cache']) {
+    const res = createResMock();
+    router.getHandlers.get(p)({ skIsAuthenticated: false }, res);
+    await res.done;
+    assert.equal(res.statusCode, 401, `${p} gated`);
+  }
+});
+
+test('GET /images/:id stays open (served via <img>, cannot carry a bearer token) even under security', async () => {
+  const { store, router } = await setup();
+  const meta = await store.ingest(await png(), 'm.png');
+  const res = createResMock();
+  router.getHandlers.get('/images/:id')({ skIsAuthenticated: false, params: { id: meta.id }, query: { w: '320' } }, res);
+  await res.done;
+  assert.equal(res.statusCode, 200);
+});
+
+test('serve maps a busy image processor to 503', async () => {
+  const { ImageProcessorBusyError } = require('../../plugin/images/worker-pool.js');
+  const router = createRouterMock();
+  const fakeStore = { getServable: async () => { throw new ImageProcessorBusyError(); } };
+  registerImageRoutes(router, { resolveStore: () => fakeStore });
+  const res = createResMock();
+  router.getHandlers.get('/images/:id')({ params: { id: 'abcd-1234' }, query: {} }, res);
+  await res.done;
+  assert.equal(res.statusCode, 503);
+});

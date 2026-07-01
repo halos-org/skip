@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import sharp from 'sharp';
 import DOMPurify from 'isomorphic-dompurify';
 import { snapWidth, CANONICAL_WIDTH, inProcessProcessor, type ImageProcessor } from './image-processing';
+import { ImageProcessorBusyError } from './worker-pool';
 
 /**
  * ImageStore — secure, testable core for the KIP image-asset feature.
@@ -29,6 +30,31 @@ const MAX_HEIC_PIXELS = 24_000_000;
 // (which is shared with the SK server's own storage). (security review)
 const MAX_IMAGE_COUNT = 500;
 const MAX_TOTAL_ORIGINAL_BYTES = 500 * 1024 * 1024; // 500 MB of stored originals
+// A cache-missing GET reads the full stored original into memory before re-encoding. Unbounded, a
+// flood of distinct-variant requests (all widths x all images, reachable without a login) multiplies
+// those buffers and OOM-kills the shared Signal K host process. Cap concurrent generations so at most
+// N originals are in memory at once; identical (id,width) requests coalesce onto one generation, and
+// excess distinct requests queue up to a bound, then get a fast 503 rather than exhausting memory.
+const MAX_CONCURRENT_GENERATIONS = 4;
+const MAX_GENERATION_WAITERS = 64;
+
+/** Bounds concurrent variant generations. Waiters take a freed slot in FIFO order; beyond a cap they
+ *  are rejected so an unbounded backlog of in-flight reads can't accumulate. */
+class GenerationLimiter {
+  private active = 0;
+  private readonly waiters: Array<() => void> = [];
+  constructor(private readonly max: number, private readonly maxWaiters: number) {}
+  async acquire(): Promise<void> {
+    if (this.active < this.max) { this.active++; return; }
+    if (this.waiters.length >= this.maxWaiters) throw new ImageProcessorBusyError('Image service is busy');
+    await new Promise<void>((resolve) => this.waiters.push(resolve));
+  }
+  release(): void {
+    const next = this.waiters.shift();
+    if (next) next();      // hand the held slot to the next waiter (active count unchanged)
+    else this.active -= 1; // no waiter: free the slot
+  }
+}
 
 export type ImageFormat = 'svg' | 'jpeg' | 'png' | 'webp' | 'gif' | 'heic';
 
@@ -144,15 +170,29 @@ export class ImageStore {
   private readonly maxImageCount: number;
   private readonly maxTotalBytes: number;
 
+  /** In-flight variant generations, keyed `id:width`, so concurrent identical requests share one
+   *  read+decode instead of each loading the original into memory. */
+  private readonly inflightVariants = new Map<string, Promise<Buffer>>();
+  private readonly genLimiter: GenerationLimiter;
+
   constructor(
     private readonly baseDir: string,
     private readonly processor: ImageProcessor = inProcessProcessor,
-    limits: { maxImageCount?: number; maxTotalBytes?: number } = {}
+    limits: {
+      maxImageCount?: number;
+      maxTotalBytes?: number;
+      maxConcurrentGenerations?: number;
+      maxGenerationWaiters?: number;
+    } = {}
   ) {
     this.originalsDir = path.join(baseDir, 'originals');
     this.cacheDir = path.join(baseDir, 'cache');
     this.maxImageCount = limits.maxImageCount ?? MAX_IMAGE_COUNT;
     this.maxTotalBytes = limits.maxTotalBytes ?? MAX_TOTAL_ORIGINAL_BYTES;
+    this.genLimiter = new GenerationLimiter(
+      limits.maxConcurrentGenerations ?? MAX_CONCURRENT_GENERATIONS,
+      limits.maxGenerationWaiters ?? MAX_GENERATION_WAITERS
+    );
   }
 
   /** Create the storage directories if they don't exist. Safe to call repeatedly. */
@@ -241,8 +281,12 @@ export class ImageStore {
     }
 
     const ext = EXT_BY_FORMAT[meta.format];
-    await fs.writeFile(path.join(this.originalsDir, `${id}.${ext}`), bytesToStore);
-    await fs.writeFile(path.join(this.originalsDir, `${id}.json`), JSON.stringify(meta, null, 2), 'utf8');
+    // Write atomically (temp + rename) and the original before its sidecar, so a mid-write crash
+    // never leaves a half-written file that a serve request would decode, nor a listed image whose
+    // original is absent. (An interrupted upload can leave an orphaned original with no sidecar; it
+    // is invisible to list/quota and simply unreferenced.)
+    await writeFileAtomic(path.join(this.originalsDir, `${id}.${ext}`), bytesToStore);
+    await writeFileAtomic(path.join(this.originalsDir, `${id}.json`), JSON.stringify(meta, null, 2));
     return meta;
   }
 
@@ -312,16 +356,42 @@ export class ImageStore {
     const cachePath = path.join(this.cacheDir, id, `${width}.webp`);
     let buffer = await readIfExists(cachePath);
     if (!buffer) {
+      buffer = await this.generateVariant(id, width, meta, cachePath);
+    }
+    return { buffer, contentType: 'image/webp', filename: `${id}.webp`, headers: safeImageHeaders('image/webp', `${id}.webp`) };
+  }
+
+  /** Generate (or await an in-flight generation of) the WebP variant, coalescing identical requests
+   *  so a serve flood can't read the same original into memory many times over. */
+  private generateVariant(id: string, width: number, meta: ImageMeta, cachePath: string): Promise<Buffer> {
+    const key = `${id}:${width}`;
+    const existing = this.inflightVariants.get(key);
+    if (existing) return existing;
+    const run = this.runGeneration(width, meta, cachePath);
+    this.inflightVariants.set(key, run);
+    const clear = (): void => { this.inflightVariants.delete(key); };
+    run.then(clear, clear);
+    return run;
+  }
+
+  private async runGeneration(width: number, meta: ImageMeta, cachePath: string): Promise<Buffer> {
+    await this.genLimiter.acquire();
+    try {
+      // A request that queued for a slot may find the variant already written by the leader it
+      // coalesced behind (or a concurrent generation) — re-check before decoding again.
+      const cached = await readIfExists(cachePath);
+      if (cached) return cached;
       const original = await fs.readFile(this.originalPath(meta));
       const result = await this.processor.process(
         { buffer: original, format: meta.format, width, animated: meta.animated },
-        `${id}:${width}`
+        `${meta.id}:${width}`
       );
-      buffer = result.buffer;
       await fs.mkdir(path.dirname(cachePath), { recursive: true });
-      await fs.writeFile(cachePath, buffer);
+      await writeFileAtomic(cachePath, result.buffer);
+      return result.buffer;
+    } finally {
+      this.genLimiter.release();
     }
-    return { buffer, contentType: 'image/webp', filename: `${id}.webp`, headers: safeImageHeaders('image/webp', `${id}.webp`) };
   }
 
   /** Total bytes + file count of the generated-variant cache (for the settings UI). */
@@ -366,6 +436,18 @@ async function readIfExists(p: string): Promise<Buffer | null> {
     return await fs.readFile(p);
   } catch {
     return null;
+  }
+}
+
+/** Write via a unique temp file + atomic rename so readers never observe a partially-written file. */
+async function writeFileAtomic(target: string, data: Buffer | string): Promise<void> {
+  const tmp = `${target}.${randomUUID()}.tmp`;
+  await fs.writeFile(tmp, data);
+  try {
+    await fs.rename(tmp, target);
+  } catch (e) {
+    await rmIfExists(tmp);
+    throw e;
   }
 }
 
