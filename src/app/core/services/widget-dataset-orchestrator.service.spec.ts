@@ -45,7 +45,7 @@ describe('WidgetDatasetOrchestratorService', () => {
 
         service.syncDataChartDataset('widget-1', cfg, 'sig-1');
 
-        expect(datasetSpy.create).toHaveBeenCalledWith('navigation.speedThroughWater', 'default', 'minute', 10, 'sig-1', true, false, 'widget-1');
+        expect(datasetSpy.create).toHaveBeenCalledWith('navigation.speedThroughWater', 'default', 'minute', 10, 'sig-1', true, false, 'widget-1', undefined);
     });
 
     it('edits existing Data Chart dataset when config changes', () => {
@@ -94,9 +94,9 @@ describe('WidgetDatasetOrchestratorService', () => {
 
         service.syncWindTrendsDatasets('widget-wind-1', 'Last 30 Minutes');
 
-        expect(datasetSpy.create).toHaveBeenCalledWith('self.environment.wind.directionTrue', 'default', 'Last 30 Minutes', 30, 'windtrends-widget-wind-1', true, false, 'widget-wind-1-twd');
+        expect(datasetSpy.create).toHaveBeenCalledWith('self.environment.wind.directionTrue', 'default', 'Last 30 Minutes', 30, 'windtrends-widget-wind-1', true, false, 'widget-wind-1-twd', undefined);
 
-        expect(datasetSpy.create).toHaveBeenCalledWith('self.environment.wind.speedTrue', 'default', 'Last 30 Minutes', 30, 'speedtrends-widget-wind-1', true, false, 'widget-wind-1-tws');
+        expect(datasetSpy.create).toHaveBeenCalledWith('self.environment.wind.speedTrue', 'default', 'Last 30 Minutes', 30, 'speedtrends-widget-wind-1', true, false, 'widget-wind-1-tws', undefined);
     });
 
     it('removes owned datasets by exact uuid and prefix', () => {

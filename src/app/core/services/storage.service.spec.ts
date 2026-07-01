@@ -95,4 +95,41 @@ describe('StorageService', () => {
       http.verify();
     });
   });
+
+  describe('removeItem completion', () => {
+    beforeEach(() => {
+      service.storageServiceReady$.next(true);
+      service.activeConfigFileVersion = 11;
+      service.sharedConfigName = 'p';
+    });
+
+    afterEach(() => http.verify());
+
+    it('resolves only after the queued delete request completes', async () => {
+      let resolved = false;
+      const done = service.removeItem('user', 'race-config').then(() => { resolved = true; });
+
+      // The request is dispatched synchronously through the patch queue...
+      const req = http.expectOne((r) => r.method === 'POST');
+      // ...but the promise must not resolve until the server responds.
+      await Promise.resolve();
+      expect(resolved).toBe(false);
+
+      req.flush(null);
+      await done;
+
+      expect(resolved).toBe(true);
+    });
+
+    it('rejects on failure yet the patch queue keeps processing', async () => {
+      const first = service.removeItem('user', 'first');
+      http.expectOne((r) => r.method === 'POST').flush('boom', { status: 500, statusText: 'err' });
+      await expect(first).rejects.toBeTruthy();
+
+      // A failed delete must not kill the sequential queue for later operations.
+      const second = service.removeItem('user', 'second');
+      http.expectOne((r) => r.method === 'POST').flush(null);
+      await expect(second).resolves.toBeUndefined();
+    });
+  });
 });
