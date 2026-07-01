@@ -31,9 +31,6 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
   public type = input<string>();
   public theme = input<ITheme | null>();
 
-  public disableWidgetShell = input<boolean>(false);
-  public swipeDisabled = input<boolean>(false);
-
   private readonly runtime = inject(WidgetRuntimeDirective, { optional: true });
   private readonly appSettings = inject(SettingsService);
   private readonly app = inject(AppService);
@@ -87,7 +84,6 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
   }
 
   private injectSwipeScript() {
-    if (this.swipeDisabled()) return;
     const iframeWindow = this.iframe().nativeElement.contentWindow;
     const iframeDocument = this.iframe().nativeElement.contentDocument;
     if (!iframeDocument || !iframeWindow) {

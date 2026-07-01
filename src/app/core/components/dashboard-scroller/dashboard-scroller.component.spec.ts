@@ -16,7 +16,7 @@ describe('DashboardScrollerComponent', () => {
     component = fixture.componentInstance;
     // Provide required inputs before first detectChanges
     fixture.componentRef.setInput('dashboards', [
-      { id: '1', name: 'Test Dashboard', icon: 'dashboard-dashboard', collapseSplitShell: false, configuration: [] }
+      { id: '1', name: 'Test Dashboard', icon: 'dashboard-dashboard', configuration: [] }
     ]);
     fixture.componentRef.setInput('activePage', 0);
     fixture.detectChanges();

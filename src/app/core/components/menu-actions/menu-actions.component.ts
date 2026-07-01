@@ -44,8 +44,7 @@ export class MenuActionsComponent implements AfterViewInit, OnDestroy {
     const segments = primary ? primary.segments.map(s => s.path) : [];
     return (
       segments.length === 0 ||
-      segments[0] === 'dashboard' ||
-      segments[0] === 'chartplotter'
+      segments[0] === 'dashboard'
     );
   })();
   protected readonly isDashboardContext = toSignal(
@@ -58,8 +57,7 @@ export class MenuActionsComponent implements AfterViewInit, OnDestroy {
         const segments = primary ? primary.segments.map(s => s.path) : [];
         return (
           segments.length === 0 ||
-          segments[0] === 'dashboard' ||
-          segments[0] === 'chartplotter'
+          segments[0] === 'dashboard'
         );
       }),
       distinctUntilChanged()

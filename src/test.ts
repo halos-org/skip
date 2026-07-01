@@ -320,10 +320,6 @@ class SettingsServiceStub {
   private themeNameSubject = new BehaviorSubject<string>('light');
   private redNightModeSubject = new BehaviorSubject<boolean>(false);
   private autoNightModeSubject = new BehaviorSubject<boolean>(false);
-  private splitShellWidthRatioSubject = new BehaviorSubject<number>(0.3); // 30% default
-  private splitShellEnabledSubject = new BehaviorSubject<boolean>(false);
-  private splitShellSideSubject = new BehaviorSubject<'left' | 'right'>('left');
-  private splitShellSwipeDisabledSubject = new BehaviorSubject<boolean>(false);
   private dashboards: unknown[] = [];
   private unitDefaultsSubject = new BehaviorSubject<Record<string, string>>({});
   private instanceNameSubject = new BehaviorSubject<string>('');
@@ -368,19 +364,6 @@ class SettingsServiceStub {
   setRedNightMode(v: boolean): void { this.redNightModeSubject.next(v); }
   setAutoNightMode(v: boolean): void { this.autoNightModeSubject.next(v); }
 
-  // Legacy helpers used by some components/specs
-  getSplitShellSide(): 'left' | 'right' { return 'left'; }
-  getSplitShellWidth(): number { return this.splitShellWidthRatioSubject.value; }
-  setSplitShellWidth(v: number): void { this.splitShellWidthRatioSubject.next(v); }
-  getSplitShellSwipeDisabledAsO(): Observable<boolean> { return this.splitShellSwipeDisabledSubject.asObservable(); }
-  // Sync getter used by SettingsDisplayComponent
-  getSplitShellSwipeDisabled(): boolean { return this.splitShellSwipeDisabledSubject.value; }
-  // Split shell enabled/side APIs used in app
-  getSplitShellEnabledAsO(): Observable<boolean> { return this.splitShellEnabledSubject.asObservable(); }
-  getSplitShellEnabled(): boolean { return this.splitShellEnabledSubject.value; }
-  setSplitShellEnabled(v: boolean): void { this.splitShellEnabledSubject.next(v); }
-  getSplitShellSideAsO(): Observable<'left' | 'right'> { return this.splitShellSideSubject.asObservable(); }
-  setSplitShellSide(v: 'left' | 'right'): void { this.splitShellSideSubject.next(v); }
   // Dashboards APIs used by DashboardService and specs
   getDashboardConfig(): unknown[] { return this.dashboards; }
   saveDashboards(d: unknown[]): void { this.dashboards = d; }
@@ -425,10 +408,6 @@ class SettingsServiceStub {
       dataSets: this.dataSets as IDatasetServiceDatasetConfig[],
       unitDefaults: this.unitDefaultsSubject.value as IUnitDefaults,
       notificationConfig: this._notificationConfig.value,
-      splitShellEnabled: false,
-      splitShellSide: 'left',
-      splitShellSwipeDisabled: false,
-      splitShellWidth: 0.3
     };
   }
 
@@ -443,7 +422,6 @@ class SettingsServiceStub {
   public setDisablePathValidation(): void { /* noop */ }
   public getWidgetHistoryDisabled(): boolean { return false; }
   public setWidgetHistoryDisabled(): void { /* noop */ }
-  public setSplitShellSwipeDisabled(v: boolean): void { this.splitShellSwipeDisabledSubject.next(v); }
   public getNotificationServiceConfigAsO(): Observable<import('./app/core/interfaces/app-settings.interfaces').INotificationConfig> { return this._notificationConfig.asObservable(); }
   public getNotificationConfig(): import('./app/core/interfaces/app-settings.interfaces').INotificationConfig { return this._notificationConfig.value; }
 }

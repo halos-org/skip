@@ -265,13 +265,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     // Matches dashboard-like views where the notification badge overlay is allowed.
     // - / (root)
     // - /dashboard and /dashboard/<id>
-    // - /chartplotter and /chartplotter/<id>
     return (
       path === '/' ||
-      path === '/dashboard' ||
-      /^\/dashboard(\/\d+)?$/.test(path) ||
-      path === '/chartplotter' ||
-      /^\/chartplotter(\/\d+)?$/.test(path)
+      /^\/dashboard(\/\d+)?$/.test(path)
     );
   }
 

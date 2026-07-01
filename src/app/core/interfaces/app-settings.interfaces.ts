@@ -39,10 +39,6 @@ export interface IAppConfig {
   dataSets: IDatasetServiceDatasetConfig[];
   unitDefaults: IUnitDefaults;
   notificationConfig: INotificationConfig;
-  splitShellEnabled?: boolean;
-  splitShellSide?: 'left' | 'right';
-  splitShellSwipeDisabled?: boolean;
-  splitShellWidth?: number;
   widgetHistoryDisabled?: boolean;
   browserTabTitle?: string;
 }

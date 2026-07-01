@@ -30,7 +30,6 @@ export interface DialogDashboardPageEditorData {
   icon?: string;
   confirmBtnText?: string;
   cancelBtnText: string;
-  collapseSplitShell?: boolean;
 }
 
 export interface DialogWidgetOptionsData {

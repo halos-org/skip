@@ -37,7 +37,6 @@ With KIP, you get the **familiar feel of professional Multi-Function Displays** 
 - [User Experience](#user-experience)
 - [Dashboards and Configuration](#dashboards-and-configuration), [Widget Library](#widget-library) & [Historical Data](#historycal-data)
 - [Night Modes](#night-modes)
-- [Chartplotter Mode](#chartplotter-mode)
 - [Remote Control](#remote-control-other-kip-displays)
 - [Kiosk Mode](#dedicated-fullscreen-instrument-display-kiosk-mode)
 - [Progressive Web App (PWA)](#progressive-web-app-pwa)
@@ -79,9 +78,6 @@ The goal is to replicate and enhance the functionality of modern marine instrume
 
 Sidenav for quick access to all important features.
 ![Sidenav Dashboard Access](./images/ActionSidenav.png)
-
-Chartplotter Mode with dashboards
-![Chartplotter Mode](./images/ChartplotterMode.png)
 
 ## Dashboards and Configuration
 
@@ -153,9 +149,6 @@ Keep your night vision with automatic or manual day and night switching to a col
 ![Night mode - All Red](./images/KipNightMode-1024.png)
 
 ![Night mode - Brightness](./images/KipBrightness-1024.png)
-
-## Chartplotter Mode
-Keep a live Freeboard‑SK chart visible while switching dashboards for an MFD‑style workflow. The chart persists (no reload or flicker), you can choose its side, collapse it per‑dashboard for full data pages, and drag resize the split. Layout auto‑stacks in portrait / narrow screens. See the dedicated Chartplotter Mode help page for setup, performance tips, and troubleshooting.
 
 ## Remote Control Other KIP Displays
 Control which dashboard is shown on another KIP instance (e.g., a mast display, hard-to-reach screen, or a non‑touch device) from any KIP, including your phone.

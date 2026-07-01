@@ -20,7 +20,6 @@ export const DefaultDashboard: Dashboard[] = [
           "x": 0,
           "y": 0
         }
-      ],
-      collapseSplitShell: false
+      ]
     }
   ];

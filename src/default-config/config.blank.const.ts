@@ -11,10 +11,6 @@ export const DefaultAppConfig: IAppConfig = {
   "dataSets": [],
   "unitDefaults": DefaultUnitsConfig,
   "notificationConfig": DefaultNotificationConfig,
-  "splitShellEnabled": true,
-  "splitShellSide": "left",
-  "splitShellSwipeDisabled": false,
-  "splitShellWidth": 0.5,
   "browserTabTitle": "SKip"
 }
 
