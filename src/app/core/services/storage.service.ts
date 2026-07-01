@@ -25,7 +25,10 @@ export interface IStorageRemoteBootstrapContext {
 interface IPatchAction {
   url: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  document: any
+  document: any,
+  // Optional deferred handlers so callers can await a queued patch's completion.
+  resolve?: () => void,
+  reject?: (error: unknown) => void
 }
 
 @Injectable({
@@ -56,8 +59,21 @@ export class StorageService {
     //console.log(`[Storage Service] Send patch request:\n${JSON.stringify(arg.document)}`);
     return this.http.post(arg.url, arg.document)
       .pipe(
-        tap(() => console.log("[Storage Service] Remote config patch request completed successfully")),
-        catchError((error) => this.handleError(error))
+        tap({
+          next: () => console.log("[Storage Service] Remote config patch request completed successfully"),
+          // Settle on completion (not on the value emission) so the deferred
+          // promise resolves whenever the request terminates successfully, even
+          // if the response body is empty.
+          complete: () => arg.resolve?.()
+        }),
+        catchError((error) => {
+          this.logError(error);
+          arg.reject?.(error);
+          // Rethrow so the queue's outer catchError can count the failure
+          // (_patchFailures) and keep the sequential queue alive. Swallowing
+          // here would hide failures from awaitQueueDrain.
+          throw error;
+        })
       );
   }
 
@@ -536,7 +552,7 @@ export class StorageService {
    *
    * @memberof StorageService
    */
-  public removeItem(scope: string, name: string, forceConfigFileVersion?: number) {
+  public removeItem(scope: string, name: string, forceConfigFileVersion?: number): Promise<void> {
     this.ensureReady();
     this.assertSlotName(name, 'removeItem');
     let url = this.serverEndpoint + scope + "/kip/" + this.configFileVersion;
@@ -550,8 +566,14 @@ export class StorageService {
           "path": `/${name}`
         }
       ]
-    const patch: IPatchAction = { url, document };
-    this.enqueuePatch(patch);
+    // Resolve only once the queued delete patch has actually run on the server,
+    // so callers can refresh their config list against the post-delete state.
+    // Route through enqueuePatch to preserve the pending-patch accounting that
+    // awaitQueueDrain relies on.
+    return new Promise<void>((resolve, reject) => {
+      const patch: IPatchAction = { url, document, resolve, reject };
+      this.enqueuePatch(patch);
+    });
   }
 
   /**
@@ -608,7 +630,7 @@ export class StorageService {
     return this._isRemoteContextBootstrapped;
   }
 
-  private handleError(error: HttpErrorResponse) {
+  private logError(error: HttpErrorResponse) {
     if (error.status === 0) {
       // A client-side or network error occurred. Handle it accordingly.
       console.error('[Storage Service] An error occurred:', error.error);
@@ -617,7 +639,11 @@ export class StorageService {
       // The response body may contain clues as to what went wrong.
       console.error(`[Storage Service] Backend returned error: `, error.message);
     }
-    // Return an observable with a user-facing error message.
+  }
+
+  private handleError(error: HttpErrorResponse) {
+    this.logError(error);
+    // Rethrow so awaiting callers (get/set/list) observe the failure.
     throw error;
   }
 
