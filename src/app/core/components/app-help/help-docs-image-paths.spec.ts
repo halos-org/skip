@@ -38,14 +38,20 @@ function isLocal(src: string): boolean {
   return !/^(https?:)?\/\//i.test(src) && !src.startsWith('data:');
 }
 
+function isBaseRelativeSafe(src: string): boolean {
+  // Only a bare base-relative path (e.g. `assets/help-docs/img/x.png`) resolves against the base
+  // href. Parent-relative (`../`), current-dir (`./`) and root-absolute (`/`) forms all break it.
+  return !src.startsWith('../') && !src.startsWith('./') && !src.startsWith('/');
+}
+
 describe('help-docs image paths (#1056)', () => {
-  it('uses only base-relative local image paths (no ../ or leading /)', () => {
+  it('uses only base-relative local image paths (no ../, ./ or leading /)', () => {
     const offenders: string[] = [];
 
     for (const file of listMarkdownFiles(HELP_DOCS_DIR)) {
       const content = readFileSync(file, 'utf-8');
       for (const src of extractImageSrcs(content)) {
-        if (isLocal(src) && (src.startsWith('../') || src.startsWith('/'))) {
+        if (isLocal(src) && !isBaseRelativeSafe(src)) {
           offenders.push(`${file.replace(cwd() + '/', '')} -> ${src}`);
         }
       }
