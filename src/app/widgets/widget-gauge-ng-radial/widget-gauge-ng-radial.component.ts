@@ -6,6 +6,7 @@
  * instantiated gauge config.
  */
 import { Component, AfterViewInit, ElementRef, effect, viewChild, inject, input, untracked, computed, signal } from '@angular/core';
+import { gaugeAnimationDurationMs } from '../../core/utils/gauge-animation.util';
 import { ChangeDetectionStrategy } from '@angular/core';
 import { GaugesModule, RadialGaugeOptions, RadialGauge } from '@godind/ng-canvas-gauges';
 import { IWidgetSvcConfig, IDataHighlight } from '../../core/interfaces/widgets-interface';
@@ -301,7 +302,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     g.valueInt = cfg.numInt ?? 1; g.valueDec = cfg.numDecimal ?? 2; g.majorTicksInt = g.valueInt; g.majorTicksDec = g.valueDec;
     g.highlightsWidth = cfg.gauge?.highlightsWidth;
     g.animation = this.animationEnabled(); g.animateOnInit = false; g.animatedValue = this.animationEnabled(); g.animationRule = 'linear';
-    const st = cfg.paths?.['gaugePath']?.sampleTime ?? 500; g.animationDuration = st - 25;
+    const st = cfg.paths?.['gaugePath']?.sampleTime ?? 500; g.animationDuration = gaugeAnimationDurationMs(st);
     g.colorBorderShadow = false; g.colorBorderOuter = theme.cardColor; g.colorBorderOuterEnd = ''; g.colorBorderMiddle = theme.cardColor; g.colorBorderMiddleEnd = '';
     g.colorPlate = g.colorPlateEnd = theme.cardColor; g.colorBar = theme.background;
 
