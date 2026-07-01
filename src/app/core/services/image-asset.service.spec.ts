@@ -38,6 +38,22 @@ describe('ImageAssetService', () => {
     expect(service.urlFor('abc', 300)).toBeNull();
   });
 
+  it('resolves URLs once the endpoint arrives after construction (reactive base URL)', () => {
+    const subject = new BehaviorSubject<{ httpServiceUrl: string | null }>({ httpServiceUrl: null });
+    const http = { post: vi.fn(() => of({})), get: vi.fn(() => of([])), delete: vi.fn(() => of({ ok: true })) };
+    TestBed.configureTestingModule({
+      providers: [
+        ImageAssetService,
+        { provide: HttpClient, useValue: http },
+        { provide: SignalKConnectionService, useValue: { serverServiceEndpoint$: subject, signalKURL: { url: '' } } }
+      ]
+    });
+    const service = TestBed.inject(ImageAssetService);
+    expect(service.urlFor('abc', 300, 1)).toBeNull(); // endpoint not yet known
+    subject.next({ httpServiceUrl: 'http://host:3000/signalk/v1/api/' });
+    expect(service.urlFor('abc', 300, 1)).toBe('http://host:3000/plugins/kip/images/abc?w=320');
+  });
+
   it('posts an upload as multipart FormData to the images endpoint', () => {
     const { service, http } = setup('http://host:3000/signalk/v1/api/');
     const file = new File([new Uint8Array([1, 2, 3])], 'map.png', { type: 'image/png' });

@@ -30,18 +30,22 @@ export function resolveKipPluginBaseUrl(httpServiceUrl: string | null | undefine
  */
 export const IMAGE_WIDTH_ALLOWLIST: readonly number[] = [160, 320, 640, 960, 1280, 1920, 2560];
 
-/** Snap a CSS width (times device pixel ratio) up to the nearest allow-listed variant width. */
+/**
+ * Snap a CSS width (times device pixel ratio) up to the nearest allow-listed variant width.
+ * An unknown/zero width (e.g. before the container's first resize measurement) snaps to the
+ * SMALLEST variant, not the largest: it makes a cheap first request that upgrades once the real
+ * width arrives, instead of fetching the full-resolution image and immediately re-fetching.
+ */
 export function snapImageWidth(cssWidth?: number | null, devicePixelRatio = 1): number {
   const dpr = devicePixelRatio && devicePixelRatio > 0 ? devicePixelRatio : 1;
   const target = cssWidth && cssWidth > 0 ? cssWidth * dpr : 0;
-  const max = IMAGE_WIDTH_ALLOWLIST[IMAGE_WIDTH_ALLOWLIST.length - 1];
   if (!target) {
-    return max;
+    return IMAGE_WIDTH_ALLOWLIST[0];
   }
   for (const w of IMAGE_WIDTH_ALLOWLIST) {
     if (w >= target) {
       return w;
     }
   }
-  return max;
+  return IMAGE_WIDTH_ALLOWLIST[IMAGE_WIDTH_ALLOWLIST.length - 1];
 }

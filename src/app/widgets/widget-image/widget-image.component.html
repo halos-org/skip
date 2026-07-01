@@ -6,6 +6,8 @@
     @if (loadFailed()) {
       <div class="image-widget-empty">Image unavailable</div>
     }
+  } @else if (hasConfiguredImage()) {
+    <div class="image-widget-empty">Loading image…</div>
   } @else {
     <div class="image-widget-empty">No image selected. Pick one in widget settings.</div>
   }

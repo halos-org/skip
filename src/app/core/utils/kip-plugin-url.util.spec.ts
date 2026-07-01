@@ -29,9 +29,12 @@ describe('snapImageWidth', () => {
     expect(snapImageWidth(320, 2)).toBe(640); // 320 css * 2 dpr = 640
   });
 
-  it('uses the canonical max for unknown/zero/oversized widths', () => {
-    expect(snapImageWidth(undefined)).toBe(max);
-    expect(snapImageWidth(0)).toBe(max);
+  it('snaps an unknown/zero width to the smallest variant (cheap first paint, upgrades on resize)', () => {
+    expect(snapImageWidth(undefined)).toBe(IMAGE_WIDTH_ALLOWLIST[0]);
+    expect(snapImageWidth(0)).toBe(IMAGE_WIDTH_ALLOWLIST[0]);
+  });
+
+  it('caps an oversized width at the canonical max', () => {
     expect(snapImageWidth(99999)).toBe(max);
   });
 });

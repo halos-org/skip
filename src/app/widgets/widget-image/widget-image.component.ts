@@ -40,6 +40,10 @@ export class WidgetImageComponent {
   protected readonly objectFit = computed(() => this.imageConfig()?.imageFit ?? 'contain');
   protected readonly background = computed(() => this.imageConfig()?.backgroundColor ?? 'transparent');
 
+  /** True when an image is configured, regardless of whether its URL can be built yet — lets the
+   *  template distinguish "nothing configured" from "configured but not loadable yet". */
+  protected readonly hasConfiguredImage = computed(() => !!this.imageConfig()?.imageId);
+
   protected readonly imageUrl = computed<string | null>(() => {
     const id = this.imageConfig()?.imageId;
     if (!id) return null;

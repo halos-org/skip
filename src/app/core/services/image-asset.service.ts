@@ -1,4 +1,4 @@
-import { DestroyRef, Injectable, inject } from '@angular/core';
+import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpEvent } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
@@ -31,25 +31,29 @@ export class ImageAssetService {
   private readonly http = inject(HttpClient);
   private readonly connection = inject(SignalKConnectionService);
   private readonly destroyRef = inject(DestroyRef);
-  private pluginBaseUrl: string | null = null;
+  // A signal (not a plain field) so reactive consumers — e.g. the Image widget's `imageUrl` computed
+  // via urlFor() — recompute once the endpoint resolves after first paint, instead of staying pinned
+  // to the pre-connection null value.
+  private readonly pluginBaseUrl = signal<string | null>(null);
 
   constructor() {
     this.connection.serverServiceEndpoint$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(endpoint => {
-        this.pluginBaseUrl = resolveKipPluginBaseUrl(endpoint?.httpServiceUrl ?? null, this.connection.signalKURL?.url);
+        this.pluginBaseUrl.set(resolveKipPluginBaseUrl(endpoint?.httpServiceUrl ?? null, this.connection.signalKURL?.url));
       });
   }
 
   get ready(): boolean {
-    return this.pluginBaseUrl !== null;
+    return this.pluginBaseUrl() !== null;
   }
 
   private imagesUrl(): string {
-    if (!this.pluginBaseUrl) {
+    const base = this.pluginBaseUrl();
+    if (!base) {
       throw new Error('Signal K connection is not ready');
     }
-    return `${this.pluginBaseUrl}images`;
+    return `${base}images`;
   }
 
   /** Upload a file; emits HttpEvents so callers can show progress. */
@@ -77,11 +81,12 @@ export class ImageAssetService {
 
   /** Build a cache-friendly variant URL matched to a container width (null if unset/not ready). */
   urlFor(id: string | null | undefined, cssWidth?: number | null, devicePixelRatio?: number): string | null {
-    if (!id || !this.pluginBaseUrl) {
+    const base = this.pluginBaseUrl();
+    if (!id || !base) {
       return null;
     }
     const dpr = devicePixelRatio ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1);
     const w = snapImageWidth(cssWidth, dpr);
-    return `${this.pluginBaseUrl}images/${encodeURIComponent(id)}?w=${w}`;
+    return `${base}images/${encodeURIComponent(id)}?w=${w}`;
   }
 }

@@ -66,4 +66,36 @@ describe('WidgetImageComponent', () => {
     options.set({ image: { imageId: 'x', backgroundColor: '#123456' } });
     expect(api().background()).toBe('#123456');
   });
+
+  it('shows a Loading state (not "No image selected") when configured but not yet loadable, then renders once ready', async () => {
+    TestBed.resetTestingModule();
+    const baseReady = signal(false);
+    const imagesReactive = {
+      urlFor: (id: string | null | undefined, w?: number | null) =>
+        id && baseReady() ? `http://host/plugins/kip/images/${id}?w=${w || 160}` : null
+    };
+    const opts = signal<IWidgetSvcConfig | undefined>({ image: { imageId: 'img-9', imageFit: 'contain', altText: '', backgroundColor: null } });
+    await TestBed.configureTestingModule({
+      imports: [WidgetImageComponent],
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options: opts } },
+        { provide: ImageAssetService, useValue: imagesReactive }
+      ]
+    }).compileComponents();
+    const f = TestBed.createComponent(WidgetImageComponent);
+    f.componentRef.setInput('id', 'w1');
+    f.componentRef.setInput('type', 'widget-image');
+    f.componentRef.setInput('theme', {} as ITheme);
+    f.detectChanges();
+
+    const el = f.nativeElement as HTMLElement;
+    // Configured but URL not ready: a Loading message, not "No image selected", and no broken <img>.
+    expect(el.querySelector('img')).toBeFalsy();
+    expect(el.querySelector('.image-widget-empty')?.textContent).toContain('Loading');
+
+    // Endpoint resolves after first paint: the computed must re-run and render the image (reactivity).
+    baseReady.set(true);
+    f.detectChanges();
+    expect(el.querySelector('img')).toBeTruthy();
+  });
 });
