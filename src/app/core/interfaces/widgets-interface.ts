@@ -334,6 +334,8 @@ export interface IWidgetSvcConfig {
   datachartPath?: string | null,
   /** Datachart widget Dataset option: Source for the dataset */
   datachartSource?: string | null,
+  /** Datachart widget option: how radian angles are displayed - 'signed' (-180..180) or 'direction' (0..360). Null/undefined uses the path default. */
+  datachartAngleRange?: 'signed' | 'direction' | null,
   /** Specifies which average data points property the chart dataset will be built with. Values can be: avg, sma, ema, ema */
   datasetAverageArray?: string;
   /** Display chart dataset as data points */

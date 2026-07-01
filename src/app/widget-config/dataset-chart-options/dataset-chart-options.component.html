@@ -83,6 +83,17 @@
       </mat-form-field>
     </div>
   </div>
+  @if (datachartAngleRange(); as angleRangeCtrl) {
+    <mat-form-field class="full-width">
+      <mat-label>Angle display range</mat-label>
+      <mat-select [formControl]="angleRangeCtrl" name="datachartAngleRange">
+        <mat-option [value]="null">Automatic (based on path)</mat-option>
+        <mat-option value="signed">Signed (-180&deg; to 180&deg;)</mat-option>
+        <mat-option value="direction">Compass (0&deg; to 360&deg;)</mat-option>
+      </mat-select>
+      <mat-hint>For angular paths. Choose Signed for values that go negative (e.g. wind shift).</mat-hint>
+    </mat-form-field>
+  }
   <br />
   <p style="margin-top: 10px;">
     Time scale and duration set how much history the chart shows (the chart window). Data is sampled to keep roughly 120 points across the window; very short windows may show fewer points for performance.

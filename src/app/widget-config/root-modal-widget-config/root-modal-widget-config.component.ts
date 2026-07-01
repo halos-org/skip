@@ -266,6 +266,10 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return this.formMaster.get('convertUnitTo') as UntypedFormControl;
   }
 
+  get datachartAngleRangeControl(): UntypedFormControl {
+    return this.formMaster.get('datachartAngleRange') as UntypedFormControl;
+  }
+
   get timeScaleControl(): UntypedFormControl {
     return this.formMaster.get('timeScale') as UntypedFormControl;
   }
