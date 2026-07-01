@@ -63,8 +63,7 @@ export class DashboardHistorySeriesSyncService {
   private readonly AUTO_RETENTION_MS = 24 * 60 * 60 * 1000;
   private reconcileTimer: number | null = null;
   private lastSubmittedSignature: string | null = null;
-  private pendingSignature: string | null = null;
-  private pendingSeries: IKipSeriesDefinition[] = [];
+  private pendingDashboards: Dashboard[] | null = null;
 
   constructor() {
     effect(() => {
@@ -75,12 +74,7 @@ export class DashboardHistorySeriesSyncService {
         return;
       }
 
-      try {
-        const desiredSeries = this.extractSeriesFromDashboards(dashboards);
-        this.scheduleReconcile(desiredSeries);
-      } catch (error) {
-        console.error('[DashboardHistorySeriesSyncService] Error extracting series from dashboards:', error);
-      }
+      this.scheduleReconcile(dashboards);
     });
 
     this.destroyRef.onDestroy(() => {
@@ -91,14 +85,8 @@ export class DashboardHistorySeriesSyncService {
     });
   }
 
-  private scheduleReconcile(seriesDefinitions: IKipSeriesDefinition[]): void {
-    const signature = this.getCanonicalSeriesSignature(seriesDefinitions);
-    if (signature === this.lastSubmittedSignature) {
-      return;
-    }
-
-    this.pendingSeries = seriesDefinitions;
-    this.pendingSignature = signature;
+  private scheduleReconcile(dashboards: Dashboard[]): void {
+    this.pendingDashboards = dashboards;
 
     if (this.reconcileTimer !== null) {
       clearTimeout(this.reconcileTimer);
@@ -110,29 +98,75 @@ export class DashboardHistorySeriesSyncService {
   }
 
   private async flushReconcile(): Promise<void> {
-    if (!this.pendingSignature) {
+    this.reconcileTimer = null;
+    const dashboards = this.pendingDashboards;
+    this.pendingDashboards = null;
+    if (!dashboards) {
       return;
     }
 
-    const nextSignature = this.pendingSignature;
-    const nextSeries = this.pendingSeries;
-    this.pendingSignature = null;
-    this.reconcileTimer = null;
+    // Load every in-use widget type's static DEFAULT_CONFIG before extracting series, so history
+    // registration is deterministic regardless of which dashboard is currently rendered. Runs after
+    // first paint, so it does not affect the initial bundle/first-paint the lazy loading targets.
+    await this.ensureWidgetDefaultsLoaded(dashboards);
+
+    let desiredSeries: IKipSeriesDefinition[];
+    try {
+      desiredSeries = this.extractSeriesFromDashboards(dashboards);
+    } catch (error) {
+      console.error('[DashboardHistorySeriesSyncService] Error extracting series from dashboards:', error);
+      return;
+    }
+
+    const signature = this.getCanonicalSeriesSignature(desiredSeries);
+    if (signature === this.lastSubmittedSignature) {
+      return;
+    }
 
     const modeConfig = await this.pluginConfig.getKipRuntimeModeConfigCached('kip');
     if (!modeConfig.historySeriesServiceEnabled) {
       console.warn('[DashboardHistorySeriesSyncService] Reconcile skipped because history series service mode is disabled');
-      this.lastSubmittedSignature = nextSignature;
+      this.lastSubmittedSignature = signature;
       return;
     }
 
     try {
-      await this.kipSeries.reconcileSeries(nextSeries);
-      this.lastSubmittedSignature = nextSignature;
+      // reconcileSeries resolves to null on failure (it swallows errors and does
+      // NOT throw), so we must inspect the result. Only mark the signature as
+      // submitted on a real success; otherwise leave it unset so the next cycle retries.
+      const result = await this.kipSeries.reconcileSeries(desiredSeries);
+      if (result) {
+        this.lastSubmittedSignature = signature;
+      } else {
+        console.warn('[DashboardHistorySeriesSyncService] Reconcile did not complete; will retry on next cycle');
+      }
     } catch (error) {
       console.error('[DashboardHistorySeriesSyncService] Reconcile failed:', error);
       // Don't update lastSubmittedSignature so next cycle will retry
     }
+  }
+
+  private async ensureWidgetDefaultsLoaded(dashboards: Dashboard[]): Promise<void> {
+    const types = new Set<string>();
+    dashboards.forEach(dashboard => {
+      this.collectWidgetTypes(this.coerceNodeList(dashboard.configuration), types);
+    });
+    await Promise.all(
+      [...types].map(type => this.widgetService.getComponentType(type).catch(() => undefined))
+    );
+  }
+
+  private collectWidgetTypes(nodes: IGridWidgetNode[], sink: Set<string>): void {
+    nodes.forEach(node => {
+      const type = node?.input?.widgetProperties?.type;
+      if (type) {
+        sink.add(type);
+      }
+      const children = this.coerceNodeList(node?.subGridOpts?.children);
+      if (children.length > 0) {
+        this.collectWidgetTypes(children, sink);
+      }
+    });
   }
 
   private extractSeriesFromDashboards(dashboards: Dashboard[]): IKipSeriesDefinition[] {
@@ -208,12 +242,10 @@ export class DashboardHistorySeriesSyncService {
   }
 
   private getDefaultConfigForType(widgetType: string): IWidgetSvcConfig | undefined {
-    try {
-      const comp = this.widgetService.getComponentType(widgetType) as { DEFAULT_CONFIG?: IWidgetSvcConfig } | undefined;
-      return comp?.DEFAULT_CONFIG;
-    } catch {
-      return undefined;
-    }
+    // Reads the widget's static DEFAULT_CONFIG from WidgetService's cache. flushReconcile() awaits
+    // ensureWidgetDefaultsLoaded() before extracting series, so the cache is warm here for every
+    // in-use widget type, independently of which dashboard is currently rendered.
+    return this.widgetService.getDefaultConfig(widgetType);
   }
 
   private collectSeriesFromNodes(nodes: IGridWidgetNode[], sink: IKipSeriesDefinition[]): void {

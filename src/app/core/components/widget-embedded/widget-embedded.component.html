@@ -1,3 +1,9 @@
 <mat-card appearance="raised" class="widget-container kip-widget-card-colors" style="border: 1px dashed transparent">
   <ng-container #childOutlet></ng-container>
+  @if (loadFailed()) {
+    <button type="button" class="widget-load-error" (click)="retryWidgetLoad()">
+      <span class="widget-load-error__title">Widget failed to load</span>
+      <span class="widget-load-error__hint">Tap to retry</span>
+    </button>
+  }
 </mat-card>
