@@ -58,9 +58,6 @@ export class SettingsDisplayComponent implements OnInit {
   protected isRemoteControl = model<boolean>(false);
   protected instanceName = model<string>('');
   protected browserTabTitle = model<string>('SKip');
-  protected splitShellEnabled = model<boolean>(false);
-  protected splitShellSide = model<'left' | 'right'>('left');
-  protected splitShellSwipeDisabled = model<boolean>(false);
   protected providerMode = model<'kip' | 'other'>('other');
   protected widgetHistoryDisabled = model<boolean>(false);
   protected isKipHistoryProviderSelectable = signal<boolean>(false);
@@ -80,9 +77,6 @@ export class SettingsDisplayComponent implements OnInit {
     this.isRemoteControl.set(this.settings.getIsRemoteControl());
     this.instanceName.set(this.settings.getInstanceName());
     this.browserTabTitle.set(this.settings.getBrowserTabTitle());
-    this.splitShellEnabled.set(this.settings.getSplitShellEnabled());
-    this.splitShellSide.set(this.settings.getSplitShellSide());
-    this.splitShellSwipeDisabled.set(this.settings.getSplitShellSwipeDisabled());
     this.widgetHistoryDisabled.set(this.settings.getWidgetHistoryDisabled());
     void this.getKipPluginConfig();
   }
@@ -125,9 +119,6 @@ export class SettingsDisplayComponent implements OnInit {
     } else {
       this.settings.setThemeName("");
     }
-    this.settings.setSplitShellEnabled(this.splitShellEnabled());
-    this.settings.setSplitShellSide(this.splitShellSide());
-    this.settings.setSplitShellSwipeDisabled(this.splitShellSwipeDisabled());
     this.settings.setWidgetHistoryDisabled(this.widgetHistoryDisabled());
     this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());

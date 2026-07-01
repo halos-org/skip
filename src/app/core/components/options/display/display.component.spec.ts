@@ -37,9 +37,6 @@ class SettingsServiceMock {
     public getRedNightMode() { return false; }
     public getIsRemoteControl() { return false; }
     public getInstanceName() { return ''; }
-    public getSplitShellEnabled() { return false; }
-    public getSplitShellSide() { return 'left' as const; }
-    public getSplitShellSwipeDisabled() { return false; }
     public getWidgetHistoryDisabled() { return false; }
     public getBrowserTabTitle() { return 'KIP'; }
     public getDisablePathValidation() { return false; }
@@ -49,9 +46,6 @@ class SettingsServiceMock {
     public setIsRemoteControl(): void { }
     public setInstanceName(): void { }
     public setThemeName(): void { }
-    public setSplitShellEnabled(): void { }
-    public setSplitShellSide(): void { }
-    public setSplitShellSwipeDisabled(): void { }
     public setWidgetHistoryDisabled(): void { }
     public setBrowserTabTitle(): void { }
     public setDisablePathValidation(): void { }

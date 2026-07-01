@@ -13,7 +13,6 @@ export interface Dashboard {
   id: string
   name?: string;
   icon?: string;
-  collapseSplitShell?: boolean;
   configuration?: NgGridStackWidget[] | [];
 }
 
@@ -143,23 +142,16 @@ export class DashboardService {
    * Behavior:
    * - Generates a new UUID for the dashboard.
    * - If no icon provided, defaults to 'dashboard-dashboard'.
-   * - collapseSplitShell flag (optional) controls forced Freeboard Shell panel collapse
-   *   when global Freeboard Shell Mode is enabled:
-   *     true  => In split view the Freeboard panel is locked collapsed (user cannot expand/resize).
-   *     false/undefined => Normal persisted panel behavior.
-   * - The flag does not overwrite previously persisted user width/collapse preferences;
-   *   it only enforces collapse while true.
    *
    * @param name  Display name of the dashboard.
    * @param configuration Initial Gridstack widget configuration (empty array for blank).
    * @param icon Optional icon key (defaults to 'dashboard-dashboard').
-   * @param collapseSplitShell Optional per-dashboard forced shell collapse flag (defaults to false).
    * @returns Index (0-based) of the newly inserted dashboard.
    */
-  public add(name: string, configuration: NgGridStackWidget[], icon?: string, collapseSplitShell?: boolean): number {
+  public add(name: string, configuration: NgGridStackWidget[], icon?: string): number {
     let newIndex = 0;
     this.dashboards.update(dashboards => {
-      const updated = [...dashboards, { id: UUID.create(), name, icon: icon ?? 'dashboard-dashboard', configuration, collapseSplitShell: collapseSplitShell ?? false }];
+      const updated = [...dashboards, { id: UUID.create(), name, icon: icon ?? 'dashboard-dashboard', configuration }];
       newIndex = updated.length - 1;
       return updated;
     });
@@ -169,24 +161,17 @@ export class DashboardService {
   /**
    * Updates dashboard metadata at the specified index.
    *
-   * Mutates only lightweight descriptive fields (name, icon) plus the
-   * per‑dashboard Freeboard Shell collapse flag. It does NOT:
+   * Mutates only lightweight descriptive fields (name, icon). It does NOT:
    *  - change the dashboard id
    *  - alter the widget configuration array
-   *
-   * collapseSplitShell semantics:
-   *  - true  => When global Freeboard Shell Mode is enabled the Freeboard panel
-   *            is forced collapsed & locked for this dashboard (no expand/resize).
-   *  - false => Normal persisted panel behavior (user can expand/resize if allowed).
    *
    * @param itemIndex Index of the dashboard to update (0-based).
    * @param name New display name.
    * @param icon New icon key (fallback to 'dashboard-dashboard').
-   * @param collapseSplitShell Per-dashboard forced collapse flag.
    */
-  public update(itemIndex: number, name: string, icon: string, collapseSplitShell: boolean): void {
+  public update(itemIndex: number, name: string, icon: string): void {
     this.dashboards.update(dashboards => dashboards.map((dashboard, i) =>
-      i === itemIndex ? { ...dashboard, name: name, icon: icon ?? 'dashboard-dashboard', collapseSplitShell: collapseSplitShell ?? false } : dashboard));
+      i === itemIndex ? { ...dashboard, name: name, icon: icon ?? 'dashboard-dashboard' } : dashboard));
   }
 
   /**
@@ -214,26 +199,18 @@ export class DashboardService {
    * - Generates a new UUID for every widget AND updates each widget's
    *   input.widgetProperties.uuid to keep internal references consistent.
    * - Name and icon are replaced with the provided values (icon defaults to 'dashboard-dashboard' if empty).
-   * - collapseSplitShell flag explicitly set from the provided parameter (falls back to false if undefined),
-   *   rather than inheriting the original value silently. Caller decides whether to retain or change it.
    *
    * Safety / Validation:
    * - Returns -1 and logs an error if itemIndex is out of bounds.
    * - If the original configuration is not an array, logs an error and replaces with [] in the duplicate.
    * - Logs an error if any widget lacks the expected input.widgetProperties structure.
    *
-   * Freeboard Shell Flag Semantics (collapseSplitShell):
-   * - true  => When global Freeboard Shell Mode is enabled, the Freeboard panel is forced collapsed & locked
-   *            (no expand/resize) for the duplicated dashboard.
-   * - false => Normal persisted panel behavior (user may expand/resize when allowed).
-   *
    * @param itemIndex             Index of the dashboard to duplicate (0-based).
    * @param newName               Display name for the duplicated dashboard.
    * @param newIcon               Optional icon key (defaults to 'dashboard-dashboard' if falsy).
-   * @param collapseSplitShell Per-dashboard forced Freeboard panel collapse flag for the duplicate.
    * @returns                     The new dashboard's index, or -1 on failure.
    */
-  public duplicate(itemIndex: number, newName: string, newIcon: string, collapseSplitShell: boolean): number {
+  public duplicate(itemIndex: number, newName: string, newIcon: string): number {
     if (itemIndex < 0 || itemIndex >= this.dashboards().length) {
       console.error(`[Dashboard Service] Invalid itemIndex: ${itemIndex}`);
       return -1;
@@ -245,7 +222,6 @@ export class DashboardService {
     newDashboard.id = UUID.create();
     newDashboard.name = newName;
     newDashboard.icon = newIcon || 'dashboard-dashboard';
-    newDashboard.collapseSplitShell = collapseSplitShell ?? false;
 
     if (Array.isArray(newDashboard.configuration)) {
       newDashboard.configuration.forEach((widget: NgGridStackWidget) => {

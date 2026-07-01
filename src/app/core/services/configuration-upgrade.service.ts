@@ -153,7 +153,7 @@ export class ConfigurationUpgradeService {
       upgradedConfig.theme = this._settings.getThemeConfig();
 
       upgradedConfig.app.configVersion = this.targetConfigVersion;
-      this.addSplitShellConfigKeys(upgradedConfig.app);
+      this.removeSplitShellConfigKeys(upgradedConfig.app);
       const datasetInfo = this.extractAppDatasets(upgradedConfig.app);
       this.upgradeDashboardWidgets(upgradedConfig.dashboards);
       this.migrateDatasetsToDataCharts(datasetInfo, upgradedConfig.dashboards);
@@ -361,10 +361,7 @@ export class ConfigurationUpgradeService {
     const clone = cloneDeep(app);
     clone.configVersion = this.targetConfigVersion;
     clone.nightModeBrightness = 0.27;
-    clone.splitShellEnabled = false;
-    clone.splitShellSide = "left";
-    clone.splitShellWidth = 0.2;
-    clone.splitShellSwipeDisabled = false;
+    this.removeSplitShellConfigKeys(clone);
     return clone;
   }
 
@@ -380,7 +377,7 @@ export class ConfigurationUpgradeService {
         this.pushError(`[Upgrade Service] Config version ${config.app.configVersion} upgrade is not supported. Skipping...`);
         return null;
       }
-      this.addSplitShellConfigKeys(config.app);
+      this.removeSplitShellConfigKeys(config.app);
       const datasetInfo = this.extractAppDatasets(config.app);
       this.migrateDatasetsToDataCharts(datasetInfo, config.dashboards);
       this.migrateUseNeedleToEnableNeedle(config.dashboards);
@@ -473,12 +470,15 @@ export class ConfigurationUpgradeService {
     if (updatedCount) this.pushMsg(`[Upgrade] Renamed gauge.useNeedle -> gauge.enableNeedle on ${updatedCount} widget(s).`);
   }
 
-  private addSplitShellConfigKeys(app: IAppConfig): void {
+  private removeSplitShellConfigKeys(app: IAppConfig): void {
     if (!app) return;
-    if (app.splitShellEnabled === undefined) app.splitShellEnabled = false;
-    if (app.splitShellSide === undefined) app.splitShellSide = "left";
-    if (app.splitShellWidth === undefined) app.splitShellWidth = 0.2;
-    if (app.splitShellSwipeDisabled === undefined) app.splitShellSwipeDisabled = false;
+    // One-way cleanup: the split-shell (chartplotter) mode was removed, so strip its now-dead keys
+    // from an upgraded config rather than seeding them.
+    const raw = app as unknown as Record<string, unknown>;
+    delete raw['splitShellEnabled'];
+    delete raw['splitShellSide'];
+    delete raw['splitShellWidth'];
+    delete raw['splitShellSwipeDisabled'];
   }
 
   private upgradeDashboardWidgets(dashboards: Dashboard[]): void {

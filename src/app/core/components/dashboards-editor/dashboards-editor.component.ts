@@ -49,7 +49,7 @@ export class DashboardsEditorComponent {
       cancelBtnText: 'Cancel'
     }).afterClosed().subscribe(data => {
       if (!data) { return } //clicked cancel
-      this._dashboard.add(data.name, [], data.icon, data.collapseSplitShell);
+      this._dashboard.add(data.name, [], data.icon);
     });
   }
 
@@ -87,11 +87,10 @@ export class DashboardsEditorComponent {
       name: dashboard.name,
       icon: dashboard.icon || 'dashboard-dashboard',
       confirmBtnText: 'Save',
-      cancelBtnText: 'Cancel',
-      collapseSplitShell: dashboard.collapseSplitShell ?? false
+      cancelBtnText: 'Cancel'
     }).afterClosed().subscribe(data => {
       if (!data) { return } //clicked cancel
-      this._dashboard.update(itemIndex, data.name, data.icon, data.collapseSplitShell);
+      this._dashboard.update(itemIndex, data.name, data.icon);
     });
   }
 
@@ -106,11 +105,10 @@ export class DashboardsEditorComponent {
       name: `${currentName} copy`,
       icon: originalDashboard.icon || 'dashboard-dashboard',
       confirmBtnText: 'Save',
-      cancelBtnText: 'Cancel',
-      collapseSplitShell: originalDashboard.collapseSplitShell ?? false
+      cancelBtnText: 'Cancel'
     }).afterClosed().subscribe(data => {
       if (!data) { return } //clicked cancel
-      this._dashboard.duplicate(itemIndex, data.name, data.icon, data.collapseSplitShell);
+      this._dashboard.duplicate(itemIndex, data.name, data.icon);
     });
   }
 

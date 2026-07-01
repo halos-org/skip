@@ -39,10 +39,6 @@ export class SettingsService {
   private isRemoteControl: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   private instanceName: BehaviorSubject<string> = new BehaviorSubject<string>('');
   private browserTabTitle: BehaviorSubject<string> = new BehaviorSubject<string>('SKip');
-  private splitShellEnabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  private splitShellSide: BehaviorSubject<'left' | 'right'> = new BehaviorSubject<'left' | 'right'>('left');
-  private splitShellSwipeDisabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  private splitShellWidth: BehaviorSubject<number> = new BehaviorSubject<number>(0.5);
   private widgetHistoryDisabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
 
   public proxyEnabled = false;
@@ -253,30 +249,6 @@ export class SettingsService {
       this.browserTabTitle.next(this.activeConfig.app.browserTabTitle);
     }
 
-    if (this.activeConfig.app.splitShellEnabled === undefined) {
-      this.setSplitShellEnabled(false);
-    } else {
-      this.splitShellEnabled.next(this.activeConfig.app.splitShellEnabled);
-    }
-
-    if (this.activeConfig.app.splitShellSide === undefined) {
-      this.setSplitShellSide('left');
-    } else {
-      this.splitShellSide.next(this.activeConfig.app.splitShellSide);
-    }
-
-    if (this.activeConfig.app.splitShellSwipeDisabled === undefined) {
-      this.setSplitShellSwipeDisabled(false);
-    } else {
-      this.splitShellSwipeDisabled.next(this.activeConfig.app.splitShellSwipeDisabled);
-    }
-
-    if (this.activeConfig.app.splitShellWidth === undefined) {
-      this.setSplitShellWidth(0.5); // default ratio
-    } else {
-      this.splitShellWidth.next(this.activeConfig.app.splitShellWidth);
-    }
-
     const serverVersion = this.server.serverVersion$.getValue();
     const historyApiSupported = typeof serverVersion === 'string' && serverVersion.trim().length > 0
       ? compare(serverVersion, '2.22.1', ">=")
@@ -482,41 +454,6 @@ export class SettingsService {
     this.disablePathValidation = disable;
   }
 
-  // --- split Shell Settings API ---
-  public getSplitShellEnabledAsO() {
-    return this.splitShellEnabled.asObservable();
-  }
-  public getSplitShellEnabled(): boolean {
-    return this.splitShellEnabled.getValue();
-  }
-  public setSplitShellEnabled(enabled: boolean): void {
-    this.splitShellEnabled.next(enabled);
-    const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
-  }
-
-  public getSplitShellSideAsO() {
-    return this.splitShellSide.asObservable();
-  }
-  public getSplitShellSide(): 'left' | 'right' {
-    return this.splitShellSide.getValue();
-  }
-  public setSplitShellSide(side: 'left' | 'right'): void {
-    this.splitShellSide.next(side);
-    const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
-  }
-
     public getWidgetHistoryDisabledAsO() {
     return this.widgetHistoryDisabled.asObservable();
   }
@@ -525,42 +462,6 @@ export class SettingsService {
   }
   public setWidgetHistoryDisabled(disabled: boolean): void {
     this.widgetHistoryDisabled.next(disabled);
-    const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
-  }
-
-  public getSplitShellSwipeDisabledAsO() {
-    return this.splitShellSwipeDisabled.asObservable();
-  }
-  public getSplitShellSwipeDisabled(): boolean {
-    return this.splitShellSwipeDisabled.getValue();
-  }
-  public setSplitShellSwipeDisabled(enabled: boolean): void {
-    this.splitShellSwipeDisabled.next(enabled);
-    const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
-  }
-
-  public getSplitShellWidthAsO() {
-    return this.splitShellWidth.asObservable();
-  }
-  public getSplitShellWidth(): number {
-    return this.splitShellWidth.getValue();
-  }
-  public setSplitShellWidth(width: number): void {
-    // interpret input as ratio (0-1), clamp to sensible bounds
-    const ratio = Math.min(0.9, Math.max(0.1, width));
-    this.splitShellWidth.next(ratio);
     const appConf = this.buildAppStorageObject();
 
     if (this.useServerStorage) {
@@ -739,10 +640,6 @@ export class SettingsService {
       dataSets: this.dataSets,
       unitDefaults: this.unitDefaults.getValue(),
       notificationConfig: this.kipKNotificationConfig.getValue(),
-      splitShellEnabled: this.splitShellEnabled.getValue(),
-      splitShellSide: this.splitShellSide.getValue() ?? 'right',
-      splitShellWidth: this.splitShellWidth.getValue() ?? 0.5,
-      splitShellSwipeDisabled: this.splitShellSwipeDisabled.getValue(),
       widgetHistoryDisabled: this.widgetHistoryDisabled.getValue(),
       browserTabTitle: this.browserTabTitle.getValue()
     }

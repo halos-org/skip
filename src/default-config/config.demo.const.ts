@@ -7,10 +7,6 @@ export const DemoAppConfig: IAppConfig = {
   "autoNightMode": false,
   "redNightMode": false,
   "nightModeBrightness": 0.27,
-  "splitShellEnabled": true,
-  "splitShellSide": "left",
-  "splitShellSwipeDisabled": false,
-  "splitShellWidth": 0.7,
   "dataSets": [
     {
       "uuid": "339698a7-2cff-4ab9-9b50-d8056f971471",
@@ -498,8 +494,7 @@ export const DemoDashboardsConfig: Dashboard[] = [
         "x": 6,
         "y": 20
       }
-    ],
-    "collapseSplitShell": true
+    ]
   },
   {
     "id": "7c67c8c5-dc55-4e1d-9fc5-3dd95fd41bea",

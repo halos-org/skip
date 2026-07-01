@@ -78,39 +78,6 @@
       <mat-expansion-panel>
         <mat-expansion-panel-header>
           <mat-panel-title>
-            Chartplotter Mode
-          </mat-panel-title>
-          @if (!isPhonePortrait().matches) {
-            <mat-panel-description>
-              Configure persistent dual‑panel chart & dashboards layout.
-            </mat-panel-description>
-          }
-        </mat-expansion-panel-header>
-        <mat-slide-toggle #isFskShellEnabled class="full-width"
-          name="freeboardShellEnabled"
-          [(ngModel)]="splitShellEnabled">
-          Enable Freeboard‑SK dual‑panel Chartplotter mode.
-        </mat-slide-toggle>
-          <mat-form-field class="optional-field">
-            <mat-label>Freeboard-SK panel side</mat-label>
-            <mat-select
-              name="splitShellSide"
-              [(ngModel)]="splitShellSide"
-              [disabled]="!isFskShellEnabled.checked">
-              <mat-option value="left">Left side</mat-option>
-              <mat-option value="right">Right side</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-slide-toggle #isFskShellSwipeEnabled class="optional-field full-width"
-            name="freeboardShellSwipeEnabled"
-            [(ngModel)]="splitShellSwipeDisabled"
-            [disabled]="!isFskShellEnabled.checked">
-            Disable swipe gestures over chart panel.
-        </mat-slide-toggle>
-      </mat-expansion-panel>
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title>
             Remote Control
           </mat-panel-title>
           @if (!isPhonePortrait().matches) {

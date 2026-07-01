@@ -1,17 +1,20 @@
 import { Routes } from '@angular/router';
 import { DashboardComponent } from './core/components/dashboard/dashboard.component';
-import { splitShellGuard } from './core/guards/split-shell.guard';
 
 export const routes: Routes = [
   {
-    path: 'dashboard/:id',
-    component: DashboardComponent,
-    canMatch: [splitShellGuard]
+    path: '',
+    redirectTo: 'dashboard/0',
+    pathMatch: 'full'
   },
   {
-    path: 'chartplotter/:id',
-    loadComponent: () => import('./core/components/split-shell/split-shell.component').then(m => m.SplitShellComponent),
-    canMatch: [splitShellGuard]
+    path: 'dashboard',
+    redirectTo: 'dashboard/0',
+    pathMatch: 'full'
+  },
+  {
+    path: 'dashboard/:id',
+    component: DashboardComponent
   },
   {
     path: 'settings',
@@ -50,7 +53,6 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    component: DashboardComponent,
-    canMatch: [splitShellGuard]
+    redirectTo: 'dashboard/0'
   }
 ];
