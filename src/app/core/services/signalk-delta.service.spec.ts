@@ -5,6 +5,8 @@ import { SignalKDeltaService } from './signalk-delta.service';
 import { AuthenticationService } from './authentication.service';
 import { SignalKConnectionService } from './signalk-connection.service';
 import { ConnectionStateMachine } from './connection-state-machine.service';
+import { ISignalKDeltaMessage, ISignalKUpdateMessage, ISignalKDataValueUpdate, ISignalKMeta, ISkMetadata } from '../interfaces/signalk-interfaces';
+import { IPathValueData, IMeta } from '../interfaces/app-interfaces';
 
 class AuthStub {
   isLoggedIn$ = new BehaviorSubject<boolean>(false);
@@ -29,7 +31,10 @@ class CsmStub {
   currentState = 'HTTPConnected';
 }
 
-interface DeltaInternals { buildWebSocketUrl(): string }
+interface DeltaInternals {
+  buildWebSocketUrl(): string;
+  processWebsocketMessage(message: ISignalKDeltaMessage): void;
+}
 
 function setup() {
   const auth = new AuthStub();
@@ -154,6 +159,236 @@ describe('SignalKDeltaService', () => {
       service.socketWSCloseEvent$.next({ wasClean: false } as CloseEvent);
 
       expect(auth.refreshLoginStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('delta parsing & flattening (characterization)', () => {
+    const TS = '2024-01-01T00:00:00Z';
+    const CTX = 'vessels.self';
+
+    function parse(service: SignalKDeltaService, message: ISignalKDeltaMessage): void {
+      (service as unknown as DeltaInternals).processWebsocketMessage(message);
+    }
+
+    function collectData(service: SignalKDeltaService): IPathValueData[] {
+      const out: IPathValueData[] = [];
+      service.subscribeDataPathsUpdates().subscribe(v => out.push(v));
+      return out;
+    }
+
+    function update(values: ISignalKDataValueUpdate[], extra: Partial<ISignalKUpdateMessage> = {}): ISignalKUpdateMessage {
+      return { $source: 'src.1', timestamp: TS, values, ...extra };
+    }
+
+    function skMeta(path: string, value: object): ISignalKMeta {
+      return { path, value: value as ISkMetadata };
+    }
+
+    it('emits a scalar value once, propagating context, source and timestamp', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'navigation.speedOverGround', value: 3.2 }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'navigation.speedOverGround', source: 'src.1', timestamp: TS, value: 3.2 },
+      ]);
+    });
+
+    it('passes a null value through untouched (typeof null === object is guarded)', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'navigation.speedOverGround', value: null }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'navigation.speedOverGround', source: 'src.1', timestamp: TS, value: null },
+      ]);
+    });
+
+    it('recursively flattens a nested object into synthetic dotted child paths', () => {
+      // Pins current behaviour (finding SK-02 / #21): KIP fabricates child paths absent from the SK spec.
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'navigation.position', value: { latitude: 48.1, longitude: -4.5 } }], { $source: 'gps.1' })] });
+      expect(out.map(v => [v.path, v.value])).toEqual([
+        ['navigation.position.latitude', 48.1],
+        ['navigation.position.longitude', -4.5],
+      ]);
+      expect(out.every(v => v.source === 'gps.1' && v.timestamp === TS)).toBe(true);
+    });
+
+    it('leaves paths in DO_NOT_FLATTEN_PATHS (displays.*) as a single whole-object value', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      const value = { layout: { rows: 2 }, name: 'main' };
+      parse(service, { context: CTX, updates: [update([{ path: 'displays.chart.config', value }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'displays.chart.config', source: 'src.1', timestamp: TS, value },
+      ]);
+    });
+
+    it('falls back to a single-level split when nesting exceeds the depth limit', () => {
+      // Deeper than maxDepth (3): canFlattenCompletely fails, so only the top level is split and the nested value is kept whole.
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'foo.bar', value: { a: { b: { c: { d: 1 } } } } }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'foo.bar.a', source: 'src.1', timestamp: TS, value: { b: { c: { d: 1 } } } },
+      ]);
+    });
+
+    it('falls back to a single-level split when an object exceeds the size limit', () => {
+      // More than maxObjectSize (20) keys: canFlattenCompletely fails, so the object is split one level deep.
+      const { service } = setup();
+      const out = collectData(service);
+      const wide: Record<string, number> = {};
+      for (let i = 0; i < 21; i++) { wide[`k${i}`] = i; }
+      parse(service, { context: CTX, updates: [update([{ path: 'wide.obj', value: wide }])] });
+      expect(out).toHaveLength(21);
+      expect(out[0]).toEqual({ context: CTX, path: 'wide.obj.k0', source: 'src.1', timestamp: TS, value: 0 });
+    });
+
+    it('routes notifications.* items to the notifications stream, not the data stream', () => {
+      const { service } = setup();
+      const data = collectData(service);
+      const notes: ISignalKDataValueUpdate[] = [];
+      service.subscribeNotificationsUpdates().subscribe(v => notes.push(v));
+      const item = { path: 'notifications.mob', value: { state: 'alarm', message: 'MOB' } };
+      parse(service, { context: CTX, updates: [update([item])] });
+      expect(notes).toEqual([item]);
+      expect(data).toEqual([]);
+    });
+
+    it('propagates a foreign (non-self) context unchanged (the self-filter is disabled)', () => {
+      // Pins finding SK-06: foreign-vessel data is not filtered out of the self stream.
+      const { service } = setup();
+      const out = collectData(service);
+      const foreign = 'vessels.urn:mrn:imo:mmsi:123456789';
+      parse(service, { context: foreign, updates: [update([{ path: 'navigation.speedOverGround', value: 5 }])] });
+      expect(out[0].context).toBe(foreign);
+    });
+
+    it('expands metadata carrying a properties map into per-property emissions', () => {
+      const { service } = setup();
+      const out: IMeta[] = [];
+      service.subscribeMetadataUpdates().subscribe(v => out.push(v));
+      const latMeta = { units: 'rad', description: 'Latitude' };
+      const lonMeta = { units: 'rad', description: 'Longitude' };
+      const meta = [skMeta('navigation.position', { description: 'Position', properties: { latitude: latMeta, longitude: lonMeta } })];
+      parse(service, { context: CTX, updates: [update([], { meta })] });
+      expect(out).toEqual([
+        { context: CTX, path: 'navigation.position.latitude', meta: latMeta },
+        { context: CTX, path: 'navigation.position.longitude', meta: lonMeta },
+      ]);
+    });
+
+    it('emits metadata without a properties map as a single path meta', () => {
+      const { service } = setup();
+      const out: IMeta[] = [];
+      service.subscribeMetadataUpdates().subscribe(v => out.push(v));
+      const sogMeta = { units: 'm/s', description: 'Speed over ground' };
+      const meta = [skMeta('navigation.speedOverGround', sogMeta)];
+      parse(service, { context: CTX, updates: [update([], { meta })] });
+      expect(out).toEqual([
+        { context: CTX, path: 'navigation.speedOverGround', meta: sogMeta },
+      ]);
+    });
+
+    it('routes a requestId message to the requests stream', () => {
+      const { service } = setup();
+      const data = collectData(service);
+      const reqs: ISignalKDeltaMessage[] = [];
+      service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
+      const msg: ISignalKDeltaMessage = { requestId: 'req-1', state: 'COMPLETED', statusCode: 200 };
+      parse(service, msg);
+      expect(reqs).toEqual([msg]);
+      expect(data).toEqual([]);
+    });
+
+    it('routes a hello/self message to the self stream and forwards server info', () => {
+      const { service, conn } = setup();
+      const setServerInfo = vi.spyOn(conn, 'setServerInfo');
+      const selves: string[] = [];
+      service.subscribeSelfUpdates().subscribe(v => selves.push(v));
+      parse(service, { self: 'vessels.urn:mrn:signalk:uuid:self', name: 'sk', version: '2.0.0', roles: ['main', 'master'] });
+      expect(selves).toEqual(['vessels.urn:mrn:signalk:uuid:self']);
+      expect(setServerInfo).toHaveBeenCalledWith('sk', '2.0.0', ['main', 'master']);
+    });
+
+    it('drops an empty object value entirely — no emissions (latent data loss)', () => {
+      // canFlattenCompletely({}) is true, flattenObjectValue({}) returns [], so nothing is emitted.
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'some.path', value: {} }])] });
+      expect(out).toEqual([]);
+    });
+
+    it('flattens an array value into indexed child paths', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'foo.list', value: [10, 20] }])] });
+      expect(out.map(v => [v.path, v.value])).toEqual([
+        ['foo.list.0', 10],
+        ['foo.list.1', 20],
+      ]);
+    });
+
+    it('fully flattens nesting whose values sit at depth 2 (inside the depth limit)', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'x', value: { a: { b: 1 } } }])] });
+      expect(out.map(v => [v.path, v.value])).toEqual([['x.a.b', 1]]);
+    });
+
+    it('falls back to single-level split once a value sits at depth 3 (the exact cutoff)', () => {
+      // The depth guard fires at currentDepth >= maxDepth (3) before the scalar check, so a value at depth 3 fails.
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [update([{ path: 'x', value: { a: { b: { c: 1 } } } }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'x.a', source: 'src.1', timestamp: TS, value: { b: { c: 1 } } },
+      ]);
+    });
+
+    it('skips flattening for any path CONTAINING "displays." (substring, not prefix)', () => {
+      // DO_NOT_FLATTEN_PATHS is matched with .includes(), so the guard triggers mid-path too.
+      const { service } = setup();
+      const out = collectData(service);
+      const value = { a: 1, b: 2 };
+      parse(service, { context: CTX, updates: [update([{ path: 'foo.displays.bar', value }])] });
+      expect(out).toEqual([
+        { context: CTX, path: 'foo.displays.bar', source: 'src.1', timestamp: TS, value },
+      ]);
+    });
+
+    it('processes updates and ignores requestId when a message carries both (updates win)', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      const reqs: ISignalKDeltaMessage[] = [];
+      service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
+      parse(service, { requestId: 'req-1', updates: [update([{ path: 'navigation.speedOverGround', value: 1 }])] });
+      expect(out).toHaveLength(1);
+      expect(reqs).toEqual([]);
+    });
+
+    it('treats an errorMessage as a no-op (no emissions on any stream)', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      const reqs: ISignalKDeltaMessage[] = [];
+      service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
+      parse(service, { errorMessage: 'stream error' });
+      expect(out).toEqual([]);
+      expect(reqs).toEqual([]);
+    });
+
+    it('associates each update\'s own $source and timestamp with its values', () => {
+      const { service } = setup();
+      const out = collectData(service);
+      parse(service, { context: CTX, updates: [
+        { $source: 'gps.1', timestamp: '2024-01-01T00:00:00Z', values: [{ path: 'navigation.speedOverGround', value: 1 }] },
+        { $source: 'wind.2', timestamp: '2024-01-02T00:00:00Z', values: [{ path: 'environment.wind.speedApparent', value: 2 }] },
+      ] });
+      expect(out).toEqual([
+        { context: CTX, path: 'navigation.speedOverGround', source: 'gps.1', timestamp: '2024-01-01T00:00:00Z', value: 1 },
+        { context: CTX, path: 'environment.wind.speedApparent', source: 'wind.2', timestamp: '2024-01-02T00:00:00Z', value: 2 },
+      ]);
     });
   });
 });
