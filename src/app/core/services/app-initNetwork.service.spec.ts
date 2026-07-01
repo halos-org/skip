@@ -36,10 +36,8 @@ describe('AppNetworkInitService', () => {
 
     const mockAuth = {
         isLoggedIn$,
-        authMode: 'token' as 'cookie' | 'token',
         loginStatusValue: null as ILoginStatus | null,
-        refreshLoginStatus: vi.fn().mockResolvedValue(null),
-        login: vi.fn().mockResolvedValue(undefined)
+        refreshLoginStatus: vi.fn().mockResolvedValue(null)
     };
 
     const mockSsoRedirect = {
@@ -94,7 +92,6 @@ describe('AppNetworkInitService', () => {
         mockConnectionStateMachine.isHTTPConnected.mockClear();
         mockConnectionStateMachine.enableWebSocketMode.mockClear();
         mockConnectionStateMachine.startWebSocketConnection.mockClear();
-        mockAuth.authMode = 'token';
         mockAuth.loginStatusValue = null;
         mockAuth.refreshLoginStatus.mockClear();
         mockRouter.navigate.mockClear();
@@ -198,15 +195,7 @@ describe('AppNetworkInitService', () => {
     });
 
     describe('mid-bootstrap 401 re-auth routing (Unit 6)', () => {
-        it('token mode routes to /login', () => {
-            mockAuth.authMode = 'token';
-            routeToReauth();
-            expect(mockRouter.navigate).toHaveBeenCalledWith(['/login']);
-            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
-        });
-
-        it('cookie mode with oidcAutoLogin auto-redirects (budget-guarded)', () => {
-            mockAuth.authMode = 'cookie';
+        it('oidcAutoLogin auto-redirects (budget-guarded)', () => {
             mockAuth.loginStatusValue = { status: 'loggedIn', oidcAutoLogin: true };
             mockSsoRedirect.attemptAutoRedirect.mockReturnValue('redirected');
 
@@ -217,7 +206,6 @@ describe('AppNetworkInitService', () => {
         });
 
         it('cookie mode honors oidcAutoLogin:false (no auto-redirect on a 401)', () => {
-            mockAuth.authMode = 'cookie';
             mockAuth.loginStatusValue = { status: 'loggedIn', oidcAutoLogin: false };
 
             routeToReauth();
@@ -227,7 +215,6 @@ describe('AppNetworkInitService', () => {
         });
 
         it('cookie mode surfaces auth-blocked when the budget is exhausted (no infinite 401 loop)', () => {
-            mockAuth.authMode = 'cookie';
             mockAuth.loginStatusValue = { status: 'loggedIn', oidcAutoLogin: true };
             mockSsoRedirect.attemptAutoRedirect.mockReturnValue('budget-exhausted');
             mockSsoRedirect.isBudgetExhausted.mockReturnValue(true);
@@ -302,7 +289,6 @@ describe('AppNetworkInitService', () => {
     // finally that an isolated handleCookieAuth test cannot see (the original P0 loop-guard hole).
     describe('cookie-mode bootstrap end-to-end (Unit 6 loop-guard seam)', () => {
         it('budget-exhausted: keeps the auth-blocked recovery state and does NOT reset the budget', async () => {
-            mockAuth.authMode = 'cookie';
             mockAuth.refreshLoginStatus.mockResolvedValue({ status: 'notLoggedIn', authenticationRequired: true, oidcAutoLogin: true });
             mockSsoRedirect.attemptAutoRedirect.mockReturnValue('budget-exhausted');
             mockSsoRedirect.isBudgetExhausted.mockReturnValue(true);
@@ -314,7 +300,6 @@ describe('AppNetworkInitService', () => {
         });
 
         it('null loginStatus: keeps the auth-blocked recovery state and does NOT reset the budget', async () => {
-            mockAuth.authMode = 'cookie';
             mockAuth.refreshLoginStatus.mockResolvedValue(null);
 
             await service.initNetworkServices();
@@ -324,7 +309,6 @@ describe('AppNetworkInitService', () => {
         });
 
         it('logged-in clean bootstrap resets the budget', async () => {
-            mockAuth.authMode = 'cookie';
             mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
 
             await service.initNetworkServices();
@@ -333,7 +317,6 @@ describe('AppNetworkInitService', () => {
         });
 
         it('does not double-start the WebSocket when a connect is already in flight at the finally', async () => {
-            mockAuth.authMode = 'cookie';
             mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
             mockConnectionStateMachine.currentState = ConnectionState.WebSocketConnecting;
 
@@ -343,7 +326,8 @@ describe('AppNetworkInitService', () => {
         });
 
         it('starts the WebSocket once from a fresh HTTPConnected state', async () => {
-            mockAuth.authMode = 'token';
+            // Anonymous read (authentication not required): a clean, non-degraded bootstrap.
+            mockAuth.refreshLoginStatus.mockResolvedValue({ status: 'notLoggedIn', authenticationRequired: false });
             mockConnectionStateMachine.currentState = ConnectionState.HTTPConnected;
 
             await service.initNetworkServices();

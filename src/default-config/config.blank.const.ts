@@ -34,8 +34,6 @@ export const DefaultConnectionConfig: IConnectionConfig = {
   "signalKUrl": null, // get's overwritten with host at getDefaultConnectionConfig()
   "proxyEnabled": false,
   "signalKSubscribeAll": false,
-  "useDeviceToken": false,
-  "loginName": null,
   "useSharedConfig": false,
   "sharedConfigName": "default",
   "isRemoteControl": false,

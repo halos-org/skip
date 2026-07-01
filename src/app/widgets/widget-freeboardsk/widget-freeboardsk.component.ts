@@ -1,5 +1,4 @@
 import { DashboardService } from './../../core/services/dashboard.service';
-import { AuthenticationService, IAuthorizationToken } from './../../core/services/authentication.service';
 import { SettingsService } from './../../core/services/settings.service';
 import { AfterViewInit, Component, ElementRef, effect, inject, input, OnDestroy, viewChild, untracked } from '@angular/core';
 import { ChangeDetectionStrategy } from '@angular/core';
@@ -9,7 +8,6 @@ import { buildFreeboardSkUrl } from './freeboard-sk-url.util';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { AppService, ITheme } from '../../core/services/app-service';
-import { toSignal } from '@angular/core/rxjs-interop';
 
 interface FreeboardCommandMessage {
   settings?: {
@@ -39,12 +37,9 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
   private readonly runtime = inject(WidgetRuntimeDirective, { optional: true });
   private readonly appSettings = inject(SettingsService);
   private readonly app = inject(AppService);
-  private readonly auth = inject(AuthenticationService);
   protected readonly dashboard = inject(DashboardService);
 
   protected iframe = viewChild.required<ElementRef<HTMLIFrameElement>>('freeboardSkIframe');
-
-  private readonly authToken = toSignal<IAuthorizationToken | null>(this.auth.authToken$, { initialValue: null });
 
   private viewReady = false;
   private iframeLoaded = false;
@@ -54,18 +49,7 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
   constructor() {
     window.addEventListener('message', this.handleIframeGesture);
 
-    effect(() => {
-      const token = this.authToken();
-
-      untracked(() => {
-        this.widgetUrl = buildFreeboardSkUrl({
-          cookieMode: this.auth.authMode === 'cookie',
-          appOrigin: window.location.origin,
-          serverUrl: this.appSettings.signalkUrl.url,
-          token: token?.token
-        });
-      });
-    });
+    this.widgetUrl = buildFreeboardSkUrl(window.location.origin);
 
     effect(() => {
       const nightModeEnabled = this.app.isNightMode();

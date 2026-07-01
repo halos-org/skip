@@ -2,10 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable , Subject } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { SettingsService } from './settings.service';
 import { ISignalKDeltaMessage } from '../interfaces/signalk-interfaces';
 import { SignalKDeltaService } from './signalk-delta.service';
-import { AuthenticationService } from './authentication.service';
 import { UUID } from '../utils/uuid.util'
 import { ToastService } from './toast.service';
 
@@ -34,10 +32,7 @@ export interface skRequest {
 })
 export class SignalkRequestsService {
   private signalKDeltaService = inject(SignalKDeltaService);
-  private settings = inject(SettingsService);
   private toast = inject(ToastService);
-  private auth = inject(AuthenticationService);
-
 
   private requestStatus$ = new Subject<skRequest>(); // public Observable passing message post processing
   private requests: skRequest[] = []; // Private array of all requests.
@@ -48,77 +43,6 @@ export class SignalkRequestsService {
         .pipe(takeUntilDestroyed())
         .subscribe(requestMessage => { this.updateRequest(requestMessage); });
     }
-
-  /**
-   * Submit a Signal K server Read/Write Device authorization token request - only required
-   * if you need to submit data to Signal K (PUT or storage requests).
-   *
-   * Once approved, a Devices authorization Token will be saved in the Kip
-   * Config and sent with every requests.
-   *
-   * The Device authorization is a manual process done on the server.
-   */
-  public requestDeviceAccessToken(): string {
-    const requestId = UUID.create();
-    const deviceTokenRequest = {
-      requestId: requestId,
-      accessRequest: {
-        clientId: this.settings.KipUUID,
-        description: "KIP Instrument MDF",
-        permissions: "admin"
-      }
-    }
-
-    console.log("[Request Service] Requesting Device Authorization Token");
-    this.signalKDeltaService.publishDelta(deviceTokenRequest);
-
-    const request = {
-      requestId: requestId,
-      state: null,
-      statusCode: null
-    }
-
-    this.requests.push(request);
-    return requestId;
-  }
-
-  /**
-  * Submit a Signal K WebSocket User login request - user needs to exist in Signal K Server.
-  * Required to use the Signal K User Storage feature (ie. to store Config by users)
-  * and if you need to submit data to Signal K.
-  *
-  * An alternative to user authentication is to use requestDeviceAccessToken method
-  * removing the need for usr/pwd but this will limit Kip's automatic Config sharing feature.
-  *
-  * Once approved, the user authorization Token will be saved in the Config and sent with every
-  * requests.
-  *
-  * @param {string} userId The Signal K server User ID
-  * @param {string} userPassword The Signal K server user Password
-  * @return {*} {string} requestId Identifier for this specific request. Enables Request result monitoring.
-  * @memberof SignalkRequestsService
-  */
-  public requestUserLogin(userId: string, userPassword: string): string {
-    const requestId = UUID.create();
-    const loginRequest = {
-      requestId: requestId,
-      login: {
-        username: userId,
-        password: userPassword
-      }
-    }
-
-    console.log("[Request Service] Requesting User Login");
-    this.signalKDeltaService.publishDelta(loginRequest);
-
-    const request = {
-      requestId: requestId,
-      state: null,
-      statusCode: null
-    }
-    this.requests.push(request);
-    return requestId;
-  }
 
   /**
    * Sends a async PUT request to the Signal K server and returns a requestId for tracking.
@@ -204,20 +128,6 @@ export class SignalkRequestsService {
 
         if (this.requests[index].statusCode == 405) {
           console.error("[Request Service] Status Code: " + this.requests[index].statusCode + " - " + this.requests[index].message);
-        }
-
-        if ((delta.accessRequest !== undefined) && (delta.accessRequest.token !== undefined)) {
-          this.toast.show(delta.accessRequest.permission + ": Device Access Token received from server.", 5000, false, 'success');
-          console.log(`[Request Service] ${delta.accessRequest.permission}: Device Access Token received`);
-          this.auth.setDeviceAccessToken(delta.accessRequest.token);
-
-        } else if (delta.login !== undefined) {
-          // Delta (WebSocket) login not implemented. Use REST login from
-          // Authentication service to obtain Session token
-          if (delta.login.token !== undefined) {
-            // Do logic
-          }
-
         }
 
       } else {

@@ -16,7 +16,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { StorageService } from './storage.service';
 import { Dashboard } from './dashboard.service';
 import { SignalKConnectionService } from '../services/signalk-connection.service';
-import { AuthenticationService } from './authentication.service';
 import { compare } from 'compare-versions';
 
 
@@ -30,7 +29,6 @@ export class SettingsService {
   private readonly storage = inject(StorageService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly server = inject(SignalKConnectionService);
-  private readonly auth = inject(AuthenticationService);
 
   private unitDefaults: BehaviorSubject<IUnitDefaults> = new BehaviorSubject<IUnitDefaults>({});
   private themeName: BehaviorSubject<string> = new BehaviorSubject<string>(defaultTheme);
@@ -49,9 +47,6 @@ export class SettingsService {
 
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
-  private useDeviceToken = false;
-  private loginName = '';
-  private loginPassword = '';
   public useSharedConfig = true;
   private sharedConfigName = 'default';
   // True once the user explicitly changes the remote-control identity this session; until then a
@@ -85,13 +80,10 @@ export class SettingsService {
 
   /**
    * Whether config persistence should target the server's applicationData rather than localStorage.
-   * True in cookie mode (same-origin SSO session) regardless of the stored useSharedConfig flag, and
-   * in cross-origin mode when shared config is enabled. Decouples storage routing from useSharedConfig
-   * the same way auth carriage is — avoids the cookie-mode localStorage split-brain.
+   * SKip runs same-origin with the SK server (SSO session cookie), so persistence always targets the
+   * server's applicationData; localStorage holds only the per-device connection config.
    */
-  private get useServerStorage(): boolean {
-    return this.auth.authMode === 'cookie' || this.useSharedConfig;
-  }
+  private readonly useServerStorage = true;
 
   private async startup(): Promise<void> {
     if (this.useServerStorage) {
@@ -136,17 +128,18 @@ export class SettingsService {
     this.signalkUrl = {url: config.signalKUrl, new: false};
     this.proxyEnabled = config.proxyEnabled;
     this.signalKSubscribeAll = config.signalKSubscribeAll;
-    this.useDeviceToken = config.useDeviceToken;
-    this.loginName = config.loginName;
-    this.loginPassword = ''; // transient only; never loaded from storage
     this.useSharedConfig = config.useSharedConfig;
     this.sharedConfigName = config.sharedConfigName;
     this.kipUUID = config.kipUUID;
 
-    // Idempotent purge: strip any plaintext password persisted by an older version.
-    // Targeted rewrite preserves all other fields (incl. configVersion) exactly.
-    if (Object.prototype.hasOwnProperty.call(config, 'loginPassword')) {
-      delete config.loginPassword;
+    // Idempotent purge: strip legacy credential fields (plaintext password, login name, device-token
+    // flag) persisted by an older version. Targeted rewrite preserves all other fields exactly.
+    const legacyCredentialKeys = ['loginPassword', 'loginName', 'useDeviceToken'];
+    const rawConfig = config as unknown as Record<string, unknown>;
+    if (legacyCredentialKeys.some(key => Object.prototype.hasOwnProperty.call(config, key))) {
+      for (const key of legacyCredentialKeys) {
+        delete rawConfig[key];
+      }
       localStorage.setItem("connectionConfig", JSON.stringify(config));
     }
 
@@ -322,22 +315,12 @@ export class SettingsService {
   }
 
   public setConnectionConfig(value: IConnectionConfig) {
-    this.loginName = value.loginName;
-    this.loginPassword = value.loginPassword ?? ''; // transient; not persisted
     this.useSharedConfig = value.useSharedConfig;
     this.proxyEnabled = value.proxyEnabled;
     this.signalKSubscribeAll = value.signalKSubscribeAll;
     if (this.signalkUrl) {
       this.signalkUrl.url = value.signalKUrl;
     }
-    // useDeviceToken and useSharedConfig are one "cross-origin intent" axis (device token only when
-    // not using shared config).
-    this.useDeviceToken = !value.useSharedConfig;
-    this.saveConnectionConfigToLocalStorage();
-  }
-
-  public setUseDeviceToken(useDeviceToken: boolean) {
-    this.useDeviceToken = useDeviceToken;
     this.saveConnectionConfigToLocalStorage();
   }
 
@@ -772,9 +755,6 @@ export class SettingsService {
       signalKUrl: this.signalkUrl?.url ?? '',
       proxyEnabled: this.proxyEnabled,
       signalKSubscribeAll: this.signalKSubscribeAll,
-      useDeviceToken: this.useDeviceToken,
-      loginName: this.loginName,
-      // loginPassword intentionally omitted: never persisted (transient in-memory only).
       useSharedConfig: this.useSharedConfig,
       sharedConfigName: this.sharedConfigName,
       // Preserve the stored (possibly migration-written) identity unless the user changed it this
