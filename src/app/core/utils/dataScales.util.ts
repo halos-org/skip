@@ -1,5 +1,3 @@
-import { TScaleType } from "../interfaces/signalk-interfaces";
-
 export interface IScale {
   min: number;
   max: number;
@@ -79,64 +77,3 @@ function calcNiceNumber(range: number, round: boolean): number {
   }
   return niceFraction * Math.pow(10, exponent);
 }
-
-
-export function generateScaleTypeTicks(minValue: number, maxValue: number, scaleType: TScaleType): number[] {
-  const ticks: number[] = [];
-
-  switch (scaleType) {
-    case 'linear': { const numTicksLinear = calculateNiceLinearNumTicks(minValue, maxValue);
-      const rangeLinear = maxValue - minValue;
-      const stepLinear = rangeLinear / (numTicksLinear - 1);
-
-      for (let i = 0; i < numTicksLinear; i++) {
-        const tick = minValue + (i * stepLinear);
-        ticks.push(tick);
-      }
-      break;
-    }
-    default:
-      throw new Error(`Invalid or or not implemented scale type: ${scaleType}`);
-  }
-
-  return ticks;
-}
-
-
-function calculateNiceLinearNumTicks(minValue: number, maxValue: number): number {
-  const range = maxValue - minValue;
-  let step = range / 10; // Start with a step that divides the range into 10 parts
-
-  // Increase the step until we get a step value with no more than 1 decimal place
-  while (Math.floor(step * 10) !== step * 10) {
-    step += 0.1;
-  }
-
-  // Calculate the number of ticks based on the step
-  const numTicks = Math.round(range / step);
-
-  return numTicks;
-}
-
-
-/**
- * Transforms a value to a new value based on a focal range.
- *
- * @export
- * @param {number} value The value to transform
- * @param {number} minValue The minimum value of the original range
- * @param {number} maxValue The maximum value of the original range
- * @param {number} focalRangeStart The start of the focal range
- * @param {number} focalRangeEnd The end of the focal range
- * @param {number} focalRange The size of the focal range
- * @return {*}  {number}
- */
-export function focalRangeTransform(value: number, minValue: number, maxValue: number, focalRangeStart: number, focalRangeEnd: number, focalRange: number): number {
-  if (value < focalRangeStart) {
-    return minValue + ((value - minValue) * 0.4); // Non-focal range (40%)
-  } else if (value <= focalRangeEnd) {
-    return minValue + (value - focalRangeStart) * ((maxValue - minValue) * 0.6 / focalRange);
-  } else {
-    return minValue + ((maxValue - minValue) * 0.6) + ((value - focalRangeEnd) * 0.4); // Non-focal range (40%)
-  }
-};
