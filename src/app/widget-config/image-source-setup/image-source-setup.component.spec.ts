@@ -4,8 +4,9 @@ import { HttpEventType, HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { ImageSourceSetupComponent } from './image-source-setup.component';
+import { MatDialog } from '@angular/material/dialog';
 import { ImageAssetService, IImageAsset } from '../../core/services/image-asset.service';
-import { DialogService } from '../../core/services/dialog.service';
+import { DialogConfirmationComponent } from '../../core/components/dialog-confirmation/dialog-confirmation.component';
 import { AppService } from '../../core/services/app-service';
 
 describe('ImageSourceSetupComponent', () => {
@@ -24,7 +25,7 @@ describe('ImageSourceSetupComponent', () => {
     delete: vi.fn(() => of(undefined)),
     urlFor: vi.fn((id: string, w?: number) => `http://host/plugins/kip/images/${id}?w=${w}`)
   };
-  const dialogMock = { openConfirmationDialog: vi.fn(() => of(true)) };
+  const dialogMock = { open: vi.fn(() => ({ afterClosed: () => of(true) })) };
   const appMock = { cssThemeColors: { cardColor: '#1e1e1e' } };
 
   const api = () => component as unknown as {
@@ -57,7 +58,7 @@ describe('ImageSourceSetupComponent', () => {
       providers: [
         { provide: FormGroupDirective, useValue: { control: formGroup } },
         { provide: ImageAssetService, useValue: imagesMock },
-        { provide: DialogService, useValue: dialogMock },
+        { provide: MatDialog, useValue: dialogMock },
         { provide: AppService, useValue: appMock }
       ]
     }).compileComponents();
@@ -162,16 +163,16 @@ describe('ImageSourceSetupComponent', () => {
   });
 
   it('confirms before deleting, then clears the selection on success', async () => {
-    dialogMock.openConfirmationDialog.mockReturnValueOnce(of(true));
+    dialogMock.open.mockReturnValueOnce({ afterClosed: () => of(true) });
     await buildWith(new UntypedFormGroup({ imageId: new UntypedFormControl('img-1') }));
     api().deleteImage('img-1', { stopPropagation: vi.fn() } as unknown as Event);
-    expect(dialogMock.openConfirmationDialog).toHaveBeenCalled();
+    expect(dialogMock.open).toHaveBeenCalledWith(DialogConfirmationComponent, expect.anything());
     expect(imagesMock.delete).toHaveBeenCalledWith('img-1');
     expect(api().imageGroup.get('imageId')!.value).toBeNull();
   });
 
   it('does NOT delete when the confirmation is declined', async () => {
-    dialogMock.openConfirmationDialog.mockReturnValueOnce(of(false));
+    dialogMock.open.mockReturnValueOnce({ afterClosed: () => of(false) });
     await buildWith(new UntypedFormGroup({ imageId: new UntypedFormControl('img-1') }));
     api().deleteImage('img-1', { stopPropagation: vi.fn() } as unknown as Event);
     expect(imagesMock.delete).not.toHaveBeenCalled();
@@ -179,7 +180,7 @@ describe('ImageSourceSetupComponent', () => {
   });
 
   it('maps a 401 delete failure to a Sign in message', async () => {
-    dialogMock.openConfirmationDialog.mockReturnValueOnce(of(true));
+    dialogMock.open.mockReturnValueOnce({ afterClosed: () => of(true) });
     imagesMock.delete.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 401 })));
     await buildWith(new UntypedFormGroup({ imageId: new UntypedFormControl('img-1') }));
     api().deleteImage('img-1', { stopPropagation: vi.fn() } as unknown as Event);

@@ -10,8 +10,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog } from '@angular/material/dialog';
 import { ImageAssetService, IImageAsset } from '../../core/services/image-asset.service';
-import { DialogService } from '../../core/services/dialog.service';
+import { DialogConfirmationComponent } from '../../core/components/dialog-confirmation/dialog-confirmation.component';
 import { AppService } from '../../core/services/app-service';
 
 type TGalleryStatus = 'loading' | 'loaded' | 'error';
@@ -39,7 +40,7 @@ export class ImageSourceSetupComponent implements OnInit {
 
   private readonly rootFormGroup = inject(FormGroupDirective);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly dialog = inject(DialogService);
+  private readonly dialog = inject(MatDialog);
   private readonly app = inject(AppService);
   protected readonly images = inject(ImageAssetService);
 
@@ -170,12 +171,16 @@ export class ImageSourceSetupComponent implements OnInit {
   protected deleteImage(id: string, event: Event): void {
     event.stopPropagation();
     const name = this.gallery().find((a) => a.id === id)?.name ?? 'this image';
-    this.dialog.openConfirmationDialog({
-      title: 'Delete From Shared Library?',
-      message: `Delete "${name}"? This removes it from every display on the boat and can't be undone.`,
-      confirmBtnText: 'Delete',
-      cancelBtnText: 'Cancel'
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((confirmed) => {
+    this.dialog.open(DialogConfirmationComponent, {
+      data: {
+        title: 'Delete From Shared Library?',
+        message: `Delete "${name}"? This removes it from every display on the boat and can't be undone.`,
+        confirmBtnText: 'Delete',
+        cancelBtnText: 'Cancel'
+      },
+      minWidth: '35vw',
+      minHeight: '25vh'
+    }).afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((confirmed) => {
       if (!confirmed) return;
       this.error.set(null);
       this.images.delete(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
