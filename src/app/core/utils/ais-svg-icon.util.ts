@@ -46,12 +46,6 @@ export const COLLISION_RISK_LOW_THRESHOLD = 25000;
 const AURA_OPACITY = 0.9;
 const AURA_SIZE_MULTIPLIER = 1.25;
 
-export function applySvgIconColors(svg: string, colors: SvgIconColors): string {
-  return svg
-    .replace(/--icon-fill:[^;]+/g, `--icon-fill:${colors.fill}`)
-    .replace(/--icon-stroke:[^;]+/g, `--icon-stroke:${colors.stroke}`);
-}
-
 export function buildAisIconTheme(input: AisIconThemeInput): AisIconTheme {
   const baseSize = input.baseSizePx
     ?? DEFAULT_ICON_SIZE_PX;
@@ -110,48 +104,6 @@ export function svgToDataUrl(svg: string): string {
     .replace(/%0A/g, '')
     .replace(/%0D/g, '');
   return `data:image/svg+xml;charset=UTF-8,${encoded}`;
-}
-
-export function buildColoredSvgDataUrl(svg: string, colors: SvgIconColors): string {
-  return svgToDataUrl(applySvgIconColors(svg, colors));
-}
-
-export function buildThemedSvgDataUrl(svg: string, theme: AisIconTheme): string {
-  return svgToDataUrl(applyAisIconTheme(svg, theme));
-}
-
-/**
- * Build icon options for libraries like OpenLayers using a recolored SVG data URL.
- *
- * Color formats: any valid CSS color string (hex, rgb/rgba, hsl/hsla, hwb, lab/lch, color(), named).
- *
- * Usage:
- * ```ts
- * import buoySvg from '../../../assets/svg/marks/buoy-mark.svg?raw';
- * import { buildSvgIconOptions } from 'src/app/core/utils/ais-svg-icon.util';
- *
- * const options = buildSvgIconOptions(buoySvg, { fill: '#ffd200', stroke: '#111111' });
- * // new Icon(options)
- * ```
- */
-export function buildSvgIconOptions(svg: string, colors: SvgIconColors) {
-  return {
-    src: buildColoredSvgDataUrl(svg, colors),
-    anchor: [0.5, 0.5],
-    anchorXUnits: 'fraction',
-    anchorYUnits: 'fraction',
-    scale: 1
-  } as const;
-}
-
-export function buildThemedSvgIconOptions(svg: string, theme: AisIconTheme) {
-  return {
-    src: buildThemedSvgDataUrl(svg, theme),
-    anchor: [0.5, 0.5],
-    anchorXUnits: 'fraction',
-    anchorYUnits: 'fraction',
-    scale: 1
-  } as const;
 }
 
 function resolveCollisionRiskFactor(rating?: number): AisIconCollisionRisk {

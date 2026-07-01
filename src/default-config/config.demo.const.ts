@@ -1,6 +1,5 @@
 import { Dashboard } from "../app/core/services/dashboard.service"
-import { IConfig, IAppConfig, IConnectionConfig, IThemeConfig } from "../app/core/interfaces/app-settings.interfaces"
-import { UUID } from "../app/core/utils/uuid.util"
+import { IAppConfig, IThemeConfig } from "../app/core/interfaces/app-settings.interfaces"
 
 // Demo Mode config settings file
 export const DemoAppConfig: IAppConfig = {
@@ -760,24 +759,4 @@ export const DemoDashboardsConfig: Dashboard[] = [
 
 export const DemoThemeConfig: IThemeConfig = {
   "themeName": ""
-}
-
-export const DemoConfig: IConfig = {
-  "app": DemoAppConfig,
-  "dashboards": DemoDashboardsConfig,
-  "theme": DemoThemeConfig,
-}
-
-export const DemoConnectionConfig: IConnectionConfig = {
-  "configVersion": 13,
-  "kipUUID": UUID.create(),
-  "signalKUrl": "https://demo.signalk.org",
-  "proxyEnabled": false,
-  "signalKSubscribeAll": false,
-  "useDeviceToken": false,
-  "loginName": null,
-  "useSharedConfig": false,
-  "sharedConfigName": "default",
-  "isRemoteControl": false,
-  "instanceName": ""
 }
