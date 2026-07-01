@@ -1,0 +1,186 @@
+@if (videoLabel(); as label) {
+  <div class="video-widget__title">{{ label }}</div>
+}
+<div class="video-widget__stage">
+  @if (pluginMissing()) {
+    <div class="video-widget__empty">
+      <span class="video-widget__empty-title" role="heading" aria-level="2">SK Video plugin required</span>
+      <small class="video-widget__empty-hint">
+        Install and enable the SK Video plugin on your Signal K server to use cameras and uploaded video.
+      </small>
+    </div>
+  } @else if (pipeline(); as pipe) {
+    @if (pipe === 'mjpeg') {
+      <img
+        class="video-widget__player"
+        [src]="sourceUrl()"
+        [style.object-fit]="objectFit()"
+        alt="Live MJPEG stream"
+        draggable="false">
+      @if (showMjpegWarning()) {
+        <div class="video-widget__toast" role="status" aria-live="polite">
+          MJPEG may show only a single frame in Safari — choose HLS or WebRTC for this camera.
+        </div>
+      }
+    } @else if (isVideoPipeline()) {
+      <video
+        #videoEl
+        class="video-widget__player"
+        [style.object-fit]="objectFit()"
+        [muted]="muted()"
+        [autoplay]="autoplay()"
+        [loop]="loop()"
+        controls
+        playsinline
+        webkit-playsinline
+      ></video>
+
+      @if (showPtz()) {
+        <!-- Drag anywhere on the video to pan/tilt; sits above the video but clear of the control bar. -->
+        <div
+          class="video-widget__drag"
+          (pointerdown)="ptzDragStart($event)"
+          (pointermove)="ptzDragMove($event)"
+          (pointerup)="ptzDragEnd()"
+          (pointercancel)="ptzDragEnd()"
+          (lostpointercapture)="ptzDragEnd()"
+          aria-hidden="true"
+        ></div>
+      }
+
+      @if (connecting()) {
+        <div class="video-widget__connecting" role="status" aria-live="polite">
+          <mat-progress-spinner diameter="36" mode="indeterminate" />
+          <span>Connecting…</span>
+        </div>
+      }
+
+      <div class="video-widget__overlay">
+        @if (canPip) {
+          <button type="button" mat-icon-button class="video-widget__ctrl" (click)="togglePip()"
+            matTooltip="Picture in Picture" aria-label="Picture in Picture">
+            <mat-icon>picture_in_picture_alt</mat-icon>
+          </button>
+        }
+        @if (canFullscreen) {
+          <button type="button" mat-icon-button class="video-widget__ctrl" (click)="toggleFullscreen()"
+            matTooltip="Fullscreen" aria-label="Fullscreen">
+            <mat-icon>fullscreen</mat-icon>
+          </button>
+        }
+        <span class="video-widget__split">
+          <button type="button" mat-icon-button class="video-widget__ctrl" (click)="takeSnapshot()"
+            matTooltip="Take snapshot" aria-label="Take snapshot">
+            <mat-icon>photo_camera</mat-icon>
+          </button>
+          <button type="button" mat-icon-button class="video-widget__ctrl video-widget__caret"
+            [matMenuTriggerFor]="snapMenu" aria-label="Snapshot destination">
+            <mat-icon>arrow_drop_down</mat-icon>
+          </button>
+          <mat-menu #snapMenu="matMenu">
+            <button mat-menu-item type="button" (click)="takeSnapshot('download')">
+              <mat-icon>download</mat-icon><span>Download</span>
+            </button>
+            @if (canShare) {
+              <button mat-menu-item type="button" (click)="takeSnapshot('share')">
+                <mat-icon>ios_share</mat-icon><span>Share…</span>
+              </button>
+            }
+          </mat-menu>
+        </span>
+      </div>
+
+      @if (showPtz()) {
+        <div class="video-widget__ptz" role="group" aria-label="Camera pan, tilt and zoom">
+          <div class="video-widget__dpad">
+            <button type="button" mat-icon-button class="video-widget__ctrl video-widget__dpad-up"
+              aria-label="Tilt up"
+              (pointerdown)="ptzStart(0, 1, 0, $event)" (pointerup)="ptzStop()" (pointercancel)="ptzStop()" (blur)="ptzStop()"
+              (keydown.enter)="!$any($event).repeat && ptzStart(0, 1, 0)" (keydown.space)="!$any($event).repeat && ptzStart(0, 1, 0)" (keyup)="ptzStop()">
+              <mat-icon>keyboard_arrow_up</mat-icon>
+            </button>
+            <button type="button" mat-icon-button class="video-widget__ctrl video-widget__dpad-left"
+              aria-label="Pan left"
+              (pointerdown)="ptzStart(-1, 0, 0, $event)" (pointerup)="ptzStop()" (pointercancel)="ptzStop()" (blur)="ptzStop()"
+              (keydown.enter)="!$any($event).repeat && ptzStart(-1, 0, 0)" (keydown.space)="!$any($event).repeat && ptzStart(-1, 0, 0)" (keyup)="ptzStop()">
+              <mat-icon>keyboard_arrow_left</mat-icon>
+            </button>
+            <button type="button" mat-icon-button class="video-widget__ctrl video-widget__dpad-right"
+              aria-label="Pan right"
+              (pointerdown)="ptzStart(1, 0, 0, $event)" (pointerup)="ptzStop()" (pointercancel)="ptzStop()" (blur)="ptzStop()"
+              (keydown.enter)="!$any($event).repeat && ptzStart(1, 0, 0)" (keydown.space)="!$any($event).repeat && ptzStart(1, 0, 0)" (keyup)="ptzStop()">
+              <mat-icon>keyboard_arrow_right</mat-icon>
+            </button>
+            <button type="button" mat-icon-button class="video-widget__ctrl video-widget__dpad-down"
+              aria-label="Tilt down"
+              (pointerdown)="ptzStart(0, -1, 0, $event)" (pointerup)="ptzStop()" (pointercancel)="ptzStop()" (blur)="ptzStop()"
+              (keydown.enter)="!$any($event).repeat && ptzStart(0, -1, 0)" (keydown.space)="!$any($event).repeat && ptzStart(0, -1, 0)" (keyup)="ptzStop()">
+              <mat-icon>keyboard_arrow_down</mat-icon>
+            </button>
+          </div>
+          <div class="video-widget__zoom">
+            <button type="button" mat-icon-button class="video-widget__ctrl"
+              aria-label="Zoom in"
+              (pointerdown)="ptzStart(0, 0, 1, $event)" (pointerup)="ptzStop()" (pointercancel)="ptzStop()" (blur)="ptzStop()"
+              (keydown.enter)="!$any($event).repeat && ptzStart(0, 0, 1)" (keydown.space)="!$any($event).repeat && ptzStart(0, 0, 1)" (keyup)="ptzStop()">
+              <mat-icon>add</mat-icon>
+            </button>
+            <button type="button" mat-icon-button class="video-widget__ctrl"
+              aria-label="Zoom out"
+              (pointerdown)="ptzStart(0, 0, -1, $event)" (pointerup)="ptzStop()" (pointercancel)="ptzStop()" (blur)="ptzStop()"
+              (keydown.enter)="!$any($event).repeat && ptzStart(0, 0, -1)" (keydown.space)="!$any($event).repeat && ptzStart(0, 0, -1)" (keyup)="ptzStop()">
+              <mat-icon>remove</mat-icon>
+            </button>
+          </div>
+          @if (ptzPresets().length) {
+            <button type="button" mat-icon-button class="video-widget__ctrl"
+              [matMenuTriggerFor]="presetMenu" aria-label="Camera presets">
+              <mat-icon>bookmarks</mat-icon>
+            </button>
+            <mat-menu #presetMenu="matMenu">
+              @for (preset of ptzPresets(); track preset.token) {
+                <button mat-menu-item type="button" (click)="ptzGoto(preset.token)">{{ preset.name }}</button>
+              }
+            </mat-menu>
+          }
+        </div>
+      }
+      @if (ptzError(); as err) {
+        <div class="video-widget__toast" role="status" aria-live="polite">{{ err }}</div>
+      }
+    } @else {
+      <div class="video-widget__empty">
+        <span class="video-widget__empty-title" role="heading" aria-level="2">Unsupported stream</span>
+        <small class="video-widget__empty-hint">This stream type can't play in this browser.</small>
+      </div>
+    }
+
+    @if (playbackError(); as err) {
+      <!-- A terminal/connection error: announce assertively so a screen reader interrupts. -->
+      <div class="video-widget__toast video-widget__toast--error" role="alert" aria-live="assertive">
+        <span>{{ err }}</span>
+        @if (canRetry()) {
+          <button type="button" mat-flat-button class="video-widget__retry" (click)="retry()">Retry</button>
+        }
+      </div>
+    }
+    @if (snapshotError(); as err) {
+      <div class="video-widget__toast" role="status" aria-live="polite">{{ err }}</div>
+    }
+    @if (snapshotMessage(); as msg) {
+      <div class="video-widget__toast video-widget__toast--success" role="status" aria-live="polite">
+        {{ msg }}
+      </div>
+    }
+    @if (codecWarning(); as warn) {
+      <div class="video-widget__toast video-widget__toast--error" role="alert" aria-live="assertive">
+        {{ warn }}
+      </div>
+    }
+  } @else {
+    <div class="video-widget__empty">
+      <span class="video-widget__empty-title" role="heading" aria-level="2">No video source</span>
+      <small class="video-widget__empty-hint">Open the widget settings to add a video URL</small>
+    </div>
+  }
+</div>

@@ -1,0 +1,756 @@
+import {
+  ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, signal, untracked, viewChild
+} from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import Hls from 'hls.js';
+import { IVideoWidgetConfig, IWidgetSvcConfig, TSnapshotDestination } from '../../core/interfaces/widgets-interface';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
+import { ITheme } from '../../core/services/app-service';
+import { DataService } from '../../core/services/data.service';
+import { SignalKConnectionService } from '../../core/services/signalk-connection.service';
+import { PluginConfigClientService } from '../../core/services/plugin-config-client.service';
+import { resolveSignalKPluginBaseUrl } from '../../core/utils/signalk-plugin-url.util';
+import { resolveVideoSourceUrl } from './video-source.util';
+import { resolveGatewaySourceUrl } from './gateway-source.util';
+import { PtzClient, type IPtzPreset } from './ptz-client';
+import { dragToPtzVector, type IPtzVector } from './ptz-command.util';
+import { VideoAssetsClient } from './video-assets-client';
+import {
+  IPlaybackCapabilities, selectPlaybackPipeline, TPlaybackPipeline
+} from './playback-pipeline.util';
+import { mapPreset } from './playback-presets.util';
+import { classifyPluginPresence } from './plugin-presence.util';
+import { whepDelete, whepNegotiate, type FetchLike } from './whep.util';
+import { applyJitter, backoffDelayMs, DEFAULT_BACKOFF, shouldReconnect } from './reconnect.util';
+import { evaluateFirstFrame } from './first-frame.util';
+import {
+  canShareSnapshot, captureVideoFrameJpegDataUrl, downloadBlob, shareSnapshot
+} from './snapshot-image.util';
+import { composeSnapshot } from './snapshot.util';
+
+const fetchLike: FetchLike = (url, init) => fetch(url, init);
+
+/**
+ * Video widget. Plays a configured source through the right browser pipeline — a progressive file or
+ * native HLS in `<video>`, HLS via hls.js, MJPEG in `<img>`, or low-latency WebRTC (WHEP) — with
+ * quality/latency presets, native + overlay controls (PiP, fullscreen) and telemetry snapshots.
+ */
+@Component({
+  selector: 'widget-video',
+  templateUrl: './widget-video.component.html',
+  styleUrls: ['./widget-video.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule, MatProgressSpinnerModule]
+})
+export class WidgetVideoComponent {
+  public id = input.required<string>();
+  public type = input.required<string>();
+  public theme = input.required<ITheme | null>();
+
+  public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
+    video: {
+      sourceKind: 'url',
+      url: null,
+      transport: 'auto',
+      preset: 'balanced',
+      muted: true,
+      autoplay: false,
+      loop: false,
+      objectFit: 'contain',
+      snapshot: { embedTelemetry: true, embedLocation: true, defaultDestination: 'download' }
+    }
+  };
+
+  protected readonly runtime = inject(WidgetRuntimeDirective);
+  private readonly data = inject(DataService);
+  private readonly connection = inject(SignalKConnectionService);
+  private readonly ptz = inject(PtzClient);
+  private readonly assets = inject(VideoAssetsClient);
+  private readonly pluginConfig = inject(PluginConfigClientService);
+
+  /** sk-video plugin base URL, tracked from the active server endpoint. */
+  private readonly endpoint = toSignal(this.connection.serverServiceEndpoint$, { initialValue: null });
+  protected readonly gatewayBaseUrl = computed<string | null>(() =>
+    resolveSignalKPluginBaseUrl(
+      'sk-video',
+      this.endpoint()?.httpServiceUrl ?? null,
+      this.connection.signalKURL?.url ?? null
+    )
+  );
+
+  protected readonly videoRef = viewChild<ElementRef<HTMLVideoElement>>('videoEl');
+
+  private readonly capabilities: IPlaybackCapabilities = {
+    hasMediaSource: typeof window !== 'undefined' && 'MediaSource' in window,
+    hlsJsSupported: Hls.isSupported(),
+    nativeHls: (() => {
+      const v = document.createElement('video');
+      return !!v.canPlayType && v.canPlayType('application/vnd.apple.mpegurl') !== '';
+    })()
+  };
+  private readonly isWebkit =
+    typeof navigator !== 'undefined' && /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+
+  protected readonly videoConfig = computed<IVideoWidgetConfig | null>(() => this.runtime.options()?.video ?? null);
+  protected readonly sourceUrl = computed<string | null>(() => {
+    const cfg = this.videoConfig();
+    const kind = cfg?.sourceKind ?? 'url';
+    if (kind === 'camera') {
+      return resolveGatewaySourceUrl(cfg, this.gatewayBaseUrl());
+    }
+    if (kind === 'file') {
+      return this.assets.playbackUrl(this.gatewayBaseUrl(), cfg?.fileAssetId ?? null);
+    }
+    return resolveVideoSourceUrl(cfg, window.location.origin);
+  });
+  protected readonly pipeline = computed<TPlaybackPipeline | null>(() => {
+    const cfg = this.videoConfig();
+    const url = this.sourceUrl();
+    if (!cfg || !url) {
+      return null;
+    }
+    return selectPlaybackPipeline(cfg.transport ?? 'auto', url, this.capabilities);
+  });
+  private readonly presetTuning = computed(() => mapPreset(this.videoConfig()?.preset ?? 'balanced'));
+
+  protected readonly isVideoPipeline = computed(() => {
+    const p = this.pipeline();
+    return p === 'file' || p === 'hls-native' || p === 'hls-hlsjs' || p === 'webrtc';
+  });
+  private readonly isLive = computed(() => {
+    const p = this.pipeline();
+    return p === 'hls-native' || p === 'hls-hlsjs' || p === 'webrtc' || p === 'mjpeg';
+  });
+  protected readonly objectFit = computed(() => this.videoConfig()?.objectFit ?? 'contain');
+  /** Optional title shown on the video to tell streams apart when several are on screen. */
+  protected readonly videoLabel = computed(() => this.videoConfig()?.label?.trim() || null);
+  protected readonly muted = computed(() => this.videoConfig()?.muted ?? true);
+  protected readonly autoplay = computed(() => this.videoConfig()?.autoplay || this.isLive());
+  protected readonly loop = computed(() => this.videoConfig()?.loop ?? false);
+  protected readonly showMjpegWarning = computed(() => this.pipeline() === 'mjpeg' && this.isWebkit);
+
+  /** Camera and uploaded-file sources are served by the sk-video plugin; URL sources are not. */
+  protected readonly requiresPlugin = computed(() => {
+    const kind = this.videoConfig()?.sourceKind ?? 'url';
+    return kind === 'camera' || kind === 'file';
+  });
+  /** Result of probing the sk-video plugin: 'unknown' until checked (or if the check is inconclusive). */
+  private readonly pluginState = signal<'unknown' | 'present' | 'missing'>('unknown');
+  /** True once we've confirmed a source that needs the sk-video plugin can't use it (not installed or disabled). */
+  protected readonly pluginMissing = computed(
+    () => this.requiresPlugin() && this.pluginState() === 'missing'
+  );
+
+  protected readonly snapshotError = signal<string | null>(null);
+  /** Transient confirmation after a snapshot succeeds (e.g. "Snapshot saved"). */
+  protected readonly snapshotMessage = signal<string | null>(null);
+  protected readonly playbackError = signal<string | null>(null);
+  protected readonly codecWarning = signal<string | null>(null);
+  protected readonly canRetry = signal(false);
+  private readonly painted = signal(false);
+  /** True while a playable pipeline is set up but hasn't shown its first frame yet (and has no error). */
+  protected readonly connecting = computed(
+    () => this.isVideoPipeline() && !!this.sourceUrl() && !this.painted() && !this.playbackError()
+  );
+  /** Live pipelines are torn down while the page/dashboard is hidden to save decoders, battery and heat. */
+  private readonly visible = signal(typeof document === 'undefined' || !document.hidden);
+  private readonly reconnectNonce = signal(0);
+  protected readonly canPip = typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
+  protected readonly canFullscreen =
+    typeof document !== 'undefined' && (!!document.fullscreenEnabled ||
+      typeof (document.createElement('video') as unknown as { webkitEnterFullscreen?: unknown }).webkitEnterFullscreen === 'function');
+  protected readonly canShare = canShareSnapshot();
+
+  /** PTZ controls are offered for a saved camera served through the gateway. */
+  protected readonly showPtz = computed(
+    () =>
+      (this.videoConfig()?.sourceKind ?? 'url') === 'camera' &&
+      !!this.gatewayBaseUrl() &&
+      !!this.videoConfig()?.cameraId
+  );
+  protected readonly ptzPresets = signal<IPtzPreset[]>([]);
+  protected readonly ptzError = signal<string | null>(null);
+  /** Re-sent while a direction is held to defeat the gateway's auto-stop safety timeout. */
+  private ptzKeepAlive: ReturnType<typeof setInterval> | null = null;
+  private static readonly PTZ_KEEPALIVE_MS = 1200;
+  /** The PTZ velocity currently being held (by the d-pad) or dragged (on the video). */
+  private ptzVector: IPtzVector = { pan: 0, tilt: 0, zoom: 0 };
+  /** Press point of a drag-to-pan gesture, or null when not dragging. */
+  private dragOrigin: { x: number; y: number } | null = null;
+  private lastPtzSend = 0;
+  private static readonly PTZ_SEND_THROTTLE_MS = 150;
+
+  private generation = 0;
+  private hls: Hls | null = null;
+  private pc: RTCPeerConnection | null = null;
+  private whepResource: string | null = null;
+  private reconnectAttempt = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private boundVideo: HTMLVideoElement | null = null;
+  private firstFrameTimer: ReturnType<typeof setTimeout> | null = null;
+  private rvfcHandle: number | null = null;
+  private paintedFrame = false;
+  private static readonly FIRST_FRAME_TIMEOUT_MS = 8000;
+  // Liveness: after the first frame, a live stream that stops advancing (network/camera hang that
+  // doesn't raise an error) holds its last frame on screen — stale footage presented as live, the
+  // worst failure mode on a marine display. Tracked via timeupdate progress; a stall forces a
+  // reconnect so the operator sees a reconnecting state instead of a frozen "live" image.
+  private lastProgressAt = 0;
+  private stalled = false;
+  private livenessTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly STALE_MS = 6000;
+
+  constructor() {
+    // (Re)attach the right pipeline whenever the source, transport, preset or visibility changes — or
+    // once the <video> element is rendered, or a reconnect is requested. A generation token prevents
+    // stale async callbacks from resurrecting a torn-down pipeline.
+    effect(() => {
+      const url = this.sourceUrl();
+      const pipe = this.pipeline();
+      const tuning = this.presetTuning();
+      const video = this.videoRef()?.nativeElement ?? null;
+      const visible = this.visible();
+      const pluginMissing = this.pluginMissing();
+      this.reconnectNonce();
+      untracked(() => {
+        // Don't try to play a source whose plugin is missing, and tear down live pipelines while
+        // hidden (a native <video> file pauses itself).
+        if (pluginMissing || (!visible && this.isLive())) {
+          this.dispose();
+          return;
+        }
+        void this.attach(url, pipe, tuning, video);
+      });
+    });
+
+    // Probe the sk-video plugin when a source that needs it is selected, so we can tell the user to
+    // install it rather than showing a blank or endlessly-reconnecting player. Re-probes only when
+    // the source kind or the server endpoint changes, so enabling the plugin server-side clears the
+    // message on the next reconnect (or when the widget is reconfigured), not instantly.
+    effect(() => {
+      const needsPlugin = this.requiresPlugin();
+      this.endpoint();
+      untracked(() => {
+        if (!needsPlugin) {
+          this.pluginState.set('unknown');
+          return;
+        }
+        void this.probePlugin();
+      });
+    });
+
+    // Load the camera's presets whenever a PTZ-capable camera source becomes active.
+    effect(() => {
+      const enabled = this.showPtz();
+      const base = this.gatewayBaseUrl();
+      const id = this.videoConfig()?.cameraId ?? null;
+      untracked(() => {
+        if (!enabled) {
+          this.ptzPresets.set([]);
+          return;
+        }
+        this.ptz
+          .listPresets(base, id)
+          .then((presets) => this.ptzPresets.set(presets))
+          .catch(() => this.ptzPresets.set([]));
+      });
+    });
+
+    const onVisibility = () => {
+      this.visible.set(!document.hidden);
+      // Stop any in-progress camera move when the view is hidden. The keep-alive that defeats the
+      // gateway's auto-stop failsafe won't get a pointerup/blur if the page is backgrounded or the
+      // dashboard switches pages, so the camera would otherwise keep slewing to its mechanical limit.
+      if (document.hidden) this.ptzStop();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+    inject(DestroyRef).onDestroy(() => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+      this.ptzStop(); // stop the keep-alive AND command the camera to stop, not just clear the timer
+      if (this.snapshotMessageTimer) clearTimeout(this.snapshotMessageTimer);
+      this.dispose();
+    });
+  }
+
+  /** Probe the sk-video plugin and record whether a camera/file source can actually use it. */
+  private async probePlugin(): Promise<void> {
+    try {
+      this.pluginState.set(classifyPluginPresence(await this.pluginConfig.getPlugin('sk-video')));
+    } catch {
+      this.pluginState.set('unknown');
+    }
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
+  /** Successful playback resets the reconnect + first-frame state. */
+  private readonly onPlaying = (): void => {
+    this.reconnectAttempt = 0;
+    this.canRetry.set(false);
+    this.playbackError.set(null);
+    this.paintedFrame = true;
+    this.painted.set(true);
+    this.codecWarning.set(null);
+    this.clearReconnectTimer();
+    this.clearFirstFrameWatchdog();
+    this.lastProgressAt = Date.now();
+    this.stalled = false;
+    this.startLivenessWatch();
+  };
+
+  /** Frame progress: keeps the liveness clock fresh; a stall is when this stops firing. */
+  private readonly onTimeupdate = (): void => {
+    this.lastProgressAt = Date.now();
+    this.stalled = false;
+  };
+
+  /** After the first frame, force a reconnect if currentTime stops advancing (a frozen live feed). */
+  private startLivenessWatch(): void {
+    this.stopLivenessWatch();
+    this.livenessTimer = setInterval(() => {
+      const v = this.boundVideo;
+      if (!v || v.paused || v.ended || !this.painted() || this.stalled) return;
+      if (Date.now() - this.lastProgressAt > WidgetVideoComponent.STALE_MS) {
+        this.stalled = true;
+        this.scheduleReconnect(this.generation);
+      }
+    }, 2000);
+  }
+
+  private stopLivenessWatch(): void {
+    if (this.livenessTimer) {
+      clearInterval(this.livenessTimer);
+      this.livenessTimer = null;
+    }
+  }
+
+  /** Watches for a first painted frame; if none arrives while data is flowing, warns about the codec. */
+  private startFirstFrameWatchdog(video: HTMLVideoElement, gen: number): void {
+    this.clearFirstFrameWatchdog();
+    this.paintedFrame = false;
+    this.painted.set(false);
+    const rvfc = video as HTMLVideoElement & {
+      requestVideoFrameCallback?: (cb: () => void) => number;
+    };
+    if (typeof rvfc.requestVideoFrameCallback === 'function') {
+      this.rvfcHandle = rvfc.requestVideoFrameCallback(() => {
+        if (this.generation === gen) {
+          this.paintedFrame = true;
+        }
+      });
+    }
+    this.firstFrameTimer = setTimeout(() => {
+      if (this.generation !== gen) {
+        return;
+      }
+      const painted = this.paintedFrame || video.videoWidth > 0;
+      const verdict = evaluateFirstFrame({ paintedFrame: painted, hasData: video.readyState >= 2, timedOut: true });
+      if (verdict === 'no-decode') {
+        this.codecWarning.set(
+          'No picture. This device can’t play this camera’s video format (often HEVC/H.265). Try switching Connection to “Standard”, or pick a lower quality.'
+        );
+      }
+    }, WidgetVideoComponent.FIRST_FRAME_TIMEOUT_MS);
+  }
+
+  private clearFirstFrameWatchdog(): void {
+    if (this.firstFrameTimer) {
+      clearTimeout(this.firstFrameTimer);
+      this.firstFrameTimer = null;
+    }
+    if (this.rvfcHandle != null && this.boundVideo) {
+      const v = this.boundVideo as HTMLVideoElement & { cancelVideoFrameCallback?: (h: number) => void };
+      try { v.cancelVideoFrameCallback?.(this.rvfcHandle); } catch { /* ignore */ }
+    }
+    this.rvfcHandle = null;
+  }
+
+  /** `<video>` error handling: terminal for files, reconnect for native HLS. */
+  private readonly onError = (): void => {
+    const pipe = this.pipeline();
+    if (pipe === 'file') {
+      this.playbackError.set('This browser can’t play this video.');
+    } else if (pipe === 'hls-native') {
+      this.scheduleReconnect(this.generation);
+    }
+    // hls.js and WebRTC report errors through their own handlers.
+  };
+
+  /** Schedules a backed-off reconnect for a recoverable error, or surfaces a manual Retry. */
+  private scheduleReconnect(gen: number): void {
+    if (this.generation !== gen) {
+      return;
+    }
+    this.reconnectAttempt++;
+    if (!shouldReconnect(this.reconnectAttempt, DEFAULT_BACKOFF)) {
+      this.canRetry.set(true);
+      this.playbackError.set('Stream lost. Check the camera, then tap Retry.');
+      return;
+    }
+    const delay = applyJitter(
+      backoffDelayMs(this.reconnectAttempt, DEFAULT_BACKOFF),
+      DEFAULT_BACKOFF.jitterRatio,
+      Math.random
+    );
+    this.playbackError.set(
+      `Reconnecting… (attempt ${this.reconnectAttempt} of ${DEFAULT_BACKOFF.maxAttempts})`
+    );
+    this.clearReconnectTimer();
+    this.reconnectTimer = setTimeout(() => {
+      if (this.generation === gen) {
+        this.reconnectNonce.update(n => n + 1);
+      }
+    }, delay);
+  }
+
+  /** Manual retry after the automatic attempts are exhausted. */
+  protected retry(): void {
+    this.reconnectAttempt = 0;
+    this.canRetry.set(false);
+    this.playbackError.set(null);
+    this.reconnectNonce.update(n => n + 1);
+  }
+
+  /** Press-and-hold a direction (d-pad): start moving and keep re-sending until released. */
+  protected ptzStart(pan: number, tilt: number, zoom: number, event?: Event): void {
+    this.ptzVector = { pan, tilt, zoom };
+    this.beginPtz(event);
+  }
+
+  /** Drag anywhere on the video to pan/tilt, like a virtual joystick. */
+  protected ptzDragStart(event: PointerEvent): void {
+    if (!this.showPtz()) {
+      return;
+    }
+    this.dragOrigin = { x: event.clientX, y: event.clientY };
+    this.ptzVector = { pan: 0, tilt: 0, zoom: 0 };
+    this.beginPtz(event);
+  }
+
+  protected ptzDragMove(event: PointerEvent): void {
+    if (!this.dragOrigin) {
+      return;
+    }
+    this.ptzVector = dragToPtzVector(
+      event.clientX - this.dragOrigin.x,
+      event.clientY - this.dragOrigin.y
+    );
+    // Pointer moves fire ~60×/s; throttle the gateway sends (the keep-alive still covers gaps).
+    const now = Date.now();
+    if (now - this.lastPtzSend >= WidgetVideoComponent.PTZ_SEND_THROTTLE_MS) {
+      this.lastPtzSend = now;
+      this.sendPtz();
+    }
+  }
+
+  protected ptzDragEnd(): void {
+    if (!this.dragOrigin) {
+      return;
+    }
+    this.dragOrigin = null;
+    this.ptzStop();
+  }
+
+  /** Capture the pointer (so finger drift won't cancel the hold) and start the keep-alive loop. */
+  private beginPtz(event?: Event): void {
+    if (event && 'pointerId' in event) {
+      const pe = event as PointerEvent;
+      try {
+        (pe.currentTarget as Element | null)?.setPointerCapture(pe.pointerId);
+      } catch {
+        // setPointerCapture can throw if the pointer is already gone; the hold still works.
+      }
+    }
+    this.stopPtzKeepAlive();
+    this.sendPtz();
+    this.ptzKeepAlive = setInterval(() => this.sendPtz(), WidgetVideoComponent.PTZ_KEEPALIVE_MS);
+  }
+
+  /** Send the current PTZ velocity to the gateway; skipped while idle (zero vector). */
+  private sendPtz(): void {
+    const { pan, tilt, zoom } = this.ptzVector;
+    if (pan === 0 && tilt === 0 && zoom === 0) {
+      return;
+    }
+    void this.ptz
+      .move(this.gatewayBaseUrl(), this.videoConfig()?.cameraId ?? null, { pan, tilt, zoom })
+      .then(() => this.ptzError.set(null))
+      .catch(() => this.ptzError.set('Camera move failed'));
+  }
+
+  /** Release: stop the keep-alive and command the camera to stop. */
+  protected ptzStop(): void {
+    if (!this.ptzKeepAlive) {
+      return; // not currently moving — avoid spurious stop commands (e.g. pointerleave without press)
+    }
+    this.stopPtzKeepAlive();
+    void this.ptz
+      .stop(this.gatewayBaseUrl(), this.videoConfig()?.cameraId ?? null)
+      .catch(() => undefined);
+  }
+
+  /** Recall a preset by token. */
+  protected ptzGoto(token: string): void {
+    void this.ptz
+      .gotoPreset(this.gatewayBaseUrl(), this.videoConfig()?.cameraId ?? null, token)
+      .then(() => this.ptzError.set(null))
+      .catch(() => this.ptzError.set('Could not recall preset'));
+  }
+
+  private stopPtzKeepAlive(): void {
+    if (this.ptzKeepAlive) {
+      clearInterval(this.ptzKeepAlive);
+      this.ptzKeepAlive = null;
+    }
+  }
+
+  private dispose(): void {
+    this.generation++;
+    this.clearReconnectTimer();
+    this.clearFirstFrameWatchdog();
+    this.stopLivenessWatch();
+    this.stalled = false;
+    this.codecWarning.set(null);
+    this.painted.set(false);
+    if (this.boundVideo) {
+      this.boundVideo.removeEventListener('playing', this.onPlaying);
+      this.boundVideo.removeEventListener('timeupdate', this.onTimeupdate);
+      this.boundVideo.removeEventListener('error', this.onError);
+      this.boundVideo = null;
+    }
+    if (this.hls) {
+      try { this.hls.destroy(); } catch { /* ignore */ }
+      this.hls = null;
+    }
+    if (this.pc) {
+      try {
+        this.pc.getReceivers().forEach(r => r.track?.stop());
+        this.pc.close();
+      } catch { /* ignore */ }
+      this.pc = null;
+    }
+    if (this.whepResource) {
+      // Best-effort session teardown that survives navigation, so go2rtc doesn't leak the consumer
+      // and keep the camera streaming.
+      try { fetch(this.whepResource, { method: 'DELETE', keepalive: true }); } catch { /* ignore */ }
+      this.whepResource = null;
+    }
+    const v = this.videoRef()?.nativeElement;
+    if (v) {
+      try { v.pause(); } catch { /* ignore */ }
+      v.removeAttribute('src');
+      v.srcObject = null;
+      try { v.load(); } catch { /* ignore */ }
+    }
+  }
+
+  private async attach(
+    url: string | null,
+    pipe: TPlaybackPipeline | null,
+    tuning: ReturnType<typeof mapPreset>,
+    video: HTMLVideoElement | null
+  ): Promise<void> {
+    this.dispose();
+    this.playbackError.set(null);
+    const gen = this.generation;
+    if (!url || !pipe) {
+      return;
+    }
+    if (pipe === 'unsupported') {
+      this.playbackError.set('This stream type is not supported in this browser.');
+      return;
+    }
+    if (pipe === 'mjpeg' || !video) {
+      return; // MJPEG renders via <img>; other pipelines need the <video> element.
+    }
+
+    video.addEventListener('playing', this.onPlaying);
+    video.addEventListener('timeupdate', this.onTimeupdate);
+    video.addEventListener('error', this.onError);
+    this.boundVideo = video;
+    this.startFirstFrameWatchdog(video, gen);
+
+    switch (pipe) {
+      case 'file':
+      case 'hls-native':
+        video.src = url;
+        break;
+      case 'hls-hlsjs': {
+        const hls = new Hls({
+          lowLatencyMode: tuning.hls.lowLatencyMode,
+          liveSyncDurationCount: tuning.hls.liveSyncDurationCount,
+          maxLiveSyncPlaybackRate: tuning.hls.maxLiveSyncPlaybackRate,
+          backBufferLength: tuning.hls.backBufferLength,
+          maxBufferLength: tuning.hls.maxBufferLength
+        });
+        this.hls = hls;
+        hls.on(Hls.Events.ERROR, (_e, errData) => {
+          if (errData.fatal && this.generation === gen) {
+            this.scheduleReconnect(gen);
+          }
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        break;
+      }
+      case 'webrtc':
+        await this.attachWhep(url, video, tuning.jitterBufferTargetMs, gen);
+        break;
+    }
+  }
+
+  private async attachWhep(endpoint: string, video: HTMLVideoElement, jitterMs: number, gen: number): Promise<void> {
+    if (typeof RTCPeerConnection === 'undefined') {
+      this.playbackError.set('WebRTC is not supported in this browser.');
+      return;
+    }
+    const pc = new RTCPeerConnection();
+    this.pc = pc;
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.addTransceiver('audio', { direction: 'recvonly' });
+    pc.ontrack = (e) => {
+      if (this.generation === gen) {
+        video.srcObject = e.streams[0] ?? new MediaStream([e.track]);
+      }
+    };
+    pc.addEventListener('iceconnectionstatechange', () => {
+      if (pc.iceConnectionState === 'failed' && this.generation === gen) {
+        this.scheduleReconnect(gen);
+      }
+    });
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await this.waitForIceGathering(pc);
+      if (this.generation !== gen) {
+        return;
+      }
+      const { answerSdp, resourceUrl } = await whepNegotiate(endpoint, pc.localDescription?.sdp ?? offer.sdp ?? '', fetchLike);
+      if (this.generation !== gen) {
+        // Disposed/superseded mid-negotiation — release the session we just created WITHOUT clobbering
+        // the active generation's resourceUrl (assigning first would orphan the live go2rtc consumer
+        // if a stale negotiation resolves after the current one).
+        void whepDelete(resourceUrl, fetchLike).catch(() => undefined);
+        return;
+      }
+      this.whepResource = resourceUrl;
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      for (const r of pc.getReceivers()) {
+        try {
+          (r as unknown as { jitterBufferTarget?: number }).jitterBufferTarget = jitterMs;
+        } catch { /* unsupported (e.g. Safari) — ignore */ }
+      }
+    } catch {
+      if (this.generation === gen) {
+        this.playbackError.set('Couldn’t connect to the live video.');
+      }
+    }
+  }
+
+  private waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 2000): Promise<void> {
+    if (pc.iceGatheringState === 'complete') {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const finish = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        pc.removeEventListener('icegatheringstatechange', check);
+        resolve();
+      };
+      const check = () => {
+        if (pc.iceGatheringState === 'complete') {
+          finish();
+        }
+      };
+      pc.addEventListener('icegatheringstatechange', check);
+      timer = setTimeout(finish, timeoutMs);
+    });
+  }
+
+  protected async takeSnapshot(destination?: TSnapshotDestination): Promise<void> {
+    const video = this.videoRef()?.nativeElement;
+    if (!video) {
+      return;
+    }
+    const snap = this.videoConfig()?.snapshot;
+    const dest = destination ?? snap?.defaultDestination ?? 'download';
+    try {
+      const jpegDataUrl = captureVideoFrameJpegDataUrl(video, 0.92);
+      const result = composeSnapshot(jpegDataUrl, (path) => this.data.getPathObject(path), {
+        now: new Date(),
+        embedTelemetry: snap?.embedTelemetry ?? true,
+        embedLocation: snap?.embedLocation ?? true,
+        cameraName: this.runtime.options()?.displayName ?? null
+      });
+      if (dest === 'share' && this.canShare) {
+        await shareSnapshot(result.blob, result.filename);
+      } else {
+        downloadBlob(result.blob, result.filename);
+      }
+      this.snapshotError.set(null);
+      this.flashSnapshotMessage(dest === 'share' && this.canShare ? 'Photo shared' : 'Snapshot saved');
+    } catch (err) {
+      const isSecurity = err instanceof DOMException && err.name === 'SecurityError';
+      this.snapshotError.set(
+        isSecurity
+          ? 'Can’t take a snapshot from this video source.'
+          : 'Snapshot failed.'
+      );
+    }
+  }
+
+  private snapshotMessageTimer: ReturnType<typeof setTimeout> | null = null;
+  private flashSnapshotMessage(message: string): void {
+    this.snapshotMessage.set(message);
+    if (this.snapshotMessageTimer) {
+      clearTimeout(this.snapshotMessageTimer);
+    }
+    this.snapshotMessageTimer = setTimeout(() => this.snapshotMessage.set(null), 2500);
+  }
+
+  protected async togglePip(): Promise<void> {
+    const video = this.videoRef()?.nativeElement;
+    if (!video) {
+      return;
+    }
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await video.requestPictureInPicture();
+      }
+    } catch { /* not allowed — ignore */ }
+  }
+
+  protected async toggleFullscreen(): Promise<void> {
+    const video = this.videoRef()?.nativeElement;
+    if (!video) {
+      return;
+    }
+    const iosVideo = video as unknown as { webkitEnterFullscreen?: () => void };
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (video.requestFullscreen) {
+        await video.requestFullscreen();
+      } else if (typeof iosVideo.webkitEnterFullscreen === 'function') {
+        iosVideo.webkitEnterFullscreen();
+      }
+    } catch { /* ignore */ }
+  }
+}

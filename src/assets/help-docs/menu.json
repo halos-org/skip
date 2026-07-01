@@ -19,6 +19,14 @@
         "file": "embedwidget.md"
       },
       {
+        "title": "The Video Widget",
+        "file": "videowidget.md"
+      },
+      {
+        "title": "Video Recipes (step by step)",
+        "file": "video-recipes.md"
+      },
+      {
         "title": "The Image Widget",
         "file": "image-widget.md"
       },

@@ -1,0 +1,274 @@
+.video-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.video-setup__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+// Used on section <h3> headings and the manual-form <legend>; neutralise their defaults.
+.video-setup__label {
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: inherit;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.video-setup__sources {
+  width: 100%;
+  border-radius: 12px;
+
+  mat-button-toggle {
+    flex: 1 1 0;
+  }
+
+  .mat-button-toggle-label-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.25;
+    padding: 8px 4px;
+  }
+
+  mat-icon {
+    margin-bottom: 2px;
+  }
+}
+
+.video-setup__source-name {
+  font-size: 0.85rem;
+}
+
+.video-setup__soon {
+  // Space the descriptor off the bold preset name so they don't run together
+  // (e.g. "Best Quality Smoothest", not "Best QualitySmoothest").
+  margin-left: 6px;
+  font-size: 0.72rem;
+  color: var(--kip-contrast-dim-color);
+}
+
+.video-setup__url {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.video-setup__appearance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-start;
+
+  mat-form-field {
+    flex: 1 1 220px;
+  }
+}
+
+.video-setup__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  align-items: center;
+}
+
+.video-setup__toggles--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.video-setup__hint {
+  opacity: 0.6;
+  margin: -2px 0 6px 0;
+}
+
+.video-setup__camera-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .video-setup__camera-pick {
+    flex: 1;
+  }
+}
+
+// Disabled-camera marker shown after the name in the picker.
+.video-setup__off {
+  color: var(--kip-contrast-dim-color);
+}
+
+// Per-camera enable/disable toggle under the picker.
+.video-setup__enable {
+  margin: 2px 0 6px 2px;
+  font-size: 0.85rem;
+}
+
+// Compact PTZ test pad: a 3x3 cross of arrow buttons.
+.video-setup__ptz-test {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 6px 2px;
+}
+
+.video-setup__ptz-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  justify-items: center;
+  align-items: center;
+  width: max-content;
+}
+
+.video-setup__ptz-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.video-setup__ptz-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.video-setup__ptz-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.video-setup__ptz-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.video-setup__scan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.video-setup__candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.video-setup__candidate {
+  justify-content: flex-start;
+  text-align: left;
+
+  small {
+    margin-left: 8px;
+    opacity: 0.7;
+  }
+}
+
+// Protocol badge (ONVIF / RTSP) on a discovered camera.
+.video-setup__chip {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.video-setup__manual {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  // It's a <fieldset> for grouping/labelling — strip the browser default border + inline margin.
+  border: 0;
+  margin: 0;
+  min-inline-size: auto;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.video-setup__manual-row {
+  display: flex;
+  gap: 8px;
+
+  .video-setup__manual-scheme {
+    width: 160px;
+  }
+  .video-setup__manual-host {
+    flex: 1;
+  }
+  .video-setup__manual-port {
+    width: 90px;
+  }
+}
+
+.video-setup__add {
+  align-self: flex-start;
+}
+
+.video-setup__error {
+  color: var(--mat-sys-error, #b3261e);
+}
+
+// "Install the SK Video plugin" notice on the Camera / Uploaded tabs when the plugin is unavailable.
+.video-setup__plugin-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--kip-contrast-color);
+  background: color-mix(in srgb, var(--kip-blue-color, #4aa3ff) 16%, transparent);
+
+  mat-icon {
+    flex: 0 0 auto;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--kip-blue-color, #4aa3ff);
+  }
+
+  span {
+    flex: 1;
+  }
+}
+
+.video-setup__manual-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.video-setup__test {
+  &.video-setup__test--ok {
+    color: var(--kip-zone-nominal-color, #43a047);
+  }
+  &.video-setup__test--bad {
+    color: var(--kip-zone-alarm-color, #e53935);
+  }
+}
+
+// "Credentials saved" row with a Clear action, shown while editing a camera.
+.video-setup__cred-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--kip-contrast-dim-color);
+
+  mat-icon {
+    flex: 0 0 auto;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  span {
+    flex: 1;
+  }
+}

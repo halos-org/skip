@@ -151,7 +151,8 @@ export class WidgetService {
     WidgetChargerComponent: () => import('../../widgets/widget-charger/widget-charger.component').then(m => m.WidgetChargerComponent),
     WidgetInverterComponent: () => import('../../widgets/widget-inverter/widget-inverter.component').then(m => m.WidgetInverterComponent),
     WidgetAlternatorComponent: () => import('../../widgets/widget-alternator/widget-alternator.component').then(m => m.WidgetAlternatorComponent),
-    WidgetAcComponent: () => import('../../widgets/widget-ac/widget-ac.component').then(m => m.WidgetAcComponent)
+    WidgetAcComponent: () => import('../../widgets/widget-ac/widget-ac.component').then(m => m.WidgetAcComponent),
+    WidgetVideoComponent: () => import('../../widgets/widget-video/widget-video.component').then(m => m.WidgetVideoComponent)
 };
   private readonly _widgetDefinition: readonly WidgetDescription[] = [
     {
@@ -401,7 +402,7 @@ export class WidgetService {
       selector: 'widget-charger',
       componentClassName: 'WidgetChargerComponent'
     },
-/*     {
+    {
       name: 'Alternator',
       description: 'Monitor alternator output and charging performance with voltage, current, power, revolutions and temperature metrics.',
       icon: 'alternator',
@@ -439,7 +440,7 @@ export class WidgetService {
       requiredPlugins: [],
       selector: 'widget-ac',
       componentClassName: 'WidgetAcComponent'
-    }, */
+    },
     {
       name: 'Windsteer',
       description: 'A wind steering display that combines wind, wind sectors, heading, course over ground and next waypoint information.',
@@ -558,6 +559,19 @@ export class WidgetService {
       requiredPlugins: [],
       selector: 'widget-tutorial',
       componentClassName: 'WidgetTutorialComponent'
+    },
+    {
+      name: 'Video',
+      description: 'Play video from a URL with built-in player controls. IP-camera streaming, ONVIF pan/tilt/zoom and snapshots are added in later updates.',
+      icon: 'videoWidget',
+      minWidth: 2,
+      minHeight: 2,
+      defaultWidth: 8,
+      defaultHeight: 6,
+      category: 'Component',
+      requiredPlugins: [],
+      selector: 'widget-video',
+      componentClassName: 'WidgetVideoComponent'
     },
     {
       name: 'Racesteer (BETA)',

@@ -1,0 +1,371 @@
+<div class="tab-content video-setup" [formGroup]="videoGroup">
+
+  <!-- Source -->
+  <section class="video-setup__section">
+    <h3 class="video-setup__label">Source</h3>
+    <mat-button-toggle-group
+      class="video-setup__sources"
+      formControlName="sourceKind"
+      aria-label="Video source">
+      <mat-button-toggle value="camera">
+        <mat-icon>videocam</mat-icon>
+        <span class="video-setup__source-name">Camera</span>
+      </mat-button-toggle>
+      <mat-button-toggle value="file">
+        <mat-icon>video_library</mat-icon>
+        <span class="video-setup__source-name">Uploaded</span>
+      </mat-button-toggle>
+      <mat-button-toggle value="url">
+        <mat-icon>link</mat-icon>
+        <span class="video-setup__source-name">URL</span>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (pluginMissing) {
+      <div class="video-setup__plugin-banner" role="status" aria-live="polite">
+        <mat-icon>extension_off</mat-icon>
+        <span>
+          The <strong>SK Video</strong> plugin isn't available on your Signal K server. Install and
+          enable it to add cameras and upload video. A web address (URL) works without it.
+        </span>
+      </div>
+    }
+
+    @if (sourceKind === 'url') {
+      <mat-form-field class="video-setup__url">
+        <mat-label>Video URL</mat-label>
+        <input
+          matInput
+          type="url"
+          formControlName="url"
+          placeholder="https://example.com/deck-camera.m3u8">
+        <mat-hint>
+          Paste a link to a video or live stream that opens in a web browser. For an onboard IP camera
+          (RTSP/RTMP), add it under the Camera tab instead.
+        </mat-hint>
+      </mat-form-field>
+
+      <mat-form-field class="video-setup__fit">
+        <mat-label>Video type</mat-label>
+        <mat-select formControlName="transport">
+          <mat-option value="auto">Detect automatically</mat-option>
+          <mat-option value="file">Recorded video file (MP4/WebM)</mat-option>
+          <mat-option value="hls">Live stream (HLS)</mat-option>
+          <mat-option value="mjpeg">Camera image stream (MJPEG)</mat-option>
+          <mat-option value="webrtc">Live, lowest delay (WebRTC)</mat-option>
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (sourceKind === 'camera') {
+      <div class="video-setup__camera-row">
+        <mat-form-field class="video-setup__camera-pick">
+          <mat-label>Camera</mat-label>
+          <mat-select formControlName="cameraId" (selectionChange)="onCameraSelected($event.value)">
+            @for (cam of cameras(); track cam.id) {
+              <mat-option [value]="cam.id">
+                {{ cam.name }}@if (!cam.enabled) {<span class="video-setup__off"> · off</span>}
+              </mat-option>
+            }
+            @if (!cameras().length) {
+              <mat-option [value]="null" disabled>No saved cameras — add one below</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-icon-button type="button" (click)="editSelectedCamera()" [disabled]="!selectedCamera"
+          matTooltip="Edit selected camera" aria-label="Edit selected camera">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button mat-icon-button type="button" (click)="removeSelected()"
+          matTooltip="Remove selected camera" aria-label="Remove selected camera">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+      @if (selectedCamera; as cam) {
+        <mat-slide-toggle
+          class="video-setup__enable"
+          [checked]="cam.enabled"
+          (change)="toggleEnabled($event.checked)">
+          {{ cam.enabled ? 'Enabled — streaming' : 'Disabled — not streaming' }}
+        </mat-slide-toggle>
+
+        <div class="video-setup__ptz-test">
+          <span class="video-setup__hint">Test pan / tilt — hold a direction (PTZ cameras only)</span>
+          <div class="video-setup__ptz-pad" role="group" aria-label="PTZ test controls">
+            <button mat-icon-button type="button" class="video-setup__ptz-up"
+              (pointerdown)="startNudge(0, 0.5, $event)" (pointerup)="stopNudge()"
+              (pointercancel)="stopNudge()" (lostpointercapture)="stopNudge()" (blur)="stopNudge()"
+              (keydown.enter)="!$any($event).repeat && startNudge(0, 0.5)"
+              (keydown.space)="!$any($event).repeat && startNudge(0, 0.5)" (keyup)="stopNudge()"
+              aria-label="Tilt up"><mat-icon>keyboard_arrow_up</mat-icon></button>
+            <button mat-icon-button type="button" class="video-setup__ptz-left"
+              (pointerdown)="startNudge(-0.5, 0, $event)" (pointerup)="stopNudge()"
+              (pointercancel)="stopNudge()" (lostpointercapture)="stopNudge()" (blur)="stopNudge()"
+              (keydown.enter)="!$any($event).repeat && startNudge(-0.5, 0)"
+              (keydown.space)="!$any($event).repeat && startNudge(-0.5, 0)" (keyup)="stopNudge()"
+              aria-label="Pan left"><mat-icon>keyboard_arrow_left</mat-icon></button>
+            <button mat-icon-button type="button" class="video-setup__ptz-right"
+              (pointerdown)="startNudge(0.5, 0, $event)" (pointerup)="stopNudge()"
+              (pointercancel)="stopNudge()" (lostpointercapture)="stopNudge()" (blur)="stopNudge()"
+              (keydown.enter)="!$any($event).repeat && startNudge(0.5, 0)"
+              (keydown.space)="!$any($event).repeat && startNudge(0.5, 0)" (keyup)="stopNudge()"
+              aria-label="Pan right"><mat-icon>keyboard_arrow_right</mat-icon></button>
+            <button mat-icon-button type="button" class="video-setup__ptz-down"
+              (pointerdown)="startNudge(0, -0.5, $event)" (pointerup)="stopNudge()"
+              (pointercancel)="stopNudge()" (lostpointercapture)="stopNudge()" (blur)="stopNudge()"
+              (keydown.enter)="!$any($event).repeat && startNudge(0, -0.5)"
+              (keydown.space)="!$any($event).repeat && startNudge(0, -0.5)" (keyup)="stopNudge()"
+              aria-label="Tilt down"><mat-icon>keyboard_arrow_down</mat-icon></button>
+          </div>
+          @if (ptzTestError(); as err) {
+            <small class="video-setup__error" role="alert" aria-live="assertive">{{ err }}</small>
+          }
+        </div>
+      }
+
+      <mat-form-field class="video-setup__fit">
+        <mat-label>Connection</mat-label>
+        <mat-select formControlName="transport">
+          <mat-option value="hls">Standard (HLS)</mat-option>
+          <mat-option value="webrtc">Live — lowest delay (WebRTC)</mat-option>
+        </mat-select>
+        <mat-hint>Your Signal K server connects to the camera and sends the video to this screen.</mat-hint>
+      </mat-form-field>
+
+      <div class="video-setup__scan">
+        <button mat-stroked-button type="button" (click)="scan()" [disabled]="scanning()">
+          <mat-icon>travel_explore</mat-icon>
+          <span>Scan network</span>
+        </button>
+        @if (scanning()) {
+          <mat-progress-spinner diameter="20" mode="indeterminate" />
+        }
+        @if (scanMessage(); as msg) {
+          <small class="video-setup__hint" role="status" aria-live="polite">{{ msg }}</small>
+        }
+      </div>
+      @if (candidates().length) {
+        <div class="video-setup__candidates">
+          @for (c of candidates(); track c.host) {
+            <button mat-button type="button" class="video-setup__candidate" (click)="useCandidate(c)">
+              <mat-icon>add</mat-icon>
+              <span class="video-setup__candidate-name">{{ c.name }}</span>
+              <span class="video-setup__chip">{{ candidateProtocol(c) }}</span>
+              <small>{{ c.host }}</small>
+            </button>
+          }
+        </div>
+      }
+
+      @if (!manualOpen()) {
+        <button mat-stroked-button type="button" class="video-setup__add" (click)="manualOpen.set(true)">
+          <mat-icon>add</mat-icon>
+          <span>Add a camera</span>
+        </button>
+      } @else {
+      <fieldset class="video-setup__manual" [formGroup]="manualForm">
+        <legend class="video-setup__label">{{ editingId() ? 'Edit camera' : 'Add a camera' }}</legend>
+        <mat-form-field>
+          <mat-label>Name</mat-label>
+          <input matInput formControlName="name" placeholder="Foredeck">
+          <mat-error>A name is required.</mat-error>
+        </mat-form-field>
+        <div class="video-setup__manual-row">
+          <mat-form-field class="video-setup__manual-scheme">
+            <mat-label>Camera type</mat-label>
+            <mat-select formControlName="scheme">
+              @for (s of schemes; track s) {
+                <mat-option [value]="s">{{ schemeLabel(s) }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field class="video-setup__manual-host">
+            <mat-label>Address (host or IP)</mat-label>
+            <input matInput formControlName="host" placeholder="192.168.1.50" (blur)="normalizeHost()">
+            <mat-hint>You can paste host:port or a full URL.</mat-hint>
+            <mat-error>Enter the camera’s address.</mat-error>
+          </mat-form-field>
+          <mat-form-field class="video-setup__manual-port">
+            <mat-label>Port</mat-label>
+            <input matInput type="number" formControlName="port" placeholder="554">
+            <mat-error>1–65535.</mat-error>
+          </mat-form-field>
+        </div>
+        <mat-form-field>
+          <mat-label>Path (optional)</mat-label>
+          <input matInput formControlName="path" placeholder="/stream1">
+          <mat-error>Start the path with “/”.</mat-error>
+        </mat-form-field>
+        <div class="video-setup__manual-row">
+          <mat-form-field class="video-setup__manual-host">
+            <mat-label>Username (optional)</mat-label>
+            <input matInput formControlName="username" autocomplete="off" aria-describedby="cred-note">
+          </mat-form-field>
+          <mat-form-field class="video-setup__manual-host">
+            <mat-label>Password (optional)</mat-label>
+            <input matInput type="password" formControlName="password" autocomplete="new-password"
+              aria-describedby="cred-note">
+          </mat-form-field>
+        </div>
+        <small class="video-setup__hint" id="cred-note">
+          Credentials are stored on the Signal K server only and never synced to your devices.
+        </small>
+        @if (editingId() && credentialPresence(); as cred) {
+          @if (cred.hasUsername || cred.hasPassword) {
+            <div class="video-setup__cred-status" role="status" aria-live="polite">
+              <mat-icon>lock</mat-icon>
+              <span>Credentials saved. Leave the fields blank to keep them, or type new ones to replace.</span>
+              <button mat-button type="button" (click)="clearCredentials()" [disabled]="clearingCredentials()">
+                Clear
+              </button>
+            </div>
+          } @else {
+            <small class="video-setup__hint">No credentials saved for this camera.</small>
+          }
+        }
+        <div class="video-setup__manual-actions">
+          <button mat-stroked-button type="button" (click)="testConnection()" [disabled]="testing()">
+            @if (testing()) {
+              <mat-progress-spinner diameter="18" mode="indeterminate" />
+            } @else {
+              <mat-icon>wifi_tethering</mat-icon>
+            }
+            <span>Test connection</span>
+          </button>
+          <button mat-flat-button type="button" class="video-setup__add" (click)="addCamera()" [disabled]="saving()">
+            <mat-icon>{{ editingId() ? 'save' : 'add' }}</mat-icon>
+            <span>{{ editingId() ? 'Save changes' : 'Add camera' }}</span>
+          </button>
+          @if (editingId()) {
+            <button mat-button type="button" (click)="cancelEdit()">Cancel</button>
+          }
+        </div>
+        @if (testResult(); as r) {
+          <small
+            class="video-setup__test"
+            [class.video-setup__test--ok]="r.ok"
+            [class.video-setup__test--bad]="!r.ok"
+            role="status"
+            aria-live="polite">
+            {{ r.ok ? '✓ ' : '✗ ' }}{{ r.message }}
+          </small>
+        }
+        @if (addError(); as err) {
+          <small class="video-setup__error" role="alert" aria-live="assertive">{{ err }}</small>
+        }
+      </fieldset>
+      }
+    }
+
+    @if (sourceKind === 'file') {
+      <div class="video-setup__camera-row">
+        <mat-form-field class="video-setup__camera-pick">
+          <mat-label>Video</mat-label>
+          <mat-select formControlName="fileAssetId">
+            @for (v of videos(); track v.id) {
+              <mat-option [value]="v.id">{{ v.name }} ({{ sizeLabel(v.size) }})</mat-option>
+            }
+            @if (!videos().length) {
+              <mat-option [value]="null" disabled>No uploaded videos yet</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-icon-button type="button" (click)="removeVideo()"
+          matTooltip="Delete selected video" aria-label="Delete selected video">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+
+      <div class="video-setup__scan">
+        <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="uploading()">
+          <mat-icon>upload</mat-icon>
+          <span>Upload a video</span>
+        </button>
+        <input #fileInput type="file" accept="video/mp4,video/webm,video/quicktime,video/*"
+          hidden (change)="onFileSelected($event)">
+        @if (uploading()) {
+          <mat-progress-spinner diameter="20" mode="indeterminate" />
+        }
+      </div>
+      <small class="video-setup__hint">
+        Videos are stored on your Signal K server and play back with seeking, on any device.
+      </small>
+      @if (uploadError(); as err) {
+        <small class="video-setup__error" role="alert" aria-live="assertive">{{ err }}</small>
+      }
+    }
+  </section>
+
+  <!-- Quality & Latency -->
+  <section class="video-setup__section">
+    <h3 class="video-setup__label">Quality &amp; Latency</h3>
+    <mat-button-toggle-group class="video-setup__sources" formControlName="preset" aria-label="Quality and latency preset">
+      <mat-button-toggle value="live">
+        <span class="video-setup__source-name">Live</span>
+        <small class="video-setup__soon">Lowest delay</small>
+      </mat-button-toggle>
+      <mat-button-toggle value="balanced">
+        <span class="video-setup__source-name">Balanced</span>
+        <small class="video-setup__soon">Everyday use</small>
+      </mat-button-toggle>
+      <mat-button-toggle value="best">
+        <span class="video-setup__source-name">Best quality</span>
+        <small class="video-setup__soon">Smoothest</small>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+    <small class="video-setup__hint">{{ presetHint }}</small>
+  </section>
+
+  <!-- Appearance -->
+  <section class="video-setup__section">
+    <h3 class="video-setup__label">Appearance</h3>
+    <mat-form-field class="video-setup__url">
+      <mat-label>Title (optional)</mat-label>
+      <input matInput formControlName="label" placeholder="Foredeck" maxlength="40" />
+      <mat-hint>Shown above the video to tell streams apart when several are on screen.</mat-hint>
+    </mat-form-field>
+    <div class="video-setup__appearance">
+      <mat-form-field>
+        <mat-label>Picture size</mat-label>
+        <mat-select formControlName="objectFit">
+          <mat-option value="contain">Fit (show whole picture)</mat-option>
+          <mat-option value="cover">Fill (crop to frame)</mat-option>
+          <mat-option value="fill">Stretch (fills the box, may distort)</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="video-setup__toggles">
+        <mat-checkbox formControlName="muted">Muted</mat-checkbox>
+        <mat-checkbox formControlName="autoplay">Autoplay</mat-checkbox>
+        <mat-checkbox formControlName="loop">Loop</mat-checkbox>
+      </div>
+    </div>
+  </section>
+
+  <!-- Snapshot -->
+  <section class="video-setup__section" formGroupName="snapshot">
+    <h3 class="video-setup__label">Snapshot</h3>
+    <div class="video-setup__toggles video-setup__toggles--stacked">
+      <mat-checkbox formControlName="embedLocation" aria-describedby="loc-privacy">
+        Save the boat’s location (GPS) in the photo
+      </mat-checkbox>
+      <small class="video-setup__hint" id="loc-privacy">
+        Anyone you share or export the photo to can see where the boat was.
+      </small>
+      <mat-checkbox formControlName="embedTelemetry" aria-describedby="tel-privacy">
+        Save other boat data in the photo (time, speed, heading, depth, wind…)
+      </mat-checkbox>
+      <small class="video-setup__hint" id="tel-privacy">
+        This data travels with the photo when it’s shared or exported.
+      </small>
+    </div>
+    <mat-form-field class="video-setup__fit">
+      <mat-label>Snapshot button sends to</mat-label>
+      <mat-select formControlName="defaultDestination">
+        <mat-option value="download">Download</mat-option>
+        <mat-option value="share">Share…</mat-option>
+        <mat-option value="signalk" disabled>Save to Signal K (coming soon)</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </section>
+
+</div>
