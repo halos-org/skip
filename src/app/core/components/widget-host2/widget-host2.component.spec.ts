@@ -352,6 +352,7 @@ describe('WidgetHost2Component', () => {
 
         fixture.detectChanges();
         await Promise.resolve();
+        await Promise.resolve();
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
         expect(testWidget.autoOpenOptionsOnCreate).toBeUndefined();
@@ -374,6 +375,7 @@ describe('WidgetHost2Component', () => {
         dialogServiceMock.openWidgetOptions.mockReturnValue({ afterClosed: () => of(null) });
 
         fixture.detectChanges();
+        await Promise.resolve();
         await Promise.resolve();
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);

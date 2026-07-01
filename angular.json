@@ -23,28 +23,35 @@
               "src/polyfills.ts"
             ],
             "assets": [
-              "src/assets",
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets",
+                "ignore": ["kip-dashboard-schema.json"]
+              },
               "src/manifest.json"
             ],
             "styles": [
               "src/styles.scss",
               "node_modules/prismjs/themes/prism-okaidia.css"
             ],
-            "scripts": [
-              "node_modules/prismjs/prism.js",
-              "node_modules/prismjs/components/prism-bash.min.js",
-              "node_modules/prismjs/components/prism-typescript.min.js",
-              "node_modules/clipboard/dist/clipboard.min.js"
-            ],
+            "scripts": [],
             "allowedCommonJsDependencies": [
               "@godind/canvas-gauges",
-              "js-quantities"
+              "js-quantities",
+              "prismjs",
+              "clipboard"
             ],
             "browser": "src/main.ts"
           },
           "configurations": {
             "production": {
               "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "3mb",
+                  "maximumError": "3.25mb"
+                },
                 {
                   "type": "anyComponentStyle",
                   "maximumWarning": "6kb"
