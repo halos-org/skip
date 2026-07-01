@@ -1,8 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { BehaviorSubject } from 'rxjs';
 import { StorageService } from './storage.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
+import { SignalKConnectionService, IEndpointStatus } from './signalk-connection.service';
+import { AuthenticationService } from './authentication.service';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
 
 const blankConfig = (): IConfig => ({ app: null, theme: null, dashboards: [] });
@@ -131,5 +134,144 @@ describe('StorageService', () => {
       http.expectOne((r) => r.method === 'POST').flush(null);
       await expect(second).resolves.toBeUndefined();
     });
+  });
+});
+
+interface StoragePrivate { serverEndpoint: string }
+
+class AuthStub {
+  isLoggedIn$ = new BehaviorSubject<boolean>(false);
+}
+class ConnStub {
+  serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({ operation: 0 } as IEndpointStatus);
+  serverVersion$ = new BehaviorSubject<string | null>(null);
+}
+
+function endpoint(httpServiceUrl: string, operation = 2): IEndpointStatus {
+  return { operation, message: '', serverDescription: '', httpServiceUrl, WsServiceUrl: '' };
+}
+
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+describe('StorageService — applicationData URLs, scope & version gate (characterization)', () => {
+  const HTTP = 'https://sk.local/signalk/v1/api/';
+  const ENDPOINT = 'https://sk.local/signalk/v1/applicationData/';
+  let http: HttpTestingController;
+
+  function setup(opts: { httpUrl?: string; version?: string | null; loggedIn?: boolean } = {}) {
+    ensureLocalStorage();
+    const auth = new AuthStub();
+    const conn = new ConnStub();
+    TestBed.configureTestingModule({
+      providers: [
+        StorageService,
+        { provide: SignalKConnectionService, useValue: conn },
+        { provide: AuthenticationService, useValue: auth },
+      ],
+    });
+    const service = TestBed.inject(StorageService);
+    http = TestBed.inject(HttpTestingController);
+    if (opts.version !== undefined) conn.serverVersion$.next(opts.version);
+    auth.isLoggedIn$.next(opts.loggedIn ?? true);
+    conn.serverServiceEndpoint$.next(endpoint(opts.httpUrl ?? HTTP));
+    service.activeConfigFileVersion = 11;
+    service.sharedConfigName = 'cockpit';
+    return { service, conn, auth };
+  }
+
+  afterEach(() => http?.verify());
+
+  it('derives the applicationData endpoint by stripping the trailing "api/" from the v1 URL', () => {
+    const { service } = setup({ httpUrl: 'https://sk.local/signalk/v1/api/' });
+    expect((service as unknown as StoragePrivate).serverEndpoint).toBe('https://sk.local/signalk/v1/applicationData/');
+  });
+
+  it('gates isAppDataSupported on at server version 1.27.0 (boundary inclusive)', () => {
+    expect(setup({ version: '1.27.0' }).service.isAppDataSupported).toBe(true);
+  });
+  it('gates isAppDataSupported off below 1.27.0', () => {
+    expect(setup({ version: '1.26.9' }).service.isAppDataSupported).toBe(false);
+  });
+  it('reports isAppDataSupported for a clearly newer server', () => {
+    expect(setup({ version: '2.5.0' }).service.isAppDataSupported).toBe(true);
+  });
+
+  it('listConfigs GETs the global then the user scoped keys URLs', async () => {
+    const { service } = setup();
+    const p = service.listConfigs();
+    http.expectOne(`${ENDPOINT}global/kip/11/?keys=true`).flush(['g-slot']);
+    await tick();
+    http.expectOne(`${ENDPOINT}user/kip/11/?keys=true`).flush(['u-slot']);
+    await expect(p).resolves.toEqual([
+      { scope: 'global', name: 'g-slot' },
+      { scope: 'user', name: 'u-slot' },
+    ]);
+  });
+
+  it('getConfig GETs the scoped, versioned, named URL and returns a deep clone', async () => {
+    const { service } = setup();
+    const p = service.getConfig('user', 'default');
+    const req = http.expectOne(`${ENDPOINT}user/kip/11/default`);
+    expect(req.request.method).toBe('GET');
+    const body = blankConfig();
+    req.flush(body);
+    const result = await p;
+    expect(result).toEqual(body);
+    expect(result).not.toBe(body);
+  });
+
+  it('setConfig POSTs the config to the scoped, versioned, named URL', async () => {
+    const { service } = setup();
+    const cfg = blankConfig();
+    const p = service.setConfig('global', 'shared', cfg);
+    const req = http.expectOne(`${ENDPOINT}global/kip/11/shared`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(cfg);
+    req.flush(null);
+    await expect(p).resolves.toBeNull();
+  });
+
+  it('patchConfig POSTs a JSON Patch to the USER scope, namespaced by the active slot', () => {
+    const { service } = setup();
+    service.patchConfig('IAppConfig', { autoNightMode: true });
+    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app', value: { autoNightMode: true } }]);
+    req.flush(null);
+  });
+
+  it('patchConfig maps a granular ObjType to its app sub-path', () => {
+    const { service } = setup();
+    service.patchConfig('Array<IUnitDefaults>', [{ group: 'speed' }]);
+    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app/unitDefaults', value: [{ group: 'speed' }] }]);
+    req.flush(null);
+  });
+
+  it('patchGlobal POSTs the operation to the given scope, keyed by config name', () => {
+    const { service } = setup();
+    const cfg = blankConfig();
+    service.patchGlobal('backup', 'global', cfg, 'add');
+    const req = http.expectOne(`${ENDPOINT}global/kip/11`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual([{ op: 'add', path: '/backup', value: cfg }]);
+    req.flush(null);
+  });
+
+  it('removeItem POSTs a remove patch to the scoped, versioned URL', async () => {
+    const { service } = setup();
+    const p = service.removeItem('user', 'old-slot');
+    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual([{ op: 'remove', path: '/old-slot' }]);
+    req.flush(null);
+    await expect(p).resolves.toBeUndefined();
+  });
+
+  it('forceConfigFileVersion overrides the version segment of the URL', async () => {
+    const { service } = setup();
+    const p = service.getConfig('user', 'default', 1);
+    http.expectOne(`${ENDPOINT}user/kip/1/default`).flush(blankConfig());
+    await p;
   });
 });
