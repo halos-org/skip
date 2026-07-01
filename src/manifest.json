@@ -5,8 +5,8 @@
   "display": "fullscreen",
   "scope": "/@halos-org/skip/",
   "start_url": "/@halos-org/skip/",
-  "name": "SKip Instrument MFD",
-  "short_name": "SKip",
+  "name": "Skip Instrument MFD",
+  "short_name": "Skip",
   "description": "An advanced and versatile marine instrumentation package to display Signal K data.",
   "orientation": "landscape",
   "icons": [

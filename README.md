@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="./src/assets/skip-logo.svg" alt="SKip logo" width="120">
+  <img src="./src/assets/skip-logo.svg" alt="Skip logo" width="120">
 </p>
 
-# SKip – Signal K Multi-Function Display (MFD) and Marine Instrument Panel
+# Skip – Signal K Multi-Function Display (MFD) and Marine Instrument Panel
 
-> **SKip** is an experimental [Hat Labs](https://hatlabs.fi) fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin, maintained for [HaLOS](https://halos.fi). It adds standard Signal K session/SSO authentication and account-independent named profiles, and may diverge from upstream as it evolves. The webapp is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)).
+> **Skip** is an experimental [Hat Labs](https://hatlabs.fi) fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin, maintained for [HaLOS](https://halos.fi). It adds standard Signal K session/SSO authentication and account-independent named profiles, and may diverge from upstream as it evolves. The webapp is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)).
 
 *Original Kip readme follows.*
 
