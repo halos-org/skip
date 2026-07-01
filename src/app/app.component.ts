@@ -267,7 +267,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     // - /dashboard and /dashboard/<id>
     return (
       path === '/' ||
-      path === '/dashboard' ||
       /^\/dashboard(\/\d+)?$/.test(path)
     );
   }

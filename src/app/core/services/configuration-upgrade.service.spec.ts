@@ -44,6 +44,25 @@ describe('ConfigurationUpgradeService', () => {
         expect(service).toBeTruthy();
     });
 
+    it('removeSplitShellConfigKeys strips the dead split-shell keys, preserving other fields', () => {
+        const app = {
+            configVersion: 12,
+            browserTabTitle: 'Helm',
+            splitShellEnabled: true,
+            splitShellSide: 'left',
+            splitShellWidth: 0.5,
+            splitShellSwipeDisabled: false
+        };
+        (service as unknown as { removeSplitShellConfigKeys: (a: unknown) => void }).removeSplitShellConfigKeys(app);
+        const raw = app as Record<string, unknown>;
+        expect(Object.prototype.hasOwnProperty.call(raw, 'splitShellEnabled')).toBe(false);
+        expect(Object.prototype.hasOwnProperty.call(raw, 'splitShellSide')).toBe(false);
+        expect(Object.prototype.hasOwnProperty.call(raw, 'splitShellWidth')).toBe(false);
+        expect(Object.prototype.hasOwnProperty.call(raw, 'splitShellSwipeDisabled')).toBe(false);
+        expect(raw['browserTabTitle']).toBe('Helm');
+        expect(raw['configVersion']).toBe(12);
+    });
+
     it('should support calling runUpgrade without a version argument', async () => {
         await service.runUpgrade();
 

@@ -13,7 +13,6 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule, MatSlideToggleChange } from '@angular/material/slide-toggle';
-import { MatSelectModule } from '@angular/material/select';
 import { MatRadioModule } from '@angular/material/radio';
 import { SignalKConnectionService } from '../../../services/signalk-connection.service';
 import { compare } from 'compare-versions';
@@ -31,7 +30,6 @@ import { compare } from 'compare-versions';
         MatExpansionModule,
         MatInputModule,
         MatSlideToggleModule,
-        MatSelectModule,
         MatRadioModule
     ],
 })
