@@ -87,14 +87,24 @@ describe('SettingsService — legacy credential purge', () => {
     expect(Object.prototype.hasOwnProperty.call(cfg, 'useDeviceToken')).toBe(false);
   });
 
-  it('strips legacy credential fields from a stored connectionConfig on load, without a version bump', () => {
+  it('strips legacy credential fields on load, preserving other fields and without a version bump', () => {
     seedConnectionConfig({ loginPassword: 'plaintext-secret', loginName: 'captain', useDeviceToken: true });
     createService();
     const persisted = JSON.parse(localStorage.getItem('connectionConfig') as string);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'loginPassword')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'loginName')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'useDeviceToken')).toBe(false);
+    // Non-legacy fields survive the targeted rewrite.
+    expect(persisted.kipUUID).toBe('test-uuid');
+    expect(persisted.sharedConfigName).toBe('default');
     expect(persisted.configVersion).toBe(12);
+  });
+
+  it('removes the orphaned authorization_token blob on load (a never-expiring device token)', () => {
+    seedConnectionConfig();
+    localStorage.setItem('authorization_token', JSON.stringify({ token: 'jwt', expiry: null, isDeviceAccessToken: true }));
+    createService();
+    expect(localStorage.getItem('authorization_token')).toBeNull();
   });
 });
 
@@ -133,6 +143,18 @@ describe('SettingsService — storage routing (server applicationData only)', ()
 
     expect(patchSpy).toHaveBeenCalledWith('IThemeConfig', { themeName: 'local-theme' });
     expect(localStorage.getItem('themeConfig')).toBeNull();
+  });
+
+  it('setBrowserTabTitle routes to server applicationData like every other setter (useSharedConfig:false)', () => {
+    // Regression guard: setBrowserTabTitle must not diverge from the always-server invariant, or the
+    // title would write to localStorage and be lost on the next (server-loaded) reload.
+    const { service, patchSpy } = setup({ useSharedConfig: false });
+    localStorage.removeItem('appConfig');
+
+    service.setBrowserTabTitle('Helm');
+
+    expect(patchSpy).toHaveBeenCalledWith('IAppConfig', expect.objectContaining({ browserTabTitle: 'Helm' }));
+    expect(localStorage.getItem('appConfig')).toBeNull();
   });
 });
 

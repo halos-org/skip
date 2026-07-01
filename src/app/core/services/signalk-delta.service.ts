@@ -158,7 +158,8 @@ export class SignalKDeltaService implements OnDestroy {
           this.connectionStateMachine.onWebSocketError('WebSocket connection lost');
 
           // A drop may mean the session cookie expired; re-check loginStatus so session state (and
-          // the UI) reflect a server-side logout rather than retrying blindly.
+          // the UI) reflect a server-side logout. WS reconnect attempts are driven separately by the
+          // connection state machine.
           void this.auth.refreshLoginStatus();
         }
         this.streamEndpoint$.next(this.streamEndpoint);

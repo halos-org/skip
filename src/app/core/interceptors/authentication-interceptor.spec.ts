@@ -38,4 +38,15 @@ describe('AuthenticationInterceptor', () => {
     expect(req.request.headers.has('authorization')).toBe(false);
     req.flush({ ok: true });
   });
+
+  // The same-origin guard must not be fooled into attaching the session cookie to another origin.
+  it.each([
+    ['//evil.example/x', 'protocol-relative'],
+    ['https://app@evil.example/x', 'userinfo-prefixed'],
+  ])('does not send credentials to a %s cross-origin URL (%s)', (url) => {
+    http.get(url).subscribe();
+    const req = httpMock.expectOne(url);
+    expect(req.request.withCredentials).toBe(false);
+    req.flush({ ok: true });
+  });
 });

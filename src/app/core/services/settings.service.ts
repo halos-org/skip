@@ -143,6 +143,11 @@ export class SettingsService {
       localStorage.setItem("connectionConfig", JSON.stringify(config));
     }
 
+    // Also drop the legacy top-level session/device token blob. Nothing reads it anymore (auth is
+    // session-cookie only), so leaving it would strand a still-server-valid bearer credential —
+    // often a never-expiring device token — at rest.
+    localStorage.removeItem('authorization_token');
+
     // Remote-control identity is per-device: read from connectionConfig, not the profile.
     this.isRemoteControl.next(config.isRemoteControl ?? false);
     this.instanceName.next(config.instanceName ?? '');
@@ -462,7 +467,7 @@ export class SettingsService {
     this.browserTabTitle.next((title ?? '').trim());
     const appConf = this.buildAppStorageObject();
 
-    if (this.useSharedConfig) {
+    if (this.useServerStorage) {
       this.storage.patchConfig('IAppConfig', appConf);
     } else {
       this.saveAppConfigToLocalStorage();

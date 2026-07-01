@@ -62,7 +62,7 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   /**
-   * Cookie-mode bootstrap decision from loginStatus. Returns 'redirecting' when the browser is being
+   * Bootstrap auth decision from loginStatus. Returns 'redirecting' when the browser is being
    * sent to the SK/SSO login (caller should stop), or 'proceed' otherwise:
    * - loggedIn   → reset the redirect budget; the storage bootstrap then runs (isLoggedIn is true).
    * - notLoggedIn + authRequired → auto-redirect when allowed by oidcAutoLogin and the budget; else
@@ -88,8 +88,8 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   /**
-   * Cookie-mode redirect-or-block decision shared by the bootstrap path and the mid-bootstrap 401
-   * path. Auto-redirects when oidcAutoLogin allows and the budget permits; otherwise surfaces the
+   * Redirect-or-block decision shared by the bootstrap path and the mid-bootstrap 401 path.
+   * Auto-redirects when oidcAutoLogin allows and the budget permits; otherwise surfaces the
    * auth-blocked recovery state (budget exhausted, or a manual sign-in is required).
    */
   private attemptCookieRedirect(status: ILoginStatus | null): 'redirecting' | 'blocked' {
