@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-SKip — an Angular 21 (zoneless, signals, new control flow) Signal K marine multi-function display. A **standalone fork** of `mxtommy/kip` (not a GitHub fork object), rebranded `@halos-org/skip`, maintained for HaLOS. It's a Signal K webapp the SK server serves at the path `/@halos-org/skip/` (its own npm package name). The `upstream` remote points at `mxtommy/kip`; the fork periodically rebases on it. The fork's reason to exist is its auth + profiles work (below), which upstream did not accept.
+Skip — an Angular 21 (zoneless, signals, new control flow) Signal K marine multi-function display. A **standalone fork** of `mxtommy/kip` (not a GitHub fork object), rebranded `@halos-org/skip`, maintained for HaLOS. It's a Signal K webapp the SK server serves at the path `/@halos-org/skip/` (its own npm package name). The `upstream` remote points at `mxtommy/kip` for occasional cherry-picking. The fork's reason to exist is its auth + profiles work (below), which upstream did not accept.
+
+**Staying rebaseable on upstream is an explicit non-goal.** Pulling an upstream feature in may mean partially reimplementing it. Design decisions weigh correctness and our own maintenance cost — never rebase risk or whether code is upstream-maintained vs. fork-added. When upstream *is* pulled in, the CI re-apply notes (see "Testing reality" and "Fork-specific gotchas") still apply opportunistically, but they never constrain what we choose to change or remove.
 
 ## Commands
 

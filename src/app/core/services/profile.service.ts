@@ -129,7 +129,8 @@ export class ProfileService {
       }
       await this.storage.setConfig(PROFILE_SCOPE, normalized, sourceConfig);
 
-      this.storage.removeItem(PROFILE_SCOPE, oldName);
+      // Failure is surfaced via awaitQueueDrain() below; swallow the per-write rejection.
+      void this.storage.removeItem(PROFILE_SCOPE, oldName).catch(() => undefined);
       const drained = await this.storage.awaitQueueDrain();
       if (!drained) {
         console.warn(`[ProfileService] Old profile slot "${oldName}" may not have been removed; an orphan copy could remain until the next refresh.`);
@@ -156,7 +157,8 @@ export class ProfileService {
       if (this.existingNames().length <= 1) {
         throw new Error('The last remaining profile cannot be deleted.');
       }
-      this.storage.removeItem(PROFILE_SCOPE, name);
+      // Failure is surfaced via awaitQueueDrain() below; swallow the per-write rejection.
+      void this.storage.removeItem(PROFILE_SCOPE, name).catch(() => undefined);
       const drained = await this.storage.awaitQueueDrain();
       await this.refresh();
       if (!drained) {

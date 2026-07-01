@@ -31,6 +31,9 @@ export class WidgetDatasetOrchestratorService {
     const timeScale = cfg?.timeScale as TimeScaleFormat;
     const period = Number(cfg?.period ?? 0);
     const label = signature ?? '';
+    const angleDomainOverride = cfg?.datachartAngleRange === 'signed' || cfg?.datachartAngleRange === 'direction'
+      ? cfg.datachartAngleRange
+      : undefined;
 
     this.upsertDataset({
       uuid: widgetUuid,
@@ -40,7 +43,8 @@ export class WidgetDatasetOrchestratorService {
       period,
       label,
       serialize: true,
-      editable: false
+      editable: false,
+      angleDomainOverride
     });
   }
 
@@ -169,6 +173,7 @@ export class WidgetDatasetOrchestratorService {
     label: string;
     serialize: boolean;
     editable: boolean;
+    angleDomainOverride?: 'signed' | 'direction';
   }): void {
     const existing = this.dataset.getDatasetConfig(input.uuid);
     if (!existing) {
@@ -180,7 +185,8 @@ export class WidgetDatasetOrchestratorService {
         input.label,
         input.serialize,
         input.editable,
-        input.uuid
+        input.uuid,
+        input.angleDomainOverride
       );
       return;
     }
@@ -190,7 +196,8 @@ export class WidgetDatasetOrchestratorService {
       || existing.pathSource !== input.source
       || existing.timeScaleFormat !== input.timeScale
       || existing.period !== input.period
-      || existing.label !== input.label;
+      || existing.label !== input.label
+      || existing.angleDomainOverride !== input.angleDomainOverride;
 
     if (!needsUpdate) {
       return;
@@ -203,7 +210,8 @@ export class WidgetDatasetOrchestratorService {
       timeScaleFormat: input.timeScale,
       period: input.period,
       label: input.label,
-      editable: input.editable
+      editable: input.editable,
+      angleDomainOverride: input.angleDomainOverride
     };
 
     this.dataset.edit(nextConfig, input.serialize);
