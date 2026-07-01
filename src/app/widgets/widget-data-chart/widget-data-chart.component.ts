@@ -59,6 +59,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     filterSelfPaths: true,
     datachartPath: null,
     datachartSource: null,
+    datachartAngleRange: null,
     convertUnitTo: null,
     timeScale: 'minute', // second | minute | hour
     period: 10,
@@ -104,7 +105,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (!cfg.datachartPath) {
       return undefined;
     }
-    return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period].join('|');
+    return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
   });
   private previousPathSignature: string | undefined = undefined;
 

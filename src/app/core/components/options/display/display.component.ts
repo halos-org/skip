@@ -102,10 +102,10 @@ export class SettingsDisplayComponent implements OnInit {
       return;
     }
 
-    this.applyAndSaveSettings();
+    void this.applyAndSaveSettings();
   }
 
-  private applyAndSaveSettings(): void {
+  private async applyAndSaveSettings(): Promise<void> {
     this.settings.setAutoNightMode(this.autoNightMode());
     this.settings.setRedNightMode(this.isRedNightMode());
     this.settings.setNightModeBrightness(this.nightBrightness());
@@ -131,10 +131,15 @@ export class SettingsDisplayComponent implements OnInit {
     this.settings.setWidgetHistoryDisabled(this.widgetHistoryDisabled());
     this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());
-    if (!this.setKipPluginConfig()) {
-      this.toast.show('Failed to save KIP plugin configuration on server.', 0, false, 'error');
-    }
+    // Await the server write; setKipPluginConfig() returns a Promise, so the old
+    // `if (!this.setKipPluginConfig())` was always false (a Promise is truthy) —
+    // the error branch was dead and "Configuration saved" lied on failure.
+    const ok = await this.setKipPluginConfig();
     this.displayForm()?.form.markAsPristine();
+    if (!ok) {
+      this.toast.show('Failed to save KIP plugin configuration on server.', 0, false, 'error');
+      return;
+    }
     this.toast.show("Configuration saved", 1000, true, 'message');
   }
 
@@ -143,7 +148,7 @@ export class SettingsDisplayComponent implements OnInit {
     if (seq !== this._pluginCheckSeq) return;
 
     if (isValid) {
-      this.applyAndSaveSettings();
+      await this.applyAndSaveSettings();
     } else {
       // Reset toggle and abort save
       this.autoNightMode.set(false);

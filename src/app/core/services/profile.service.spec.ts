@@ -22,7 +22,7 @@ function makeStorageMock(userNames: string[] = ['default', 'profileA']) {
     ),
     getConfig: vi.fn<(scope: string, name: string) => Promise<IConfig>>(() => Promise.resolve(cfg('fromGet'))),
     setConfig: vi.fn<(scope: string, name: string, config: IConfig) => Promise<null>>(() => Promise.resolve(null)),
-    removeItem: vi.fn<(scope: string, name: string) => void>(() => undefined),
+    removeItem: vi.fn<(scope: string, name: string) => Promise<void>>(() => Promise.resolve()),
     awaitQueueDrain: vi.fn<() => Promise<boolean>>(() => Promise.resolve(true))
   };
 }

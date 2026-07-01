@@ -47,6 +47,7 @@ function pathRequiredOrValidMatch(getPaths: () => IPathMetaData[]): ValidatorFn 
 })
 export class DatasetChartOptionsComponent implements OnInit {
   public convertUnitTo = input.required<UntypedFormControl>();
+  public datachartAngleRange = input<UntypedFormControl | undefined>(undefined);
   public filterSelfPaths = input.required<UntypedFormControl>()
   public datachartPath = input.required<UntypedFormControl>()
   public datachartSource = input.required<UntypedFormControl>()
