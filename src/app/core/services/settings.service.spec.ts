@@ -17,14 +17,9 @@ function seedConfig(opts: SeedOpts = {}): void {
   localStorage.setItem('connectionConfig', JSON.stringify({
     configVersion: 13,
     kipUUID: 'test-uuid',
-    // Cross-origin so authMode resolves to token: storage then routes purely on useSharedConfig,
-    // keeping "local mode" (useSharedConfig:false) genuinely local under the auth-era routing.
     signalKUrl: 'https://boat.example:3443',
     proxyEnabled: false,
     signalKSubscribeAll: false,
-    useDeviceToken: false,
-    loginName: '',
-    loginPassword: '',
     useSharedConfig: opts.useSharedConfig ?? false,
     sharedConfigName: opts.sharedConfigName ?? 'profileA',
     isRemoteControl: opts.isRemoteControl ?? false,
@@ -81,43 +76,45 @@ function createService(opts?: SeedOpts): SettingsService {
   return TestBed.inject(SettingsService);
 }
 
-describe('SettingsService — connection credential persistence', () => {
+describe('SettingsService — legacy credential purge', () => {
   beforeEach(() => ensureLocalStorage());
 
-  it('getConnectionConfig() does not expose a loginPassword key', () => {
+  it('getConnectionConfig() exposes no credential keys', () => {
     seedConnectionConfig();
-    const cfg = createService().getConnectionConfig();
+    const cfg = createService().getConnectionConfig() as unknown as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(cfg, 'loginPassword')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(cfg, 'loginName')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(cfg, 'useDeviceToken')).toBe(false);
   });
 
-  it('strips a persisted loginPassword from a legacy connectionConfig on load, without a version bump', () => {
-    seedConnectionConfig({ loginPassword: 'plaintext-secret' });
+  it('strips legacy credential fields on load, preserving other fields and without a version bump', () => {
+    seedConnectionConfig({ loginPassword: 'plaintext-secret', loginName: 'captain', useDeviceToken: true });
     createService();
     const persisted = JSON.parse(localStorage.getItem('connectionConfig') as string);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'loginPassword')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(persisted, 'loginName')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(persisted, 'useDeviceToken')).toBe(false);
+    // Non-legacy fields survive the targeted rewrite.
+    expect(persisted.kipUUID).toBe('test-uuid');
+    expect(persisted.sharedConfigName).toBe('default');
     expect(persisted.configVersion).toBe(12);
   });
 
-  it('preserves loginName while dropping the password', () => {
-    seedConnectionConfig({ loginName: 'captain', loginPassword: 'secret' });
-    const cfg = createService().getConnectionConfig();
-    expect(cfg.loginName).toBe('captain');
-    expect(Object.prototype.hasOwnProperty.call(cfg, 'loginPassword')).toBe(false);
+  it('removes the orphaned authorization_token blob on load (a never-expiring device token)', () => {
+    seedConnectionConfig();
+    localStorage.setItem('authorization_token', JSON.stringify({ token: 'jwt', expiry: null, isDeviceAccessToken: true }));
+    createService();
+    expect(localStorage.getItem('authorization_token')).toBeNull();
   });
 });
 
-describe('SettingsService — storage routing by mode (Unit 5)', () => {
+describe('SettingsService — storage routing (server applicationData only)', () => {
   beforeEach(() => ensureLocalStorage());
 
-  // authMode is derived by the real AuthenticationService from the seeded connectionConfig:
-  // proxyEnabled => cookie; a cross-origin signalKUrl => token.
-  const COOKIE = { proxyEnabled: true };
-  const CROSS_ORIGIN = { signalKUrl: 'https://boat.example:3443' };
-
+  // SKip runs same-origin with the SK server (SSO session), so config always persists to the
+  // server's applicationData regardless of the useSharedConfig flag.
   function setup(connExtra: Record<string, unknown>) {
     seedConnectionConfig(connExtra);
-    // Seed the local config keys so the localStorage startup() branch (cross-origin/local routing)
-    // loads cleanly instead of throwing an (unhandled, suite-masking) JSON parse error.
     localStorage.setItem('appConfig', JSON.stringify({ configVersion: 12, dataSets: [], unitDefaults: {}, notificationConfig: {} }));
     localStorage.setItem('dashboardsConfig', JSON.stringify([]));
     localStorage.setItem('themeConfig', JSON.stringify({ themeName: '' }));
@@ -128,18 +125,8 @@ describe('SettingsService — storage routing by mode (Unit 5)', () => {
     return { service, patchSpy };
   }
 
-  it('cookie mode routes a setting write to server applicationData, not localStorage', () => {
-    const { service, patchSpy } = setup({ ...COOKIE, useSharedConfig: false });
-    localStorage.removeItem('themeConfig');
-
-    service.setThemeName('cookie-theme');
-
-    expect(patchSpy).toHaveBeenCalledWith('IThemeConfig', { themeName: 'cookie-theme' });
-    expect(localStorage.getItem('themeConfig')).toBeNull();
-  });
-
-  it('cross-origin shared config still routes to server applicationData (unchanged)', () => {
-    const { service, patchSpy } = setup({ ...CROSS_ORIGIN, useSharedConfig: true });
+  it('shared config routes a setting write to server applicationData, not localStorage', () => {
+    const { service, patchSpy } = setup({ useSharedConfig: true });
     localStorage.removeItem('themeConfig');
 
     service.setThemeName('shared-theme');
@@ -148,13 +135,26 @@ describe('SettingsService — storage routing by mode (Unit 5)', () => {
     expect(localStorage.getItem('themeConfig')).toBeNull();
   });
 
-  it('cross-origin local config still routes to localStorage (unchanged)', () => {
-    const { service, patchSpy } = setup({ ...CROSS_ORIGIN, useSharedConfig: false });
+  it('local (useSharedConfig:false) also routes to server applicationData (single same-origin store)', () => {
+    const { service, patchSpy } = setup({ useSharedConfig: false });
+    localStorage.removeItem('themeConfig');
 
     service.setThemeName('local-theme');
 
-    expect(patchSpy).not.toHaveBeenCalled();
-    expect(JSON.parse(localStorage.getItem('themeConfig') as string)).toEqual({ themeName: 'local-theme' });
+    expect(patchSpy).toHaveBeenCalledWith('IThemeConfig', { themeName: 'local-theme' });
+    expect(localStorage.getItem('themeConfig')).toBeNull();
+  });
+
+  it('setBrowserTabTitle routes to server applicationData like every other setter (useSharedConfig:false)', () => {
+    // Regression guard: setBrowserTabTitle must not diverge from the always-server invariant, or the
+    // title would write to localStorage and be lost on the next (server-loaded) reload.
+    const { service, patchSpy } = setup({ useSharedConfig: false });
+    localStorage.removeItem('appConfig');
+
+    service.setBrowserTabTitle('Helm');
+
+    expect(patchSpy).toHaveBeenCalledWith('IAppConfig', expect.objectContaining({ browserTabTitle: 'Helm' }));
+    expect(localStorage.getItem('appConfig')).toBeNull();
   });
 });
 

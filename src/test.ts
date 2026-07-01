@@ -221,13 +221,10 @@ class AppNetworkInitServiceStub {
   public bootstrapIssue$ = this._bootstrapIssueSubject.asObservable();
 }
 class AuthenticationServiceStub {
-  // Minimal stub surface for tests that inject AuthenticationService
+  // Minimal stub surface for tests that inject AuthenticationService. SKip authenticates only through
+  // the same-origin server session, so the surface is loginStatus-derived (no tokens, no auth mode).
   private _isLoggedIn$ = new BehaviorSubject<boolean>(false);
   public isLoggedIn$ = this._isLoggedIn$.asObservable();
-  private _authToken$ = new BehaviorSubject<{ expiry: number | null; token: string | null; isDeviceAccessToken: boolean }>(null);
-  public authToken$ = this._authToken$.asObservable();
-  // Cookie-mode session surface (Unit 3). Default to token mode so existing specs are unaffected.
-  public authMode: 'cookie' | 'token' = 'token';
   private _loginStatus$ = new BehaviorSubject<unknown>(null);
   public loginStatus$ = this._loginStatus$.asObservable();
   private _isUserSession$ = new BehaviorSubject<boolean>(false);
@@ -236,10 +233,6 @@ class AuthenticationServiceStub {
   public canWriteUserData$ = this._canWriteUserData$.asObservable();
   public get loginStatusValue(): unknown { return this._loginStatus$.getValue(); }
   refreshLoginStatus = async (): Promise<unknown> => null;
-  authModeForConfig = (): 'cookie' | 'token' => this.authMode;
-  deleteToken = () => { this._authToken$.next(null); this._isLoggedIn$.next(false); };
-  login = async () => { this._isLoggedIn$.next(true); };
-  logout = async () => { this._isLoggedIn$.next(false); this._authToken$.next(null); };
 }
 // ActivatedRoute stub must expose observable params/queryParams for components piping them
 const ActivatedRouteStub = {
@@ -346,9 +339,6 @@ class SettingsServiceStub {
     signalKUrl: 'http://localhost',
     proxyEnabled: false,
     signalKSubscribeAll: false,
-    useDeviceToken: false,
-    loginName: '',
-    loginPassword: '',
     useSharedConfig: false,
     sharedConfigName: '',
     kipUUID: 'test-uuid',

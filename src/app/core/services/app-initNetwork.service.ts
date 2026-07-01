@@ -62,16 +62,7 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   /**
-   * Whether remote (server applicationData) config should be bootstrapped: cookie mode regardless of
-   * the stored useSharedConfig flag, or cross-origin shared config. Mirrors SettingsService storage
-   * routing so the two never disagree (avoids the cookie-mode localStorage split-brain).
-   */
-  private useServerStorage(): boolean {
-    return this.auth.authMode === 'cookie' || !!this.config?.useSharedConfig;
-  }
-
-  /**
-   * Cookie-mode bootstrap decision from loginStatus. Returns 'redirecting' when the browser is being
+   * Bootstrap auth decision from loginStatus. Returns 'redirecting' when the browser is being
    * sent to the SK/SSO login (caller should stop), or 'proceed' otherwise:
    * - loggedIn   → reset the redirect budget; the storage bootstrap then runs (isLoggedIn is true).
    * - notLoggedIn + authRequired → auto-redirect when allowed by oidcAutoLogin and the budget; else
@@ -97,8 +88,8 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   /**
-   * Cookie-mode redirect-or-block decision shared by the bootstrap path and the mid-bootstrap 401
-   * path. Auto-redirects when oidcAutoLogin allows and the budget permits; otherwise surfaces the
+   * Redirect-or-block decision shared by the bootstrap path and the mid-bootstrap 401 path.
+   * Auto-redirects when oidcAutoLogin allows and the budget permits; otherwise surfaces the
    * auth-blocked recovery state (budget exhausted, or a manual sign-in is required).
    */
   private attemptCookieRedirect(status: ILoginStatus | null): 'redirecting' | 'blocked' {
@@ -113,16 +104,12 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   /**
-   * Mode-aware re-authentication routing for a mid-bootstrap 401. Cookie mode reuses the same
-   * oidcAutoLogin/budget-guarded decision as the bootstrap path (so a 401 cannot loop past the
-   * budget, and honors oidcAutoLogin:false); token mode routes to /login.
+   * Re-authentication routing for a mid-bootstrap 401. Reuses the same oidcAutoLogin/budget-guarded
+   * decision as the bootstrap path (so a 401 cannot loop past the budget, and honors
+   * oidcAutoLogin:false).
    */
   private routeToReauth(): void {
-    if (this.auth.authMode === 'cookie') {
-      this.attemptCookieRedirect(this.auth.loginStatusValue);
-      return;
-    }
-    this.router.navigate(['/login']);
+    this.attemptCookieRedirect(this.auth.loginStatusValue);
   }
 
   public async initNetworkServices() {
@@ -142,31 +129,24 @@ export class AppNetworkInitService implements OnDestroy {
         );
       }
 
-      // Cookie mode (same-origin): session state comes from loginStatus, not a credential login.
-      if (this.auth.authMode === 'cookie') {
-        const status = await this.auth.refreshLoginStatus();
-        const outcome = this.handleCookieAuth(status);
-        if (outcome === 'redirecting') {
-          redirecting = true;
-          return; // browser is navigating to the SK/SSO login
-        }
-        if (outcome === 'auth-blocked') {
-          // Not authorized and not auto-redirecting: keep the auth-blocked recovery state (set by
-          // handleCookieAuth), do not reset the loop budget, and finish degraded (not 'ready') so the
-          // recovery UI shows. Returning here also avoids the 'reason: none' overwrite below.
-          startupDegraded = true;
-          this._bootstrapStatus$.next('degraded');
-          return;
-        }
+      // Same-origin session: state comes from loginStatus, not a credential login.
+      const status = await this.auth.refreshLoginStatus();
+      const outcome = this.handleCookieAuth(status);
+      if (outcome === 'redirecting') {
+        redirecting = true;
+        return; // browser is navigating to the SK/SSO login
       }
-
-      // Token mode (cross-origin) credential login. Never runs in cookie mode (no stored password).
-      if (this.auth.authMode !== 'cookie' && !this.isLoggedIn && this.config?.signalKUrl && this.config?.useSharedConfig && this.config?.loginName && this.config?.loginPassword) {
-        await this.login();
+      if (outcome === 'auth-blocked') {
+        // Not authorized and not auto-redirecting: keep the auth-blocked recovery state (set by
+        // handleCookieAuth), do not reset the loop budget, and finish degraded (not 'ready') so the
+        // recovery UI shows. Returning here also avoids the 'reason: none' overwrite below.
+        startupDegraded = true;
+        this._bootstrapStatus$.next('degraded');
+        return;
       }
 
       let remoteConfig: IConfig | null = null;
-      if (this.isLoggedIn && this.useServerStorage()) {
+      if (this.isLoggedIn) {
         // Wait for storage to be fully ready before accessing it
         const storageReady = await this.storage.waitUntilReady();
         if (!storageReady) {
@@ -191,11 +171,6 @@ export class AppNetworkInitService implements OnDestroy {
       // Seed datasets after authentication (if required) so History API calls are authenticated.
       // This ensures all chart data is ready before any widget components are created.
       await this.getDatasetService().waitUntilReady();
-
-      // Cookie mode handled its own redirect/auth-blocked state above; only token mode falls to /login.
-      if (this.auth.authMode !== 'cookie' && !this.isLoggedIn && this.config?.signalKUrl && this.config?.useSharedConfig) {
-        this.router.navigate(['/login']); // need to set credentials
-      }
 
     } catch (error) {
       startupDegraded = true;
@@ -333,21 +308,6 @@ export class AppNetworkInitService implements OnDestroy {
       return legacyConfigVersion === 10;
     } catch {
       return false;
-    }
-  }
-
-  private async login(): Promise<void> {
-    if (!this.isLoggedIn && this.config.useSharedConfig && this.config.loginName && this.config.loginPassword) {
-      try {
-        await this.auth.login({ usr: this.config.loginName, pwd: this.config.loginPassword });
-      } catch (error) {
-        if (error.status === 0) {
-          this.router.navigate(['/settings']);
-        } else if (error.status === 401) {
-          this.router.navigate(['/login']);
-        }
-        throw error;  // Re-throw the error to be handled by the caller
-      }
     }
   }
 

@@ -7,19 +7,14 @@ import { IConnectionConfig } from "../../../interfaces/app-settings.interfaces";
 import { SignalKConnectionService, IEndpointStatus } from '../../../services/signalk-connection.service';
 import { IDeltaUpdate, DataService } from '../../../services/data.service';
 import { SignalKDeltaService, IStreamStatus } from '../../../services/signalk-delta.service';
-import { AuthenticationService, IAuthorizationToken } from '../../../services/authentication.service';
+import { AuthenticationService } from '../../../services/authentication.service';
 import { SsoRedirectService } from '../../../services/sso-redirect.service';
 import { ConnectionStateMachine } from '../../../services/connection-state-machine.service';
-import { ModalUserCredentialComponent } from '../../../components/modal-user-credential/modal-user-credential.component';
-import { compare } from 'compare-versions';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatButton } from '@angular/material/button';
-import { MatTooltip } from '@angular/material/tooltip';
-import { MatSlideToggle, MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel, MatError } from '@angular/material/form-field';
 import { FormsModule } from '@angular/forms';
-import { MatDialog } from '@angular/material/dialog';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import { CanvasService } from '../../../services/canvas.service';
@@ -29,8 +24,9 @@ import { InternetReachabilityService } from '../../../services/internet-reachabi
 
 /**
  * Signal K settings component for managing server connection configuration.
- * Handles URL validation, authentication, connection establishment, and
- * real-time monitoring of connection status and data stream statistics.
+ * Handles URL validation, connection establishment, and real-time monitoring
+ * of connection status and data stream statistics. SKip authenticates only through
+ * the server's same-origin session (SSO); it has no credential entry of its own.
  */
 @Component({
   selector: 'settings-signalk',
@@ -43,14 +39,11 @@ import { InternetReachabilityService } from '../../../services/internet-reachabi
     MatInput,
     MatError,
     MatCheckbox,
-    MatSlideToggle,
-    MatTooltip,
     MatButton
   ]
 })
 
 export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestroy {
-  private readonly dialog = inject(MatDialog);
   private readonly settings = inject(SettingsService);
   protected readonly app = inject(AppService);
   protected readonly toast = inject(ToastService);
@@ -70,9 +63,7 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   public connectionConfig: IConnectionConfig;
   public isConnecting = false; // Loading state for connect button
 
-  // Cookie mode (same-origin): the Connectivity tab shows session identity instead of the credential
-  // controls. These drive that identity block.
-  protected cookieMode = false;
+  // The Connectivity tab shows the server session identity (SSO). These drive that identity block.
   protected readonly loginStatus = toSignal(this.auth.loginStatus$, { initialValue: null });
   protected readonly isUserSession = toSignal(this.auth.isUserSession$, { initialValue: false });
   protected readonly canWriteUserData = toSignal(this.auth.canWriteUserData$, { initialValue: false });
@@ -80,8 +71,6 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   protected signIn(): void {
     this.ssoRedirect.manualSignIn();
   }
-
-  public authToken: IAuthorizationToken;
 
   public endpointServiceStatus: IEndpointStatus;
   public streamStatus: IStreamStatus;
@@ -109,18 +98,6 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   ngOnInit() {
     // get Signal K connection configuration
     this.connectionConfig = this.settings.getConnectionConfig();
-    this.cookieMode = this.auth.authMode === 'cookie';
-
-    // get authentication token status
-    this.auth.authToken$.pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe((token: IAuthorizationToken) => {
-      if (token) {
-        this.authToken = token;
-      } else {
-        this.authToken = null;
-      }
-    });
 
     // get Signal K connection status
     this.signalKConnectionService.getServiceEndpointStatusAsO().pipe(
@@ -155,43 +132,12 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   /**
-   * Opens the user credential modal dialog for authentication.
-   * @param errorMsg Optional error message to display in the modal
-   */
-  public openUserCredentialModal(errorMsg: string) {
-    const dialogRef = this.dialog.open(ModalUserCredentialComponent, {
-      data: {
-        user: this.connectionConfig.loginName,
-        password: this.connectionConfig.loginPassword,
-        error: errorMsg
-      }
-    });
-
-    dialogRef.afterClosed().pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe(data => {
-      if (!data) { return } // User clicked cancel
-      this.connectionConfig.loginName = data.user;
-      this.connectionConfig.loginPassword = data.password;
-      this.connectToServer();
-    });
-  }
-
-  /**
    * Validates the Signal K server URL and establishes connection.
    * Handles the complete connection workflow including validation,
-   * configuration saving, connection cleanup, and app reload.
+   * configuration saving, connection cleanup, and app reload. The same-origin
+   * session cookie authenticates after reload — no in-app credential step.
    */
   public async connectToServer() {
-    // Cookie mode (same-origin): the session cookie authenticates after reload — no KIP credential
-    // dialog, no in-app login.
-    const newConfigIsCookieMode = this.auth.authModeForConfig(this.connectionConfig) === 'cookie';
-
-    if (!newConfigIsCookieMode && this.connectionConfig.useSharedConfig && (!this.connectionConfig.loginName || !this.connectionConfig.loginPassword)) {
-      this.openUserCredentialModal("Credentials required");
-      return;
-    }
-
     // Start loading state
     this.isConnecting = true;
 
@@ -203,31 +149,14 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
 
       console.log('[Settings-SignalK] Validation successful - proceeding with connection');
 
-      // Step 2: Token mode only — establish the session in-memory FIRST (using the explicit newUrl) so
-      // a failed credential login does not persist a rejected config. The session JWT (the plaintext
-      // password is no longer persisted) then survives the reload that bootstraps the new config.
-      if (!newConfigIsCookieMode && this.connectionConfig.useSharedConfig) {
-        await this.auth.login({
-          usr: this.connectionConfig.loginName,
-          pwd: this.connectionConfig.loginPassword ?? '',
-          newUrl: this.connectionConfig.signalKUrl
-        });
-      }
-
-      // Step 3: Persist the now-validated configuration to localStorage.
+      // Step 2: Persist the now-validated configuration to localStorage.
       this.settings.setConnectionConfig(this.connectionConfig);
 
-      // Step 4: Properly close WebSocket and HTTP connections
+      // Step 3: Properly close WebSocket and HTTP connections
       this.connectionStateMachine.shutdown('Configuration changed - restarting app');
 
-      // Step 5: Clear a stored user token when the new config resolves to cookie mode (the session
-      // cookie is authoritative) or when switching from shared to individual config.
-      if (this.authToken && !this.authToken.isDeviceAccessToken && (newConfigIsCookieMode || !this.connectionConfig.useSharedConfig)) {
-        this.auth.deleteToken();
-      }
-
-      // Step 6: Reload immediately - APP_INITIALIZER will handle connection and authentication with new URL
-      // Skip during unit tests to avoid breaking Karma connection
+      // Step 4: Reload immediately - APP_INITIALIZER will handle connection and authentication with new URL
+      // Skip during unit tests to avoid breaking the test connection
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (!(window as any).__KIP_TEST__) {
         location.reload();
@@ -308,22 +237,6 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
       }
     });
   }
-
-  /**
-   * Handles the shared configuration toggle change event.
-   * Validates Signal K server version compatibility and opens credential modal.
-   */
-  public useSharedConfigToggleClick(e: MatSlideToggleChange): void {
-    if (e.checked) {
-      const version: string = this.signalKConnectionService.serverVersion$.getValue();
-      if (!compare(version, '1.46.2', ">=")) {
-        this.toast.show("Configuration sharing requires Signal K version 1.46.2 or better", 0, false, 'warn');
-        this.connectionConfig.useSharedConfig = false;
-        return;
-      }
-      this.openUserCredentialModal(null);
-    }
-  };
 
   ngOnDestroy() {
     this._chart?.destroy();

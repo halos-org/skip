@@ -4,9 +4,6 @@ export interface v10IConnectionConfig {
   kipUUID: string;
   signalKUrl: string;
   proxyEnabled: boolean;
-  useDeviceToken: boolean;
-  loginName: string;
-  loginPassword: string;
   useSharedConfig: boolean;
   sharedConfigName: string;
 }

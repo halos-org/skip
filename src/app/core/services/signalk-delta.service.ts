@@ -6,7 +6,7 @@ import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { ISignalKDataValueUpdate, ISignalKDeltaMessage, ISignalKMeta, ISignalKUpdateMessage } from '../interfaces/signalk-interfaces';
 import { IMeta, IPathValueData } from "../interfaces/app-interfaces";
 import { SignalKConnectionService, IEndpointStatus } from './signalk-connection.service'
-import { AuthenticationService, IAuthorizationToken } from './authentication.service';
+import { AuthenticationService } from './authentication.service';
 import { ConnectionStateMachine, ConnectionState } from './connection-state-machine.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -24,7 +24,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 export interface IStreamStatus {
   operation: number;
   message: string;
-  hasToken: boolean;
 }
 
 @Injectable({
@@ -50,7 +49,6 @@ export class SignalKDeltaService implements OnDestroy {
   public streamEndpoint: IStreamStatus = {
     operation: 0,
     message: "Not connected",
-    hasToken: false,
   }
   public streamEndpoint$: BehaviorSubject<IStreamStatus> = new BehaviorSubject<IStreamStatus>(this.streamEndpoint);
 
@@ -62,9 +60,6 @@ export class SignalKDeltaService implements OnDestroy {
   private socketWS$: WebSocketSubject<object>;
   public socketWSCloseEvent$ = new Subject<CloseEvent>();
   public socketWSOpenEvent$ = new Subject<Event>();
-
-  // Token
-  private authToken: IAuthorizationToken = null;
 
   private server = inject(SignalKConnectionService);
   private auth = inject(AuthenticationService);
@@ -122,28 +117,13 @@ export class SignalKDeltaService implements OnDestroy {
         }
       });
 
-    // Monitor Token changes
-    this.auth.authToken$
-      .pipe(takeUntilDestroyed(this._destroyRef))
-      .subscribe((token: IAuthorizationToken) => {
-        if (this.authToken != token) {
-          this.authToken = token;
-
-          // If WebSocket is connected, reconnect with new token
-          if (this.socketWS$ && this.connectionStateMachine.isFullyConnected()) {
-            this.closeWS('Token changed');
-            this.connectionStateMachine.startWebSocketConnection();
-          }
-        }
-      });
-
-    // Cookie mode has no token, so the authToken$ reconnect above never fires. Drive the WS
-    // (re)connect off the session signal instead, reusing checkAndReconnect's isFullyConnected
-    // guard so we do not double-connect with the bootstrap's startWebSocketConnection().
+    // The same-origin session cookie authenticates the WS upgrade, so drive the (re)connect off the
+    // session signal, reusing checkAndReconnect's isFullyConnected guard so we do not double-connect
+    // with the bootstrap's startWebSocketConnection().
     this.auth.isLoggedIn$
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this._destroyRef))
       .subscribe((loggedIn: boolean) => {
-        if (loggedIn && this.auth.authMode === 'cookie') {
+        if (loggedIn) {
           this.checkAndReconnect('Cookie session established');
         }
       });
@@ -154,11 +134,7 @@ export class SignalKDeltaService implements OnDestroy {
       .subscribe(() => {
         this.streamEndpoint.message = "Connected";
         this.streamEndpoint.operation = 2;
-        if (this.authToken) {
-          console.log("[Delta Service] WebSocket connected with Authorization Token")
-        } else {
-          console.log("[Delta Service] WebSocket connected without Authorization Token");
-        }
+        console.log("[Delta Service] WebSocket connected");
         this.streamEndpoint$.next(this.streamEndpoint);
 
         // Notify ConnectionStateMachine of successful WebSocket connection
@@ -181,11 +157,10 @@ export class SignalKDeltaService implements OnDestroy {
           // Notify ConnectionStateMachine of WebSocket error
           this.connectionStateMachine.onWebSocketError('WebSocket connection lost');
 
-          // In cookie mode a drop may mean the session cookie expired; re-check loginStatus so
-          // session state (and the UI) reflect a server-side logout rather than retrying blindly.
-          if (this.auth.authMode === 'cookie') {
-            void this.auth.refreshLoginStatus();
-          }
+          // A drop may mean the session cookie expired; re-check loginStatus so session state (and
+          // the UI) reflect a server-side logout. WS reconnect attempts are driven separately by the
+          // connection state machine.
+          void this.auth.refreshLoginStatus();
         }
         this.streamEndpoint$.next(this.streamEndpoint);
       });
@@ -277,23 +252,16 @@ export class SignalKDeltaService implements OnDestroy {
   }
 
   /**
-   * Builds the WebSocket URL including the subscription/meta args and, in token mode only, the
-   * auth token. Mode-first: in cookie mode the same-origin session cookie authenticates the WS
-   * upgrade, so &token= is never appended (even if a stale token is present).
+   * Builds the WebSocket URL from the subscription/meta args. The same-origin session cookie
+   * authenticates the WS upgrade, so no auth token is ever appended.
    */
   private buildWebSocketUrl(): string {
-    let args = this.WS_CONNECTION_SUBSCRIBE + this.SubscriptionType + this.WS_CONNECTION_META;
-    if (this.auth.authMode === 'token' && this.authToken != null) {
-      args += "&token=" + this.authToken.token;
-      this.streamEndpoint.hasToken = true;
-    } else {
-      this.streamEndpoint.hasToken = false;
-    }
+    const args = this.WS_CONNECTION_SUBSCRIBE + this.SubscriptionType + this.WS_CONNECTION_META;
     return this.endpointWS + args;
   }
 
   /**
-   * Handles connection arguments, token and links socket Open/Close Observers
+   * Handles connection arguments and links socket Open/Close Observers
    */
   private getNewWebSocket(): WebSocketSubject<object> {
     return webSocket({
