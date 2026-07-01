@@ -474,7 +474,9 @@ export class SettingsService {
   }
 
   public setBrowserTabTitle(title: string) {
-    this.browserTabTitle.next(title);
+    // Trim before storing so a padded/whitespace-only value isn't persisted (the resolver already
+    // trims for display; this keeps the saved config clean and blank values normalized to '').
+    this.browserTabTitle.next((title ?? '').trim());
     const appConf = this.buildAppStorageObject();
 
     if (this.useSharedConfig) {
