@@ -229,6 +229,54 @@ describe('WidgetVideoComponent', () => {
     expect(ptz.stop).toHaveBeenCalledWith(base, 'foredeck');
   });
 
+  it('stops PTZ when the page is hidden (no pointerup/blur is delivered on backgrounding)', async () => {
+    const ptz = {
+      listPresets: vi.fn().mockResolvedValue([]),
+      move: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      gotoPreset: vi.fn().mockResolvedValue(undefined)
+    };
+    const options = signal<IWidgetSvcConfig | undefined>({
+      video: { sourceKind: 'camera', cameraId: 'foredeck', transport: 'webrtc' }
+    });
+    TestBed.configureTestingModule({
+      imports: [WidgetVideoComponent],
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: DataService, useValue: { getPathObject: () => null } },
+        { provide: PtzClient, useValue: ptz },
+        { provide: PluginConfigClientService, useValue: pluginAvailable() },
+        {
+          provide: SignalKConnectionService,
+          useValue: {
+            serverServiceEndpoint$: of({ httpServiceUrl: 'http://boat.local:3000/signalk/v1/api/' }),
+            signalKURL: { url: null }
+          }
+        }
+      ]
+    });
+    const fixture = TestBed.createComponent(WidgetVideoComponent);
+    fixture.componentRef.setInput('id', 'test-id');
+    fixture.componentRef.setInput('type', 'widget-video');
+    fixture.componentRef.setInput('theme', null);
+    fixture.detectChanges();
+    await flush();
+    fixture.detectChanges();
+
+    const base = 'http://boat.local:3000/plugins/sk-video/';
+    const left = (fixture.nativeElement as HTMLElement).querySelector('button[aria-label="Pan left"]') as HTMLButtonElement;
+    left.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(ptz.move).toHaveBeenCalled(); // a hold is in progress (keep-alive running)
+
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(ptz.stop).toHaveBeenCalledWith(base, 'foredeck');
+    } finally {
+      Reflect.deleteProperty(document, 'hidden');
+    }
+  });
+
   it('renders an optional title bar above the video', () => {
     const el: HTMLElement = setup({
       video: { sourceKind: 'url', url: 'https://cam.example/clip.mp4', label: 'Foredeck' }

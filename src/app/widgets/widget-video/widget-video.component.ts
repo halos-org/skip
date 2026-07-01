@@ -196,6 +196,14 @@ export class WidgetVideoComponent {
   private rvfcHandle: number | null = null;
   private paintedFrame = false;
   private static readonly FIRST_FRAME_TIMEOUT_MS = 8000;
+  // Liveness: after the first frame, a live stream that stops advancing (network/camera hang that
+  // doesn't raise an error) holds its last frame on screen — stale footage presented as live, the
+  // worst failure mode on a marine display. Tracked via timeupdate progress; a stall forces a
+  // reconnect so the operator sees a reconnecting state instead of a frozen "live" image.
+  private lastProgressAt = 0;
+  private stalled = false;
+  private livenessTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly STALE_MS = 6000;
 
   constructor() {
     // (Re)attach the right pipeline whenever the source, transport, preset or visibility changes — or
@@ -253,7 +261,13 @@ export class WidgetVideoComponent {
       });
     });
 
-    const onVisibility = () => this.visible.set(!document.hidden);
+    const onVisibility = () => {
+      this.visible.set(!document.hidden);
+      // Stop any in-progress camera move when the view is hidden. The keep-alive that defeats the
+      // gateway's auto-stop failsafe won't get a pointerup/blur if the page is backgrounded or the
+      // dashboard switches pages, so the camera would otherwise keep slewing to its mechanical limit.
+      if (document.hidden) this.ptzStop();
+    };
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', onVisibility);
     }
@@ -261,7 +275,8 @@ export class WidgetVideoComponent {
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisibility);
       }
-      this.stopPtzKeepAlive();
+      this.ptzStop(); // stop the keep-alive AND command the camera to stop, not just clear the timer
+      if (this.snapshotMessageTimer) clearTimeout(this.snapshotMessageTimer);
       this.dispose();
     });
   }
@@ -292,7 +307,36 @@ export class WidgetVideoComponent {
     this.codecWarning.set(null);
     this.clearReconnectTimer();
     this.clearFirstFrameWatchdog();
+    this.lastProgressAt = Date.now();
+    this.stalled = false;
+    this.startLivenessWatch();
   };
+
+  /** Frame progress: keeps the liveness clock fresh; a stall is when this stops firing. */
+  private readonly onTimeupdate = (): void => {
+    this.lastProgressAt = Date.now();
+    this.stalled = false;
+  };
+
+  /** After the first frame, force a reconnect if currentTime stops advancing (a frozen live feed). */
+  private startLivenessWatch(): void {
+    this.stopLivenessWatch();
+    this.livenessTimer = setInterval(() => {
+      const v = this.boundVideo;
+      if (!v || v.paused || v.ended || !this.painted() || this.stalled) return;
+      if (Date.now() - this.lastProgressAt > WidgetVideoComponent.STALE_MS) {
+        this.stalled = true;
+        this.scheduleReconnect(this.generation);
+      }
+    }, 2000);
+  }
+
+  private stopLivenessWatch(): void {
+    if (this.livenessTimer) {
+      clearInterval(this.livenessTimer);
+      this.livenessTimer = null;
+    }
+  }
 
   /** Watches for a first painted frame; if none arrives while data is flowing, warns about the codec. */
   private startFirstFrameWatchdog(video: HTMLVideoElement, gen: number): void {
@@ -478,10 +522,13 @@ export class WidgetVideoComponent {
     this.generation++;
     this.clearReconnectTimer();
     this.clearFirstFrameWatchdog();
+    this.stopLivenessWatch();
+    this.stalled = false;
     this.codecWarning.set(null);
     this.painted.set(false);
     if (this.boundVideo) {
       this.boundVideo.removeEventListener('playing', this.onPlaying);
+      this.boundVideo.removeEventListener('timeupdate', this.onTimeupdate);
       this.boundVideo.removeEventListener('error', this.onError);
       this.boundVideo = null;
     }
@@ -532,6 +579,7 @@ export class WidgetVideoComponent {
     }
 
     video.addEventListener('playing', this.onPlaying);
+    video.addEventListener('timeupdate', this.onTimeupdate);
     video.addEventListener('error', this.onError);
     this.boundVideo = video;
     this.startFirstFrameWatchdog(video, gen);
@@ -592,12 +640,14 @@ export class WidgetVideoComponent {
         return;
       }
       const { answerSdp, resourceUrl } = await whepNegotiate(endpoint, pc.localDescription?.sdp ?? offer.sdp ?? '', fetchLike);
-      this.whepResource = resourceUrl;
       if (this.generation !== gen) {
-        // Disposed mid-negotiation — release the session we just created.
+        // Disposed/superseded mid-negotiation — release the session we just created WITHOUT clobbering
+        // the active generation's resourceUrl (assigning first would orphan the live go2rtc consumer
+        // if a stale negotiation resolves after the current one).
         void whepDelete(resourceUrl, fetchLike).catch(() => undefined);
         return;
       }
+      this.whepResource = resourceUrl;
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
       for (const r of pc.getReceivers()) {
         try {
@@ -616,7 +666,9 @@ export class WidgetVideoComponent {
       return Promise.resolve();
     }
     return new Promise<void>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
       const finish = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
         pc.removeEventListener('icegatheringstatechange', check);
         resolve();
       };
@@ -626,7 +678,7 @@ export class WidgetVideoComponent {
         }
       };
       pc.addEventListener('icegatheringstatechange', check);
-      setTimeout(finish, timeoutMs);
+      timer = setTimeout(finish, timeoutMs);
     });
   }
 

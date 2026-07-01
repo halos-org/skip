@@ -38,12 +38,23 @@ describe('whepNegotiate', () => {
     const fetchImpl: FetchLike = () => Promise.resolve(fakeResponse({ ok: false, status: 404, body: '' }));
     await expect(whepNegotiate('https://gw.local/whep', 'offer', fetchImpl)).rejects.toThrow(/404/);
   });
+
+  it('attaches an abort signal so a hung gateway cannot block negotiation forever', async () => {
+    const calls: { init?: RequestInit }[] = [];
+    const fetchImpl: FetchLike = (_url, init) => { calls.push({ init }); return Promise.resolve(fakeResponse({ body: 'a' })); };
+    await whepNegotiate('https://gw.local/whep', 'offer', fetchImpl);
+    expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
+  });
 });
 
 describe('whepDelete', () => {
-  it('DELETEs the resource URL', async () => {
+  it('DELETEs the resource URL with a bounded timeout signal', async () => {
     const fetchImpl = vi.fn<FetchLike>(() => Promise.resolve(fakeResponse({ status: 200 })));
     await whepDelete('https://gw.local/whep/session/42', fetchImpl);
-    expect(fetchImpl).toHaveBeenCalledWith('https://gw.local/whep/session/42', { method: 'DELETE' });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://gw.local/whep/session/42');
+    expect(init?.method).toBe('DELETE');
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 });
