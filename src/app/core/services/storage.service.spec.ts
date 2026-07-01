@@ -199,7 +199,9 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('listConfigs GETs the global then the user scoped keys URLs', async () => {
     const { service } = setup();
     const p = service.listConfigs();
-    http.expectOne(`${ENDPOINT}global/kip/11/?keys=true`).flush(['g-slot']);
+    const g = http.expectOne(`${ENDPOINT}global/kip/11/?keys=true`);
+    expect(g.request.method).toBe('GET');
+    g.flush(['g-slot']);
     await tick();
     http.expectOne(`${ENDPOINT}user/kip/11/?keys=true`).flush(['u-slot']);
     await expect(p).resolves.toEqual([
@@ -244,6 +246,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     const { service } = setup();
     service.patchConfig('Array<IUnitDefaults>', [{ group: 'speed' }]);
     const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app/unitDefaults', value: [{ group: 'speed' }] }]);
     req.flush(null);
   });
@@ -271,7 +274,43 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('forceConfigFileVersion overrides the version segment of the URL', async () => {
     const { service } = setup();
     const p = service.getConfig('user', 'default', 1);
-    http.expectOne(`${ENDPOINT}user/kip/1/default`).flush(blankConfig());
+    const req = http.expectOne(`${ENDPOINT}user/kip/1/default`);
+    expect(req.request.method).toBe('GET');
+    req.flush(blankConfig());
     await p;
+  });
+
+  it('patchConfig IThemeConfig extracts themeName into the theme sub-path (not the whole object)', () => {
+    const { service } = setup();
+    service.patchConfig('IThemeConfig', { themeName: 'dark', extra: 'ignored' });
+    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/theme/themeName', value: 'dark' }]);
+    req.flush(null);
+  });
+
+  it('patchGlobal replace targets the config-name path', () => {
+    const { service } = setup();
+    const cfg = blankConfig();
+    service.patchGlobal('slot-a', 'user', cfg, 'replace');
+    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    expect(req.request.body).toEqual([{ op: 'replace', path: '/slot-a', value: cfg }]);
+    req.flush(null);
+  });
+
+  it('patchGlobal remove keeps a value field (unlike removeItem)', () => {
+    const { service } = setup();
+    const cfg = blankConfig();
+    service.patchGlobal('slot-b', 'global', cfg, 'remove');
+    const req = http.expectOne(`${ENDPOINT}global/kip/11`);
+    expect(req.request.body).toEqual([{ op: 'remove', path: '/slot-b', value: cfg }]);
+    req.flush(null);
+  });
+
+  it('refuses reads and writes when the storage service is not ready', async () => {
+    const { service } = setup();
+    service.storageServiceReady$.next(false);
+    await expect(service.getConfig('user', 'default')).rejects.toThrow(/not ready/i);
+    expect(() => service.patchConfig('IAppConfig', {})).toThrow(/not ready/i);
+    http.expectNone(() => true);
   });
 });
