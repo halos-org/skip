@@ -21,7 +21,7 @@ full reference, see **The Video Widget** help page.
 5. Tap **Add camera**, then leave **Delivery** on **Standard (HLS)**.
 6. Set **Quality & Latency** to **Balanced** and save.
 
-<img src="../../assets/help-docs/img/video/widget-playing.png" alt="A foredeck camera on a sailing dashboard" title="The foredeck on your dashboard" width="100%">
+<img src="assets/help-docs/img/video/widget-playing.png" alt="A foredeck camera on a sailing dashboard" title="The foredeck on your dashboard" width="100%">
 
 **Tip:** Put this widget on its own "Underway" dashboard so it only runs when you're looking at it —
 that saves battery and keeps your device cool.
@@ -39,7 +39,7 @@ the camera can move.
 4. Set **Quality & Latency** to **Live**.
 5. Save. If the camera supports it, the **pan/tilt/zoom** pad appears over the picture.
 
-<img src="../../assets/help-docs/img/video/ptz.png" alt="On-screen pan, tilt and zoom controls" title="Steer the camera while docking" width="100%">
+<img src="assets/help-docs/img/video/ptz.png" alt="On-screen pan, tilt and zoom controls" title="Steer the camera while docking" width="100%">
 
 **Tip:** Press and hold the arrows to move; let go to stop. Use the **bookmark** button to jump to a
 saved "looking at the dock" position.
@@ -59,7 +59,7 @@ saved "looking at the dock" position.
    - **Username / Password** — only if the camera requires a login.
 3. Tap **Add camera**. It's saved and selected.
 
-<img src="../../assets/help-docs/img/video/camera-setup.png" alt="The Add a camera form" title="Adding a camera by hand" width="100%">
+<img src="assets/help-docs/img/video/camera-setup.png" alt="The Add a camera form" title="Adding a camera by hand" width="100%">
 
 **Tip:** Not sure of the address or path? Check the camera's manual or its phone app — look for the
 "RTSP URL". The part after the address (like `/stream1` or `/h264`) is the **Path**.
@@ -75,7 +75,7 @@ saved "looking at the dock" position.
 3. Back on the video, hover (or tap) to show the buttons, and press the **snapshot** button.
 4. Use the small arrow beside it to **Download** or **Share** the photo.
 
-<img src="../../assets/help-docs/img/video/snapshot.png" alt="Snapshot settings with location and telemetry toggles" title="Put your position into the photo" width="100%">
+<img src="assets/help-docs/img/video/snapshot.png" alt="Snapshot settings with location and telemetry toggles" title="Put your position into the photo" width="100%">
 
 > ⚠️ **Privacy:** a photo with location turned on reveals where your boat was when you share or export
 > it. Turn **Embed location (GPS)** off if you don't want that.
@@ -103,7 +103,7 @@ those.
 2. Tap **Upload a video** and choose a file (MP4, WebM or MOV).
 3. When it finishes, it's selected automatically. Pick it again any time from the list.
 
-<img src="../../assets/help-docs/img/video/uploaded.png" alt="The uploaded-video list and Upload button" title="Your saved clips" width="100%">
+<img src="assets/help-docs/img/video/uploaded.png" alt="The uploaded-video list and Upload button" title="Your saved clips" width="100%">
 
 **Tip:** Uploaded videos are shared from the boat's server, so every phone and tablet on board can
 play the same clip — no copying files around.

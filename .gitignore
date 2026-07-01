@@ -47,9 +47,14 @@ yarn-error.log
 /e2e/*.js
 /e2e/*.map
 
+# Playwright MCP working dir
+.playwright-mcp/
+
 # System Files
 .DS_Store
 Thumbs.db
 
 # Playwright MCP / e2e scratch output
 .playwright-mcp/
+# kip-plugin test scratch dirs
+/.tmp-kip*

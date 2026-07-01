@@ -27,6 +27,10 @@
         "file": "video-recipes.md"
       },
       {
+        "title": "The Image Widget",
+        "file": "image-widget.md"
+      },
+      {
         "title": "History-API Provider",
         "file": "history-api.md"
       },

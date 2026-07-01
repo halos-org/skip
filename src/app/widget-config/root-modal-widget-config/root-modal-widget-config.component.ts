@@ -26,13 +26,14 @@ import { AisTargetOptionsComponent } from '../ais-target-options/ais-target-opti
 import { SolarChargerSetupComponent } from '../solar-charger-setup/solar-charger-setup.component';
 import { ElectricalFamilySetupComponent } from '../electrical-family-setup/electrical-family-setup.component';
 import { VideoCameraSetupComponent } from '../video-camera-setup/video-camera-setup.component';
+import { ImageSourceSetupComponent } from '../image-source-setup/image-source-setup.component';
 import { MatTabsModule } from '@angular/material/tabs';
 
 @Component({
   selector: 'modal-widget-config',
   templateUrl: './root-modal-widget-config.component.html',
   styleUrls: ['./root-modal-widget-config.component.scss'],
-  imports: [FormsModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatTabsModule, MatCheckboxModule, MatSelectModule, MatDividerModule, MatButtonModule, DisplayDatetimeComponent, DisplayChartOptionsComponent, DatasetChartOptionsComponent, BooleanMultiControlOptionsComponent, PathsOptionsComponent, SelectAutopilotComponent, AisTargetOptionsComponent, BmsBankSetupComponent, SolarChargerSetupComponent, ElectricalFamilySetupComponent, VideoCameraSetupComponent]
+  imports: [FormsModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatTabsModule, MatCheckboxModule, MatSelectModule, MatDividerModule, MatButtonModule, DisplayDatetimeComponent, DisplayChartOptionsComponent, DatasetChartOptionsComponent, BooleanMultiControlOptionsComponent, PathsOptionsComponent, SelectAutopilotComponent, AisTargetOptionsComponent, BmsBankSetupComponent, SolarChargerSetupComponent, ElectricalFamilySetupComponent, ImageSourceSetupComponent, VideoCameraSetupComponent]
 })
 export class RootModalWidgetConfigComponent implements OnInit {
   // Property name constants to avoid magic strings

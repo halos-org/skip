@@ -4,7 +4,7 @@ The Video widget puts live cameras and saved video clips right on your dashboard
 eye on the water while docking, watch the foredeck under sail, check the engine room, or look back at
 a clip you saved earlier.
 
-<img src="../../assets/help-docs/img/video/widget-playing.png" alt="A Video widget playing a live camera on a KIP dashboard" title="A live camera on the dashboard" width="100%">
+<img src="assets/help-docs/img/video/widget-playing.png" alt="A Video widget playing a live camera on a KIP dashboard" title="A live camera on the dashboard" width="100%">
 
 There are three kinds of video you can show:
 
@@ -20,7 +20,7 @@ There are three kinds of video you can show:
 Open the widget's settings and look at the **Source** row at the top. Pick the kind of video you
 want, then fill in the details that appear.
 
-<img src="../../assets/help-docs/img/video/source-tabs.png" alt="The Source selector with URL, Camera and Uploaded options" title="Choose where your video comes from" width="100%">
+<img src="assets/help-docs/img/video/source-tabs.png" alt="The Source selector with URL, Camera and Uploaded options" title="Choose where your video comes from" width="100%">
 
 ### Paste a web address (URL)
 
@@ -46,7 +46,7 @@ Most onboard cameras speak **RTSP**, which browsers can't play directly. The **S
 your Signal K server does the translating for you, so KIP can show the picture. Once it's installed,
 choose **Camera** under **Source**.
 
-<img src="../../assets/help-docs/img/video/camera-setup.png" alt="Camera setup showing the saved-camera list, a Scan button, and the Add a camera form" title="Set up a camera" width="100%">
+<img src="assets/help-docs/img/video/camera-setup.png" alt="Camera setup showing the saved-camera list, a Scan button, and the Add a camera form" title="Set up a camera" width="100%">
 
 You have three ways to set up a camera:
 
@@ -56,7 +56,7 @@ you're done — its login and settings are remembered, so you never type them tw
 **2. Scan for cameras.** Tap **Scan network** and KIP asks your boat's network for cameras that
 announce themselves. Found cameras appear in a list; tap one to fill in its details for you.
 
-<img src="../../assets/help-docs/img/video/scan.png" alt="A list of cameras found on the network after scanning" title="Cameras found on the network" width="100%">
+<img src="assets/help-docs/img/video/scan.png" alt="A list of cameras found on the network after scanning" title="Cameras found on the network" width="100%">
 
 **3. Add a camera by hand.** Under **Add a camera**, enter:
 
@@ -78,7 +78,7 @@ only — it is never copied onto your phone, tablet, or shared between devices.*
 
 If your camera can move (this is called **PTZ**), a control pad appears over the picture.
 
-<img src="../../assets/help-docs/img/video/ptz.png" alt="Pan, tilt and zoom controls over a live camera" title="Move the camera" width="100%">
+<img src="assets/help-docs/img/video/ptz.png" alt="Pan, tilt and zoom controls over a live camera" title="Move the camera" width="100%">
 
 - **Press and hold an arrow** to pan or tilt. Let go to stop.
 - **Hold + or −** to zoom in or out.
@@ -98,7 +98,7 @@ Choose **Uploaded** under **Source**, then tap **Upload a video** and pick a fil
 It appears in the list to choose from, plays with a scrub bar so you can jump around, and can be
 removed with the trash button.
 
-<img src="../../assets/help-docs/img/video/uploaded.png" alt="The uploaded-video list with an Upload a video button" title="Your uploaded videos" width="100%">
+<img src="assets/help-docs/img/video/uploaded.png" alt="The uploaded-video list with an Upload a video button" title="Your uploaded videos" width="100%">
 
 ---
 
@@ -107,7 +107,7 @@ removed with the trash button.
 Live video always trades **delay** against **smoothness**. Under **Quality & Latency**, pick the
 balance you want:
 
-<img src="../../assets/help-docs/img/video/quality.png" alt="The Quality and Latency presets: Live, Balanced, Best quality" title="Balance delay against smoothness" width="100%">
+<img src="assets/help-docs/img/video/quality.png" alt="The Quality and Latency presets: Live, Balanced, Best quality" title="Balance delay against smoothness" width="100%">
 
 - **Live** — the least delay, for live, hands-on viewing (docking, fishing, on-deck work).
 - **Balanced** — a small delay with smooth, steady playback. Recommended.
@@ -134,7 +134,7 @@ A snapshot can quietly tuck your boat's live data into the photo file (this is c
 your **GPS position**, plus heading, speed, depth, wind and the time. It's a great way to mark a
 hazard or remember a dock. You control this under **Snapshot** in the settings:
 
-<img src="../../assets/help-docs/img/video/snapshot.png" alt="Snapshot settings with toggles for embedding location and telemetry" title="Choose what goes into your snapshots" width="100%">
+<img src="assets/help-docs/img/video/snapshot.png" alt="Snapshot settings with toggles for embedding location and telemetry" title="Choose what goes into your snapshots" width="100%">
 
 - **Embed location (GPS)** — ⚠️ a photo you share or export will reveal **where the boat was**. Turn
   this off if you don't want that.
