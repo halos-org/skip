@@ -556,27 +556,10 @@ describe('WidgetSolarChargerComponent', () => {
     const solarConfigOf = (dashboards: ReturnType<typeof solarDashboard>) =>
       dashboards[0].configuration[0].input.widgetProperties.config;
 
-    it('preserves solar optionsById/color through the local (JSON) storage round-trip', () => {
-      const saved = cloneDeep(solarDashboard());                 // saveDashboard(): cloneDeep
-      const persisted = JSON.stringify(saved);                   // saveLDashboardsConfigToLocalStorage()
-      const reloaded = JSON.parse(persisted) as typeof saved;    // loadConfigFromLocalStorage()
-
-      const cfg = solarConfigOf(reloaded);
-      expect(cfg.solarCharger.optionsById).toEqual({ sc1: { arrayRatedPowerW: 300 } });
-      expect(cfg.color).toBe('green');
-    });
-
-    it('preserves solar config through the shared-config JSON-Patch replace round-trip', () => {
-      const dashboards = cloneDeep(solarDashboard());
-      // storage.patchConfig('Dashboards', value) sends a full replace of the dashboards array.
-      const patch = [{ op: 'replace', path: '/default/dashboards', value: dashboards }];
-      const onServer = JSON.parse(JSON.stringify(patch))[0].value as typeof dashboards;
-
-      const cfg = solarConfigOf(onServer);
-      expect(cfg.solarCharger.optionsById).toEqual({ sc1: { arrayRatedPowerW: 300 } });
-      expect(cfg.color).toBe('green');
-    });
-
+    // The pure JSON.stringify/parse round-trip and the JSON-Patch replace round-trip were dropped:
+    // they only re-asserted that plain objects survive JSON serialization (tautological, no KIP code
+    // exercised). The #1061 gotcha is the lodash merge below clobbering saved arrays with the empty
+    // DEFAULT_CONFIG defaults, which the remaining test and the sibling 'config merge' test pin.
     it('still has the saved options after the full persist -> reload -> runtime merge chain', () => {
       // Persist
       const reloaded = JSON.parse(JSON.stringify(cloneDeep(solarDashboard()))) as ReturnType<typeof solarDashboard>;
