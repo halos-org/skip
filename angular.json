@@ -23,7 +23,12 @@
               "src/polyfills.ts"
             ],
             "assets": [
-              "src/assets",
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets",
+                "ignore": ["kip-dashboard-schema.json"]
+              },
               "src/manifest.json"
             ],
             "styles": [
