@@ -53,3 +53,6 @@ yarn-error.log
 # System Files
 .DS_Store
 Thumbs.db
+
+# kip-plugin test scratch dirs
+/.tmp-kip*

@@ -59,9 +59,11 @@
   "signalk-plugin-enabled-by-default": true,
   "scripts": {
     "test": "ng test --watch=false",
-    "test:plugin": "npm run build:plugin && node --test --test-concurrency=1 kip-plugin/tests/index.test.cjs",
+    "test:plugin": "npm run build:plugin && node --test --test-concurrency=1 kip-plugin/tests/*.test.cjs",
     "test:interactive": "ng test",
     "test:headless": "CI=1 ng test --watch=false",
+    "test:mcp-schema": "vitest run --config tools/gen-mcp-schema/vitest.config.ts",
+    "gen:mcp-schema": "UPDATE_SCHEMA=1 npm run test:mcp-schema",
     "lint": "ng lint",
     "dev": "ng serve --configuration=dev --serve-path=/@halos-org/skip/",
     "build:plugin": "tsc -p ./kip-plugin/tsconfig.plugin.json",
@@ -131,6 +133,10 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@signalk/server-api": "^2.22.0"
+    "@signalk/server-api": "^2.22.0",
+    "heic-convert": "^2.1.0",
+    "isomorphic-dompurify": "^3.18.0",
+    "multer": "^2.2.0",
+    "sharp": "^0.35.2"
   }
 }
