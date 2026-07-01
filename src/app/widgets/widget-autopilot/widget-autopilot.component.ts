@@ -797,6 +797,12 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   protected buildAndSendCommand(cmd: string): void {
     const cmdAction = COMMANDS[cmd];
     if (typeof cmdAction === 'undefined') {
+      // V2 autopilot modes are provider-defined free-form strings, so a reported mode outside the
+      // built-in COMMANDS table is still commandable via its raw mode string.
+      if (this.runtime.options().autopilot.apiVersion === 'v2' && this.autopilotModes().includes(cmd)) {
+        this.sendV2Command(cmd);
+        return;
+      }
       alert('Unknown Autopilot command: ' + cmd);
       return;
     }
@@ -963,6 +969,11 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         await this.setModeAndEnable(cmd, endpoints);
         break;
       default:
+        if (this.autopilotModes().includes(cmd)) {
+          // Provider-reported mode outside the standard set: command it via its raw mode string.
+          await this.setModeAndEnable(cmd, endpoints);
+          break;
+        }
         console.error('Unknown V2 command:', cmd);
         this.displayApError({
           statusCode: 400,
