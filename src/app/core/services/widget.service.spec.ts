@@ -17,9 +17,11 @@ describe('WidgetService', () => {
   it('registers the available electrical family widgets in definitions', () => {
     const selectors = service.kipWidgets.map(widget => widget.selector);
 
-    // widget-alternator/-inverter/-ac are commented out in widget.service.ts pending readiness.
     expect(selectors).toContain('widget-solar-charger');
     expect(selectors).toContain('widget-charger');
+    expect(selectors).toContain('widget-alternator');
+    expect(selectors).toContain('widget-inverter');
+    expect(selectors).toContain('widget-ac');
   });
 
   it('lazily resolves a component type as a promise and dedupes concurrent lookups', async () => {
