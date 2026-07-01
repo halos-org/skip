@@ -91,6 +91,16 @@ describe('WidgetAutopilotComponent', () => {
     expect(label).toBe('Disengage');
   });
 
+  it('labels the v2 standby toggle as Engage before the engaged state is known (null)', () => {
+    runtimeOptions.autopilot.apiVersion = 'v2';
+    (component as unknown as { apEngaged: { set: (value: boolean | null) => void } }).apEngaged.set(null);
+
+    const label = (component as unknown as { standbyButtonLabel: () => string }).standbyButtonLabel();
+
+    // A click in this state POSTs engage (apEngaged() is falsy), so the label must read Engage, not Disengage.
+    expect(label).toBe('Engage');
+  });
+
   it('keeps the v1 standby command label as Disengage', () => {
     runtimeOptions.autopilot.apiVersion = 'v1';
     (component as unknown as { apEngaged: { set: (value: boolean) => void } }).apEngaged.set(false);

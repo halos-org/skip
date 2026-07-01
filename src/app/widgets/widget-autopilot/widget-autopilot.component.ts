@@ -314,7 +314,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   protected readonly standbyButtonLabel = computed(() => {
     const apiVersion = this.runtime.options().autopilot.apiVersion;
 
-    if (apiVersion === "v2" && this.apEngaged() === false) {
+    if (apiVersion === "v2" && !this.apEngaged()) {
       return "Engage";
     }
 
