@@ -1,4 +1,4 @@
-import { Component, inject, Type, ViewChild, ViewContainerRef, Input, effect, ComponentRef, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, Type, ViewChild, ViewContainerRef, Input, effect, ComponentRef, OnInit, OnDestroy, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
 import { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
@@ -85,6 +85,8 @@ export class WidgetEmbeddedComponent implements OnInit, OnDestroy {
   private readonly _widgetService = inject(WidgetService);
   private readonly _app = inject(AppService);
   protected theme = toSignal(this._app.cssThemeColorRoles$, { requireSync: true });
+  // True when the widget's lazy chunk could not be resolved, so the template shows a retry affordance.
+  protected readonly loadFailed = signal(false);
   private childRef: ComponentRef<WidgetViewComponentBase>;
   private compType: Type<WidgetViewComponentBase>
   private _destroyed = false;
@@ -121,6 +123,8 @@ export class WidgetEmbeddedComponent implements OnInit, OnDestroy {
     this._streams?.applyStreamsConfigDiff?.(merged);
     this._meta?.applyMetaConfigDiff?.(merged);
 
+    this.loadFailed.set(!this.compType);
+
     if (this.outlet && this.compType) {
       this.childRef = this.outlet.createComponent(this.compType);
       this.childRef.setInput('id', this.widgetProperties.uuid);
@@ -130,5 +134,13 @@ export class WidgetEmbeddedComponent implements OnInit, OnDestroy {
       // Created after the import resolved (outside the initial CD pass), so render it now.
       this.childRef.changeDetectorRef.detectChanges();
     }
+  }
+
+  /** Re-attempt a failed lazy chunk load (the import promise is dropped on failure, so this re-imports). */
+  protected retryWidgetLoad(): void {
+    const type = this.widgetProperties.type;
+    if (!type || this._destroyed) return;
+    this.loadFailed.set(false);
+    void this.loadAndCreateChild(type);
   }
 }

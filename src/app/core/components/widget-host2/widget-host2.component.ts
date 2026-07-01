@@ -1,4 +1,4 @@
-import { Component, inject, Type, ViewChild, ViewContainerRef, Input, effect, ComponentRef, OnDestroy, OnInit, untracked, ChangeDetectionStrategy, inputBinding, computed } from '@angular/core';
+import { Component, inject, Type, ViewChild, ViewContainerRef, Input, effect, ComponentRef, OnDestroy, OnInit, untracked, ChangeDetectionStrategy, inputBinding, computed, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
 import { GestureDirective } from '../../directives/gesture.directive';
@@ -77,6 +77,9 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
 
   protected theme = toSignal(this.app.cssThemeColorRoles$, { requireSync: true });
   protected readonly dashboardStaticView = computed(() => this.dashboard.isDashboardStatic());
+  // True when the widget's lazy chunk could not be resolved, so the template shows a retry affordance
+  // instead of a silent blank tile.
+  protected readonly loadFailed = signal(false);
   private childRef: ComponentRef<WidgetViewComponentBase> | null = null;
   private compType: Type<WidgetViewComponentBase>
   private _hasInitialized = false;
@@ -148,6 +151,8 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
     this.streams?.applyStreamsConfigDiff?.(merged);
     this.meta?.applyMetaConfigDiff?.(merged);
 
+    this.loadFailed.set(!this.compType);
+
     if (this.outlet && this.compType) {
       this.childRef = this.outlet.createComponent(this.compType, {
         bindings: [
@@ -164,6 +169,14 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
     if (shouldAutoOpenOptions) {
       queueMicrotask(() => this.openWidgetOptions(new Event('kip:auto-open-options')));
     }
+  }
+
+  /** Re-attempt a failed lazy chunk load (the import promise is dropped on failure, so this re-imports). */
+  protected retryWidgetLoad(): void {
+    const type = this.widgetProperties.type;
+    if (!type || this._destroyed) return;
+    this.loadFailed.set(false);
+    void this.loadAndCreateChild(type, false);
   }
 
   ngOnDestroy(): void {
