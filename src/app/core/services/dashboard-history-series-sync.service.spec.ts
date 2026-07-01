@@ -241,6 +241,38 @@ describe('DashboardHistorySeriesSyncService', () => {
         expect(reconcileSpy).not.toHaveBeenCalled();
     });
 
+    it('loads in-use widget DEFAULT_CONFIG before reconciling (deterministic across dashboards)', async () => {
+        vi.useFakeTimers();
+        TestBed.inject(DashboardHistorySeriesSyncService);
+        connectionStub.serverServiceEndpoint$.next({
+            operation: 2,
+            message: 'Connected',
+            serverDescription: 'Signal K',
+            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
+            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
+        });
+
+        dashboardStub.dashboards.set([
+            {
+                id: 'dash-1',
+                name: 'Dashboard 1',
+                icon: 'dashboard-dashboard',
+                configuration: [
+                    createAutomaticNode('widget-numeric-1', 'widget-numeric', {
+                        numericPath: 'navigation.speedThroughWater'
+                    })
+                ]
+            }
+        ]);
+
+        await vi.advanceTimersByTimeAsync(800);
+
+        // The reconcile warms each in-use widget type's DEFAULT_CONFIG (via getComponentType),
+        // independently of which dashboard is rendered, before extracting series.
+        expect(widgetServiceMock.getComponentType).toHaveBeenCalledWith('widget-numeric');
+        expect(reconcileSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('should extract numeric path series and reconcile once after debounce', async () => {
         vi.useFakeTimers();
         TestBed.inject(DashboardHistorySeriesSyncService);
