@@ -31,6 +31,12 @@ describe('chart-stats.util', () => {
     expect(normalizeSignedRad((3 * Math.PI) / 2)).toBeCloseTo(-Math.PI / 2, 5);
   });
 
+  it('normalizes exactly π to +π in the signed domain (atan2 boundary, shared by both engines)', () => {
+    // The single shared signed normalizer is the atan2 form, so 180° maps to +π (the included end of
+    // (-π, π]), not the recorder's former mod-based -π. Both chart engines now agree here.
+    expect(normalizeSignedRad(Math.PI)).toBeCloseTo(Math.PI, 10);
+  });
+
   it('wraps a single value into the direction domain [0, 2π)', () => {
     const dir = computeWindowStats([(350 * Math.PI) / 180], 1, 'direction');
     expect(dir.value).toBeCloseTo((350 * Math.PI) / 180, 5);

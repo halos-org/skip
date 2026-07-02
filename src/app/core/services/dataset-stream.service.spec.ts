@@ -312,7 +312,7 @@ describe('DatasetStreamService', () => {
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const datapoints = (service as any).convertHistoryToDatapoints(response, 'number', 'scalar');
+        const datapoints = (service as any).convertHistoryToDatapoints(response, 'scalar');
 
         expect(datapoints.length).toBe(3);
         expect(datapoints[0].data.lastAverage).toBeNull();
@@ -345,7 +345,7 @@ describe('DatasetStreamService', () => {
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const datapoints = (service as any).convertHistoryToDatapoints(response, 'number', 'scalar');
+        const datapoints = (service as any).convertHistoryToDatapoints(response, 'scalar');
 
         expect(datapoints.length).toBe(2);
         expect(datapoints[0].data.value).toBe(0.5);
@@ -370,7 +370,7 @@ describe('DatasetStreamService', () => {
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const datapoints = (service as any).convertHistoryToDatapoints(response, 'rad', 'direction');
+        const datapoints = (service as any).convertHistoryToDatapoints(response, 'direction');
 
         expect(datapoints.length).toBe(3);
         expect(datapoints[0].data.lastAverage).toBeNull();
@@ -382,21 +382,16 @@ describe('DatasetStreamService', () => {
         expect(final.lastMaximum).toBeCloseTo(0.0872664626, 6); // 5°
     }));
 
-    it('honors an explicit angle-domain override for non-allowlisted rad paths (#1070)', inject([DatasetStreamService], (service: DatasetStreamService) => {
+    it('updateDataset delegates to circular stats for angle domains (wrap-safe)', inject([DatasetStreamService], (service: DatasetStreamService) => {
+        // Guards the wiring: a dropped domain arg would silently compute linear stats on the
+        // recorder's live tail (the #6 bug, recorder side). Buffer straddles the 0/360° wrap.
+        const ds = { historicalData: [(350 * Math.PI) / 180, (10 * Math.PI) / 180], smoothingPeriod: 2 };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const resolve = (path: string, unit: string, override?: 'signed' | 'direction') => (service as any).resolveAngleDomain(path, unit, override);
-
-        // A custom angular path (e.g. advancedwind wind shift, published in -PI..PI) is not in the
-        // signed allowlist, so by default it wraps into the 0..2PI direction domain.
-        expect(resolve('environment.wind.shift', 'rad')).toBe('direction');
-        // With an explicit 'signed' override the value keeps its native -PI..PI range.
-        expect(resolve('environment.wind.shift', 'rad', 'signed')).toBe('signed');
-        // A 'direction' override forces compass range for an otherwise-signed path.
-        expect(resolve('environment.wind.angleApparent', 'rad', 'direction')).toBe('direction');
-        // Non-rad units stay scalar regardless of override.
-        expect(resolve('navigation.speedOverGround', 'number', 'signed')).toBe('scalar');
-        // Back-compat: no override keeps the allowlist behavior.
-        expect(resolve('environment.wind.angleApparent', 'rad')).toBe('signed');
+        const point = (service as any).updateDataset(ds, 'direction');
+        const avg = point.data.lastAverage as number;
+        // Circular mean of 350° and 10° is ~0° in the direction domain, not the ~180° a linear mean gives.
+        expect(Math.min(avg, 2 * Math.PI - avg)).toBeLessThan(0.02);
+        expect(point.data.value).toBeCloseTo((10 * Math.PI) / 180, 5); // wrapped last value
     }));
 });
 

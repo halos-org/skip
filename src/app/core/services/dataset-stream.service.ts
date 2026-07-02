@@ -6,6 +6,8 @@ import { HistoryApiClientService, IHistoryValuesResponse, IHistoryValuesQueryPar
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { UUID } from '../utils/uuid.util'
 import { resolveWindowMs, deriveDataSourceInfo } from '../utils/chart-window.util';
+import { resolveAngleDomain } from '../utils/angle-domain.util';
+import { computeWindowStats, ChartStatsDomain } from '../utils/chart-stats.util';
 import { cloneDeep } from 'lodash-es';
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 
@@ -17,7 +19,6 @@ export interface IDatasetServiceDatapoint {
     sma?: number; // Simple Moving Average
     ema?: number; // Exponential Moving Average - A better Moving Average calculation than Simple Moving Average
     doubleEma?: number; // Double Exponential Moving Average - Moving Average that is even more reactive to data variation then EMA. Suitable for wind and angle average calculations
-    lastAngleAverage?: number;
     lastAverage?: number; // Computed from the latest historicalData.
     lastMinimum?: number;
     lastMaximum?: number;
@@ -54,9 +55,6 @@ interface IDatasetServiceObserverRegistration {
   rxjsSubject: ReplaySubject<IDatasetServiceDatapoint>;
 }
 
-// How to interpret angular (radian) data
-type AngleDomain = 'scalar' | 'direction' | 'signed';
-
 @Injectable({
   providedIn: 'root'
 })
@@ -71,18 +69,6 @@ export class DatasetStreamService implements OnDestroy {
   private _svcDataSource: IDatasetServiceDataSource[] = [];
   private _svcSubjectObserverRegistry: IDatasetServiceObserverRegistration[] = [];
   private _startAllPromise: Promise<void>;
-
-  // List of Signal K paths that should be interpreted as signed angles (-π, π].
-  // Add your specific paths here. All other radian paths will default to direction domain [0, 2π).
-  private readonly signedAnglePaths = new Set<string>([
-    "self.navigation.attitude.roll",
-    "self.navigation.attitude.pitch",
-    "self.navigation.attitude.yaw",
-    "self.environment.wind.angleApparent",
-    "self.environment.wind.angleTrueGround",
-    "self.environment.wind.angleTrueWater",
-    "self.steering.rudderAngle"
-  ]);
 
   constructor() {
     this._svcDatasetConfigs = this.appSettings.getDataSets();
@@ -247,7 +233,7 @@ export class DatasetStreamService implements OnDestroy {
     );
 
     // Decide how to interpret the dataset values (scalar vs radian domains)
-    const angleDomain = this.resolveAngleDomain(configuration.path, configuration.baseUnit, configuration.angleDomainOverride);
+    const angleDomain = resolveAngleDomain(configuration.path, configuration.baseUnit, configuration.angleDomainOverride);
 
     // Attempt to seed dataset with history if eligible
     const historyResolutionSeconds = Math.max(1, Math.round(newDataSourceConfig.sampleTime / 1000));
@@ -277,7 +263,7 @@ export class DatasetStreamService implements OnDestroy {
       }
       dataSource.historicalData.push(newValue.data.value);
 
-      const datapoint: IDatasetServiceDatapoint = this.updateDataset(dataSource, configuration.baseUnit, angleDomain);
+      const datapoint: IDatasetServiceDatapoint = this.updateDataset(dataSource, angleDomain);
 
       this._svcSubjectObserverRegistry
         .find(registration => registration.datasetUuid === dataSource.uuid)
@@ -292,14 +278,14 @@ export class DatasetStreamService implements OnDestroy {
    * @param {IDatasetServiceDataSource} dataSource The data source to seed.
    * @param {IDatasetServiceDatasetConfig} configuration The dataset config.
    * @param {number} historyResolutionSeconds The resolution in seconds (minimum 1).
-   * @param {AngleDomain} angleDomain The angle domain interpretation.
+   * @param {ChartStatsDomain} angleDomain The angle domain interpretation.
    * @return {Promise<void>}
    */
   private async seedHistoryData(
     dataSource: IDatasetServiceDataSource,
     configuration: IDatasetServiceDatasetConfig,
     historyResolutionSeconds: number,
-    angleDomain: AngleDomain
+    angleDomain: ChartStatsDomain
   ): Promise<void> {
     try {
       // Build history request path with aggregations
@@ -338,7 +324,7 @@ export class DatasetStreamService implements OnDestroy {
       }
 
       // Convert history response to datapoints
-      const historyDatapoints = this.convertHistoryToDatapoints(response, configuration.baseUnit, angleDomain);
+      const historyDatapoints = this.convertHistoryToDatapoints(response, angleDomain);
 
       // Seed the ReplaySubject with history datapoints
       const subject = this._svcSubjectObserverRegistry.find(r => r.datasetUuid === dataSource.uuid)?.rxjsSubject;
@@ -357,7 +343,7 @@ export class DatasetStreamService implements OnDestroy {
           }
           dataSource.historicalData.push(value);
 
-          const computedPoint = this.updateDataset(dataSource, configuration.baseUnit, angleDomain);
+          const computedPoint = this.updateDataset(dataSource, angleDomain);
           computedPoint.timestamp = historyPoint.timestamp;
           seededPoints.push(computedPoint);
         });
@@ -562,133 +548,20 @@ export class DatasetStreamService implements OnDestroy {
    * @return {*}  {IDatasetServiceDatapoint} A new historicalData object. Note: push() the object to the historicalData to
    * @memberof DatasetStreamService
    */
-  private updateDataset(ds: IDatasetServiceDataSource, unit: string, domain: AngleDomain = 'scalar'): IDatasetServiceDatapoint {
-    let avgCalc: number = null;
-    let smaCalc: number = null;
-    let minCalc: number = null;
-    let maxCalc: number = null;
-
-    if (unit === "rad") {
-      // Circular statistics for angles
-      avgCalc = this.circularMeanRad(ds.historicalData);
-      const window = ds.historicalData.slice(-ds.smoothingPeriod);
-      smaCalc = this.circularMeanRad(window);
-      const { min, max } = this.circularMinMaxRad(ds.historicalData);
-
-      // Normalize outputs to requested domain
-      if (domain === 'direction') {
-        avgCalc = this.normalizeToDirection(avgCalc);
-        smaCalc = this.normalizeToDirection(smaCalc);
-        minCalc = this.normalizeToDirection(min);
-        maxCalc = this.normalizeToDirection(max);
-      } else if (domain === 'signed') {
-        avgCalc = this.normalizeToSigned(avgCalc);
-        smaCalc = this.normalizeToSigned(smaCalc);
-        minCalc = this.normalizeToSigned(min);
-        maxCalc = this.normalizeToSigned(max);
-      } else {
-        // Fallback: treat as scalar (shouldn't happen for unit==='rad')
-        minCalc = min;
-        maxCalc = max;
-      }
-    } else {
-      // Arithmetic statistics for scalars
-      avgCalc = calculateAverage(ds.historicalData);
-      smaCalc = calculateSMA(ds.historicalData, ds.smoothingPeriod);
-      minCalc = Math.min(...ds.historicalData);
-      maxCalc = Math.max(...ds.historicalData);
-    }
-
-    const newDatapoint: IDatasetServiceDatapoint = {
+  private updateDataset(ds: IDatasetServiceDataSource, domain: ChartStatsDomain = 'scalar'): IDatasetServiceDatapoint {
+    const stats = computeWindowStats(ds.historicalData, ds.smoothingPeriod, domain);
+    return {
       timestamp: Date.now(),
       data: {
-        value: unit === 'rad'
-          ? (domain === 'signed'
-            ? this.normalizeToSigned(ds.historicalData[ds.historicalData.length - 1])
-            : this.normalizeToDirection(ds.historicalData[ds.historicalData.length - 1]))
-          : ds.historicalData[ds.historicalData.length - 1],
-        sma: smaCalc,
+        value: stats.value,
+        sma: stats.sma,
         ema: null,
         doubleEma: null,
-        lastAverage: avgCalc,
-        lastMinimum: minCalc,
-        lastMaximum: maxCalc
+        lastAverage: stats.lastAverage,
+        lastMinimum: stats.lastMinimum,
+        lastMaximum: stats.lastMaximum
       }
     };
-
-    return newDatapoint;
-
-    function calculateAverage(arr: number[]): number | null {
-      if (arr.length === 0) return null;
-      const sum = arr.reduce((acc, val) => acc + val, 0);
-      return sum / arr.length;
-    }
-
-    function calculateSMA(values: number[], windowSize: number): number {
-      if (values.length < windowSize) windowSize = values.length;
-      let sum = 0;
-      for (let i = values.length - windowSize; i < values.length; i++) {
-        sum += values[i];
-      }
-      return sum / windowSize;
-    }
-  }
-
-  // Windowed circular mean (for SMA)
-  private circularMeanRad(anglesRad: number[]): number {
-    if (anglesRad.length === 0) return 0;
-    const sumSin = anglesRad.reduce((sum, a) => sum + Math.sin(a), 0);
-    const sumCos = anglesRad.reduce((sum, a) => sum + Math.cos(a), 0);
-    return Math.atan2(sumSin / anglesRad.length, sumCos / anglesRad.length);
-  }
-
-  // Circular min/max: returns the smallest arc containing all points
-  private circularMinMaxRad(anglesRad: number[]): { min: number, max: number } {
-    if (anglesRad.length === 0) return { min: 0, max: 0 };
-    const degAngles = anglesRad.map(a => ((a * 180 / Math.PI) + 360) % 360).sort((a, b) => a - b);
-    let maxGap = 0;
-    let minIdx = 0;
-    for (let i = 0; i < degAngles.length; i++) {
-      const next = (i + 1) % degAngles.length;
-      const gap = (degAngles[next] - degAngles[i] + 360) % 360;
-      if (gap > maxGap) {
-        maxGap = gap;
-        minIdx = next;
-      }
-    }
-    // Convert back to radians
-    const min = degAngles[minIdx] * Math.PI / 180;
-    const max = degAngles[(minIdx - 1 + degAngles.length) % degAngles.length] * Math.PI / 180;
-    return { min, max };
-  }
-
-  // Domain resolution helpers
-  private resolveAngleDomain(path: string, unit: string, override?: 'signed' | 'direction'): AngleDomain {
-    if (unit !== 'rad') return 'scalar';
-    // A per-chart override wins over the path allowlist so any angular path (e.g. a plugin's
-    // wind-shift) can be shown in its native signed range instead of wrapping to 0..360 (#1070).
-    if (override === 'signed' || override === 'direction') return override;
-    const incoming = this.normalizePathKey(path);
-    for (const candidate of this.signedAnglePaths) {
-      if (incoming === this.normalizePathKey(candidate)) {
-        return 'signed';
-      }
-    }
-    return 'direction';
-  }
-
-  // Angle normalization helpers
-  private normalizePathKey(path: string): string {
-    return path.replace(/^vessels\.self\./, '').replace(/^self\./, '');
-  }
-  private mod(a: number, n: number): number { return ((a % n) + n) % n; }
-  private normalizeToDirection(rad: number): number {
-    const twoPi = 2 * Math.PI;
-    return this.mod(rad, twoPi); // [0, 2π)
-  }
-  private normalizeToSigned(rad: number): number {
-    const twoPi = 2 * Math.PI;
-    return this.mod(rad + Math.PI, twoPi) - Math.PI; // (-π, π]
   }
 
   /**
@@ -740,17 +613,14 @@ export class DatasetStreamService implements OnDestroy {
    *
    * @private
    * @param {IHistoryValuesResponse} response The History API response.
-   * @param {string} unit The base unit type (for angle interpretation).
-   * @param {AngleDomain} domain The angle domain (scalar, direction, or signed).
+   * @param {ChartStatsDomain} domain The angle domain (scalar, direction, or signed).
    * @returns {IDatasetServiceDatapoint[]} Array of datapoints with preserved timestamps.
    */
   private convertHistoryToDatapoints(
     response: IHistoryValuesResponse,
-    unit: string,
-    domain: AngleDomain
+    domain: ChartStatsDomain
   ): IDatasetServiceDatapoint[] {
     return this.historyChartAdapter.mapValuesToChartDatapoints(response, {
-      unit,
       domain
     }) as IDatasetServiceDatapoint[];
   }

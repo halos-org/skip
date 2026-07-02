@@ -207,7 +207,6 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       }
 
       const datapoints = this.historyMapper.mapValuesToChartDatapoints(response, {
-        unit: 'number',
         domain: 'scalar'
       });
 
