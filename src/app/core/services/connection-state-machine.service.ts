@@ -218,6 +218,10 @@ export class ConnectionStateMachine implements OnDestroy {
       return;
     }
 
+    // Unlike HTTP discovery, WebSocket reconnection is intentionally unbounded: a
+    // marine display must keep reaching for a boat server that may be intermittently
+    // offline rather than give up into PermanentFailure. Backoff escalates through
+    // retryIntervals and holds at the longest interval once exhausted.
     this._webSocketRetryCount++;
     this.setState(
       ConnectionState.WebSocketRetrying,
@@ -356,8 +360,10 @@ export class ConnectionStateMachine implements OnDestroy {
 
   private scheduleWebSocketRetry(): void {
     this.clearRetryTimer();
+    const retryIndex = Math.min(this._webSocketRetryCount - 1, this.config.retryIntervals.length - 1);
+    const delay = this.config.retryIntervals[retryIndex];
 
-    console.log(`[ConnectionStateMachine] Scheduling WebSocket retry in ${this.config.retryIntervals[1]}ms`);
+    console.log(`[ConnectionStateMachine] Scheduling WebSocket retry in ${delay}ms`);
     this._retryTimeout = setTimeout(() => {
       // Trigger WebSocket reconnection attempt via callback
       // Don't change state here - let the WebSocket result determine the new state
@@ -374,7 +380,7 @@ export class ConnectionStateMachine implements OnDestroy {
           this.config.webSocketRetryCount
         );
       }
-    }, this.config.retryIntervals[1]);
+    }, delay);
   }
 
   private clearRetryTimer(): void {
