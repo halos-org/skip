@@ -30,6 +30,7 @@ const server = await startServer({ publicDir, base: '/@halos-org/skip/', port })
 server.setConfigDocument(serverConfigDocument({ dashboards: buildDashboards([aisRadarWidget()]) }));
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const ctx = await browser.newContext({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 1 });
+await ctx.route('https://www.gstatic.com/generate_204', (route) => route.fulfill({ status: 204, body: '' }));
 const bundle = localStorageBundle({ origin: server.origin, subscribeAll: true });
 await ctx.addInitScript({ content: `window.__KIP_TEST__=true;` + Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('') });
 const page = await ctx.newPage();

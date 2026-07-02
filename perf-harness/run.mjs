@@ -70,11 +70,25 @@ async function prepareBuild() {
   return buildBranch(BRANCH, LABEL, { rebuild: !flag('no-rebuild') });
 }
 
+/*
+ * A mis-seeded config still boots Skip into a plausible-looking empty/default
+ * dashboard, which would silently measure the wrong thing — so a boot that does
+ * not render exactly the scenario's widgets fails the run.
+ */
 async function waitForBoot(page, expectedWidgets) {
-  await page.waitForSelector('widget-host2', { timeout: 25000 }).catch(() => {});
+  const deadline = Date.now() + 25000;
+  let count = 0;
+  while (Date.now() < deadline) {
+    count = await page.$$eval('widget-host2', (els) => els.length).catch(() => 0);
+    if (count === expectedWidgets) break;
+    await page.waitForTimeout(250);
+  }
+  if (count !== expectedWidgets) {
+    throw new Error(`boot check failed: ${count} widget-host2 rendered, expected ${expectedWidgets}`);
+  }
   // settle a couple of frames
   await page.waitForTimeout(800);
-  return page.$$eval('widget-host2', (els) => els.length).catch(() => 0);
+  return count;
 }
 
 async function main() {
@@ -95,6 +109,10 @@ async function main() {
     const reps = [];
     for (let r = 0; r < REPEATS; r++) {
       const ctx = await browser.newContext();
+      // InternetReachabilityService probes gstatic at boot, on connection-state
+      // changes, and every 60s — answer locally so no external request lands
+      // inside the measurement window.
+      await ctx.route('https://www.gstatic.com/generate_204', (route) => route.fulfill({ status: 204, body: '' }));
       await ctx.addInitScript({ content: probeJs });
       const dashboards = s.dashboards();
       server.setConfigDocument(serverConfigDocument({ dashboards }));
@@ -109,7 +127,7 @@ async function main() {
       // fresh stream state
       server.setControl({ streaming: false, ais: { count: 0, churnPerSec: 0 } });
       await page.goto(server.appUrl + '#/dashboard/0', { waitUntil: 'load', timeout: 30000 });
-      const widgetCount = await waitForBoot(page);
+      const widgetCount = await waitForBoot(page, dashboards[0].configuration.length);
 
       // start the scenario data profile, warm up, then measure
       server.setControl({ streaming: true, ...s.control });
