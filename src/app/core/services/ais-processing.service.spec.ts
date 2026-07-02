@@ -183,3 +183,103 @@ describe('AisProcessingService applyAisUpdate dispatch', () => {
     expect(track!.ais.status).toBe('confirmed');
   });
 });
+
+/**
+ * Eviction bounds unbounded target growth (the "unresponsive after a while"
+ * freeze): many Signal K setups never send an explicit `status: 'remove'`, so
+ * every distinct MMSI ever heard used to accumulate for the app lifetime,
+ * making every flush + radar render O(targets) and heavier over uptime.
+ */
+describe('AisProcessingService target eviction (bounds unbounded growth)', () => {
+  let stream$: Subject<IPathUpdateWithPath>;
+  let service: AisProcessingService;
+  const EVENT_TS = new Date('2026-06-24T00:00:00Z').getTime();
+
+  function makeEvent(fullPath: string, value: unknown): IPathUpdateWithPath {
+    return { path: fullPath, update: { data: { value, timestamp: new Date(EVENT_TS) }, state: 'normal' } } as IPathUpdateWithPath;
+  }
+  function push(fullPath: string, value: unknown): void {
+    stream$.next(makeEvent(fullPath, value));
+    vi.advanceTimersByTime(300);
+  }
+  function pushAt(fullPath: string, value: unknown, tsMs: number): void {
+    stream$.next({ path: fullPath, update: { data: { value, timestamp: new Date(tsMs) }, state: 'normal' } } as IPathUpdateWithPath);
+    vi.advanceTimersByTime(300);
+  }
+  const internals = () => service as unknown as {
+    tracks: Map<string, unknown>;
+    contextIndex: Map<string, string>;
+    mmsiIndex: Map<string, Set<string>>;
+    maxTargets: number;
+    evictStaleTracks: (nowMs: number) => void;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    stream$ = new Subject<IPathUpdateWithPath>();
+    TestBed.configureTestingModule({
+      providers: [AisProcessingService, { provide: DataService, useValue: { subscribePathTree: () => stream$.asObservable() } as Partial<DataService> }]
+    });
+    service = TestBed.inject(AisProcessingService);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('caps the retained track set at maxTargets, evicting the oldest, and prunes the indexes', () => {
+    internals().maxTargets = 5;
+    for (let i = 0; i < 12; i++) {
+      push(`vessels.urn:mrn:imo:mmsi:${100000000 + i}.navigation.position.latitude`, 10 + i * 0.001);
+    }
+    expect(internals().tracks.size).toBe(5);
+    // indexes must not leak entries for evicted tracks
+    expect(internals().contextIndex.size).toBe(5);
+  });
+
+  it('evicts tracks not updated within the TTL when the sweep runs', () => {
+    push(`vessels.urn:mrn:imo:mmsi:123456789.navigation.position.latitude`, 10);
+    expect(internals().tracks.size).toBe(1);
+    // 11 minutes after the last update (default TTL is 10 min) -> evicted
+    internals().evictStaleTracks(EVENT_TS + 11 * 60 * 1000);
+    expect(internals().tracks.size).toBe(0);
+  });
+
+  it('keeps tracks that were updated within the TTL', () => {
+    push(`vessels.urn:mrn:imo:mmsi:123456789.navigation.position.latitude`, 10);
+    internals().evictStaleTracks(EVENT_TS + 60 * 1000); // 1 min later, within TTL
+    expect(internals().tracks.size).toBe(1);
+  });
+
+  it('runs TTL eviction through the periodic interval sweep', () => {
+    // Anchor the fake clock to the event timestamp so the sweep's Date.now()
+    // is deterministic relative to lastUpdateAt.
+    vi.setSystemTime(EVENT_TS);
+    push(`vessels.urn:mrn:imo:mmsi:123456789.mmsi`, '123456789');
+    expect(internals().tracks.size).toBe(1);
+    expect(internals().mmsiIndex.size).toBe(1);
+
+    // Sweeps within the TTL must keep the track (also proves the clock anchor
+    // took: an unanchored real-time clock would evict on the first sweep).
+    vi.advanceTimersByTime(5 * 60 * 1000);
+    expect(internals().tracks.size).toBe(1);
+
+    // Past the 10 min TTL the interval-driven sweep evicts and prunes indexes.
+    vi.advanceTimersByTime(6 * 60 * 1000);
+    expect(internals().tracks.size).toBe(0);
+    expect(internals().contextIndex.size).toBe(0);
+    expect(internals().mmsiIndex.size).toBe(0);
+  });
+
+  it('evicts the least-recently-updated tracks first when over the cap', () => {
+    internals().maxTargets = 3;
+    const contexts = [0, 1, 2, 3, 4].map(i => `vessels.urn:mrn:imo:mmsi:${200000000 + i}`);
+    contexts.forEach((context, i) => {
+      pushAt(`${context}.navigation.position.latitude`, 10 + i, EVENT_TS + i * 1000);
+    });
+
+    expect(internals().tracks.size).toBe(3);
+    expect(internals().contextIndex.has(contexts[0])).toBe(false);
+    expect(internals().contextIndex.has(contexts[1])).toBe(false);
+    expect(internals().contextIndex.has(contexts[2])).toBe(true);
+    expect(internals().contextIndex.has(contexts[3])).toBe(true);
+    expect(internals().contextIndex.has(contexts[4])).toBe(true);
+  });
+});
