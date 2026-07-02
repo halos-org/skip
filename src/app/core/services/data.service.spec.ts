@@ -42,6 +42,33 @@ describe('DataService', () => {
     expect(service).toBeTruthy();
   });
 
+  it('shares one live subject per (path, source) so co-subscribers cannot tear each other down', () => {
+    const first$ = service.subscribePath('self.electrical.batteries.10.voltage', 'default');
+    const second$ = service.subscribePath('self.electrical.batteries.10.voltage', 'default');
+    const otherSource$ = service.subscribePath('self.electrical.batteries.10.voltage', 'test-source');
+
+    // Deduplication is keyed by (path, source): identical pairs share one subject, distinct sources do not.
+    expect(second$).toBe(first$);
+    expect(otherSource$).not.toBe(first$);
+
+    const firstValues: unknown[] = [];
+    const secondValues: unknown[] = [];
+    first$.subscribe(update => firstValues.push(update.data.value));
+    second$.subscribe(update => secondValues.push(update.data.value));
+
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'electrical.batteries.10.voltage',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: 12.5,
+    });
+
+    // Both co-subscribers keep receiving from the shared stream; there is no teardown that could complete it.
+    expect(firstValues.at(-1)).toBe(12.5);
+    expect(secondValues.at(-1)).toBe(12.5);
+  });
+
   it('applies notification state to path value updates', () => {
     let latest: IPathUpdate | undefined;
 
