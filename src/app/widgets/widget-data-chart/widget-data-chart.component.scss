@@ -2,6 +2,14 @@
   display: block;
   width: 100%;
   height: 100%;
+  position: relative;
+}
+
+// #64 history engine: overlay shown over the (empty) chart when no history provider is available.
+.history-unavailable {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--mat-sys-surface) 70%, transparent);
 }
 
 .empty-state {

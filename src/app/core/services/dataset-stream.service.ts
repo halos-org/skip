@@ -219,7 +219,7 @@ export class DatasetStreamService implements OnDestroy {
    * then starts building the historicalData values, and pushes them to the Subject.
    *
    * This method handles the process that takes SK data and feeds the Subject. Clients/Observers,
-   * (widgets mostly), will use the getDatasetObservable() method to receive data from the Subject.
+   * (widgets mostly), will use the getDatasetBatchThenLiveObservable() method to receive data from the Subject.
    *
    * Concept: SK_path_values -> datasource -> (ReplaySubject) <- Widget observers
    *

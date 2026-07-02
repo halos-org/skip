@@ -31,9 +31,24 @@ describe('chart-stats.util', () => {
     expect(normalizeSignedRad((3 * Math.PI) / 2)).toBeCloseTo(-Math.PI / 2, 5);
   });
 
-  it('wraps circular stats into the requested domain', () => {
+  it('wraps a single value into the direction domain [0, 2π)', () => {
     const dir = computeWindowStats([(350 * Math.PI) / 180], 1, 'direction');
-    expect(dir.value).toBeGreaterThanOrEqual(0);
-    expect(dir.value).toBeLessThan(2 * Math.PI);
+    expect(dir.value).toBeCloseTo((350 * Math.PI) / 180, 5);
+    expect(dir.lastAverage).toBeCloseTo((350 * Math.PI) / 180, 5);
+  });
+
+  it('aggregates circularly across the 0/360 wrap (direction domain)', () => {
+    // Buffer straddles the wrap; the circular average is ~0°, not the ~180° a linear mean gives.
+    const dir = computeWindowStats([(350 * Math.PI) / 180, (10 * Math.PI) / 180], 2, 'direction');
+    expect(dir.value).toBeCloseTo((10 * Math.PI) / 180, 5);
+    expect(normalizeSignedRad(dir.lastAverage)).toBeCloseTo(0, 5);
+    expect((dir.lastMinimum * 180) / Math.PI).toBeCloseTo(350, 4);
+    expect((dir.lastMaximum * 180) / Math.PI).toBeCloseTo(10, 4);
+  });
+
+  it('aggregates circularly in the signed domain (-π, π]', () => {
+    const signed = computeWindowStats([(350 * Math.PI) / 180, (10 * Math.PI) / 180], 2, 'signed');
+    expect(signed.value).toBeCloseTo((10 * Math.PI) / 180, 5);
+    expect(signed.lastAverage).toBeCloseTo(0, 5);
   });
 });
