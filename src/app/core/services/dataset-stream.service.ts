@@ -5,6 +5,7 @@ import { DataService, IPathUpdate } from './data.service';
 import { HistoryApiClientService, IHistoryValuesResponse, IHistoryValuesQueryParams } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { UUID } from '../utils/uuid.util'
+import { resolveWindowMs, deriveDataSourceInfo } from '../utils/chart-window.util';
 import { cloneDeep } from 'lodash-es';
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 
@@ -174,59 +175,16 @@ export class DatasetStreamService implements OnDestroy {
   }
 
   private createDataSourceConfiguration(dsConf: IDatasetServiceDatasetConfig): IDatasetServiceDataSource {
-    const smoothingPeriodFactor = 0.25;
-    const targetPointsPerWindow = 120;
-    const minSampleTimeMs = 100;
-    const newDataSourceConfiguration: IDatasetServiceDataSource = {
+    const windowMs = resolveWindowMs(dsConf.timeScaleFormat, dsConf.period);
+    const { sampleTime, maxDataPoints, smoothingPeriod } = deriveDataSourceInfo(windowMs);
+    return {
       uuid: dsConf.uuid,
       pathObserverSubscription: null,
-      sampleTime: null,
-      maxDataPoints: null,
-      smoothingPeriod: null,
+      sampleTime,
+      maxDataPoints,
+      smoothingPeriod,
       historicalData: []
-    }
-
-    const windowMs = resolveWindowMs(dsConf.timeScaleFormat, dsConf.period);
-
-    // Target a consistent datapoint density across time windows.
-    // For very small windows, enforce a minimum sampling interval for performance.
-    const derivedSampleTimeMs = windowMs > 0 ? Math.max(minSampleTimeMs, Math.round(windowMs / targetPointsPerWindow)) : 1000;
-
-    newDataSourceConfiguration.sampleTime = derivedSampleTimeMs;
-    newDataSourceConfiguration.maxDataPoints = Math.max(1, Math.ceil(windowMs / derivedSampleTimeMs));
-    newDataSourceConfiguration.smoothingPeriod = Math.max(1, Math.floor(newDataSourceConfiguration.maxDataPoints * smoothingPeriodFactor));
-
-    // Enforce minimum of 1 for maxDataPoints to prevent infinite size array
-    if (!newDataSourceConfiguration.maxDataPoints || newDataSourceConfiguration.maxDataPoints < 1) {
-      newDataSourceConfiguration.maxDataPoints = 1;
-    }
-
-    if (!newDataSourceConfiguration.sampleTime || newDataSourceConfiguration.sampleTime < 1) {
-      newDataSourceConfiguration.sampleTime = 1;
-    }
-
-    return newDataSourceConfiguration;
-
-    function resolveWindowMs(timeScaleFormat: TimeScaleFormat, period: number): number {
-      switch (timeScaleFormat) {
-        case 'Last Minute':
-          return 60_000;
-        case 'Last 5 Minutes':
-          return 5 * 60_000;
-        case 'Last 30 Minutes':
-          return 30 * 60_000;
-        case 'day':
-          return Math.max(0, period) * 24 * 60 * 60_000;
-        case 'hour':
-          return Math.max(0, period) * 60 * 60_000;
-        case 'minute':
-          return Math.max(0, period) * 60_000;
-        case 'second':
-          return Math.max(0, period) * 1_000;
-        default:
-          return 0;
-      }
-    }
+    };
   }
 
   /**
@@ -261,7 +219,7 @@ export class DatasetStreamService implements OnDestroy {
    * then starts building the historicalData values, and pushes them to the Subject.
    *
    * This method handles the process that takes SK data and feeds the Subject. Clients/Observers,
-   * (widgets mostly), will use the getDatasetObservable() method to receive data from the Subject.
+   * (widgets mostly), will use the getDatasetBatchThenLiveObservable() method to receive data from the Subject.
    *
    * Concept: SK_path_values -> datasource -> (ReplaySubject) <- Widget observers
    *
@@ -557,24 +515,6 @@ export class DatasetStreamService implements OnDestroy {
 
     if (serialize === true) this.appSettings.saveDataSets(this._svcDatasetConfigs);
     return true;
-  }
-
-  /**
-   * Returns an Observable for the historicalData UUID or null if not found. Clients (widget) can use
-   * subscribe() to start receiving historicalData data.
-   *
-   * @param {string} dataSetUuid The UUID is the historicalData
-   * @return {*}  {Observable<IDatasetServiceDatapoint> | null} Observable of data point array or null if not found
-  * @memberof DatasetStreamService
-   */
-  public getDatasetObservable(dataSetUuid: string): Observable<IDatasetServiceDatapoint> | null {
-    const registration = this._svcSubjectObserverRegistry.find(registration => registration.datasetUuid == dataSetUuid);
-
-    if (registration) {
-      return registration.rxjsSubject.asObservable();
-    }
-
-    return null;
   }
 
   /**

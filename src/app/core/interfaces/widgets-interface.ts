@@ -402,6 +402,8 @@ export interface IWidgetSvcConfig {
   timeScale?: string;
   /** Used by datachart & windtrend chart Widget to set period configuration */
   period?: number;
+  /** widget-data-chart data engine: 'recorder' (client-side sampler, default) or 'history' (SK History API backfill + live delta tail). #64 prototype toggle. */
+  chartEngine?: 'recorder' | 'history';
   /** Specifies if the chart should track against the average dataset instead of the value (default setting) */
   trackAgainstAverage?: boolean;
   /** Specifies which average data points property (1=avg, 2=ema or 3=dema) the chart dataset will be built with */

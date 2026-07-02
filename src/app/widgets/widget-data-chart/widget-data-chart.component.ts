@@ -1,5 +1,5 @@
-import { IDatasetServiceDatasetConfig } from '../../core/services/dataset-stream.service';
-import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, computed, ChangeDetectionStrategy } from '@angular/core';
+import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/services/dataset-stream.service';
+import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { DatasetStreamService, IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/services/dataset-stream.service';
 import { Subscription } from 'rxjs';
@@ -8,6 +8,10 @@ import { UnitsService } from '../../core/services/units.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { ITheme } from '../../core/services/app-service';
 import { WidgetDatasetOrchestratorService } from '../../core/services/widget-dataset-orchestrator.service';
+import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
+import { resolveWindowMs, deriveDataSourceInfo } from '../../core/utils/chart-window.util';
+import { ChartStatsDomain } from '../../core/utils/chart-stats.util';
+import { CHART_ENGINE_OVERRIDE_KEY } from '../../core/constants/config-storage.const';
 
 import { Chart, ChartConfiguration, ChartData, ChartType, TimeUnit, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
@@ -52,6 +56,7 @@ export class WidgetDataChartComponent implements OnDestroy {
   private readonly canvasService = inject(CanvasService);
   private readonly unitsService = inject(UnitsService);
   private readonly datasetLifecycle = inject(WidgetDatasetOrchestratorService);
+  private readonly historyStream = inject(HistoryChartStreamService);
   readonly widgetDataChart = viewChild('widgetDataChart', { read: ElementRef });
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     displayName: 'Chart Label',
@@ -63,6 +68,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     convertUnitTo: null,
     timeScale: 'minute', // second | minute | hour
     period: 10,
+    chartEngine: 'recorder', // 'recorder' | 'history' (#64 prototype)
     numDecimal: 1,
     inverseYAxis: false,
     datasetAverageArray: 'sma', // sma | ema | dema | avg
@@ -100,12 +106,25 @@ export class WidgetDataChartComponent implements OnDestroy {
     const cfg = this.runtime.options();
     return !!cfg?.datachartPath;
   });
+  // #64 A/B toggle. A global override (localStorage['skip.chartEngine'] = 'history' | 'recorder',
+  // applied on reload) flips every data-chart at once for live testing; otherwise the per-widget
+  // config field wins, defaulting to the recorder.
+  protected chartEngine = computed<'recorder' | 'history'>(() => {
+    const cfg = this.runtime.options();
+    let override: string | null = null;
+    try { override = localStorage.getItem(CHART_ENGINE_OVERRIDE_KEY); } catch { override = null; }
+    if (override === 'history' || override === 'recorder') return override;
+    return cfg?.chartEngine ?? 'recorder';
+  });
+  // History engine only: true when no history provider is available, so the widget shows the
+  // "history unavailable" empty state instead of a blank chart (no recorder live-only fallback).
+  protected historyUnavailable = signal<boolean>(false);
   private pathSignature = computed<string | undefined>(() => {
     const cfg = this.runtime.options();
     if (!cfg.datachartPath) {
       return undefined;
     }
-    return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
+    return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange, cfg.chartEngine].join('|');
   });
   private previousPathSignature: string | undefined = undefined;
 
@@ -162,12 +181,29 @@ export class WidgetDataChartComponent implements OnDestroy {
 
     this.dsServiceSub?.unsubscribe(); // Cleanup old subscription & chart data
     this.lineChartData.datasets = [];
+    this.historyUnavailable.set(false);
 
-    this.datasetLifecycle.syncDataChartDataset(this.id(), cfg, this.pathSignature());
-
-    this.datasetConfig = this.dsService.getDatasetConfig(this.id());
-    this.dataSourceInfo = this.dsService.getDataSourceInfo(this.id());
-    if (!this.datasetConfig) return; // dataset not ready yet
+    if (this.chartEngine() === 'history') {
+      // History-API path: no recorder dataset; synthesize the config + cadence the axis/streaming
+      // options expect, derived from the same window as the recorder would use.
+      const windowMs = resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period);
+      this.dataSourceInfo = deriveDataSourceInfo(windowMs);
+      this.datasetConfig = {
+        uuid: this.id(),
+        path: cfg.datachartPath,
+        pathSource: cfg.datachartSource ?? 'default',
+        baseUnit: '',
+        timeScaleFormat: cfg.timeScale as TimeScaleFormat,
+        period: cfg.period,
+        label: '',
+        angleDomainOverride: cfg.datachartAngleRange ?? undefined
+      };
+    } else {
+      this.datasetLifecycle.syncDataChartDataset(this.id(), cfg, this.pathSignature());
+      this.datasetConfig = this.dsService.getDatasetConfig(this.id());
+      this.dataSourceInfo = this.dsService.getDataSourceInfo(this.id());
+      if (!this.datasetConfig) return; // dataset not ready yet
+    }
     this.createDatasets(cfg);
     this.setChartOptions(cfg);
     // Always recreate chart instance on rebuild to ensure orientation/scale axis changes apply
@@ -738,38 +774,60 @@ export class WidgetDataChartComponent implements OnDestroy {
     const cfg = this.runtime.options();
     if (!cfg?.datachartPath) return;
     this.dsServiceSub?.unsubscribe();
-    const batchThenLive$ = this.dsService.getDatasetBatchThenLiveObservable(this.id());
-    this.dsServiceSub = batchThenLive$?.subscribe(dsPointOrBatch => {
-      if (!this.chart) return;
-      if (Array.isArray(dsPointOrBatch)) {
-        const valueRows = this.transformDatasetRows(dsPointOrBatch, 0);
-        this.chart.data.datasets[0].data.push(...valueRows);
-        if (cfg.showAverageData && this.lineChartData.datasets[1]) {
-          const avgRows = this.transformDatasetRows(dsPointOrBatch, cfg.datasetAverageArray);
-          this.chart.data.datasets[1].data.push(...avgRows);
-        }
 
-        const lastBatchPoint = dsPointOrBatch[dsPointOrBatch.length - 1];
-        if (lastBatchPoint) {
-          this.applyTitleAndAnnotationValues(lastBatchPoint, cfg);
+    if (this.chartEngine() === 'history') {
+      const domain: ChartStatsDomain =
+        cfg.datachartAngleRange === 'signed' || cfg.datachartAngleRange === 'direction' ? cfg.datachartAngleRange : 'scalar';
+      const info = this.dataSourceInfo;
+      const params: IHistoryChartStreamParams = {
+        path: cfg.datachartPath,
+        source: cfg.datachartSource ?? 'default',
+        unit: domain === 'scalar' ? 'number' : 'rad',
+        domain,
+        windowMs: resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period),
+        sampleTime: info.sampleTime,
+        maxDataPoints: info.maxDataPoints,
+        smoothingPeriod: info.smoothingPeriod
+      };
+      this.dsServiceSub = this.historyStream.getBackfillThenLive(params).subscribe(emission => {
+        if (isHistoryUnavailable(emission)) {
+          this.historyUnavailable.set(true);
+          return;
         }
-      } else {
-        const valueRow = this.transformDatasetRows([dsPointOrBatch], 0)[0];
-        this.chart.data.datasets[0].data.push(valueRow);
-        /* if (this.chart.data.datasets[0].data.length > (this.dataSourceInfo?.maxDataPoints ?? 0)) {
-          this.chart.data.datasets[0].data.shift();
-        } */
-        if (cfg.showAverageData && this.lineChartData.datasets[1]) {
-          const avgRow = this.transformDatasetRows([dsPointOrBatch], cfg.datasetAverageArray)[0];
-          this.chart.data.datasets[1].data.push(avgRow);
-          /* if (this.chart.data.datasets[1].data.length > (this.dataSourceInfo?.maxDataPoints ?? 0)) {
-            this.chart.data.datasets[1].data.shift();
-          } */
-        }
-        this.applyTitleAndAnnotationValues(dsPointOrBatch, cfg);
+        this.historyUnavailable.set(false);
+        this.handleDatasetEmission(emission, cfg);
+      });
+      return;
+    }
+
+    const batchThenLive$ = this.dsService.getDatasetBatchThenLiveObservable(this.id());
+    this.dsServiceSub = batchThenLive$?.subscribe(dsPointOrBatch => this.handleDatasetEmission(dsPointOrBatch, cfg));
+  }
+
+  private handleDatasetEmission(dsPointOrBatch: IDatasetServiceDatapoint[] | IDatasetServiceDatapoint, cfg: IWidgetSvcConfig): void {
+    if (!this.chart) return;
+    if (Array.isArray(dsPointOrBatch)) {
+      const valueRows = this.transformDatasetRows(dsPointOrBatch, 0);
+      this.chart.data.datasets[0].data.push(...valueRows);
+      if (cfg.showAverageData && this.lineChartData.datasets[1]) {
+        const avgRows = this.transformDatasetRows(dsPointOrBatch, cfg.datasetAverageArray);
+        this.chart.data.datasets[1].data.push(...avgRows);
       }
-      this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
-    });
+
+      const lastBatchPoint = dsPointOrBatch[dsPointOrBatch.length - 1];
+      if (lastBatchPoint) {
+        this.applyTitleAndAnnotationValues(lastBatchPoint, cfg);
+      }
+    } else {
+      const valueRow = this.transformDatasetRows([dsPointOrBatch], 0)[0];
+      this.chart.data.datasets[0].data.push(valueRow);
+      if (cfg.showAverageData && this.lineChartData.datasets[1]) {
+        const avgRow = this.transformDatasetRows([dsPointOrBatch], cfg.datasetAverageArray)[0];
+        this.chart.data.datasets[1].data.push(avgRow);
+      }
+      this.applyTitleAndAnnotationValues(dsPointOrBatch, cfg);
+    }
+    this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
   }
 
   private applyTitleAndAnnotationValues(point: IDatasetServiceDatapoint, cfg: IWidgetSvcConfig): void {
