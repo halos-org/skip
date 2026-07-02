@@ -84,6 +84,19 @@ export class WidgetIframeComponent implements AfterViewInit, OnDestroy {
   private handleIframeGesture = (event: MessageEvent) => {
     if (!event.data) return;
 
+    // Only accept messages from this widget's own iframe; a foreign window that guessed the
+    // widget UUID must not drive navigation, toggle sidenavs, or inject synthetic key events.
+    let iframeWindow: Window | null = null;
+    try {
+      iframeWindow = this.iframe()?.nativeElement?.contentWindow ?? null;
+    } catch {
+      iframeWindow = null;
+    }
+    if (!iframeWindow || event.source !== iframeWindow) return;
+
+    const expectedOrigin = this.getExpectedIframeOrigin();
+    if (expectedOrigin && event.origin !== expectedOrigin) return;
+
     const instanceId = event.data?.eventData?.instanceId || event.data?.keyEventData?.instanceId;
     if (!instanceId || instanceId !== this.id()) return;
 
@@ -136,6 +149,16 @@ export class WidgetIframeComponent implements AfterViewInit, OnDestroy {
       iframeDocument.body.appendChild(script);
     } catch (e) {
       console.warn('[WidgetIframe] Failed to inject swipe script into iframe:', e);
+    }
+  }
+
+  private getExpectedIframeOrigin(): string | null {
+    const rawUrl = this.runtime.options()?.widgetUrl;
+    if (!rawUrl) return null;
+    try {
+      return new URL(rawUrl, window.location.origin).origin;
+    } catch {
+      return null;
     }
   }
 
