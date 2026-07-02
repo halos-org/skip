@@ -448,14 +448,6 @@ export interface IWidgetSvcConfig {
 
   /** Used by the Video widget: source selection + display options. */
   video?: IVideoWidgetConfig;
-  /** Used by the Image widget: selected shared image asset + display options. */
-  image?: {
-    imageId?: string | null;
-    imageFit?: 'contain' | 'cover';
-    altText?: string;
-    /** Letterbox/background fill; null = transparent (dashboard shows through). */
-    backgroundColor?: string | null;
-  };
 
   /** Use by racetimer widget */
   timerLength?: number;
