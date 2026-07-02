@@ -366,18 +366,19 @@ export class StorageService {
       console.debug('[StorageService.setConfig]', { scope, configName, ver, url, appConfigVersion: appVer });
     }
 
-    try {
-      await lastValueFrom(this.http.post<null>(url, config));
-      if (this._logIO) {
-        console.debug('[StorageService.setConfig Response]', { scope, configName, ver, url, status: 'ok' });
-      } else {
-        console.log(`[Storage Service] Saved config [${configName}] to [${scope}] scope`);
-      }
-      return null;
-    } catch (error) {
-      this.handleError(error as HttpErrorResponse); // throws
-      return null; // unreachable, keeps signature
+    // Route the full-file write through the same serial patch queue as JSON patches, so a slot
+    // replacement never races an in-flight autosave POST against the same applicationData document.
+    // A queued-write failure rejects this promise (patch() logs and rejects), preserving the
+    // throw-on-error contract callers rely on.
+    await new Promise<void>((resolve, reject) => {
+      this.enqueuePatch({ url, document: config, resolve, reject });
+    });
+    if (this._logIO) {
+      console.debug('[StorageService.setConfig Response]', { scope, configName, ver, url, status: 'ok' });
+    } else {
+      console.log(`[Storage Service] Saved config [${configName}] to [${scope}] scope`);
     }
+    return null;
   }
 
   /**
