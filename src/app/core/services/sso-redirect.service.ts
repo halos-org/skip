@@ -1,8 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { AuthenticationService, ILoginStatus } from './authentication.service';
 import { buildLoginRedirectUrl, isSafeReturnTo } from '../utils/login-redirect.util';
+import { SSO_REDIRECT_BUDGET_KEY } from '../constants/config-storage.const';
 
-const REDIRECT_BUDGET_KEY = 'kip.ssoRedirectAttempts';
+const REDIRECT_BUDGET_KEY = SSO_REDIRECT_BUDGET_KEY;
 const MAX_REDIRECT_ATTEMPTS = 3;
 const ADMIN_LOGIN_URL = '/admin/#/login'; // non-OIDC same-origin fallback login
 

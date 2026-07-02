@@ -142,7 +142,7 @@ describe('AppNetworkInitService', () => {
         (service as unknown as { migrateRemoteControlToDevice: (r: IConfig | null) => void }).migrateRemoteControlToDevice(remoteConfig);
     }
     function storedConn(): IConnectionConfig | null {
-        const raw = localStorage.getItem('connectionConfig');
+        const raw = localStorage.getItem('skip.connectionConfig');
         return raw ? JSON.parse(raw) : null;
     }
 
@@ -150,7 +150,7 @@ describe('AppNetworkInitService', () => {
         const baseV12: Partial<IConnectionConfig> = { configVersion: 12, useSharedConfig: true, isRemoteControl: false, instanceName: '' };
 
         it('shared boot lifts the profile identity and stamps v13 once', () => {
-            localStorage.removeItem('connectionConfig');
+            localStorage.removeItem('skip.connectionConfig');
             setConnConfig({ ...baseV12 });
             migrate({ app: { isRemoteControl: true, instanceName: 'Helm' } } as unknown as IConfig);
             expect(storedConn()?.isRemoteControl).toBe(true);
@@ -159,8 +159,8 @@ describe('AppNetworkInitService', () => {
         });
 
         it('local boot lifts the identity from the local appConfig', () => {
-            localStorage.removeItem('connectionConfig');
-            localStorage.setItem('appConfig', JSON.stringify({ isRemoteControl: true, instanceName: 'Mast' }));
+            localStorage.removeItem('skip.connectionConfig');
+            localStorage.setItem('skip.appConfig', JSON.stringify({ isRemoteControl: true, instanceName: 'Mast' }));
             setConnConfig({ ...baseV12, useSharedConfig: false });
             migrate(null);
             expect(storedConn()?.isRemoteControl).toBe(true);
@@ -169,7 +169,7 @@ describe('AppNetworkInitService', () => {
         });
 
         it('degraded shared boot (no profile) defers: version stays 12, nothing persisted', () => {
-            localStorage.removeItem('connectionConfig');
+            localStorage.removeItem('skip.connectionConfig');
             setConnConfig({ ...baseV12, useSharedConfig: true });
             migrate(null);
             expect(storedConn()).toBeNull();
@@ -177,7 +177,7 @@ describe('AppNetworkInitService', () => {
         });
 
         it('is a no-op when already migrated (version >= 13)', () => {
-            localStorage.removeItem('connectionConfig');
+            localStorage.removeItem('skip.connectionConfig');
             setConnConfig({ ...baseV12, configVersion: 13 });
             migrate({ app: { isRemoteControl: true, instanceName: 'X' } } as unknown as IConfig);
             expect(storedConn()).toBeNull();

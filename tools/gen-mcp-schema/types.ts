@@ -144,7 +144,7 @@ export interface SchemaMeta {
   schemaVersion: number;
   /** KIP package version the artifact was generated from. */
   kipVersion: string;
-  /** applicationData file version used in the storage URL (`.../kip/{N}/...`). */
+  /** applicationData file version used in the storage URL (`.../skip/{N}/...`). */
   configFileVersion: number;
   /** `app.configVersion` value KIP expects in a saved config body. */
   configVersion: number;

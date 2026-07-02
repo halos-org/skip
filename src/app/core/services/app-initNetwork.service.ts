@@ -20,9 +20,10 @@ import { IStorageRemoteBootstrapContext, StorageService } from './storage.servic
 import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { InternetReachabilityService } from './internet-reachability.service';
 import { DatasetStreamService } from './dataset-stream.service';
+import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
 
 const configFileVersion = 11; // used to change the Signal K configuration storage file name (ie. 9.0.0.json) that contains the configuration definitions. Applies only to remote storage.
-const CONNECTION_CONFIG_KEY = 'connectionConfig';
+const CONNECTION_CONFIG_KEY = LOCAL_CONFIG_KEYS.connectionConfig;
 export type TBootstrapStatus = 'starting' | 'ready' | 'degraded';
 export type TBootstrapIssueReason = 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked';
 export type TAuthBlockedCause = 'budget-exhausted' | 'sign-in-required';
@@ -347,7 +348,7 @@ export class AppNetworkInitService implements OnDestroy {
       (remoteConfig?.app as unknown as { isRemoteControl?: boolean; instanceName?: string }) ?? null;
     if (!app && !this.config.useSharedConfig) {
       try {
-        app = JSON.parse(localStorage.getItem('appConfig') ?? 'null');
+        app = JSON.parse(localStorage.getItem(LOCAL_CONFIG_KEYS.appConfig) ?? 'null');
       } catch {
         app = null;
       }

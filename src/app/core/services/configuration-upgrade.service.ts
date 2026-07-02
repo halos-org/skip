@@ -6,6 +6,7 @@ import { IAppConfig, IConfig, IThemeConfig } from '../interfaces/app-settings.in
 import { v10IConfig, v10IThemeConfig } from '../interfaces/v10-config-interface';
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { Dashboard } from './dashboard.service';
+import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
 
 interface DataChartConfigUpdate {
   datachartPath: string;
@@ -159,9 +160,9 @@ export class ConfigurationUpgradeService {
       this.migrateDatasetsToDataCharts(datasetInfo, upgradedConfig.dashboards);
       this.migrateUseNeedleToEnableNeedle(upgradedConfig.dashboards);
 
-      localStorage.setItem('appConfig', JSON.stringify(upgradedConfig.app));
-      localStorage.setItem('dashboardsConfig', JSON.stringify(upgradedConfig.dashboards));
-      localStorage.setItem('themeConfig', JSON.stringify(upgradedConfig.theme));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(upgradedConfig.app));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(upgradedConfig.dashboards));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(upgradedConfig.theme));
       setTimeout(() => this._settings.reloadApp(), 1500);
       this.upgrading.set(false);
     } else {
@@ -187,9 +188,9 @@ export class ConfigurationUpgradeService {
       this.migrateDatasetsToDataCharts(datasetInfo, dashboards);
       this.migrateUseNeedleToEnableNeedle(dashboards);
 
-      localStorage.setItem('appConfig', JSON.stringify(transformedApp));
-      localStorage.setItem('dashboardsConfig', JSON.stringify(dashboards));
-      localStorage.setItem('themeConfig', JSON.stringify(transformedTheme));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(transformedApp));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(dashboards));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(transformedTheme));
       setTimeout(() => this._settings.reloadApp(), 1500);
       this.upgrading.set(false);
     }
@@ -232,10 +233,10 @@ export class ConfigurationUpgradeService {
       localStorageConfig.app.configVersion = this.targetConfigVersion; // baseline fresh
       localStorageConfig.app.nightModeBrightness = 0.27;
       localStorageConfig.theme.themeName = '';
-      localStorage.setItem('appConfig', JSON.stringify(localStorageConfig.app));
-      localStorage.setItem('themeConfig', JSON.stringify(localStorageConfig.theme));
-      localStorage.removeItem('widgetConfig');
-      localStorage.removeItem('layoutConfig');
+      localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(localStorageConfig.app));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(localStorageConfig.theme));
+      localStorage.removeItem(LOCAL_CONFIG_KEYS.widgetConfig);
+      localStorage.removeItem(LOCAL_CONFIG_KEYS.layoutConfig);
       this.upgrading.set(false);
     }
   }

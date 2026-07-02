@@ -18,6 +18,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { StorageService } from './storage.service';
 import { Dashboard } from './dashboard.service';
+import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
 import { SignalKConnectionService } from '../services/signalk-connection.service';
 import { compare } from 'compare-versions';
 
@@ -157,7 +158,7 @@ export class SettingsService {
       for (const key of legacyCredentialKeys) {
         delete rawConfig[key];
       }
-      localStorage.setItem("connectionConfig", JSON.stringify(config));
+      localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(config));
     }
 
     // Also drop the legacy top-level session/device token blob. Nothing reads it anymore (auth is
@@ -171,7 +172,7 @@ export class SettingsService {
   }
 
   public resetConnection() {
-    localStorage.setItem("connectionConfig", JSON.stringify(this.getDefaultConnectionConfig()));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.getDefaultConnectionConfig()));
     this.reloadApp();
   }
 
@@ -190,7 +191,7 @@ export class SettingsService {
    * @memberof SettingsService
    */
   public loadConfigFromLocalStorage(type: string) {
-    let config = JSON.parse(localStorage.getItem(type) ?? 'null');
+    let config = JSON.parse(localStorage.getItem(localConfigKey(type)) ?? 'null');
 
     if (config === null) {
       console.log(`[AppSettings Service] Error loading ${type} config. Force loading ${type} defaults`);
@@ -596,7 +597,7 @@ export class SettingsService {
    */
   public replaceConfig(configType: string, newConfig: IAppConfig | IConnectionConfig | IThemeConfig | Dashboard[], reloadApp?: boolean) {
     const jsonConfig = JSON.stringify(newConfig);
-    localStorage.setItem(configType, jsonConfig);
+    localStorage.setItem(localConfigKey(configType), jsonConfig);
     if (reloadApp) {
       this.reloadApp();
     }
@@ -690,7 +691,7 @@ export class SettingsService {
 
   private readStoredConnectionConfig(): Partial<IConnectionConfig> | null {
     try {
-      return JSON.parse(localStorage.getItem('connectionConfig') ?? 'null');
+      return JSON.parse(localStorage.getItem(LOCAL_CONFIG_KEYS.connectionConfig) ?? 'null');
     } catch {
       return null;
     }
@@ -710,22 +711,22 @@ export class SettingsService {
   // Calls build methods and saves to LocalStorage
   private saveAppConfigToLocalStorage() {
     console.log("[AppSettings Service] Saving Application config to LocalStorage");
-    localStorage.setItem('appConfig', JSON.stringify(this.buildAppStorageObject()));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(this.buildAppStorageObject()));
   }
 
   private saveConnectionConfigToLocalStorage() {
     console.log("[AppSettings Service] Saving Connection config to LocalStorage");
-    localStorage.setItem('connectionConfig', JSON.stringify(this.buildConnectionStorageObject()));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.buildConnectionStorageObject()));
   }
 
   private saveLDashboardsConfigToLocalStorage(dashboards: Dashboard[]) {
     console.log("[AppSettings Service] Saving Dashboard config to LocalStorage");
-    localStorage.setItem('dashboardsConfig', JSON.stringify(dashboards));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(dashboards));
   }
 
   private  saveThemeConfigToLocalStorage() {
     console.log("[AppSettings Service] Saving Theme config to LocalStorage");
-    localStorage.setItem('themeConfig', JSON.stringify(this.buildThemeStorageObject()));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(this.buildThemeStorageObject()));
   }
 
   // Creates config from defaults and saves to LocalStorage
@@ -734,7 +735,7 @@ export class SettingsService {
     config.notificationConfig = cloneDeep(DefaultNotificationConfig);
     config.unitDefaults = cloneDeep(DefaultUnitsConfig);
     config.configVersion = latestConfigVersion;
-    localStorage.setItem('appConfig', JSON.stringify(config));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(config));
     return config;
   }
 
@@ -742,19 +743,19 @@ export class SettingsService {
     const config: IConnectionConfig = cloneDeep(DefaultConnectionConfig);
     config.kipUUID = UUID.create();
     config.signalKUrl = window.location.origin;
-    localStorage.setItem('connectionConfig', JSON.stringify(config));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(config));
     return config;
   }
 
   private getDefaultDashboardsConfig(): Dashboard[] {
     const config: Dashboard[] = [];
-    localStorage.setItem("dashboardsConfig", JSON.stringify(config));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(config));
     return config;
   }
 
   private getDefaultThemeConfig(): IThemeConfig {
     const config: IThemeConfig = DefaultThemeConfig;
-    localStorage.setItem("themeConfig", JSON.stringify(config));
+    localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(config));
     return config;
   }
 }
