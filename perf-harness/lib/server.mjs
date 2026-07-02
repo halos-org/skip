@@ -1,8 +1,12 @@
 /*
- * Combined server for the harness: serves the built KIP app under `base`
- * AND acts as the mock Signal K server (/signalk/ discovery, WS delta stream,
+ * Combined server for the harness: serves the built Skip app under `base`
+ * AND acts as the mock Signal K server (/skServer/loginStatus session,
+ * applicationData config, /plugins, /signalk/ discovery, WS delta stream,
  * v2 history) on the SAME origin — so signalKUrl is same-origin (no CORS) and
- * the app talks to a fully controllable data source.
+ * the app talks to a fully controllable data source. Skip is SSO/session-only
+ * and always persists config server-side, so the mock must answer the auth
+ * probe and serve/absorb the applicationData document — a localStorage-only
+ * bootstrap (upstream Kip's approach) boots Skip into a degraded empty app.
  */
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -69,9 +73,24 @@ function targetSceneDelta(tg, t) {
   ] }] });
 }
 
+// Skip gates widget history on server.version >= 2.22.1 (settings.service.ts).
+const SERVER_VERSION = '2.24.0';
+
 function helloMsg() {
-  return JSON.stringify({ name: 'kip-mock', version: '2.3.0', self: SELF_URN, roles: ['master', 'main'], timestamp: iso(Date.now()) });
+  return JSON.stringify({ name: 'skip-mock', version: SERVER_VERSION, self: SELF_URN, roles: ['master', 'main'], timestamp: iso(Date.now()) });
 }
+
+// Raw /plugins list entry (IRawPluginInformation). getPlugin() reads plugin
+// configuration from the LIST response, not the /plugins/kip detail, so
+// historySeriesServiceEnabled:false must live here to suppress the
+// series-reconcile POST that otherwise fires ~750ms after boot.
+const KIP_PLUGIN_LIST = [{
+  id: 'kip', name: 'KIP', packageName: 'kip', keywords: [], version: '0.0.0',
+  description: 'mock', schema: null,
+  data: { configuration: { historySeriesServiceEnabled: false, registerAsHistoryApiProvider: false }, enabled: true, enableLogging: false, enableDebug: false },
+}];
+// IRawPluginDetail for GET /plugins/kip.
+const KIP_PLUGIN_DETAIL = { id: 'kip', name: 'KIP', version: '0.0.0', enabled: true };
 
 function historyResponse(paths, rows, stepSec) {
   const base = Date.parse('2026-06-30T00:00:00.000Z');
@@ -93,19 +112,47 @@ function historyResponse(paths, rows, stepSec) {
 export async function startServer({ publicDir, base, port }) {
   const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], ais: { count: 0, churnPerSec: 0 } };
   let history = { rows: 0, stepSec: 1, paths: ['navigation.speedOverGround'] };
+  let configDoc = null; // IConfig served from applicationData (set per scenario by the runner)
   let sent = 0;
   let mmsiBase = 100000000;
+
+  const json = (res, body) => {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(typeof body === 'string' ? body : JSON.stringify(body));
+  };
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const p = decodeURIComponent(url.pathname);
     // --- Signal K endpoints (origin root) ---
     if (p === '/signalk' || p === '/signalk/') {
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      return res.end(JSON.stringify({
-        endpoints: { v1: { version: '2.3.0', 'signalk-http': `http://localhost:${port}/signalk/v1/api/`, 'signalk-ws': `ws://localhost:${port}/signalk/v1/stream` } },
-        server: { id: 'kip-mock', version: '2.3.0' },
-      }));
+      return json(res, {
+        endpoints: { v1: { version: SERVER_VERSION, 'signalk-http': `http://localhost:${port}/signalk/v1/api/`, 'signalk-ws': `ws://localhost:${port}/signalk/v1/stream` } },
+        server: { id: 'skip-mock', version: SERVER_VERSION },
+      });
+    }
+    // Session probe: Skip is session-cookie SSO-only; a loggedIn answer with a
+    // write-capable userLevel unlocks the server-side config bootstrap.
+    if (p === '/skServer/loginStatus') {
+      return json(res, { status: 'loggedIn', username: 'harness', userLevel: 'admin' });
+    }
+    // applicationData: config document + slot listing; POSTs (the boot Dashboards
+    // JSON-Patch and autosaves) are absorbed with 200 — any non-2xx would put a
+    // persistent error snackbar into the measurement.
+    if (p.startsWith('/signalk/v1/applicationData/')) {
+      if (req.method === 'POST') { req.resume(); return req.on('end', () => json(res, {})); }
+      const m = p.match(/^\/signalk\/v1\/applicationData\/(user|global)\/skip\/\d+\/(.*)$/);
+      if (m && url.searchParams.get('keys') === 'true') return json(res, m[1] === 'user' ? ['default'] : []);
+      if (m && m[2] === 'default' && m[1] === 'user') return json(res, configDoc ?? {});
+      return json(res, {}); // SK answers never-created slots with 200 {}
+    }
+    // Plugin surface: disable the KIP history-series service so the dashboard
+    // sync's reconcile POST (~750ms after boot) is skipped.
+    if (p === '/plugins' || p === '/plugins/') return json(res, KIP_PLUGIN_LIST);
+    if (p === '/plugins/kip') return json(res, KIP_PLUGIN_DETAIL);
+    if (p === '/plugins/kip/series/reconcile' && req.method === 'POST') {
+      req.resume();
+      return req.on('end', () => json(res, { created: 0, updated: 0, deleted: 0, total: 0 }));
     }
     if (p.startsWith('/signalk/v2/api/history/values')) {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -131,10 +178,14 @@ export async function startServer({ publicDir, base, port }) {
   });
 
   const wss = new WebSocketServer({ server, path: '/signalk/v1/stream' });
+  // Skip opens its WS once during APP_INITIALIZER (before the scenario's
+  // setControl) and keeps it — so a connection-time snapshot of rateHz (as
+  // upstream Kip could afford) would stream every scenario at the boot-time
+  // default. Timers restart on rateHz changes instead.
+  const timerRestarts = new Set();
   wss.on('connection', (ws) => {
     ws.send(helloMsg());
-    let tick = 0;
-    const timer = setInterval(() => {
+    const sendTick = () => {
       if (!control.streaming || ws.readyState !== ws.OPEN) return;
       const t = Date.now();
       // Deterministic scene: fixed own-ship + fixed targets (reproducible screenshots).
@@ -152,9 +203,15 @@ export async function startServer({ publicDir, base, port }) {
         const per = Math.max(1, Math.round(churn / control.rateHz));
         for (let c = 0; c < per; c++) { mmsiBase++; ws.send(aisDelta(mmsiBase + n, n + c, t)); sent++; }
       }
-      tick++;
-    }, Math.max(1, Math.round(1000 / control.rateHz)));
-    ws.on('close', () => clearInterval(timer));
+    };
+    let timer = null;
+    const startTimer = () => {
+      if (timer) clearInterval(timer);
+      timer = setInterval(sendTick, Math.max(1, Math.round(1000 / control.rateHz)));
+    };
+    startTimer();
+    timerRestarts.add(startTimer);
+    ws.on('close', () => { clearInterval(timer); timerRestarts.delete(startTimer); });
     // Many separate frames (sustained flood) — each is its own onmessage task.
     ws._blast = (count) => { const t = Date.now(); for (let i = 0; i < count; i++) { ws.send(selfDelta(control.selfPaths, t + i)); sent++; } };
     // ONE frame carrying many values (reconnect snapshot) — a single synchronous
@@ -172,7 +229,13 @@ export async function startServer({ publicDir, base, port }) {
   const origin = `http://localhost:${port}`;
   return {
     origin, appUrl: `${origin}${base}`,
-    setControl(c) { Object.assign(control, c); if (c.history) history = { ...history, ...c.history }; },
+    setControl(c) {
+      const rateChanged = c.rateHz !== undefined && c.rateHz !== control.rateHz;
+      Object.assign(control, c);
+      if (c.history) history = { ...history, ...c.history };
+      if (rateChanged) for (const restart of timerRestarts) restart();
+    },
+    setConfigDocument(doc) { configDoc = doc; },
     blast(count) { for (const ws of wss.clients) if (ws._blast) ws._blast(count); },
     blastBig(nValues) { for (const ws of wss.clients) if (ws._blastBig) ws._blastBig(nValues); },
     streamCount() { return sent; },
