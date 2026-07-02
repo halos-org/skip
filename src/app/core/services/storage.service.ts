@@ -72,6 +72,10 @@ export class StorageService {
     //console.log(`[Storage Service] Send patch request:\n${JSON.stringify(arg.document)}`);
     return this.http.post(arg.url, arg.document)
       .pipe(
+        // Bound each queued write so a hung applicationData POST cannot stall the serial queue —
+        // and, since setConfig now awaits its turn, every full-file write (reset/demo/profile) behind
+        // it. A timeout fails the queue item like any other error: reject, count, advance.
+        timeout(REMOTE_CONFIG_TIMEOUT_MS),
         tap({
           next: () => console.log("[Storage Service] Remote config patch request completed successfully"),
           // Settle on completion (not on the value emission) so the deferred
@@ -115,7 +119,9 @@ export class StorageService {
         }
       });
 
-    // Patch request queue to insure JSON Patch requests to SK server don't run over each other and cause collisions/conflicts. SK does not handle multiple async applicationData access calls
+    // Serial queue for ALL applicationData writes — JSON patches (patchConfig/patchGlobal/removeItem)
+    // and full-file replacements (setConfig) alike — so they never run over each other. SK does not
+    // handle concurrent applicationData writes.
     this.patchQueue$
       .pipe(
         // Keep the queue alive when one patch fails (e.g. a read-only session's 401): without this,
@@ -366,18 +372,19 @@ export class StorageService {
       console.debug('[StorageService.setConfig]', { scope, configName, ver, url, appConfigVersion: appVer });
     }
 
-    try {
-      await lastValueFrom(this.http.post<null>(url, config));
-      if (this._logIO) {
-        console.debug('[StorageService.setConfig Response]', { scope, configName, ver, url, status: 'ok' });
-      } else {
-        console.log(`[Storage Service] Saved config [${configName}] to [${scope}] scope`);
-      }
-      return null;
-    } catch (error) {
-      this.handleError(error as HttpErrorResponse); // throws
-      return null; // unreachable, keeps signature
+    // Route the full-file write through the same serial patch queue as JSON patches, so a slot
+    // replacement never races an in-flight autosave POST against the same applicationData document.
+    // A queued-write failure rejects this promise (patch() logs and rejects), preserving the
+    // throw-on-error contract callers rely on.
+    await new Promise<void>((resolve, reject) => {
+      this.enqueuePatch({ url, document: config, resolve, reject });
+    });
+    if (this._logIO) {
+      console.debug('[StorageService.setConfig Response]', { scope, configName, ver, url, status: 'ok' });
+    } else {
+      console.log(`[Storage Service] Saved config [${configName}] to [${scope}] scope`);
     }
+    return null;
   }
 
   /**

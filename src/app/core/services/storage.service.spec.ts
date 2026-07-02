@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { StorageService, IPatchFailure } from './storage.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
@@ -175,6 +175,76 @@ describe('StorageService', () => {
       const second = service.removeItem('user', 'second');
       http.expectOne((r) => r.method === 'POST').flush(null);
       await expect(second).resolves.toBeUndefined();
+    });
+  });
+
+  describe('setConfig queue serialization', () => {
+    beforeEach(() => {
+      service.storageServiceReady$.next(true);
+      service.activeConfigFileVersion = 11;
+      service.sharedConfigName = 'p';
+    });
+
+    afterEach(() => http.verify());
+
+    it('queues behind an in-flight autosave patch instead of racing a direct POST', async () => {
+      // An autosave JSON-Patch is in flight (dispatched, not yet answered).
+      service.patchConfig('Dashboards', [{ id: 'd1' }]);
+      const patchReq = http.expectOne((r) => Array.isArray(r.body));
+
+      // A full-file write must NOT fire concurrently — it waits its turn in the queue.
+      const done = service.setConfig('user', 'default', blankConfig());
+      http.expectNone((r) => !Array.isArray(r.body));
+
+      patchReq.flush(null);
+      await Promise.resolve();
+
+      // Only now does the full-file write go out, on its own.
+      const setReq = http.expectOne((r) => !Array.isArray(r.body));
+      expect(setReq.request.method).toBe('POST');
+      setReq.flush(null);
+      await done;
+    });
+
+    it('resolves only after the queued full-file write completes', async () => {
+      let resolved = false;
+      const done = service.setConfig('user', 'default', blankConfig()).then(() => { resolved = true; });
+
+      const req = http.expectOne((r) => r.method === 'POST');
+      await Promise.resolve();
+      expect(resolved).toBe(false);
+
+      req.flush(null);
+      await done;
+      expect(resolved).toBe(true);
+    });
+
+    it('rejects on failure yet the queue keeps processing later writes', async () => {
+      const first = service.setConfig('user', 'first', blankConfig());
+      http.expectOne((r) => r.method === 'POST').flush('boom', { status: 500, statusText: 'err' });
+      await expect(first).rejects.toBeTruthy();
+
+      const second = service.setConfig('user', 'second', blankConfig());
+      http.expectOne((r) => r.method === 'POST').flush(null);
+      await expect(second).resolves.toBeNull();
+    });
+
+    it('rejects a queued write that stalls past the request timeout, so the queue is not wedged', async () => {
+      vi.useFakeTimers();
+      try {
+        const stalled = service.setConfig('user', 'first', blankConfig());
+        const stalledRejects = expect(stalled).rejects.toBeTruthy(); // attach handler before the timeout fires
+        http.expectOne((r) => r.method === 'POST'); // dispatched, never answered
+        await vi.advanceTimersByTimeAsync(5001); // past REMOTE_CONFIG_TIMEOUT_MS (5000)
+        await stalledRejects;
+
+        // The timed-out write freed the queue; a later write still processes.
+        const next = service.setConfig('user', 'second', blankConfig());
+        http.expectOne((r) => r.method === 'POST').flush(null);
+        await expect(next).resolves.toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
