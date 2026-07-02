@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { computeTrueWindBaseAngle } from './widget-windsteer.component';
+import { WritableSignal, signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { WidgetWindComponent, computeTrueWindBaseAngle } from './widget-windsteer.component';
+import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
+import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { IPathUpdate } from '../../core/services/data.service';
+import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 
 /**
  * Regression tests for #1066 / #1063.
@@ -33,5 +39,59 @@ describe('computeTrueWindBaseAngle (#1066, #1063)', () => {
   it('passes through non boat-relative true wind paths (e.g. directionTrue) in both modes', () => {
     expect(computeTrueWindBaseAngle(DIRECTION_TRUE, 200, 90, false)).toBe(200);
     expect(computeTrueWindBaseAngle(DIRECTION_TRUE, 200, 90, true)).toBe(200);
+  });
+});
+
+/**
+ * Regression test for #73.
+ *
+ * Toggling compass mode live must recompute the displayed TWA base immediately from the last
+ * received sample. The wind stream does not re-emit on an options change, so before the fix the
+ * dial kept the previous base and showed a one-frame heading-offset transient until the next
+ * sample arrived.
+ */
+describe('WidgetWindComponent live compass-mode toggle (#73)', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const makeConfig = (compassModeEnabled: boolean): IWidgetSvcConfig => ({
+    ...WidgetWindComponent.DEFAULT_CONFIG,
+    compassModeEnabled,
+    windSectorEnable: false
+  });
+
+  const update = (value: number): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
+
+  const twa = (): number => (component as unknown as { trueWindAngle: () => number }).trueWindAngle();
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>(makeConfig(false));
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock }
+      ]
+    });
+
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick(); // flush the options effect so streams register and callbacks are captured
+  });
+
+  it('recomputes the TWA base on a live compass-mode toggle without a new wind sample', () => {
+    callbacks.get('headingPath')!(update(90));
+    callbacks.get('trueWindAngle')!(update(45));
+    expect(twa()).toBe(45); // simple mode: boat-relative angle shown as-is
+
+    options.set(makeConfig(true));
+    TestBed.tick();
+
+    expect(twa()).toBe(135); // compass mode: heading (90) added to the cached angle (45)
   });
 });

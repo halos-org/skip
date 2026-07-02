@@ -167,6 +167,7 @@ export class WidgetWindComponent implements OnDestroy {
   private hasSet = false;
   private hasDrift = false;
   private hasWPT = false;
+  private lastRawTrueWindAngle: number | null = null;
 
   protected currentHeading = signal(0);
   protected courseOverGroundAngle = signal(0);
@@ -207,6 +208,11 @@ export class WidgetWindComponent implements OnDestroy {
         this.registerStreams();
         this.stopWindSectors();
         this.startWindSectors();
+        // A live compass-mode or TWA-path change does not re-fire the wind stream, so recompute
+        // the displayed base from the cached sample here; otherwise the dial keeps a stale heading
+        // offset until the next sample arrives (#73). currentHeading is read untracked to avoid
+        // re-running this effect on every heading tick.
+        this.applyTrueWindBase();
       });
     });
   }
@@ -273,14 +279,23 @@ export class WidgetWindComponent implements OnDestroy {
   };
   private onTrueWindAngle = (u: IPathUpdate) => {
     if (u.data.value == null) u.data.value = 0;
-    const cfg = this.runtime.options();
-    const path = cfg?.paths['trueWindAngle'].path || '';
-    const base = computeTrueWindBaseAngle(path, u.data.value, this.currentHeading(), !!cfg?.compassModeEnabled);
-    const next = this.normalizeAngle(base);
+    this.lastRawTrueWindAngle = u.data.value;
+    const next = this.normalizeAngle(this.computeTrueWindBase(u.data.value));
     if (!this.hasTWA || this.angleDelta(this.trueWindAngle(), next) >= this.DEG_EPSILON) {
       this.trueWindAngle.set(next); this.hasTWA = true;
     }
   };
+
+  private computeTrueWindBase(rawAngle: number): number {
+    const cfg = this.runtime.options();
+    const path = cfg?.paths['trueWindAngle'].path || '';
+    return computeTrueWindBaseAngle(path, rawAngle, this.currentHeading(), !!cfg?.compassModeEnabled);
+  }
+
+  private applyTrueWindBase() {
+    if (this.lastRawTrueWindAngle == null) return;
+    this.trueWindAngle.set(this.normalizeAngle(this.computeTrueWindBase(this.lastRawTrueWindAngle)));
+  }
 
   private registerStreams() {
     const cfg = this.runtime.options();
