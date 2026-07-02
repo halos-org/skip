@@ -2616,4 +2616,50 @@ testRequiresNodeSqlite('sqlite getValues queries requested paths in a single sql
   assert.equal(response.data[0][2], 20);
 });
 
+testRequiresNodeSqlite('sqlite storage binds sql metacharacters instead of interpolating them', async () => {
+  const storage = new SqliteHistoryStorageService(TEST_DATA_DIR);
+  storage.configure();
+  const ready = await storage.initialize();
+  assert.equal(ready, true);
+
+  // Payload that would break or exploit naive string interpolation.
+  const trickyPath = "navigation.speed'); DROP TABLE history_samples;--";
+  const context = 'vessels.self';
+  const ts = Date.parse('2026-03-01T12:00:00.000Z');
+
+  storage.enqueueSample({
+    seriesId: "s'1",
+    datasetUuid: 'd1',
+    ownerWidgetUuid: 'w1',
+    path: trickyPath,
+    context,
+    source: "n2k'src",
+    timestamp: ts,
+    value: 4.25
+  });
+
+  const flushResult = await storage.flush();
+  assert.equal(flushResult.inserted, 1);
+
+  const response = await storage.getValues({
+    paths: `${trickyPath}:avg`,
+    context,
+    from: '2026-03-01T11:59:00.000Z',
+    to: '2026-03-01T12:01:00.000Z'
+  });
+
+  assert.notEqual(response, null);
+  assert.equal(response.data.length, 1);
+  assert.equal(response.data[0][1], 4.25);
+
+  // Table survived the injection attempt and the value round-trips verbatim.
+  const paths = await storage.getStoredPaths({
+    from: '2026-03-01T11:59:00.000Z',
+    to: '2026-03-01T12:01:00.000Z'
+  });
+  assert.equal(paths.includes(trickyPath), true);
+
+  await storage.close();
+});
+
 });

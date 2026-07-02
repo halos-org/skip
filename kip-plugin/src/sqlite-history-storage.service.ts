@@ -66,8 +66,11 @@ interface TLogger {
   error: (msg: string) => void;
 }
 
+type TSqlBindValue = string | number | null;
+
 interface ISqliteStatement {
-  all: () => unknown[];
+  all: (...params: TSqlBindValue[]) => unknown[];
+  run: (...params: TSqlBindValue[]) => unknown;
 }
 
 interface ISqliteDatabase {
@@ -411,8 +414,8 @@ export class SqliteHistoryStorageService {
       return;
     }
 
-    await this.runSql(`DELETE FROM history_series WHERE series_id = ${this.escape(series.seriesId)}`);
-    await this.runSql(`
+    await this.runSqlWithParams('DELETE FROM history_series WHERE series_id = ?', [series.seriesId]);
+    await this.runSqlWithParams(`
       INSERT INTO history_series (
         series_id,
         dataset_uuid,
@@ -428,23 +431,23 @@ export class SqliteHistoryStorageService {
         enabled,
         methods_json,
         reconcile_ts
-      ) VALUES (
-        ${this.escape(series.seriesId)},
-        ${this.escape(series.datasetUuid)},
-        ${this.escape(series.ownerWidgetUuid)},
-        ${this.nullableString(series.ownerWidgetSelector)},
-        ${this.escape(series.path)},
-        ${this.nullableString(series.source)},
-        ${this.nullableString(series.context)},
-        ${this.nullableString(series.timeScale)},
-        ${this.nullableNumber(series.period)},
-        ${this.nullableNumber(series.retentionDurationMs)},
-        ${this.nullableNumber(series.sampleTime)},
-        ${series.enabled === false ? '0' : '1'},
-        ${this.nullableString(series.methods ? JSON.stringify(series.methods) : null)},
-        ${this.nullableNumber(series.reconcileTs)}
-      )
-    `);
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      series.seriesId,
+      series.datasetUuid,
+      series.ownerWidgetUuid,
+      this.toNullableString(series.ownerWidgetSelector),
+      series.path,
+      this.toNullableString(series.source),
+      this.toNullableString(series.context),
+      this.toNullableString(series.timeScale),
+      this.toNullableInteger(series.period),
+      this.toNullableInteger(series.retentionDurationMs),
+      this.toNullableInteger(series.sampleTime),
+      series.enabled === false ? 0 : 1,
+      this.toNullableString(series.methods ? JSON.stringify(series.methods) : null),
+      this.toNullableInteger(series.reconcileTs)
+    ]);
   }
 
   /**
@@ -460,7 +463,7 @@ export class SqliteHistoryStorageService {
     if (!this.isSqliteEnabled() || !this.db) {
       return;
     }
-    await this.runSql(`DELETE FROM history_series WHERE series_id = ${this.escape(seriesId)}`);
+    await this.runSqlWithParams('DELETE FROM history_series WHERE series_id = ?', [seriesId]);
   }
 
   /**
@@ -939,11 +942,7 @@ export class SqliteHistoryStorageService {
       return;
     }
 
-    const valuesSql = rows
-      .map(sample => `(${this.escape(sample.seriesId)}, ${this.escape(sample.datasetUuid)}, ${this.escape(sample.ownerWidgetUuid)}, ${this.escape(sample.path)}, ${this.escape(sample.context)}, ${this.escape(sample.source)}, ${Math.trunc(sample.timestamp)}, ${Number(sample.value)})`)
-      .join(',\n');
-
-    const sql = `
+    const statement = this.db.prepare(`
       INSERT INTO history_samples (
         series_id,
         dataset_uuid,
@@ -953,12 +952,23 @@ export class SqliteHistoryStorageService {
         source,
         ts_ms,
         value
-      ) VALUES ${valuesSql}
-    `;
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
     this.db.exec('BEGIN');
     try {
-      await this.runSql(sql);
+      for (const sample of rows) {
+        statement.run(
+          sample.seriesId,
+          sample.datasetUuid,
+          sample.ownerWidgetUuid,
+          sample.path,
+          sample.context,
+          sample.source,
+          Math.trunc(sample.timestamp),
+          Number(sample.value)
+        );
+      }
       this.db.exec('COMMIT');
     } catch (error) {
       this.db.exec('ROLLBACK');
@@ -974,13 +984,21 @@ export class SqliteHistoryStorageService {
     this.db.exec(sql);
   }
 
-  private async querySql<T>(sql: string): Promise<T[]> {
+  private async runSqlWithParams(sql: string, params: TSqlBindValue[]): Promise<void> {
+    if (!this.db) {
+      throw new Error('node:sqlite database is not initialized');
+    }
+
+    this.db.prepare(sql).run(...params);
+  }
+
+  private async querySql<T>(sql: string, params: TSqlBindValue[] = []): Promise<T[]> {
     if (!this.db) {
       throw new Error('node:sqlite database is not initialized');
     }
 
     const statement = this.db.prepare(sql);
-    return statement.all() as unknown as T[];
+    return statement.all(...params) as unknown as T[];
   }
 
   private async selectRowsForPaths(paths: string[], context: string, fromMs: number, toMs: number): Promise<Map<string, IPathRow[]>> {
@@ -989,18 +1007,18 @@ export class SqliteHistoryStorageService {
       return rowsByPath;
     }
 
-    const pathFilter = paths.map(path => this.escape(path)).join(', ');
+    const pathPlaceholders = paths.map(() => '?').join(', ');
     const sql = `
       SELECT path, ts_ms, value
       FROM history_samples
-      WHERE context = ${this.escape(context)}
-        AND path IN (${pathFilter})
-        AND ts_ms >= ${Math.trunc(fromMs)}
-        AND ts_ms <= ${Math.trunc(toMs)}
+      WHERE context = ?
+        AND path IN (${pathPlaceholders})
+        AND ts_ms >= ?
+        AND ts_ms <= ?
       ORDER BY path ASC, ts_ms ASC
     `;
 
-    const rows = await this.querySql<IPathValueRow>(sql);
+    const rows = await this.querySql<IPathValueRow>(sql, [context, ...paths, Math.trunc(fromMs), Math.trunc(toMs)]);
     rows.forEach(row => {
       const list = rowsByPath.get(row.path) ?? [];
       list.push({ ts_ms: Number(row.ts_ms), value: Number(row.value) });
@@ -1219,22 +1237,18 @@ export class SqliteHistoryStorageService {
     return sum / values.length;
   }
 
-  private escape(value: string): string {
-    return `'${String(value).replace(/'/g, "''")}'`;
-  }
-
-  private nullableString(value?: string | null): string {
+  private toNullableString(value?: string | null): string | null {
     if (value === undefined || value === null || value === '') {
-      return 'NULL';
+      return null;
     }
-    return this.escape(value);
+    return value;
   }
 
-  private nullableNumber(value?: number | null): string {
+  private toNullableInteger(value?: number | null): number | null {
     if (value === undefined || value === null || !Number.isFinite(value)) {
-      return 'NULL';
+      return null;
     }
-    return String(Math.trunc(value));
+    return Math.trunc(value);
   }
 
   private parseMethods(value: string | null): THistoryMethod[] | undefined {
