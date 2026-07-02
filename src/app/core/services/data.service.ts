@@ -1,5 +1,5 @@
 import { DestroyRef, inject, Injectable, OnDestroy } from '@angular/core';
-import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, of, interval, Subscription, filter } from 'rxjs';
+import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, of, interval, filter } from 'rxjs';
 import { ISkPathData, IPathValueData, IPathMetaData, IMeta, IPathUpdateEvent } from "../interfaces/app-interfaces";
 import { ISignalKDataValueUpdate, ISkMetadata, ISignalKNotification, States, TState } from '../interfaces/signalk-interfaces'
 import { SignalKDeltaService } from './signalk-delta.service';
@@ -76,7 +76,12 @@ const buildPathData = (value: unknown, rawTimestamp: string | number | Date | nu
 /**
  * The `IPathRegistration` interface represents a registration object used to track a path's Subjects.
  * Each registration is used to share the same Subject with multiple Observers.
- * The `subscribePath()` and `unsubscribePath()` methods return the registration's subject as an Observable.
+ * The `subscribePath()` method returns the registration's subject as an Observable.
+ *
+ * Registrations are app-lifetime objects, bounded by the unique `(path, source)` pairs a session
+ * encounters, and are intentionally never torn down individually: a subject is shared across every
+ * co-subscriber of a `(path, source)` pair, so completing one would terminate the stream for the
+ * others. Consumers scope their own subscriptions with `takeUntilDestroyed`/`finalize` instead.
  *
  * @property {string} path - A Signal K path.
  * @property {string} source - The Signal K data path source. This is used when multiple sources exist for the same path. If set, the Signal K default source will be ignored.
@@ -94,7 +99,6 @@ interface IPathRegistration {
   _pathState$: BehaviorSubject<TState>;
   pathDataUpdate$: BehaviorSubject<IPathUpdate>;
   pathMeta$: BehaviorSubject<ISkMetadata | null>;
-  combinedSub?: Subscription; // explicit subscription for combined$ to allow manual teardown
 }
 
 export interface IDeltaUpdate {
@@ -228,35 +232,6 @@ export class DataService implements OnDestroy {
     this._isReset.next(true);
   }
 
-  public unsubscribePath(path: string): void {
-    const index = this._pathRegister.findIndex(registration => registration.path === path);
-
-    if (index !== -1) {
-      const registration = this._pathRegister[index];
-
-      // Ensure all observables are completed to avoid memory leaks
-      registration.combinedSub?.unsubscribe();
-      registration._pathData$?.complete();
-      registration._pathState$?.complete();
-      registration.pathDataUpdate$?.complete();
-      registration.pathMeta$?.complete();
-
-      // Use splice to remove the item without changing the entire
-      // array reference.
-      this._pathRegister.splice(index, 1);
-
-      const registrations = this._pathRegisterByPath.get(path);
-      if (registrations) {
-        const updated = registrations.filter(item => item !== registration);
-        if (updated.length) {
-          this._pathRegisterByPath.set(path, updated);
-        } else {
-          this._pathRegisterByPath.delete(path);
-        }
-      }
-    }
-  }
-
   public subscribePath(path: string, source: string): Observable<IPathUpdate> {
     const registrations = this._pathRegisterByPath.get(path);
     const matchingPaths = registrations?.find(item => item.path === path && item.source === source);
@@ -309,7 +284,7 @@ export class DataService implements OnDestroy {
       map(([d, s]) => ({ data: d, state: s } as IPathUpdate))
     );
 
-    newPathSubject.combinedSub = combined$.subscribe(value => newPathSubject.pathDataUpdate$.next(value));
+    combined$.subscribe(value => newPathSubject.pathDataUpdate$.next(value));
 
     this._pathRegister.push(newPathSubject);
     if (registrations) {
@@ -773,7 +748,7 @@ export class DataService implements OnDestroy {
    * Notes:
    * - The path must already be registered via {@link subscribePath}; otherwise this returns an Observable that emits `null`.
    * - If multiple registrations exist for the same path (e.g. different sources), this returns the first match by path.
-   * - The returned Observable completes when the path is unsubscribed via {@link unsubscribePath} (subjects are completed).
+   * - Registrations are app-lifetime, so the returned Observable stays live for the session and does not complete on its own.
    */
   public getPathMetaObservable(path: string): Observable<ISkMetadata | null> {
     const registration = this._pathRegisterByPath.get(path)?.[0];
