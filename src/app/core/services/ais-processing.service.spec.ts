@@ -202,6 +202,10 @@ describe('AisProcessingService target eviction (bounds unbounded growth)', () =>
     stream$.next(makeEvent(fullPath, value));
     vi.advanceTimersByTime(300);
   }
+  function pushAt(fullPath: string, value: unknown, tsMs: number): void {
+    stream$.next({ path: fullPath, update: { data: { value, timestamp: new Date(tsMs) }, state: 'normal' } } as IPathUpdateWithPath);
+    vi.advanceTimersByTime(300);
+  }
   const internals = () => service as unknown as {
     tracks: Map<string, unknown>;
     contextIndex: Map<string, string>;
@@ -242,5 +246,40 @@ describe('AisProcessingService target eviction (bounds unbounded growth)', () =>
     push(`vessels.urn:mrn:imo:mmsi:123456789.navigation.position.latitude`, 10);
     internals().evictStaleTracks(EVENT_TS + 60 * 1000); // 1 min later, within TTL
     expect(internals().tracks.size).toBe(1);
+  });
+
+  it('runs TTL eviction through the periodic interval sweep', () => {
+    // Anchor the fake clock to the event timestamp so the sweep's Date.now()
+    // is deterministic relative to lastUpdateAt.
+    vi.setSystemTime(EVENT_TS);
+    push(`vessels.urn:mrn:imo:mmsi:123456789.mmsi`, '123456789');
+    expect(internals().tracks.size).toBe(1);
+    expect(internals().mmsiIndex.size).toBe(1);
+
+    // Sweeps within the TTL must keep the track (also proves the clock anchor
+    // took: an unanchored real-time clock would evict on the first sweep).
+    vi.advanceTimersByTime(5 * 60 * 1000);
+    expect(internals().tracks.size).toBe(1);
+
+    // Past the 10 min TTL the interval-driven sweep evicts and prunes indexes.
+    vi.advanceTimersByTime(6 * 60 * 1000);
+    expect(internals().tracks.size).toBe(0);
+    expect(internals().contextIndex.size).toBe(0);
+    expect(internals().mmsiIndex.size).toBe(0);
+  });
+
+  it('evicts the least-recently-updated tracks first when over the cap', () => {
+    internals().maxTargets = 3;
+    const contexts = [0, 1, 2, 3, 4].map(i => `vessels.urn:mrn:imo:mmsi:${200000000 + i}`);
+    contexts.forEach((context, i) => {
+      pushAt(`${context}.navigation.position.latitude`, 10 + i, EVENT_TS + i * 1000);
+    });
+
+    expect(internals().tracks.size).toBe(3);
+    expect(internals().contextIndex.has(contexts[0])).toBe(false);
+    expect(internals().contextIndex.has(contexts[1])).toBe(false);
+    expect(internals().contextIndex.has(contexts[2])).toBe(true);
+    expect(internals().contextIndex.has(contexts[3])).toBe(true);
+    expect(internals().contextIndex.has(contexts[4])).toBe(true);
   });
 });
