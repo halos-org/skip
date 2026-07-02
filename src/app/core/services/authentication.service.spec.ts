@@ -114,6 +114,70 @@ describe('AuthenticationService', () => {
       }
     });
 
+    it('transport failure (no HTTP response) preserves the last known-good session', async () => {
+      const service = createService();
+      const httpTesting = TestBed.inject(HttpTestingController);
+
+      // Establish a known-good writable session.
+      const first = service.refreshLoginStatus();
+      expectLoginStatusRequest(httpTesting).flush({ status: 'loggedIn', userLevel: 'admin' });
+      await first;
+
+      // A transient network error carries no logout verdict: session state must survive it.
+      const second = service.refreshLoginStatus();
+      expectLoginStatusRequest(httpTesting).error(new ProgressEvent('network error'));
+      const result = await second;
+
+      expect(result).toEqual({ status: 'loggedIn', userLevel: 'admin' });
+      expect(await firstValueFrom(service.isLoggedIn$)).toBe(true);
+      expect(await firstValueFrom(service.isUserSession$)).toBe(true);
+      expect(await firstValueFrom(service.canWriteUserData$)).toBe(true);
+      httpTesting.verify();
+    });
+
+    it('transport timeout preserves the last known-good session', async () => {
+      vi.useFakeTimers();
+      try {
+        const service = createService();
+        const httpTesting = TestBed.inject(HttpTestingController);
+
+        const first = service.refreshLoginStatus();
+        expectLoginStatusRequest(httpTesting).flush({ status: 'loggedIn', userLevel: 'admin' });
+        await first;
+
+        const second = service.refreshLoginStatus();
+        expectLoginStatusRequest(httpTesting); // request opened, never flushed
+        await vi.advanceTimersByTimeAsync(5001);
+        const result = await second;
+
+        expect(result).toEqual({ status: 'loggedIn', userLevel: 'admin' });
+        expect(await firstValueFrom(service.isLoggedIn$)).toBe(true);
+        expect(await firstValueFrom(service.canWriteUserData$)).toBe(true);
+        httpTesting.verify();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('authoritative not-logged-in after a good session still clears it (not a transport blip)', async () => {
+      const service = createService();
+      const httpTesting = TestBed.inject(HttpTestingController);
+
+      const first = service.refreshLoginStatus();
+      expectLoginStatusRequest(httpTesting).flush({ status: 'loggedIn', userLevel: 'admin' });
+      await first;
+      expect(await firstValueFrom(service.isLoggedIn$)).toBe(true);
+
+      const second = service.refreshLoginStatus();
+      expectLoginStatusRequest(httpTesting).flush({ status: 'notLoggedIn' });
+      const result = await second;
+
+      expect(result).toEqual({ status: 'notLoggedIn' });
+      expect(await firstValueFrom(service.isLoggedIn$)).toBe(false);
+      expect(await firstValueFrom(service.isUserSession$)).toBe(false);
+      httpTesting.verify();
+    });
+
     it('not-logged-in: all session flags false; OIDC descriptors captured', async () => {
       const service = createService();
       const httpTesting = TestBed.inject(HttpTestingController);

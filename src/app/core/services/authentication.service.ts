@@ -1,6 +1,6 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { BehaviorSubject, lastValueFrom, timeout } from 'rxjs';
+import { BehaviorSubject, TimeoutError, lastValueFrom, timeout } from 'rxjs';
 import { distinctUntilChanged, map } from "rxjs/operators";
 
 /**
@@ -22,6 +22,7 @@ export interface ILoginStatus {
 
 const loginStatusPath = '/skServer/loginStatus'; // server-origin, not the /signalk/v1 API base
 const loginStatusTimeoutMs = 5000; // bounded so a hung endpoint cannot block the APP_INITIALIZER
+const noHttpResponseStatus = 0; // HttpErrorResponse.status is 0 when no response ever reached the client
 
 /**
  * Session authentication for the Signal K server. SKip is served same-origin by the SK server (behind
@@ -38,7 +39,7 @@ export class AuthenticationService {
   private _IsLoggedIn$ = new BehaviorSubject<boolean>(false);
   public isLoggedIn$ = this._IsLoggedIn$.asObservable();
 
-  // Latest parsed loginStatus (null until refreshed or on any failure).
+  // Latest parsed loginStatus (null until an authoritative probe; a transport blip leaves it unchanged).
   private _loginStatus$ = new BehaviorSubject<ILoginStatus | null>(null);
   public loginStatus$ = this._loginStatus$.asObservable();
 
@@ -69,19 +70,37 @@ export class AuthenticationService {
   /**
    * Query `GET /skServer/loginStatus` with credentials so the httpOnly session cookie authenticates
    * the probe, and derive session state from it (fail-closed). Returns the parsed status (including
-   * OIDC descriptors for the bootstrap redirect), or null on any failure. The request targets the
-   * served origin — the effective Signal K origin equals `window.location.origin` by definition — not
-   * the post-discovery `/signalk/v1` base.
+   * OIDC descriptors for the bootstrap redirect). An authoritative answer — a not-logged-in verdict,
+   * a non-2xx response, or an unparseable body — clears the session and returns null; a transport-layer
+   * failure (unreachable server or timeout) instead preserves the last known-good status so a transient
+   * drop cannot wedge a live cookie session into a false logged-out state. The request targets the served
+   * origin — the effective Signal K origin equals `window.location.origin` by definition — not the
+   * post-discovery `/signalk/v1` base.
    */
   public async refreshLoginStatus(): Promise<ILoginStatus | null> {
     const url = window.location.origin + loginStatusPath;
     try {
       const raw = await lastValueFrom(this.http.get<ILoginStatus>(url, { withCredentials: true }).pipe(timeout(loginStatusTimeoutMs)));
       return this.applyLoginStatus(raw);
-    } catch {
-      // Unreachable, non-2xx, or unparseable response: treat as not logged in.
+    } catch (error) {
+      if (this.isTransportFailure(error)) {
+        // A transient blip carries no logout verdict: keep the last known-good session so a brief
+        // connectivity drop cannot wedge the UI logged-out until a manual reload.
+        return this.loginStatusValue;
+      }
+      // The server answered but the response is not an authenticated session: treat as not logged in.
       return this.applyLoginStatus(null);
     }
+  }
+
+  /**
+   * Whether a failed probe is a transport-layer blip rather than an authoritative answer. A request
+   * that never reached the server surfaces as an HttpErrorResponse with no HTTP status, and a slow
+   * endpoint surfaces as an RxJS TimeoutError; neither implies the session ended.
+   */
+  private isTransportFailure(error: unknown): boolean {
+    return (error instanceof HttpErrorResponse && error.status === noHttpResponseStatus)
+      || error instanceof TimeoutError;
   }
 
   private applyLoginStatus(raw: unknown): ILoginStatus | null {
