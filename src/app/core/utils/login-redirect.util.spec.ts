@@ -43,6 +43,15 @@ describe('isSafeReturnTo', () => {
   it('rejects the login self-route (avoids a redirect loop)', () => {
     expect(isSafeReturnTo('/login')).toBe(false);
   });
+
+  it('rejects the hash-routed login self-route (hash routing puts /login in the fragment)', () => {
+    expect(isSafeReturnTo('/#/login')).toBe(false);
+    expect(isSafeReturnTo('/#/login?returnTo=%2Fdashboard')).toBe(false);
+  });
+
+  it('accepts a non-login hash route', () => {
+    expect(isSafeReturnTo('/#/dashboard/0')).toBe(true);
+  });
 });
 
 describe('buildLoginRedirectUrl', () => {

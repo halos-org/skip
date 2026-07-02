@@ -2,6 +2,19 @@
 // SSO bounce instead of returning the user to real content.
 const SELF_ROUTE_PATHS = ['/login'];
 
+// The app uses hash-based routing (main.ts withHashLocation), so KIP's own routes live in the URL
+// fragment: /#/login resolves to pathname '/' with hash '#/login'. Checking only the pathname would
+// let /#/login pass as a safe returnTo and loop the SSO bounce, so the fragment's route is checked too.
+function isSelfRoute(resolved: URL): boolean {
+  if (SELF_ROUTE_PATHS.includes(resolved.pathname)) {
+    return true;
+  }
+  const fragment = resolved.hash.startsWith('#') ? resolved.hash.slice(1) : '';
+  const queryIndex = fragment.indexOf('?');
+  const fragmentPath = queryIndex >= 0 ? fragment.slice(0, queryIndex) : fragment;
+  return SELF_ROUTE_PATHS.includes(fragmentPath);
+}
+
 /**
  * Validates a returnTo target for the SSO redirect. Accepts only site-relative paths on the app's
  * own origin; rejects protocol-relative (`//host`), backslash (normalized to `/` by browsers),
@@ -38,7 +51,7 @@ export function isSafeReturnTo(target: string | null | undefined): boolean {
   if (resolved.pathname.startsWith('//')) {
     return false;
   }
-  return !SELF_ROUTE_PATHS.includes(resolved.pathname);
+  return !isSelfRoute(resolved);
 }
 
 /**
