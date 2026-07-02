@@ -12,8 +12,8 @@
         </mat-form-field>
       </td>
       <td class="connect-cell">
-        <button mat-flat-button class="connect-btn" type="submit" [disabled]="!connectionForm.form.valid || isConnecting">
-          {{ isConnecting ? 'Validating...' : 'Connect' }}
+        <button mat-flat-button class="connect-btn" type="submit" [disabled]="!connectionForm.form.valid || isConnecting()">
+          {{ isConnecting() ? 'Validating...' : 'Connect' }}
         </button>
       </td>
     </tr>
@@ -55,8 +55,8 @@
     <div class="info-container">
       <pre>KIP: {{ app.appVersion() }}
 {{ app.browserVersion() }}, {{ app.osVersion() }}<br />
-{{ endpointServiceStatus.serverDescription }}
-{{ streamStatus.message }}, {{ isUserSession() ? 'Signed in' : 'Not signed in' }}
+{{ endpointServiceStatus().serverDescription }}
+{{ streamStatus().message }}, {{ isUserSession() ? 'Signed in' : 'Not signed in' }}
 Internet: {{ internetAvailabilityLabel() }}</pre>
     </div>
   </div>

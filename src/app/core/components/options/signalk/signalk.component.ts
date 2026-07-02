@@ -1,12 +1,12 @@
-import { ElementRef, Component, OnInit, OnDestroy, AfterViewInit, viewChild, inject, DestroyRef, computed } from '@angular/core';
+import { ElementRef, Component, OnInit, OnDestroy, AfterViewInit, viewChild, inject, DestroyRef, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { AppService } from '../../../services/app-service';
 import { ToastService } from '../../../services/toast.service';
 import { SettingsService } from '../../../services/settings.service';
 import { IConnectionConfig } from "../../../interfaces/app-settings.interfaces";
-import { SignalKConnectionService, IEndpointStatus } from '../../../services/signalk-connection.service';
+import { SignalKConnectionService } from '../../../services/signalk-connection.service';
 import { IDeltaUpdate, DataService } from '../../../services/data.service';
-import { SignalKDeltaService, IStreamStatus } from '../../../services/signalk-delta.service';
+import { SignalKDeltaService } from '../../../services/signalk-delta.service';
 import { AuthenticationService } from '../../../services/authentication.service';
 import { SsoRedirectService } from '../../../services/sso-redirect.service';
 import { ConnectionStateMachine } from '../../../services/connection-state-machine.service';
@@ -40,7 +40,8 @@ import { InternetReachabilityService } from '../../../services/internet-reachabi
     MatError,
     MatCheckbox,
     MatButton
-  ]
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 
 export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -61,7 +62,7 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly activityGraph = viewChild<ElementRef<HTMLCanvasElement>>('activityGraph');
 
   public connectionConfig: IConnectionConfig;
-  public isConnecting = false; // Loading state for connect button
+  protected readonly isConnecting = signal(false); // Loading state for connect button
 
   // The Connectivity tab shows the server session identity (SSO). These drive that identity block.
   protected readonly loginStatus = toSignal(this.auth.loginStatus$, { initialValue: null });
@@ -72,8 +73,14 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
     this.ssoRedirect.manualSignIn();
   }
 
-  public endpointServiceStatus: IEndpointStatus;
-  public streamStatus: IStreamStatus;
+  // Both streams are BehaviorSubjects that replay their current value synchronously, so requireSync
+  // guarantees the view always has a status to render on first read. Both services re-emit the same
+  // mutated status object on each update, so equal:()=>false is required — the default Object.is
+  // equality would treat a same-reference re-emit as unchanged and drop the update under OnPush.
+  protected readonly endpointServiceStatus = toSignal(
+    this.signalKConnectionService.getServiceEndpointStatusAsO(), { requireSync: true, equal: () => false });
+  protected readonly streamStatus = toSignal(
+    this.deltaService.getDataStreamStatusAsO(), { requireSync: true, equal: () => false });
 
   protected readonly internetAvailabilityLabel = computed(() => {
     if (this.internetReachability.isChecking()) {
@@ -98,20 +105,6 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   ngOnInit() {
     // get Signal K connection configuration
     this.connectionConfig = this.settings.getConnectionConfig();
-
-    // get Signal K connection status
-    this.signalKConnectionService.getServiceEndpointStatusAsO().pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe((status: IEndpointStatus) => {
-      this.endpointServiceStatus = status;
-    });
-
-    // get Delta Service WebSocket stream status
-    this.deltaService.getDataStreamStatusAsO().pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe((status: IStreamStatus): void => {
-      this.streamStatus = status;
-    });
   }
 
   ngAfterViewInit(): void {
@@ -139,7 +132,7 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
    */
   public async connectToServer() {
     // Start loading state
-    this.isConnecting = true;
+    this.isConnecting.set(true);
 
     try {
       console.log('[Settings-SignalK] Validating Signal K server before connecting...');
@@ -164,7 +157,7 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
 
     } catch (error: unknown) {
       // Validation failed - show error and stay on current page
-      this.isConnecting = false;
+      this.isConnecting.set(false);
       const errorMessage = (error as Error)?.message || 'Unknown validation error';
       console.error('[Settings-SignalK] Server validation failed:', errorMessage);
       this.toast.show(`${errorMessage}`, 0, false, 'error');
