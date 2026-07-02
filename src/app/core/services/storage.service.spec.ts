@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { StorageService, IPatchFailure } from './storage.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
@@ -227,6 +227,24 @@ describe('StorageService', () => {
       const second = service.setConfig('user', 'second', blankConfig());
       http.expectOne((r) => r.method === 'POST').flush(null);
       await expect(second).resolves.toBeNull();
+    });
+
+    it('rejects a queued write that stalls past the request timeout, so the queue is not wedged', async () => {
+      vi.useFakeTimers();
+      try {
+        const stalled = service.setConfig('user', 'first', blankConfig());
+        const stalledRejects = expect(stalled).rejects.toBeTruthy(); // attach handler before the timeout fires
+        http.expectOne((r) => r.method === 'POST'); // dispatched, never answered
+        await vi.advanceTimersByTimeAsync(5001); // past REMOTE_CONFIG_TIMEOUT_MS (5000)
+        await stalledRejects;
+
+        // The timed-out write freed the queue; a later write still processes.
+        const next = service.setConfig('user', 'second', blankConfig());
+        http.expectOne((r) => r.method === 'POST').flush(null);
+        await expect(next).resolves.toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
