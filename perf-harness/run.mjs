@@ -8,6 +8,10 @@
  * a mock Signal K server on one origin, injects the identical probe + a
  * localStorage config into a throttled Chromium, runs each scenario K times,
  * and writes results/<label>.json (raw + median/p95 aggregate).
+ *
+ * Scenario results merge into any existing results/<label>.json and are written
+ * after every scenario, so a long suite can run as chunked --scenarios
+ * invocations under one label and a crash never loses completed scenarios.
  */
 import { chromium } from 'playwright-core';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
@@ -102,7 +106,10 @@ async function main() {
     args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'],
   });
 
-  const results = { label: LABEL, branch: BRANCH, throttle: THROTTLE, repeats: REPEATS, chrome: await browser.version(), scenarios: {} };
+  await mkdir(join(HERE, 'results'), { recursive: true });
+  const outPath = join(HERE, 'results', `${LABEL}.json`);
+  const prior = JSON.parse(await readFile(outPath, 'utf8').catch(() => 'null'));
+  const results = { label: LABEL, branch: BRANCH, throttle: THROTTLE, repeats: REPEATS, chrome: await browser.version(), scenarios: prior?.scenarios ?? {} };
 
   for (const s of scenarios) {
     console.log(`\n=== scenario: ${s.label} — ${s.note} ===`);
@@ -146,14 +153,11 @@ async function main() {
       await ctx.close();
     }
     results.scenarios[s.label] = { note: s.note, agg: aggregate(reps), raw: reps.map((r) => ({ ...r, heap: { ...r.heap } })) };
+    await writeFile(outPath, JSON.stringify(results, null, 2));
   }
 
   await server.stop();
   await browser.close();
-
-  await mkdir(join(HERE, 'results'), { recursive: true });
-  const outPath = join(HERE, 'results', `${LABEL}.json`);
-  await writeFile(outPath, JSON.stringify(results, null, 2));
   console.log(`\n[done] wrote ${outPath}`);
 }
 

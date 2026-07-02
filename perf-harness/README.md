@@ -62,6 +62,9 @@ node run.mjs --branch main --label main
 node run.mjs --branch 11f3fbd0 --label pre-fix   # pre-#119/#120/#121/#122/#135 baseline
 # fast iteration against an already-built ../public (the app's build output):
 node run.mjs --public ../public --label dev --scenarios ais-radar-150 --repeats 2
+# long suites can be chunked: per-scenario runs under one label accumulate
+# into the same results/<label>.json (--no-rebuild reuses the built worktree):
+node run.mjs --branch main --label main --no-rebuild --scenarios gauges-16
 # compare two result files (by label):
 node report.mjs --a pre-fix --b main
 ```
