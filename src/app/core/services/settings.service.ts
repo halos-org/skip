@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { cloneDeep } from 'lodash-es';
 
 import { IDatasetServiceDatasetConfig } from './dataset-stream.service';
 import { IWidget } from '../interfaces/widgets-interface';
@@ -709,16 +710,16 @@ export class SettingsService {
 
   // Creates config from defaults and saves to LocalStorage
   private getDefaultAppConfig(): IAppConfig {
-    const config: IAppConfig = DefaultAppConfig;
-    config.notificationConfig = DefaultNotificationConfig;
-    config.unitDefaults = DefaultUnitsConfig;
-    config['configVersion'] = latestConfigVersion;
+    const config: IAppConfig = cloneDeep(DefaultAppConfig);
+    config.notificationConfig = cloneDeep(DefaultNotificationConfig);
+    config.unitDefaults = cloneDeep(DefaultUnitsConfig);
+    config.configVersion = latestConfigVersion;
     localStorage.setItem('appConfig', JSON.stringify(config));
     return config;
   }
 
   private getDefaultConnectionConfig(): IConnectionConfig {
-    const config: IConnectionConfig = DefaultConnectionConfig;
+    const config: IConnectionConfig = cloneDeep(DefaultConnectionConfig);
     config.kipUUID = UUID.create();
     config.signalKUrl = window.location.origin;
     localStorage.setItem('connectionConfig', JSON.stringify(config));

@@ -4,6 +4,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsService } from './settings.service';
 import { StorageService } from './storage.service';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
+import { DefaultAppConfig, DefaultConnectionConfig } from '../../../default-config/config.blank.const';
+import { IAppConfig, IConnectionConfig } from '../interfaces/app-settings.interfaces';
+
+interface DefaultConfigGetters {
+  getDefaultAppConfig(): IAppConfig;
+  getDefaultConnectionConfig(): IConnectionConfig;
+}
 
 interface SeedOpts {
   sharedConfigName?: string;
@@ -290,5 +297,47 @@ describe('SettingsService', () => {
       expect(reloadSpy).not.toHaveBeenCalled();
       expect(snackSpy).toHaveBeenCalled();
     });
+  });
+});
+
+describe('SettingsService — default config isolation', () => {
+  beforeEach(() => ensureLocalStorage());
+
+  it('getDefaultAppConfig returns a fresh clone and never mutates the shared singleton', () => {
+    const service = createService({}) as unknown as DefaultConfigGetters;
+    // Capture the singleton's state up front rather than asserting an absolute value: other test
+    // files share this module singleton and one (app-initNetwork) mutates it, so the invariant to
+    // pin is that the getter itself leaves it unchanged, not what its value happens to be.
+    const titleBefore = DefaultAppConfig.browserTabTitle;
+    const notificationsBefore = DefaultAppConfig.notificationConfig.disableNotifications;
+
+    const first = service.getDefaultAppConfig();
+    first.browserTabTitle = 'mutated';
+    first.notificationConfig.disableNotifications = !first.notificationConfig.disableNotifications;
+
+    const second = service.getDefaultAppConfig();
+    expect(second).not.toBe(first);
+    expect(second.browserTabTitle).not.toBe('mutated');
+    // Nested defaults are cloned too (different reference), and mutating a result never reaches the singleton.
+    expect(first.notificationConfig).not.toBe(DefaultAppConfig.notificationConfig);
+    expect(DefaultAppConfig.browserTabTitle).toBe(titleBefore);
+    expect(DefaultAppConfig.notificationConfig.disableNotifications).toBe(notificationsBefore);
+  });
+
+  it('getDefaultConnectionConfig returns a fresh clone and never mutates the shared singleton', () => {
+    const service = createService({}) as unknown as DefaultConfigGetters;
+    const urlBefore = DefaultConnectionConfig.signalKUrl;
+    const uuidBefore = DefaultConnectionConfig.kipUUID;
+
+    const first = service.getDefaultConnectionConfig();
+    first.sharedConfigName = 'mutated';
+    first.signalKUrl = 'https://mutated.example';
+
+    const second = service.getDefaultConnectionConfig();
+    expect(second).not.toBe(first);
+    expect(second.signalKUrl).not.toBe('https://mutated.example');
+    // The getter clones, so mutating a returned result never reaches the shared singleton.
+    expect(DefaultConnectionConfig.signalKUrl).toBe(urlBefore);
+    expect(DefaultConnectionConfig.kipUUID).toBe(uuidBefore);
   });
 });
