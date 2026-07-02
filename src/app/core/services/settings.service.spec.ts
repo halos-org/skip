@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpTestingController } from '@angular/common/http/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsService } from './settings.service';
@@ -162,6 +163,48 @@ describe('SettingsService — storage routing (server applicationData only)', ()
 
     expect(patchSpy).toHaveBeenCalledWith('IAppConfig', expect.objectContaining({ browserTabTitle: 'Helm' }));
     expect(localStorage.getItem('appConfig')).toBeNull();
+  });
+});
+
+describe('SettingsService — config save failure reporting', () => {
+  beforeEach(() => ensureLocalStorage());
+
+  it('surfaces a snackbar when a routine config save to the server fails', async () => {
+    const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+    const storage = TestBed.inject(StorageService);
+    const http = TestBed.inject(HttpTestingController);
+    const snack = TestBed.inject(MatSnackBar);
+    const snackSpy = vi.spyOn(snack, 'open').mockImplementation(() => undefined as never);
+
+    storage.storageServiceReady$.next(true);
+    storage.activeConfigFileVersion = 11;
+    storage.sharedConfigName = 'profileA';
+
+    service.setThemeName('dark'); // fire-and-forget patchConfig write
+    http.expectOne((r) => r.method === 'POST').flush('boom', { status: 500, statusText: 'err' });
+    await Promise.resolve();
+
+    expect(snackSpy).toHaveBeenCalled();
+    http.verify();
+  });
+
+  it('does not raise the alarm toast for an expected read-only 401 save denial', async () => {
+    const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+    const storage = TestBed.inject(StorageService);
+    const http = TestBed.inject(HttpTestingController);
+    const snack = TestBed.inject(MatSnackBar);
+    const snackSpy = vi.spyOn(snack, 'open').mockImplementation(() => undefined as never);
+
+    storage.storageServiceReady$.next(true);
+    storage.activeConfigFileVersion = 11;
+    storage.sharedConfigName = 'profileA';
+
+    service.setThemeName('dark');
+    http.expectOne((r) => r.method === 'POST').flush('denied', { status: 401, statusText: 'Unauthorized' });
+    await Promise.resolve();
+
+    expect(snackSpy).not.toHaveBeenCalled();
+    http.verify();
   });
 });
 
