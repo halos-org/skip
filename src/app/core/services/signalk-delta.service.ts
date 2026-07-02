@@ -139,6 +139,10 @@ export class SignalKDeltaService implements OnDestroy {
 
         // Notify ConnectionStateMachine of successful WebSocket connection
         this.connectionStateMachine.onWebSocketConnected();
+
+        // The reconnected upgrade re-authenticated with the same session cookie; re-probe loginStatus
+        // so a session left stale by a failed probe during the drop self-heals without a page reload.
+        void this.auth.refreshLoginStatus();
       });
 
     // WebSocket closed Event Handling

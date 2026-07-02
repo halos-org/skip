@@ -103,6 +103,17 @@ describe('SignalKDeltaService', () => {
     });
   });
 
+  describe('loginStatus re-probe on WS open', () => {
+    it('re-probes loginStatus when the WebSocket opens so a reconnected session self-heals', () => {
+      const { service, auth } = setup();
+      auth.refreshLoginStatus.mockClear();
+
+      service.socketWSOpenEvent$.next({} as Event);
+
+      expect(auth.refreshLoginStatus).toHaveBeenCalled();
+    });
+  });
+
   describe('loginStatus re-check on WS drop', () => {
     it('re-checks loginStatus on a non-clean close', () => {
       const { service, auth } = setup();
