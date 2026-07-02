@@ -9,7 +9,7 @@ import { chromium } from 'playwright-core';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
-import { aisRadarWidget, buildDashboards, localStorageBundle } from './lib/kip-config.mjs';
+import { aisRadarWidget, buildDashboards, localStorageBundle, serverConfigDocument } from './lib/kip-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -26,10 +26,11 @@ const targets = [
   { mmsi: 300000002, lat: own.lat + dLat, lon: own.lon + dLon, heading: 20, cog: 20, sog: 5, name: 'Overlap B' },
 ];
 
-const server = await startServer({ publicDir, base: '/@mxtommy/kip/', port });
+const server = await startServer({ publicDir, base: '/@halos-org/skip/', port });
+server.setConfigDocument(serverConfigDocument({ dashboards: buildDashboards([aisRadarWidget()]) }));
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const ctx = await browser.newContext({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 1 });
-const bundle = localStorageBundle({ origin: server.origin, subscribeAll: true, dashboards: buildDashboards([aisRadarWidget()]) });
+const bundle = localStorageBundle({ origin: server.origin, subscribeAll: true });
 await ctx.addInitScript({ content: `window.__KIP_TEST__=true;` + Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('') });
 const page = await ctx.newPage();
 

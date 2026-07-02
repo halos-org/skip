@@ -9,7 +9,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
-import { aisRadarWidget, buildDashboards, localStorageBundle } from './lib/kip-config.mjs';
+import { aisRadarWidget, buildDashboards, localStorageBundle, serverConfigDocument } from './lib/kip-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -33,10 +33,11 @@ for (const r of [3, 7]) for (const b of [0, 45, 90, 135, 180, 225, 270, 315]) ta
 // two targets well beyond a 12nm ring (to visually check range culling later)
 for (const b of [30, 210]) targets.push({ mmsi: mmsi++, ...place(b, 20, { sog: 9 }) });
 
-const server = await startServer({ publicDir, base: '/@mxtommy/kip/', port });
+const server = await startServer({ publicDir, base: '/@halos-org/skip/', port });
+server.setConfigDocument(serverConfigDocument({ dashboards: buildDashboards([aisRadarWidget()]) }));
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const ctx = await browser.newContext({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 2 });
-const bundle = localStorageBundle({ origin: server.origin, subscribeAll: true, dashboards: buildDashboards([aisRadarWidget()]) });
+const bundle = localStorageBundle({ origin: server.origin, subscribeAll: true });
 await ctx.addInitScript({ content: `window.__KIP_TEST__=true;` + Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('') });
 const page = await ctx.newPage();
 

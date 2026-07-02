@@ -50,7 +50,7 @@ export async function buildBranch(ref, label, { rebuild = true } = {}) {
 }
 
 /** Start the static SPA server for a built public dir. Returns {url, base, stop()}. */
-export async function serve(publicDir, port, base = '/@mxtommy/kip/') {
+export async function serve(publicDir, port, base = '/@halos-org/skip/') {
   const child = spawn('node', [join(HARNESS_DIR, 'serve.mjs'), '--root', publicDir, '--port', String(port), '--base', base], {
     stdio: 'inherit',
   });

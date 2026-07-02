@@ -1,9 +1,9 @@
 /*
- * Minimal static SPA server for a built KIP bundle.
- * KIP builds to <root>/public with <base href="/@mxtommy/kip/">, so we mount the
- * files under that base and SPA-fallback unknown routes to index.html.
+ * Minimal static SPA server for a built Skip bundle.
+ * Skip builds to <root>/public with <base href="/@halos-org/skip/">, so we mount
+ * the files under that base and SPA-fallback unknown routes to index.html.
  *
- * Usage: node serve.mjs --root /path/to/worktree/public --port 4321 [--base /@mxtommy/kip/]
+ * Usage: node serve.mjs --root /path/to/worktree/public --port 4321 [--base /@halos-org/skip/]
  */
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -16,7 +16,7 @@ function arg(name, def) {
 
 const ROOT = arg('root', 'public');
 const PORT = Number(arg('port', '4321'));
-let BASE = arg('base', '/@mxtommy/kip/');
+let BASE = arg('base', '/@halos-org/skip/');
 if (!BASE.endsWith('/')) BASE += '/';
 
 const TYPES = {

@@ -15,17 +15,17 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBranch, WORKTREES } from './lib/build-serve.mjs';
 import { startServer } from './lib/server.mjs';
-import { localStorageBundle } from './lib/kip-config.mjs';
+import { localStorageBundle, serverConfigDocument } from './lib/kip-config.mjs';
 import { scenarios as ALL } from './scenarios.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const BASE = '/@mxtommy/kip/';
+const BASE = '/@halos-org/skip/';
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 ? process.argv[i + 1] : d; };
 const flag = (n) => process.argv.includes(`--${n}`);
 
-const BRANCH = arg('branch', 'master');
+const BRANCH = arg('branch', 'main');
 const LABEL = arg('label', BRANCH.replace(/[^\w.-]/g, '_'));
 const REPEATS = Number(arg('repeats', '4'));
 const THROTTLE = Number(arg('throttle', '10'));
@@ -96,7 +96,9 @@ async function main() {
     for (let r = 0; r < REPEATS; r++) {
       const ctx = await browser.newContext();
       await ctx.addInitScript({ content: probeJs });
-      const bundle = localStorageBundle({ origin: server.origin, subscribeAll: s.subscribeAll, dashboards: s.dashboards() });
+      const dashboards = s.dashboards();
+      server.setConfigDocument(serverConfigDocument({ dashboards }));
+      const bundle = localStorageBundle({ origin: server.origin, subscribeAll: s.subscribeAll });
       const injector = `window.__KIP_TEST__ = true;` +
         Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('');
       await ctx.addInitScript({ content: injector });
