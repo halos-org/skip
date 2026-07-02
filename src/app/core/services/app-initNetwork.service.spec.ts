@@ -60,9 +60,11 @@ describe('AppNetworkInitService', () => {
         navigate: vi.fn().mockResolvedValue(true)
     };
 
+    const validRemoteConfig = (): IConfig => ({ app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig);
+
     const mockStorage = {
         waitUntilReady: vi.fn().mockResolvedValue(true),
-        getConfig: vi.fn().mockResolvedValue({}),
+        getConfig: vi.fn().mockResolvedValue(validRemoteConfig()),
         bootstrapRemoteContext: vi.fn()
     };
 
@@ -92,6 +94,8 @@ describe('AppNetworkInitService', () => {
         mockConnectionStateMachine.isHTTPConnected.mockClear();
         mockConnectionStateMachine.enableWebSocketMode.mockClear();
         mockConnectionStateMachine.startWebSocketConnection.mockClear();
+        mockStorage.getConfig.mockReset().mockResolvedValue(validRemoteConfig());
+        mockStorage.bootstrapRemoteContext.mockClear();
         mockAuth.loginStatusValue = null;
         mockAuth.refreshLoginStatus.mockClear();
         mockRouter.navigate.mockClear();
@@ -314,6 +318,17 @@ describe('AppNetworkInitService', () => {
             await service.initNetworkServices();
 
             expect(mockSsoRedirect.resetBudget).toHaveBeenCalled();
+        });
+
+        it('logged-in with an appless 200 {} config raises missing-shared-config, not a clean bootstrap', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockResolvedValue({} as IConfig);
+
+            await service.initNetworkServices();
+
+            expect(latestIssue().reason).toBe('missing-shared-config');
+            expect(mockStorage.bootstrapRemoteContext).not.toHaveBeenCalled();
+            expect(mockSsoRedirect.resetBudget).not.toHaveBeenCalled();
         });
 
         it('does not double-start the WebSocket when a connect is already in flight at the finally', async () => {

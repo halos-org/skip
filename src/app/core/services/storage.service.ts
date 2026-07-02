@@ -605,7 +605,9 @@ export class StorageService {
    * });
    */
   public bootstrapRemoteContext(context: IStorageRemoteBootstrapContext): void {
-    if (!context?.sharedConfigName || context.configFileVersion == null || !context.initConfig) {
+    // An appless config (SK returns 200 {} for a never-created slot) is an absent bootstrap, not a
+    // successful one — reject it so callers route to recovery instead of booting a blank app.
+    if (!context?.sharedConfigName || context.configFileVersion == null || !context.initConfig?.app) {
       throw new Error('[StorageService] Invalid remote bootstrap context');
     }
 
