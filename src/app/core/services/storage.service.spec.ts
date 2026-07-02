@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
-import { StorageService } from './storage.service';
+import { StorageService, IPatchFailure } from './storage.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
 import { SignalKConnectionService, IEndpointStatus } from './signalk-connection.service';
 import { AuthenticationService } from './authentication.service';
@@ -58,6 +58,48 @@ describe('StorageService', () => {
       // JSON Patch op path is namespaced by the active slot name
       expect(req.request.body[0].path).toBe('/cockpit/dashboards');
       req.flush(null);
+    });
+  });
+
+  describe('patch-failure reporting', () => {
+    beforeEach(() => {
+      service.storageServiceReady$.next(true);
+      service.activeConfigFileVersion = 11;
+      service.sharedConfigName = 'p';
+    });
+
+    afterEach(() => http.verify());
+
+    it('emits on patchFailure$ when a routine patch fails, naming the target', () => {
+      const failures: IPatchFailure[] = [];
+      const sub = service.patchFailure$.subscribe((f) => failures.push(f));
+      service.patchConfig('IThemeConfig', { themeName: 'dark' });
+      http.expectOne((r) => r.method === 'POST').flush('boom', { status: 500, statusText: 'err' });
+      sub.unsubscribe();
+      expect(failures).toHaveLength(1);
+      expect(failures[0].key).toBe('IThemeConfig');
+      expect(failures[0].error).toBeTruthy();
+    });
+
+    it('reports the unset-slot refusal on patchFailure$ without POSTing', () => {
+      service.sharedConfigName = undefined as unknown as string;
+      const failures: IPatchFailure[] = [];
+      const sub = service.patchFailure$.subscribe((f) => failures.push(f));
+      service.patchConfig('Dashboards', []);
+      sub.unsubscribe();
+      expect(failures).toHaveLength(1);
+      expect(failures[0].key).toBe('Dashboards');
+      http.expectNone(() => true);
+    });
+
+    it('stays silent on patchFailure$ for a deferred patch (removeItem settles its own promise)', async () => {
+      const failures: IPatchFailure[] = [];
+      const sub = service.patchFailure$.subscribe((f) => failures.push(f));
+      const removal = service.removeItem('user', 'slot');
+      http.expectOne((r) => r.method === 'POST').flush('boom', { status: 500, statusText: 'err' });
+      await expect(removal).rejects.toBeTruthy();
+      sub.unsubscribe();
+      expect(failures).toHaveLength(0);
     });
   });
 

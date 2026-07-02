@@ -1,5 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { BehaviorSubject, Observable, filter } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { cloneDeep } from 'lodash-es';
 
 import { IDatasetServiceDatasetConfig } from './dataset-stream.service';
@@ -64,6 +66,24 @@ export class SettingsService {
   constructor() {
     console.log("[AppSettings Service] Service startup...");
     this.storage.activeConfigFileVersion = configFileVersion;
+
+    // Routine saves go through the fire-and-forget patchConfig queue, so a failed server write is
+    // otherwise invisible: the setting applies in memory but reverts on the next reload. Surface it.
+    this.storage.patchFailure$
+      .pipe(
+        // A read-only session (no SK write scope) returns 401/403 on every save — expected, not a
+        // fault — so it must not raise the alarming persistent toast; only genuine failures do.
+        filter(({ error }) => !(error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403))),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => this.snackBar.open(
+        'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
+        'Close',
+        {
+          duration: 0,
+          verticalPosition: 'top'
+        }
+      ));
 
     if (!window.localStorage) {
       // REQUIRED BY APP - localStorage support

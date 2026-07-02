@@ -16,6 +16,12 @@ export interface Config {
   scope: string
 }
 
+export interface IPatchFailure {
+  // Config target that failed to persist — patchConfig's ObjType, when known.
+  key?: string;
+  error: unknown;
+}
+
 export interface IStorageRemoteBootstrapContext {
   sharedConfigName: string;
   configFileVersion: number;
@@ -26,6 +32,8 @@ interface IPatchAction {
   url: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   document: any,
+  // Config target of the patch, carried into patchFailure$ so a failed save names what was lost.
+  key?: string,
   // Optional deferred handlers so callers can await a queued patch's completion.
   resolve?: () => void,
   reject?: (error: unknown) => void
@@ -55,6 +63,11 @@ export class StorageService {
   private patchQueue$ = new Subject();  // REST call queue to force sequential calls
   private _pendingPatches$ = new BehaviorSubject<number>(0); // in-flight + queued patch count, for awaitQueueDrain
   private _patchFailures = 0; // monotonic count of failed patches, so awaitQueueDrain can report failure (not just emptiness)
+  private readonly _patchFailure$ = new Subject<IPatchFailure>();
+  // Surfaces fire-and-forget patch failures so a caller that did not await the write can still tell
+  // the user their save was lost; deferred patches settle their own promise and are excluded here to
+  // avoid a double report.
+  public readonly patchFailure$ = this._patchFailure$.asObservable();
   private patch = function (arg: IPatchAction) { // http JSON Patch function
     //console.log(`[Storage Service] Send patch request:\n${JSON.stringify(arg.document)}`);
     return this.http.post(arg.url, arg.document)
@@ -112,6 +125,9 @@ export class StorageService {
             catchError((err) => {
               console.error('[Storage Service] Config patch failed; keeping the queue alive:', err);
               this._patchFailures++;
+              if (!arg.reject) {
+                this._patchFailure$.next({ key: arg.key, error: err });
+              }
               return of(null);
             }),
             finalize(() => this._pendingPatches$.next(Math.max(0, this._pendingPatches$.value - 1)))
@@ -375,7 +391,9 @@ export class StorageService {
   public patchConfig(ObjType: string, value: any, forceConfigFileVersion?: number) {
     this.ensureReady();
     if (!this.sharedConfigName) {
-      console.error('[StorageService] Refusing patchConfig: active config slot name is unset.');
+      const error = new Error('[StorageService] Refusing patchConfig: active config slot name is unset.');
+      console.error(error.message);
+      this._patchFailure$.next({ key: ObjType, error });
       return;
     }
     const ver = forceConfigFileVersion ?? this.configFileVersion;
@@ -468,7 +486,7 @@ export class StorageService {
         break;
     }
 
-    const patch: IPatchAction = { url, document };
+    const patch: IPatchAction = { url, document, key: ObjType };
     if (this._logIO) {
       const appVer = ObjType === 'IAppConfig' ? (value?.configVersion) : undefined;
       const touchesConfigVersion = ObjType === 'IAppConfig' && (typeof appVer !== 'undefined');
