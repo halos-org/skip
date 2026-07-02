@@ -52,7 +52,11 @@ export class SignalKDeltaService implements OnDestroy {
   }
   public streamEndpoint$: BehaviorSubject<IStreamStatus> = new BehaviorSubject<IStreamStatus>(this.streamEndpoint);
 
-  // Websocket config
+  // Websocket config.
+  // The stream opens a single coarse subscription (self or all) and receives the server's
+  // full delta firehose; path selection happens in DataService and per-widget rate limiting in
+  // WidgetStreamsDirective (sampleTime). We intentionally do not emit per-path SK subscribe/unsubscribe deltas or use
+  // SK subscription policies (policy/format/minPeriod), so no such controls exist in widget config.
   private endpointWS: string = null;
   private SubscriptionType = "self";
   private readonly WS_CONNECTION_SUBSCRIBE = "?subscribe=";
