@@ -16,6 +16,7 @@
  * - swipeleft, swiperight, swipeup, swipedown, press, doubletap
  */
 import { Directive, DestroyRef, ElementRef, inject, input, output } from '@angular/core';
+import { GESTURES_DEBUG_KEY } from '../constants/config-storage.const';
 
 
 // Cancel handler metadata used for long-press cancellation listeners.
@@ -1204,7 +1205,7 @@ export class GestureDirective {
 (() => {
   try {
     // Enable via persisted localStorage flag only (URL parameter support removed)
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('kip:gesturesDebug') : null;
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(GESTURES_DEBUG_KEY) : null;
     if (stored === '1') {
       (GestureDirective as unknown as { DEBUG: boolean }).DEBUG = true;
     }
@@ -1213,7 +1214,7 @@ export class GestureDirective {
     w.kipGesturesDebug = (on?: boolean) => {
       const ctor = GestureDirective as unknown as { DEBUG: boolean };
       if (typeof on === 'boolean') ctor.DEBUG = on; else ctor.DEBUG = !ctor.DEBUG;
-      try { localStorage.setItem('kip:gesturesDebug', ctor.DEBUG ? '1' : '0'); } catch { /* ignore */ }
+      try { localStorage.setItem(GESTURES_DEBUG_KEY, ctor.DEBUG ? '1' : '0'); } catch { /* ignore */ }
       console.info('KIP gestures debug:', ctor.DEBUG);
       return ctor.DEBUG;
     };

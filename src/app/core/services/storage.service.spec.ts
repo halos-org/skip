@@ -332,11 +332,11 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('listConfigs GETs the global then the user scoped keys URLs', async () => {
     const { service } = setup();
     const p = service.listConfigs();
-    const g = http.expectOne(`${ENDPOINT}global/kip/11/?keys=true`);
+    const g = http.expectOne(`${ENDPOINT}global/skip/11/?keys=true`);
     expect(g.request.method).toBe('GET');
     g.flush(['g-slot']);
     await tick();
-    http.expectOne(`${ENDPOINT}user/kip/11/?keys=true`).flush(['u-slot']);
+    http.expectOne(`${ENDPOINT}user/skip/11/?keys=true`).flush(['u-slot']);
     await expect(p).resolves.toEqual([
       { scope: 'global', name: 'g-slot' },
       { scope: 'user', name: 'u-slot' },
@@ -346,7 +346,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('getConfig GETs the scoped, versioned, named URL and returns a deep clone', async () => {
     const { service } = setup();
     const p = service.getConfig('user', 'default');
-    const req = http.expectOne(`${ENDPOINT}user/kip/11/default`);
+    const req = http.expectOne(`${ENDPOINT}user/skip/11/default`);
     expect(req.request.method).toBe('GET');
     const body = blankConfig();
     req.flush(body);
@@ -359,7 +359,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     const { service } = setup();
     const cfg = blankConfig();
     const p = service.setConfig('global', 'shared', cfg);
-    const req = http.expectOne(`${ENDPOINT}global/kip/11/shared`);
+    const req = http.expectOne(`${ENDPOINT}global/skip/11/shared`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(cfg);
     req.flush(null);
@@ -369,7 +369,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('patchConfig POSTs a JSON Patch to the USER scope, namespaced by the active slot', () => {
     const { service } = setup();
     service.patchConfig('IAppConfig', { autoNightMode: true });
-    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app', value: { autoNightMode: true } }]);
     req.flush(null);
@@ -378,7 +378,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('patchConfig maps a granular ObjType to its app sub-path', () => {
     const { service } = setup();
     service.patchConfig('Array<IUnitDefaults>', [{ group: 'speed' }]);
-    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app/unitDefaults', value: [{ group: 'speed' }] }]);
     req.flush(null);
@@ -388,7 +388,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     const { service } = setup();
     const cfg = blankConfig();
     service.patchGlobal('backup', 'global', cfg, 'add');
-    const req = http.expectOne(`${ENDPOINT}global/kip/11`);
+    const req = http.expectOne(`${ENDPOINT}global/skip/11`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual([{ op: 'add', path: '/backup', value: cfg }]);
     req.flush(null);
@@ -397,7 +397,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('removeItem POSTs a remove patch to the scoped, versioned URL', async () => {
     const { service } = setup();
     const p = service.removeItem('user', 'old-slot');
-    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual([{ op: 'remove', path: '/old-slot' }]);
     req.flush(null);
@@ -407,7 +407,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('forceConfigFileVersion overrides the version segment of the URL', async () => {
     const { service } = setup();
     const p = service.getConfig('user', 'default', 1);
-    const req = http.expectOne(`${ENDPOINT}user/kip/1/default`);
+    const req = http.expectOne(`${ENDPOINT}user/skip/1/default`);
     expect(req.request.method).toBe('GET');
     req.flush(blankConfig());
     await p;
@@ -416,7 +416,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('patchConfig IThemeConfig extracts themeName into the theme sub-path (not the whole object)', () => {
     const { service } = setup();
     service.patchConfig('IThemeConfig', { themeName: 'dark', extra: 'ignored' });
-    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
     expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/theme/themeName', value: 'dark' }]);
     req.flush(null);
   });
@@ -425,7 +425,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     const { service } = setup();
     const cfg = blankConfig();
     service.patchGlobal('slot-a', 'user', cfg, 'replace');
-    const req = http.expectOne(`${ENDPOINT}user/kip/11`);
+    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
     expect(req.request.body).toEqual([{ op: 'replace', path: '/slot-a', value: cfg }]);
     req.flush(null);
   });
@@ -434,7 +434,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     const { service } = setup();
     const cfg = blankConfig();
     service.patchGlobal('slot-b', 'global', cfg, 'remove');
-    const req = http.expectOne(`${ENDPOINT}global/kip/11`);
+    const req = http.expectOne(`${ENDPOINT}global/skip/11`);
     expect(req.request.body).toEqual([{ op: 'remove', path: '/slot-b', value: cfg }]);
     req.flush(null);
   });

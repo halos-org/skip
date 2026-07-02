@@ -8,6 +8,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Subject } from 'rxjs/internal/Subject';
 import { tap, concatMap, catchError, finalize, lastValueFrom, of, BehaviorSubject, timeout } from 'rxjs';
 import { AuthenticationService } from './authentication.service';
+import { SERVER_CONFIG_APPID } from '../constants/config-storage.const';
 
 const REMOTE_CONFIG_TIMEOUT_MS = 5000; // bounded so a hung applicationData fetch cannot stall the bootstrap
 
@@ -280,8 +281,8 @@ export class StorageService {
 
     const base = this.serverEndpoint;
     const ver = forceConfigFileVersion ?? this.configFileVersion;
-    const globalUrl = `${base}global/kip/${ver}/?keys=true`;
-    const userUrl = `${base}user/kip/${ver}/?keys=true`;
+    const globalUrl = `${base}global/${SERVER_CONFIG_APPID}/${ver}/?keys=true`;
+    const userUrl = `${base}user/${SERVER_CONFIG_APPID}/${ver}/?keys=true`;
 
     try {
       const globalNames = await lastValueFrom(this.http.get<string[]>(globalUrl));
@@ -319,7 +320,7 @@ export class StorageService {
    */
   public async getConfig(scope: string, configName: string, forceConfigFileVersion?: number, isInitLoad?: boolean): Promise<IConfig> {
     this.ensureReady();
-    const base = this.serverEndpoint + scope + "/kip/";
+    const base = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/";
     const ver = forceConfigFileVersion ?? this.configFileVersion;
     const url = base + ver + "/" + configName; // URL for fetching config
 
@@ -363,7 +364,7 @@ export class StorageService {
     this.ensureReady();
     this.assertSlotName(configName, 'setConfig');
 
-    const base = this.serverEndpoint + scope + "/kip/";
+    const base = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/";
     const ver = forceConfigFileVersion ?? this.configFileVersion;
     const url = base + ver + "/" + configName; // URL for setting config
 
@@ -404,7 +405,7 @@ export class StorageService {
       return;
     }
     const ver = forceConfigFileVersion ?? this.configFileVersion;
-    const url = this.serverEndpoint + "user/kip/" + ver;
+    const url = this.serverEndpoint + "user/" + SERVER_CONFIG_APPID + "/" + ver;
     let document;
     // url already reflects forced version if provided
 
@@ -522,7 +523,7 @@ export class StorageService {
     this.ensureReady();
     this.assertSlotName(configName, 'patchGlobal');
     const ver = fileVersion ?? this.configFileVersion;
-  const url = this.serverEndpoint + scope + "/kip/" + ver;
+  const url = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/" + ver;
 
     let document;
     switch (operation) {
@@ -580,9 +581,9 @@ export class StorageService {
   public removeItem(scope: string, name: string, forceConfigFileVersion?: number): Promise<void> {
     this.ensureReady();
     this.assertSlotName(name, 'removeItem');
-    let url = this.serverEndpoint + scope + "/kip/" + this.configFileVersion;
+    let url = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/" + this.configFileVersion;
     if (forceConfigFileVersion) {
-      url = this.serverEndpoint + scope + "/kip/" + forceConfigFileVersion;
+      url = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/" + forceConfigFileVersion;
     }
     const document =
       [

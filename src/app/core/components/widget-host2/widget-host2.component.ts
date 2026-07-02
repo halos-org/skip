@@ -8,6 +8,7 @@ import { IWidget, IWidgetPath, IWidgetSvcConfig } from '../../interfaces/widgets
 import type { NgCompInputs, NgGridStackWidget } from 'gridstack/dist/angular';
 import { BaseWidget } from 'gridstack/dist/angular';
 import { WidgetStreamsDirective } from '../../directives/widget-streams.directive';
+import { GESTURES_DEBUG_KEY } from '../../constants/config-storage.const';
 import { WidgetMetadataDirective } from '../../directives/widget-metadata.directive';
 import { WidgetRuntimeDirective } from '../../directives/widget-runtime.directive';
 import { DialogService } from '../../services/dialog.service';
@@ -87,7 +88,7 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   private readonly openOverlays = new Set<TOverlayGate>();
   // Debug helper gated by the same localStorage flag used by gestures directive
   private isDebugEnabled(): boolean {
-    try { return typeof localStorage !== 'undefined' && localStorage.getItem('kip:gesturesDebug') === '1'; } catch { return false; }
+    try { return typeof localStorage !== 'undefined' && localStorage.getItem(GESTURES_DEBUG_KEY) === '1'; } catch { return false; }
   }
   private debug(...args: unknown[]) { if (this.isDebugEnabled()) console.debug('[Host2]', ...args); }
 

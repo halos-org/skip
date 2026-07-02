@@ -22,7 +22,7 @@ interface SeedOpts {
 
 function seedConfig(opts: SeedOpts = {}): void {
   localStorage.setItem('authorization_token', JSON.stringify(null));
-  localStorage.setItem('connectionConfig', JSON.stringify({
+  localStorage.setItem('skip.connectionConfig', JSON.stringify({
     configVersion: 13,
     kipUUID: 'test-uuid',
     signalKUrl: 'https://boat.example:3443',
@@ -33,7 +33,7 @@ function seedConfig(opts: SeedOpts = {}): void {
     isRemoteControl: opts.isRemoteControl ?? false,
     instanceName: opts.instanceName ?? ''
   }));
-  localStorage.setItem('appConfig', JSON.stringify({
+  localStorage.setItem('skip.appConfig', JSON.stringify({
     configVersion: 12,
     autoNightMode: false,
     redNightMode: false,
@@ -48,14 +48,14 @@ function seedConfig(opts: SeedOpts = {}): void {
       sound: { disableSound: true, muteNormal: true, muteNominal: true, muteWarn: true, muteAlert: true, muteAlarm: true, muteEmergency: true }
     }
   }));
-  localStorage.setItem('dashboardsConfig', JSON.stringify([{ id: 'dash-1' }]));
-  localStorage.setItem('themeConfig', JSON.stringify({ themeName: 'light' }));
+  localStorage.setItem('skip.dashboardsConfig', JSON.stringify([{ id: 'dash-1' }]));
+  localStorage.setItem('skip.themeConfig', JSON.stringify({ themeName: 'light' }));
 }
 
 function seedConnectionConfig(extra: Record<string, unknown> = {}): void {
   localStorage.setItem('authorization_token', JSON.stringify(null));
   localStorage.setItem(
-    'connectionConfig',
+    'skip.connectionConfig',
     JSON.stringify({
       configVersion: 12,
       kipUUID: 'test-uuid',
@@ -98,7 +98,7 @@ describe('SettingsService — legacy credential purge', () => {
   it('strips legacy credential fields on load, preserving other fields and without a version bump', () => {
     seedConnectionConfig({ loginPassword: 'plaintext-secret', loginName: 'captain', useDeviceToken: true });
     createService();
-    const persisted = JSON.parse(localStorage.getItem('connectionConfig') as string);
+    const persisted = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'loginPassword')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'loginName')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'useDeviceToken')).toBe(false);
@@ -123,9 +123,9 @@ describe('SettingsService — storage routing (server applicationData only)', ()
   // server's applicationData regardless of the useSharedConfig flag.
   function setup(connExtra: Record<string, unknown>) {
     seedConnectionConfig(connExtra);
-    localStorage.setItem('appConfig', JSON.stringify({ configVersion: 12, dataSets: [], unitDefaults: {}, notificationConfig: {} }));
-    localStorage.setItem('dashboardsConfig', JSON.stringify([]));
-    localStorage.setItem('themeConfig', JSON.stringify({ themeName: '' }));
+    localStorage.setItem('skip.appConfig', JSON.stringify({ configVersion: 12, dataSets: [], unitDefaults: {}, notificationConfig: {} }));
+    localStorage.setItem('skip.dashboardsConfig', JSON.stringify([]));
+    localStorage.setItem('skip.themeConfig', JSON.stringify({ themeName: '' }));
     TestBed.configureTestingModule({ providers: [SettingsService, StorageService] });
     const storage = TestBed.inject(StorageService);
     const patchSpy = vi.spyOn(storage, 'patchConfig').mockImplementation(() => undefined);
@@ -135,34 +135,34 @@ describe('SettingsService — storage routing (server applicationData only)', ()
 
   it('shared config routes a setting write to server applicationData, not localStorage', () => {
     const { service, patchSpy } = setup({ useSharedConfig: true });
-    localStorage.removeItem('themeConfig');
+    localStorage.removeItem('skip.themeConfig');
 
     service.setThemeName('shared-theme');
 
     expect(patchSpy).toHaveBeenCalledWith('IThemeConfig', { themeName: 'shared-theme' });
-    expect(localStorage.getItem('themeConfig')).toBeNull();
+    expect(localStorage.getItem('skip.themeConfig')).toBeNull();
   });
 
   it('local (useSharedConfig:false) also routes to server applicationData (single same-origin store)', () => {
     const { service, patchSpy } = setup({ useSharedConfig: false });
-    localStorage.removeItem('themeConfig');
+    localStorage.removeItem('skip.themeConfig');
 
     service.setThemeName('local-theme');
 
     expect(patchSpy).toHaveBeenCalledWith('IThemeConfig', { themeName: 'local-theme' });
-    expect(localStorage.getItem('themeConfig')).toBeNull();
+    expect(localStorage.getItem('skip.themeConfig')).toBeNull();
   });
 
   it('setBrowserTabTitle routes to server applicationData like every other setter (useSharedConfig:false)', () => {
     // Regression guard: setBrowserTabTitle must not diverge from the always-server invariant, or the
     // title would write to localStorage and be lost on the next (server-loaded) reload.
     const { service, patchSpy } = setup({ useSharedConfig: false });
-    localStorage.removeItem('appConfig');
+    localStorage.removeItem('skip.appConfig');
 
     service.setBrowserTabTitle('Helm');
 
     expect(patchSpy).toHaveBeenCalledWith('IAppConfig', expect.objectContaining({ browserTabTitle: 'Helm' }));
-    expect(localStorage.getItem('appConfig')).toBeNull();
+    expect(localStorage.getItem('skip.appConfig')).toBeNull();
   });
 });
 
@@ -227,7 +227,7 @@ describe('SettingsService', () => {
     it('setActiveProfile updates the name and persists it to connectionConfig', () => {
       service.setActiveProfile('cockpit');
       expect(service.getActiveProfileName()).toBe('cockpit');
-      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.sharedConfigName).toBe('cockpit');
     });
 
@@ -248,16 +248,16 @@ describe('SettingsService', () => {
     it('setIsRemoteControl persists to connectionConfig, not the profile/appConfig', () => {
       const service = createService({ isRemoteControl: false });
       service.setIsRemoteControl(true);
-      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.isRemoteControl).toBe(true);
-      const appConf = JSON.parse(localStorage.getItem('appConfig') as string);
+      const appConf = JSON.parse(localStorage.getItem('skip.appConfig') as string);
       expect(appConf.isRemoteControl).toBeUndefined();
     });
 
     it('setInstanceName persists to connectionConfig', () => {
       const service = createService({ instanceName: '' });
       service.setInstanceName('Mast');
-      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.instanceName).toBe('Mast');
     });
 
@@ -266,7 +266,7 @@ describe('SettingsService', () => {
       service.setActiveProfile('cockpit');
       expect(service.getIsRemoteControl()).toBe(true);
       expect(service.getInstanceName()).toBe('Helm');
-      const cc = JSON.parse(localStorage.getItem('connectionConfig') as string);
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.isRemoteControl).toBe(true);
       expect(cc.instanceName).toBe('Helm');
     });

@@ -8,6 +8,7 @@
 * OIDC/SSO users could not sign in to KIP because it required a server-local password they do not have; same-origin SSO mode resolves this.
 ## Behavior changes
 * Cross-origin token sign-in: the Signal K server provides no token-refresh endpoint, so the stored password is no longer re-sent to renew a session. The session token still persists across browser reloads until it expires; when it expires you are prompted to sign in again.
+* Skip now stores its configuration in its own namespace, separate from KIP's, on both the Signal K server (applicationData appid `skip` instead of `kip`) and in browser storage (`skip.`-prefixed keys). On a server or browser that had also run KIP, Skip previously loaded KIP's dashboards and settings; it now starts from its own defaults. This is a **one-time reset with no migration** — your existing KIP config is left untouched but is not imported, so re-create or re-import your Skip configuration after this upgrade.
 
 # v4.8.0
 ## New Features
