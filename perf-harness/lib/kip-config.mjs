@@ -1,7 +1,15 @@
 /*
- * Builders for the KIP localStorage bundle that puts the app in anonymous,
- * local-config mode pointed at our mock Signal K server. Shapes are taken
- * verbatim from src/default-config/* and the widget registry (configVersion 12).
+ * Builders for the Skip boot config. Skip (unlike upstream Kip) always persists
+ * app/theme/dashboards config on the server's applicationData — localStorage holds
+ * only the per-device connection config ('skip.connectionConfig'). So the harness
+ * seeds one localStorage key and hands the mock server a full IConfig document to
+ * answer the applicationData GET with. Shapes are taken verbatim from
+ * src/default-config/* and the widget registry.
+ *
+ * Three distinct version spaces (all from src/app/core/services):
+ *  - applicationData URL path segment 11 (configFileVersion, app-initNetwork.service.ts)
+ *  - app.configVersion 12 (latestConfigVersion, settings.service.ts)
+ *  - connectionConfig.configVersion 13 (CONNECTION_CONFIG_VERSION, app-settings.interfaces.ts)
  */
 export const SELF_URN = 'vessels.urn:mrn:signalk:uuid:11111111-1111-4111-8111-111111111111';
 
@@ -24,22 +32,20 @@ const DEFAULT_NOTIF = {
 export function appConfig(extra = {}) {
   return {
     configVersion: 12, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
-    isRemoteControl: false, instanceName: '', dataSets: [], unitDefaults: DEFAULT_UNITS,
-    notificationConfig: DEFAULT_NOTIF, splitShellEnabled: false, splitShellSide: 'left',
-    splitShellSwipeDisabled: false, splitShellWidth: 0.5, ...extra,
+    widgetHistoryDisabled: false, dataSets: [], unitDefaults: DEFAULT_UNITS,
+    notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'SKip', ...extra,
   };
 }
 
 export function connectionConfig(subscribeAll = false) {
   return {
-    configVersion: 12, kipUUID: '00000000-0000-4000-8000-000000000001',
+    configVersion: 13, kipUUID: '00000000-0000-4000-8000-000000000001',
     signalKUrl: '__ORIGIN__', // replaced with the served origin at inject time
-    proxyEnabled: false, signalKSubscribeAll: subscribeAll, useDeviceToken: false,
-    loginName: null, loginPassword: null, useSharedConfig: false, sharedConfigName: 'default',
+    proxyEnabled: false, signalKSubscribeAll: subscribeAll,
+    useSharedConfig: true, sharedConfigName: 'default',
+    isRemoteControl: false, instanceName: '',
   };
 }
-
-export const themeConfig = { themeName: '' };
 
 // --- widget factories (gridstack node wrapping widget-host2 + widgetProperties) ---
 let seq = 0;
@@ -69,7 +75,8 @@ export function radialGaugeWidget({ path = 'self.navigation.speedOverGround', un
     config: {
       displayName: 'G', filterSelfPaths: true,
       paths: { gaugePath: { description: 'Gauge', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit, sampleTime } },
-      gauge: { type: 'ngRadial', subType: 'measuring' }, minValue: 0, maxValue: 30, numInt: 2, numDecimal: 1,
+      gauge: { type: 'ngRadial', subType: 'measuring' },
+      displayScale: { lower: 0, upper: 30, type: 'linear' }, numInt: 2, numDecimal: 1,
       color: 'blue', enableTimeout: false, dataTimeout: 5,
     },
   });
@@ -101,17 +108,20 @@ export function buildDashboards(factories, cols = 12) {
     x += w; rowH = Math.max(rowH, h);
     return n;
   });
-  return [{ id: uid('dash'), name: 'Perf', icon: 'dashboard-dashboard', collapseSplitShell: false, configuration }];
+  return [{ id: uid('dash'), name: 'Perf', icon: 'dashboard-dashboard', configuration }];
 }
 
-/** The full localStorage bundle as {key: jsonString}. signalKUrl is patched to `origin` at inject time. */
-export function localStorageBundle({ origin, subscribeAll, dashboards, app = appConfig() }) {
+/**
+ * The only localStorage key Skip reads at boot. All other config (app/theme/
+ * dashboards) lives server-side — see serverConfigDocument().
+ */
+export function localStorageBundle({ origin, subscribeAll }) {
   const cc = connectionConfig(subscribeAll);
   cc.signalKUrl = origin;
-  return {
-    connectionConfig: JSON.stringify(cc),
-    appConfig: JSON.stringify(app),
-    dashboardsConfig: JSON.stringify(dashboards),
-    themeConfig: JSON.stringify(themeConfig),
-  };
+  return { 'skip.connectionConfig': JSON.stringify(cc) };
+}
+
+/** Full IConfig document the mock serves from applicationData/user/skip/<ver>/default. */
+export function serverConfigDocument({ dashboards, app = appConfig() }) {
+  return { app, theme: { themeName: '' }, dashboards };
 }
