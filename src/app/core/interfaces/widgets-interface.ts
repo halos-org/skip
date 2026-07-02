@@ -1,6 +1,6 @@
 import { ITheme } from '../services/app-service';
 import { TValidSkUnits } from '../services/units.service';
-import { TFormat, TPolicy, TScaleType } from './signalk-interfaces';
+import { TScaleType } from './signalk-interfaces';
 import type { IElectricalCardModeConfig } from '../contracts/electrical-topology-card.contract';
 
 /**
@@ -689,14 +689,6 @@ export interface IWidgetPath {
   suppressBootstrapNull?: boolean;
   /** Used as a reference ID when path is an Array and array index is not appropriate. */
   pathID?: string | null | '';
-  /** NOT IMPLEMENTED - Signal K - smoothingPeriod=[milliseconds] becomes the transmission rate, e.g. every smoothingPeriod/1000 seconds. Default: 1000 */
-  smoothingPeriod?: number;
-  /** NOT IMPLEMENTED - Signal K - format=[delta|full] specifies delta or full format. Default: delta */
-  format?: TFormat;
-  /** NOT IMPLEMENTED - Signal K - policy=[instant|ideal|fixed]. Default: ideal */
-  policy?: TPolicy;
-  /** NOT IMPLEMENTED - Signal K - minPeriod=[milliseconds] becomes the fastest message transmission rate allowed, e.g. every minPeriod/1000 seconds. This is only relevant for policy='instant' to avoid swamping the client or network. */
-  minPeriod?: number;
   /**
    * Optional: Indicates if the path control must have a path value or not.
    * - If true: The control is valid if the path is either a valid (non-empty) path or empty (null or '').
