@@ -135,6 +135,27 @@ describe('StorageService', () => {
       await expect(second).resolves.toBeUndefined();
     });
   });
+
+  describe('bootstrapRemoteContext appless-config guard', () => {
+    it('rejects an appless config (SK 200 {}) as an absent bootstrap', () => {
+      expect(() => service.bootstrapRemoteContext({
+        sharedConfigName: 'cockpit',
+        configFileVersion: 11,
+        initConfig: blankConfig()
+      })).toThrow(/invalid remote bootstrap/i);
+      expect(service.isRemoteContextBootstrapped()).toBe(false);
+    });
+
+    it('accepts a config that carries an app section', () => {
+      service.bootstrapRemoteContext({
+        sharedConfigName: 'cockpit',
+        configFileVersion: 11,
+        initConfig: { app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig
+      });
+      expect(service.isRemoteContextBootstrapped()).toBe(true);
+      expect(service.initConfig?.app).toBeTruthy();
+    });
+  });
 });
 
 interface StoragePrivate { serverEndpoint: string }

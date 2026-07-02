@@ -153,6 +153,20 @@ export class AppNetworkInitService implements OnDestroy {
           throw new Error('[AppInit Network Service] StorageService did not become ready in time. Cannot bootstrap remote configuration.');
         } else {
           remoteConfig = await this.storage.getConfig('user', this.config.sharedConfigName, configFileVersion);
+          if (!remoteConfig?.app) {
+            // SK answers a never-created slot with 200 {} rather than a 404, so an appless config is
+            // the real "no shared configuration yet" signal. Surface recovery here; the 404 catch
+            // branch below remains only for servers that genuinely answer 404.
+            startupDegraded = true;
+            const legacyUpgradeAvailable = await this.probeLegacyUpgradeAvailability(this.config.sharedConfigName);
+            this._bootstrapIssue$.next({
+              reason: 'missing-shared-config',
+              sharedConfigName: this.config.sharedConfigName,
+              legacyUpgradeAvailable
+            });
+            this._bootstrapStatus$.next('degraded');
+            return;
+          }
           const bootstrapContext: IStorageRemoteBootstrapContext = {
             sharedConfigName: this.config.sharedConfigName,
             configFileVersion,
