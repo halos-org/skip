@@ -7,7 +7,7 @@ import { SignalKDeltaService } from './signalk-delta.service';
 import { UUID } from '../utils/uuid.util'
 import { ToastService } from './toast.service';
 
-const deltaStatusCodes = {
+const deltaStatusCodes: Record<number, string> = {
   200: "The request was successfully.",
   202: "Request accepted and pending completion.",
   400: "Something is wrong with the client's request.",
@@ -18,6 +18,8 @@ const deltaStatusCodes = {
   502: "Something went wrong carrying out the request on the server.",
   504: "Timeout on the server side trying to carry out the request."
 }
+// Codes dispatched as recognized responses; anything else raises the unknown-status error toast.
+const handledStatusCodes = new Set([200, 202, 400, 401, 403, 405]);
 export interface skRequest {
   requestId: string;
   state: string;
@@ -109,7 +111,7 @@ export class SignalkRequestsService {
 
       const currentStatusCode = deltaStatusCodes[delta.statusCode];
 
-      if ((typeof currentStatusCode != 'undefined') && (this.requests[index].statusCode == 200 || this.requests[index].statusCode == 202 || this.requests[index].statusCode == 400 || this.requests[index].statusCode == 401 || this.requests[index].statusCode == 403 || this.requests[index].statusCode == 405)) {
+      if ((typeof currentStatusCode != 'undefined') && handledStatusCodes.has(this.requests[index].statusCode)) {
         this.requests[index].statusCodeDescription = currentStatusCode;
 
         if (this.requests[index].statusCode == 202) {

@@ -16,6 +16,7 @@ import { InternetReachabilityService } from './internet-reachability.service';
 import { DatasetStreamService } from './dataset-stream.service';
 import { Injector } from '@angular/core';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
+import { DefaultConnectionConfig } from '../../../default-config/config.blank.const';
 
 // jsdom has no FontFace; preloadFonts() constructs one during the end-to-end initNetworkServices runs.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,6 +266,21 @@ describe('AppNetworkInitService', () => {
 
     it('should be created', () => {
         expect(service).toBeTruthy();
+    });
+
+    describe('loadLocalStorageConfig default seeding (issue #100)', () => {
+        it('clones DefaultConnectionConfig instead of mutating the shared singleton', () => {
+            localStorage.removeItem('skip.connectionConfig');
+
+            (service as unknown as { loadLocalStorageConfig: () => void }).loadLocalStorageConfig();
+
+            const config = (service as unknown as { config: IConnectionConfig }).config;
+            expect(config).not.toBe(DefaultConnectionConfig);
+            expect(config.signalKUrl).toBe(window.location.origin);
+            // The blank singleton stays pristine: earlier end-to-end runs in this file also seed the
+            // default config, so assert the known blank value rather than a captured "before" value.
+            expect(DefaultConnectionConfig.signalKUrl).toBeNull();
+        });
     });
 
     it('should use connection retry window when no timeout is provided', async () => {
