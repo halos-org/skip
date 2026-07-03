@@ -4,7 +4,7 @@ import { DataService, IPathUpdate } from './data.service';
 import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { resolveAngleDomain } from '../utils/angle-domain.util';
-import { IDatasetServiceDatapoint } from './dataset-stream.service';
+import { IDatasetServiceDatapoint } from '../interfaces/dataset.interfaces';
 import { computeWindowStats, ChartStatsDomain } from '../utils/chart-stats.util';
 
 /** Emitted (instead of datapoints) when trend history cannot be served — no history provider. */

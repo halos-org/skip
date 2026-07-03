@@ -1,7 +1,8 @@
 import { TestBed, inject } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@angular/core';
-import { DatasetStreamService, TimeScaleFormat } from './dataset-stream.service';
+import { DatasetStreamService } from './dataset-stream.service';
+import { TimeScaleFormat } from '../interfaces/dataset.interfaces';
 import { deriveDataSourceInfo, resolveWindowMs, MIN_SAMPLE_TIME_MS } from '../utils/chart-window.util';
 import { SettingsService } from './settings.service';
 import { IAppConfig } from '../interfaces/app-settings.interfaces';

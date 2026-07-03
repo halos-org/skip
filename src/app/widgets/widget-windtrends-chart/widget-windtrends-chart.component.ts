@@ -2,13 +2,14 @@ import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, in
 import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
-import { DatasetStreamService, IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/services/dataset-stream.service';
+import { DatasetStreamService } from '../../core/services/dataset-stream.service';
+import { IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/interfaces/dataset.interfaces';
 import { Subscription } from 'rxjs';
 import { CanvasService } from '../../core/services/canvas.service';
 import { UnitsService } from '../../core/services/units.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { ITheme } from '../../core/services/app-service';
-import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/services/dataset-stream.service';
+import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/interfaces/dataset.interfaces';
 import { WidgetDatasetOrchestratorService } from '../../core/services/widget-dataset-orchestrator.service';
 
 import { Chart, ChartConfiguration, ChartData, ChartType, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle, ChartArea, Scale, ChartTypeRegistry } from 'chart.js';
