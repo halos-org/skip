@@ -2,21 +2,26 @@ import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, in
 import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
-import { DatasetStreamService } from '../../core/services/dataset-stream.service';
-import { IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/interfaces/dataset.interfaces';
+import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
+import { IDatasetServiceDatapoint } from '../../core/interfaces/dataset.interfaces';
+import { resolveWindowMs, deriveDataSourceInfo, IChartDataSourceInfo } from '../../core/utils/chart-window.util';
 import { Subscription } from 'rxjs';
 import { CanvasService } from '../../core/services/canvas.service';
 import { UnitsService } from '../../core/services/units.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { ITheme } from '../../core/services/app-service';
-import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/interfaces/dataset.interfaces';
-import { WidgetDatasetOrchestratorService } from '../../core/services/widget-dataset-orchestrator.service';
+import { TimeScaleFormat } from '../../core/interfaces/dataset.interfaces';
 
 import { Chart, ChartConfiguration, ChartData, ChartType, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle, ChartArea, Scale, ChartTypeRegistry } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import ChartStreaming from '@aziham/chartjs-plugin-streaming';
 
 Chart.register(ChartStreaming, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle);
+
+/** Windtrends plots two fixed wind paths (direction + speed) over the widget's configured window. */
+const WINDTRENDS_PERIOD = 30;
+const WINDTRENDS_TWD_PATH = 'self.environment.wind.directionTrue';
+const WINDTRENDS_TWS_PATH = 'self.environment.wind.speedTrue';
 
 interface IChartColors {
   valueLine: string,
@@ -53,8 +58,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     timeScale: 'Last 30 Minutes'
   };
   private readonly ngZone = inject(NgZone);
-  private readonly _dataset = inject(DatasetStreamService);
-  private readonly datasetLifecycle = inject(WidgetDatasetOrchestratorService);
+  private readonly historyStream = inject(HistoryChartStreamService);
   private readonly canvasService = inject(CanvasService);
   private readonly unitsService = inject(UnitsService);
   private readonly responsive = inject(BreakpointObserver);
@@ -84,8 +88,8 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   private _dsSpeedSub: Subscription = null;
   /** Pending coalesced chart recompute+repaint frame id (one per animation frame across both streams). */
   private _chartUpdateRafId: number | null = null;
-  private datasetConfig: IDatasetServiceDatasetConfig = null;
-  private dataSourceInfo: IDatasetServiceDataSourceInfo = null;
+  private timeScale: TimeScaleFormat = null;
+  private dataSourceInfo: IChartDataSourceInfo = null;
   private xCenter: number | null = null;
   private xStep: number | null = null;
   private xCenterSpeed: number | null = null;
@@ -310,7 +314,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       const cfg = this.runtime?.options();
       if (!theme || !cfg) return;
       untracked(() => {
-        if (this.datasetConfig && this.chart) {
+        if (this.timeScale && this.chart) {
           this.setChartOptions();
           this.setDatasetsColors();
           this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
@@ -322,9 +326,8 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     effect(() => {
       const cfg = this.runtime?.options();
       if (!cfg) return;
-      const needsDataset = !this.datasetConfig || this.datasetConfig.timeScaleFormat !== cfg.timeScale;
-      if (needsDataset) {
-        this.syncServiceDatasets();
+      const needsRebuild = this.timeScale !== cfg.timeScale;
+      if (needsRebuild) {
         this.startWidget();
       } else if (this.chart) {
         // color-only change already handled above, but ensure labels updated
@@ -336,9 +339,10 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   private startWidget(): void {
     // Guard until canvas view is ready
     if (!this.widgetDataChart()) return;
-    this.datasetConfig = this._dataset.getDatasetConfig(`${this.id()}-twd`);
-    this.dataSourceInfo = this._dataset.getDataSourceInfo(`${this.id()}-twd`);
-    if (!this.datasetConfig) return;
+    const cfg = this.runtime?.options();
+    if (!cfg || !cfg.timeScale) return;
+    this.timeScale = cfg.timeScale as TimeScaleFormat;
+    this.dataSourceInfo = deriveDataSourceInfo(resolveWindowMs(this.timeScale, WINDTRENDS_PERIOD));
     this.createDatasets();
     this.setChartOptions();
     if (!this.chart) {
@@ -353,12 +357,6 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
     }
     this.startStreaming();
-  }
-
-  private syncServiceDatasets(): void {
-    const cfg = this.runtime?.options();
-    if (!cfg || cfg.timeScale === '') return;
-    this.datasetLifecycle.syncWindTrendsDatasets(this.id(), cfg.timeScale as TimeScaleFormat);
   }
 
   private setChartOptions() {
@@ -384,7 +382,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         reverse: true, // 0 (now) at top; older increases downward
         title: {
           display: true,
-          text: `${this.datasetConfig.timeScaleFormat}`,
+          text: `${this.timeScale}`,
           align: "center"
         },
         ticks: {
@@ -396,7 +394,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
           font: this.isPhonePortrait().matches ? { size: 12 } : { size: 16 },
           callback: (value: number) => {
             const ms = Number(value);
-            const fmt = this.datasetConfig?.timeScaleFormat;
+            const fmt = this.timeScale;
             const windowMs = this.getWindowMs(fmt);
             // 5-minute scale: show whole minutes
             if (fmt === 'Last 5 Minutes') {
@@ -555,7 +553,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       streaming: {
         duration: this.dataSourceInfo.maxDataPoints * this.dataSourceInfo.sampleTime,
         delay: this.dataSourceInfo.sampleTime,
-        frameRate: this.datasetConfig.timeScaleFormat === "day" ? 5 : this.datasetConfig.timeScaleFormat === "hour" ? 8 : this.datasetConfig.timeScaleFormat === "minute" ? 15 : 30,
+        frameRate: this.timeScale === "day" ? 5 : this.timeScale === "hour" ? 8 : this.timeScale === "minute" ? 15 : 30,
       }
     }
 
@@ -714,14 +712,24 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     this._dsDirectionSub?.unsubscribe();
     this._dsSpeedSub?.unsubscribe();
 
-    const batchThenLiveDir$ = this._dataset.getDatasetBatchThenLiveObservable(`${this.id()}-twd`);
-    const batchThenLiveSpd$ = this._dataset.getDatasetBatchThenLiveObservable(`${this.id()}-tws`);
+    const info = this.dataSourceInfo;
+    const baseParams = {
+      source: 'default',
+      windowMs: resolveWindowMs(this.timeScale, WINDTRENDS_PERIOD),
+      sampleTime: info.sampleTime,
+      maxDataPoints: info.maxDataPoints,
+      smoothingPeriod: info.smoothingPeriod
+    };
+    // TWD is a direction path; the History engine auto-resolves its circular domain from the unit.
+    const twdParams: IHistoryChartStreamParams = { ...baseParams, path: WINDTRENDS_TWD_PATH };
+    const twsParams: IHistoryChartStreamParams = { ...baseParams, path: WINDTRENDS_TWS_PATH };
 
-    this._dsDirectionSub = batchThenLiveDir$?.subscribe(dsPointOrBatch => {
-      if (Array.isArray(dsPointOrBatch)) {
-        this.pushRowsToDatasets(dsPointOrBatch);
+    this._dsDirectionSub = this.historyStream.getBackfillThenLive(twdParams).subscribe(emission => {
+      if (isHistoryUnavailable(emission)) return;
+      if (Array.isArray(emission)) {
+        this.pushRowsToDatasets(emission);
       } else {
-        this.pushRowsToDatasets([dsPointOrBatch]);
+        this.pushRowsToDatasets([emission]);
         if (this.chart.data.datasets[0].data.length > this.dataSourceInfo.maxDataPoints) {
           for (let i = 0; i <= 4; i++) this.chart.data.datasets[i].data.shift();
         }
@@ -729,11 +737,12 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       this.scheduleChartUpdate();
     });
 
-    this._dsSpeedSub = batchThenLiveSpd$?.subscribe(dsPointOrBatch => {
-      if (Array.isArray(dsPointOrBatch)) {
-        this.pushRowsToSpeedDatasets(dsPointOrBatch);
+    this._dsSpeedSub = this.historyStream.getBackfillThenLive(twsParams).subscribe(emission => {
+      if (isHistoryUnavailable(emission)) return;
+      if (Array.isArray(emission)) {
+        this.pushRowsToSpeedDatasets(emission);
       } else {
-        this.pushRowsToSpeedDatasets([dsPointOrBatch]);
+        this.pushRowsToSpeedDatasets([emission]);
         if (this.chart.data.datasets[5].data.length > this.dataSourceInfo.maxDataPoints) {
           for (let i = 5; i <= 9; i++) this.chart.data.datasets[i].data.shift();
         }
@@ -934,7 +943,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     }
 
     // Fixed, non-scrolling y-axis window (relative age)
-    const windowMs = this.getWindowMs(this.datasetConfig?.timeScaleFormat);
+    const windowMs = this.getWindowMs(this.timeScale);
     const data0 = this.chart.data.datasets[0].data as (IDataSetRow[]);
     if (data0.length > 0) {
       const nowTs = Date.now();
@@ -950,7 +959,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       this.chart.options.scales.y.max = windowMs;
       // Explicit step per selected window
       let step: number;
-      const fmt = this.datasetConfig?.timeScaleFormat;
+      const fmt = this.timeScale;
       switch (fmt) {
         case 'Last Minute':
           step = 15_000; // 15 seconds
