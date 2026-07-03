@@ -292,4 +292,73 @@ describe('DataService', () => {
     subA.unsubscribe();
     subB.unsubscribe();
   });
+
+  it('resets value, timestamp and state on timeout for a recognised pathType', () => {
+    let latest: IPathUpdate | undefined;
+    service
+      .subscribePath('self.environment.wind.speedApparent', 'default')
+      .subscribe(update => (latest = update));
+
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'environment.wind.speedApparent',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: 5.5,
+    });
+    expect(latest!.data.value).toBe(5.5);
+
+    service.timeoutPathObservable('self.environment.wind.speedApparent', 'number');
+
+    expect(latest!.data.value).toBeNull();
+    expect(latest!.data.timestamp).toBeNull();
+    expect(latest!.state).toBe(States.Normal);
+  });
+
+  it('does not emit on timeout for an unrecognised pathType', () => {
+    const updates: IPathUpdate[] = [];
+    service
+      .subscribePath('self.navigation.position', 'default')
+      .subscribe(update => updates.push(update));
+
+    const countBefore = updates.length;
+    service.timeoutPathObservable('self.navigation.position', 'object');
+
+    expect(updates.length).toBe(countBefore);
+    expect(updates.every(update => update !== undefined)).toBe(true);
+  });
+
+  it('derives path type from meta units when meta precedes the value', () => {
+    metadataUpdates$.next({
+      context: 'self',
+      path: 'electrical.batteries.10.current',
+      meta: { description: 'Battery current', units: 'A', properties: {} },
+    });
+    metadataUpdates$.next({
+      context: 'self',
+      path: 'navigation.datetime',
+      meta: { description: 'Time', units: 'RFC 3339 (UTC)', properties: {} },
+    });
+    metadataUpdates$.next({
+      context: 'self',
+      path: 'design.aisShipType',
+      meta: { description: 'Ship type', units: undefined, properties: {} },
+    });
+
+    expect(service.getPathObject('self.electrical.batteries.10.current')!.type).toBe('number');
+    expect(service.getPathObject('self.navigation.datetime')!.type).toBe('Date');
+    expect(service.getPathObject('self.design.aisShipType')!.type).toBeUndefined();
+  });
+
+  it('leaves path type undefined when the first received value is null', () => {
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'navigation.anchor.position',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: null,
+    });
+
+    expect(service.getPathObject('self.navigation.anchor.position')!.type).toBeUndefined();
+  });
 });
