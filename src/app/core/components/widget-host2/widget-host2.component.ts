@@ -21,7 +21,6 @@ import { IKipSeriesDefinition, KipSeriesApiClientService } from '../../services/
 import { isKipSeriesEnabled, isKipTemplateSeriesDefinition } from '../../contracts/kip-series-contract';
 import { getElectricalWidgetFamilyDescriptor } from '../../contracts/electrical-widget-family.contract';
 import cloneDeep from 'lodash-es/cloneDeep';
-import { SettingsService } from '../../services/settings.service';
 import { uiEventService } from '../../services/uiEvent.service';
 
 // Base shape expected from view components (optional defaultConfig)
@@ -73,8 +72,6 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   private readonly historySync = inject(DashboardHistorySeriesSyncService);
   private readonly kipSeries = inject(KipSeriesApiClientService);
   private readonly _uiEvent = inject(uiEventService);
-
-  private readonly settings = inject(SettingsService);
 
   protected theme = toSignal(this.app.cssThemeColorRoles$, { requireSync: true });
   protected readonly dashboardStaticView = computed(() => this.dashboard.isDashboardStatic());
@@ -411,10 +408,6 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   }
 
   private async openWidgetHistoryDialogInternal(): Promise<void> {
-
-    if (this.settings.getWidgetHistoryDisabled()) {
-      return;
-    }
 
     if (!this.dashboard.isDashboardStatic()) {
       return;

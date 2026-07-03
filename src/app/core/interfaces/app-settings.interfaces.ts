@@ -39,7 +39,6 @@ export interface IAppConfig {
   dataSets: IDatasetServiceDatasetConfig[];
   unitDefaults: IUnitDefaults;
   notificationConfig: INotificationConfig;
-  widgetHistoryDisabled?: boolean;
   browserTabTitle?: string;
 }
 

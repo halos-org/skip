@@ -4,10 +4,8 @@ import { DataService, IPathUpdate } from './data.service';
 import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { resolveAngleDomain } from '../utils/angle-domain.util';
-import { SettingsService } from './settings.service';
 import { IDatasetServiceDatapoint } from './dataset-stream.service';
 import { computeWindowStats, ChartStatsDomain } from '../utils/chart-stats.util';
-import { createChartPerfProbe, IChartPerfProbe } from '../utils/chart-perf.util';
 
 /** Emitted (instead of datapoints) when trend history cannot be served — no history provider. */
 export interface IHistoryUnavailable {
@@ -56,32 +54,21 @@ export class HistoryChartStreamService {
   private readonly history = inject(HistoryApiClientService);
   private readonly mapper = inject(HistoryToChartMapperService);
   private readonly data = inject(DataService);
-  private readonly settings = inject(SettingsService);
 
   /**
    * Backfill (History API, one-shot) then a live delta tail. Emits the backfill as a single array,
    * then live datapoints one at a time. Emits {@link HISTORY_UNAVAILABLE} and stops when there is no
-   * history provider (or history is disabled). A *transient* backfill failure (network/5xx/timeout)
+   * history provider. A *transient* backfill failure (network/5xx/timeout)
    * does not disable the chart: it falls through to the live delta tail with no backfill seed.
    */
   public getBackfillThenLive(params: IHistoryChartStreamParams): Observable<StreamEmission> {
     return new Observable<StreamEmission>(subscriber => {
-      const perf = createChartPerfProbe('history');
       const domain = resolveAngleDomain(params.path, this.data.getPathUnitType(params.path), params.angleDomainOverride);
       let disposed = false;
       let liveSub: Subscription | null = null;
       const buffer: number[] = [];
 
-      // No history provider / history disabled: degrade gracefully. The delta stream could still feed
-      // a live-only chart, but the decision on #64 is not to maintain that path — surface the empty
-      // state instead.
-      if (this.settings.getWidgetHistoryDisabled()) {
-        subscriber.next(HISTORY_UNAVAILABLE);
-        subscriber.complete();
-        return () => { /* nothing to tear down */ };
-      }
-
-      this.fetchBackfill(params, domain, perf)
+      this.fetchBackfill(params, domain)
         .then(result => {
           if (disposed) return;
           if (result === null) {
@@ -96,7 +83,7 @@ export class HistoryChartStreamService {
           }
           this.trim(buffer, params.maxDataPoints);
           const newestBackfillTs = points.length ? points[points.length - 1].timestamp : null;
-          liveSub = this.startLive(params, domain, buffer, offsetMs, newestBackfillTs, perf, subscriber);
+          liveSub = this.startLive(params, domain, buffer, offsetMs, newestBackfillTs, subscriber);
         })
         .catch(err => {
           if (disposed) return;
@@ -105,7 +92,7 @@ export class HistoryChartStreamService {
             // the live delta tail with no seed so live data still renders; a reconnect re-backfill
             // (#85) fills the gap. Only a genuine no-provider (null result above) degrades to empty.
             // offsetMs is null (no backfill anchor) → startLive derives it from the first live sample.
-            liveSub = this.startLive(params, domain, buffer, null, null, perf, subscriber);
+            liveSub = this.startLive(params, domain, buffer, null, null, subscriber);
             return;
           }
           // An unexpected error (e.g. a mapper/logic bug), not a known request failure: degrade to
@@ -128,7 +115,6 @@ export class HistoryChartStreamService {
     buffer: number[],
     offsetMs: number | null,
     newestBackfillTs: number | null,
-    perf: IChartPerfProbe,
     subscriber: { next: (v: StreamEmission) => void }
   ): Subscription {
     // One shared upstream so the freshness tracker, the immediate first value and the resampler all
@@ -203,13 +189,12 @@ export class HistoryChartStreamService {
       buffer.push(value);
       this.trim(buffer, params.maxDataPoints);
       const stats = computeWindowStats(buffer, params.smoothingPeriod, domain);
-      perf.recordLive(now);
       subscriber.next({ timestamp: now, data: { ...stats } });
     }));
     return sub;
   }
 
-  private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain, perf: IChartPerfProbe): Promise<{ points: IDatasetServiceDatapoint[]; offsetMs: number } | null> {
+  private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain): Promise<{ points: IDatasetServiceDatapoint[]; offsetMs: number } | null> {
     const normalizedPath = params.path.replace(/^(vessels\.)?self\./, '');
     const paths = [
       `${normalizedPath}:sma:${params.smoothingPeriod}`,
@@ -219,7 +204,6 @@ export class HistoryChartStreamService {
     ].join(',');
     const resolutionSeconds = Math.max(1, Math.round(params.sampleTime / 1000));
 
-    perf.startBackfill();
     const response = await this.history.getValues({
       paths,
       from: new Date(Date.now() - params.windowMs).toISOString(),
@@ -231,9 +215,6 @@ export class HistoryChartStreamService {
     const mapped = this.mapper.mapValuesToChartDatapoints(response, {
       domain
     });
-    if (perf.enabled) {
-      perf.endBackfill(mapped.length, JSON.stringify(response).length);
-    }
     // History timestamps are server time; shift them into the client clock so backfill lines up with
     // the client-stamped live tail and the client-driven realtime axis (survives clock skew). Prefer
     // range.to (the server's "now"); fall back to the newest sample so a missing range still de-skews.

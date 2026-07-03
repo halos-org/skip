@@ -19,8 +19,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { StorageService } from './storage.service';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
-import { SignalKConnectionService } from '../services/signalk-connection.service';
-import { compare } from 'compare-versions';
 
 
 const defaultTheme = '';
@@ -32,7 +30,6 @@ const latestConfigVersion = 12; // used to set the configVersion property in the
 export class SettingsService {
   private readonly storage = inject(StorageService);
   private readonly snackBar = inject(MatSnackBar);
-  private readonly server = inject(SignalKConnectionService);
 
   private unitDefaults: BehaviorSubject<IUnitDefaults> = new BehaviorSubject<IUnitDefaults>({});
   private themeName: BehaviorSubject<string> = new BehaviorSubject<string>(defaultTheme);
@@ -43,7 +40,6 @@ export class SettingsService {
   private isRemoteControl: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   private instanceName: BehaviorSubject<string> = new BehaviorSubject<string>('');
   private browserTabTitle: BehaviorSubject<string> = new BehaviorSubject<string>('SKip');
-  private widgetHistoryDisabled: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
 
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
@@ -270,16 +266,6 @@ export class SettingsService {
     } else {
       this.browserTabTitle.next(this.activeConfig.app.browserTabTitle);
     }
-
-    const serverVersion = this.server.serverVersion$.getValue();
-    const historyApiSupported = typeof serverVersion === 'string' && serverVersion.trim().length > 0
-      ? compare(serverVersion, '2.22.1', ">=")
-      : false;
-    if (this.activeConfig.app.widgetHistoryDisabled === undefined) {
-      this.setWidgetHistoryDisabled(historyApiSupported ? false : true);
-    } else {
-      this.widgetHistoryDisabled.next(historyApiSupported ? this.activeConfig.app.widgetHistoryDisabled : true);
-    }
   }
 
   //UnitDefaults
@@ -476,23 +462,6 @@ export class SettingsService {
     this.disablePathValidation = disable;
   }
 
-    public getWidgetHistoryDisabledAsO() {
-    return this.widgetHistoryDisabled.asObservable();
-  }
-  public getWidgetHistoryDisabled(): boolean {
-    return this.widgetHistoryDisabled.getValue();
-  }
-  public setWidgetHistoryDisabled(disabled: boolean): void {
-    this.widgetHistoryDisabled.next(disabled);
-    const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
-  }
-
   public getNightModeBrightness(): number {
     return this.nightModeBrightness.getValue();
   }
@@ -662,7 +631,6 @@ export class SettingsService {
       dataSets: this.dataSets,
       unitDefaults: this.unitDefaults.getValue(),
       notificationConfig: this.kipKNotificationConfig.getValue(),
-      widgetHistoryDisabled: this.widgetHistoryDisabled.getValue(),
       browserTabTitle: this.browserTabTitle.getValue()
     }
     return storageObject;
