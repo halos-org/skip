@@ -75,9 +75,66 @@ for reuse; they stay registered in the parent clone's `git worktree list`.
 exist — `git worktree remove` each one, or delete `perf-harness/worktrees/`
 and then run `git worktree prune`.
 
+Label reuse hazard: because scenario results merge into any existing
+`results/<label>.json`, re-pointing a label at a different ref keeps the old
+build's scenario entries under the new `branch` field. Delete the file before
+reusing a label for a different build.
+
 `screenshot.mjs` renders the AIS radar with a fixed deterministic scene for
 visual before/after; `verify-click.mjs` checks radar hit-testing (overlapping
 targets under view rotation) end-to-end.
+
+## Interpreting the numbers
+
+| Question | Metric | Caveat |
+|---|---|---|
+| Would a queued handler (e.g. the exit-fullscreen keydown) have hung? | `taskLatencyMaxMs` / `taskLatencyP95Ms` | Max is one worst sample; p95 is the more stable signal. |
+| Is there a single monster task? | `longTaskMaxMs` | — |
+| How much total jank over the scenario? | `blockingTimeMs` | Raw sum over the probe window, which self-extends under load — compare the labels' median window lengths (report context row) before trusting small deltas. |
+| Are animations dropping frames? | `frameMaxGapMs` / `framesDropped` | — |
+| Is memory growing without bound? | `heapGrowthMB` / `heapSlopeKBps` | Weakest metrics: no forced GC, `usedJSHeapSize` includes uncollected garbage; same-ref spreads of 5–21 MB observed. |
+
+Claims the data cannot support:
+
+- Small blocking-time deltas between labels whose median windows differ —
+  normalize to a common window or dismiss.
+- Leak conclusions from heap deltas inside the same-ref spread.
+- Anything from a single AIS-scenario rep: `results/diag-pre-variance.json`
+  (the same build measured twice) spans blocking 7.8–9.7 s on `ais-radar-150`.
+- Comparisons across machines, Chrome versions, or throttle factors. Both are
+  recorded in every results JSON — compare like for like only.
+
+## Adding a scenario
+
+1. Append an entry to `scenarios` in `scenarios.mjs`: `label`, `note`,
+   `subscribeAll`, `durationMs`, `warmupMs`, `dashboards()` returning
+   `buildDashboards([...])` from widget factories, and `control`
+   (`rateHz`, `selfPaths`, `ais: { count, churnPerSec }`). Add an
+   `action(page, server, durationMs)` only when the scenario needs interaction
+   (viewport resizes, `blastBig`); otherwise the runner just waits `durationMs`.
+2. Widget factories live in `lib/kip-config.mjs` (`numericWidget`,
+   `radialGaugeWidget`, `aisRadarWidget`). For a new widget type, add a factory
+   whose `config` shape is taken verbatim from the widget's current schema — a
+   mis-shaped config silently renders defaults instead of erroring.
+3. The boot assertion expects exactly `dashboards[0].configuration.length`
+   rendered `widget-host2` elements: one factory, one widget host. A widget that
+   fails to render fails the run.
+4. Verify solo against a prebuilt bundle:
+
+   ```bash
+   node run.mjs --public ../public --label dev --scenarios <label> --repeats 2
+   ```
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `boot check failed: 0 widget-host2 rendered, expected N` | The build rejected or ignored the seeded config — config-version drift (three distinct version spaces; see the `lib/kip-config.mjs` header) or widget-schema drift — and booted the default empty dashboard | Diff `lib/kip-config.mjs` version constants and widget config shapes against the ref's `src/`; rerun with `--headed` to watch the boot |
+| App boots degraded or lands on the sign-in flow | The build probes a session/config endpoint the mock doesn't answer (`loginStatus`, `applicationData`, `/plugins`, discovery) | Cover the endpoint in `lib/server.mjs`; find the missing call with `--headed` and devtools |
+| Console shows `Unexpected token '<'` / an API response is HTML | An extensionless request fell through to the SPA `index.html` fallback — an unmocked API route | Same as above: add the route to `lib/server.mjs` |
+| `ENOENT … results/<label>.json` from `report.mjs` | Label typo, or the run never completed a scenario | `ls results/`; report labels must match `run.mjs --label` exactly |
+| `EADDRINUSE` at startup | A previous run's server still listening (default port 4399) | Kill the stray `node` process or pass `--port` |
+| Chromium launch fails: executable not found | Non-macOS host; the default Chrome path is the macOS app bundle | Set `CHROME_BIN` to the local Chrome/Chromium binary |
 
 ## Honesty safeguards
 
