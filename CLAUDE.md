@@ -61,7 +61,7 @@ The mock serves Skip's full session/config surface (`loginStatus`, `applicationD
 
 **Auth & profiles** (the fork's additions): `AuthenticationService` authenticates **only** through the same-origin Signal K server session (SSO behind the reverse proxy). The httpOnly session cookie is the sole credential — the HTTP interceptor sends it on same-origin requests, session state derives from `GET /skServer/loginStatus`, and `SsoRedirectService` owns the sign-in redirect. SKip never collects, stores, or transmits raw credentials or tokens. `ProfileService` adds **named configuration profiles decoupled from user accounts** (multiple dashboards/layouts under one identity), stored as user-scope applicationData slots. Write capability is gated on the session's `userLevel`, not on a read-only flag.
 
-**History & charts**: the SK **v2 History API** is consumed by `HistoryApiClientService` / `KipSeriesApiClientService`; `HistoryToChartMapperService` adapts history values to chart datapoints; `DashboardHistorySeriesSyncService` reconciles series; `WidgetDatasetOrchestratorService` coordinates dataset create/edit/remove (use widget UUID ownership for cleanup). `kip-plugin/` is an optional server-side history provider backed by `node:sqlite`.
+**History & charts**: the SK **v2 History API** is consumed by `HistoryApiClientService` / `KipSeriesApiClientService`; `HistoryToChartMapperService` adapts history values to chart datapoints; `DashboardHistorySeriesSyncService` reconciles series; `HistoryChartStreamService` feeds the trend-chart widgets (History-API backfill plus a thin delta-stream live tail). `kip-plugin/` is an optional server-side history provider backed by `node:sqlite`.
 
 ## Fork-specific gotchas
 
