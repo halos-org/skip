@@ -151,7 +151,7 @@ describe('SettingsConfigComponent', () => {
       getThemeConfig: ReturnType<typeof vi.fn>;
       loadConfigFromLocalStorage: ReturnType<typeof vi.fn>;
     };
-    const serverApp = { configVersion: 12, browserTabTitle: 'Server' };
+    const serverApp = { configVersion: 13, browserTabTitle: 'Server' };
     settings.getAppConfig.mockReturnValue(serverApp);
     settings.getDashboardConfig.mockReturnValue([{ id: 'dash-1' }]);
     settings.getThemeConfig.mockReturnValue({ themeName: 'dark' });

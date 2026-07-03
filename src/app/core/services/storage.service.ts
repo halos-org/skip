@@ -19,7 +19,7 @@ export interface Config {
 
 export type TConfigObjectType =
   'IAppConfig' | 'IThemeConfig' | 'Dashboards' |
-  'Array<IUnitDefaults>' | 'Array<IDatasetDef>' | 'INotificationConfig';
+  'Array<IUnitDefaults>' | 'INotificationConfig';
 
 export interface IPatchFailure {
   // Config target that failed to persist — patchConfig's ObjType, when known.
@@ -451,15 +451,6 @@ export class StorageService {
           [{
             "op": "replace",
             "path": `/${this.sharedConfigName}/app/unitDefaults`,
-            "value": value
-          }]
-        break;
-
-      case "Array<IDatasetDef>":
-        document =
-          [{
-            "op": "replace",
-            "path": `/${this.sharedConfigName}/app/dataSets`,
             "value": value
           }]
         break;

@@ -1,4 +1,3 @@
-import { IDatasetServiceDatasetConfig } from './dataset.interfaces';
 import { IUnitDefaults } from '../services/units.service';
 import { Dashboard } from './../services/dashboard.service';
 
@@ -26,7 +25,6 @@ export interface IAppConfig {
   autoNightMode: boolean;
   redNightMode: boolean;
   nightModeBrightness: number;
-  dataSets: IDatasetServiceDatasetConfig[];
   unitDefaults: IUnitDefaults;
   notificationConfig: INotificationConfig;
   browserTabTitle?: string;

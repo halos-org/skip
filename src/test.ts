@@ -171,7 +171,6 @@ import type {
   ISignalkPlugin,
 } from './app/core/interfaces/signalk-plugin-config.interfaces';
 import type { IUnitDefaults } from './app/core/services/units.service';
-import type { IDatasetServiceDatasetConfig } from './app/core/interfaces/dataset.interfaces';
 // Global provider setup (HttpClient, RouterTestingModule, animation & material stubs, etc.)
 import { TestBed } from '@angular/core/testing';
 import type { Provider } from '@angular/core';
@@ -323,7 +322,6 @@ class SettingsServiceStub {
   private dashboards: unknown[] = [];
   private unitDefaultsSubject = new BehaviorSubject<Record<string, string>>({});
   private instanceNameSubject = new BehaviorSubject<string>('');
-  private dataSets: unknown[] = [];
   private _isRemoteControlSubject = new BehaviorSubject<boolean>(false);
   private _configUpgradeSubject = new BehaviorSubject<boolean>(false);
   private nightModeBrightnessSubject = new BehaviorSubject<number>(0.2);
@@ -383,10 +381,6 @@ class SettingsServiceStub {
   getInstanceName(): string { return this.instanceNameSubject.value; }
   setInstanceName(v: string): void { this.instanceNameSubject.next(v); this.instanceName.set(v); }
 
-  // DataSets config registry accessors (mirror SettingsService)
-  getDataSets(): unknown[] { return this.dataSets; }
-  saveDataSets(d: unknown[]): void { this.dataSets = d; }
-
   // Remote control mode flag used by RemoteDashboardsService and others
   getIsRemoteControl(): boolean { return this._isRemoteControlSubject.value; }
   setIsRemoteControl(v: boolean): void { this._isRemoteControlSubject.next(v); this.isRemoteControl.set(v); }
@@ -405,11 +399,10 @@ class SettingsServiceStub {
   // App-level getters used by multiple services
   public getAppConfig(): IAppConfig {
     return {
-      configVersion: 12,
+      configVersion: 13,
       autoNightMode: this.autoNightModeSubject.value,
       redNightMode: this.redNightModeSubject.value,
       nightModeBrightness: this.nightModeBrightnessSubject.value,
-      dataSets: this.dataSets as IDatasetServiceDatasetConfig[],
       unitDefaults: this.unitDefaultsSubject.value as IUnitDefaults,
       notificationConfig: this._notificationConfig.value,
     };

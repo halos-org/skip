@@ -63,7 +63,6 @@ export class WidgetDataChartComponent implements OnDestroy {
     convertUnitTo: null,
     timeScale: 'minute', // second | minute | hour
     period: 10,
-    chartEngine: 'history',
     numDecimal: 1,
     inverseYAxis: false,
     datasetAverageArray: 'sma', // sma | ema | dema | avg

@@ -8,7 +8,6 @@ import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-hel
 import { DefaultAppConfig, DefaultConnectionConfig, DefaultThemeConfig } from '../../../default-config/config.blank.const';
 import { IAppConfig, IConfig, IConnectionConfig, INotificationConfig, IThemeConfig } from '../interfaces/app-settings.interfaces';
 import { LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
-import { IDatasetServiceDatasetConfig } from '../interfaces/dataset.interfaces';
 import { IUnitDefaults } from './units.service';
 import { Dashboard } from './dashboard.service';
 
@@ -36,11 +35,10 @@ function seedConfig(opts: SeedOpts = {}): void {
     instanceName: opts.instanceName ?? ''
   }));
   localStorage.setItem('skip.appConfig', JSON.stringify({
-    configVersion: 12,
+    configVersion: 13,
     autoNightMode: false,
     redNightMode: false,
     nightModeBrightness: 1,
-    dataSets: [],
     unitDefaults: {},
     notificationConfig: {
       disableNotifications: true,
@@ -94,7 +92,6 @@ function loadedAppConfig(omit: string[] = []): Record<string, unknown> {
     autoNightMode: true,
     redNightMode: true,
     nightModeBrightness: 0.65,
-    dataSets: [{ uuid: 'ds-loaded' }],
     unitDefaults: { Speed: 'knots' },
     notificationConfig: fullNotificationConfig(),
     browserTabTitle: 'My Boat'
@@ -180,7 +177,7 @@ describe('SettingsService — storage routing (server applicationData only)', ()
   // server's applicationData.
   function setup() {
     seedConnectionConfig();
-    localStorage.setItem('skip.appConfig', JSON.stringify({ configVersion: 12, dataSets: [], unitDefaults: {}, notificationConfig: {} }));
+    localStorage.setItem('skip.appConfig', JSON.stringify({ configVersion: 13, unitDefaults: {}, notificationConfig: {} }));
     localStorage.setItem('skip.dashboardsConfig', JSON.stringify([]));
     localStorage.setItem('skip.themeConfig', JSON.stringify({ themeName: '' }));
     TestBed.configureTestingModule({ providers: [SettingsService, StorageService] });
@@ -434,7 +431,7 @@ describe('SettingsService — default config isolation', () => {
 
 describe('SettingsService — hydration (pushSettings) characterization', () => {
   const APP_CONFIG_KEYS = [
-    'autoNightMode', 'browserTabTitle', 'configVersion', 'dataSets',
+    'autoNightMode', 'browserTabTitle', 'configVersion',
     'nightModeBrightness', 'notificationConfig', 'redNightMode', 'unitDefaults'
   ];
 
@@ -451,7 +448,6 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
     expect(service.getNightModeBrightness()).toBe(0.65);
     expect(service.getBrowserTabTitle()).toBe('My Boat');
     expect(service.getThemeName()).toBe('dark');
-    expect(service.getDataSets()).toEqual([{ uuid: 'ds-loaded' }]);
     expect(service.getDefaultUnits()).toEqual({ Speed: 'knots' });
     expect(service.getNotificationConfig()).toEqual(fullNotificationConfig());
     expect(service.getDashboardConfig()).toEqual([{ id: 'd1' }]);
@@ -478,7 +474,6 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
       expect(Object.keys(blob).sort()).toEqual(APP_CONFIG_KEYS);
       // ...that preserves the loaded configVersion, with the already-hydrated fields riding along.
       expect(blob.configVersion).toBe(LOADED_CONFIG_VERSION);
-      expect(blob.dataSets).toEqual([{ uuid: 'ds-loaded' }]);
       expect(blob.unitDefaults).toEqual({ Speed: 'knots' });
       expect(blob.notificationConfig).toEqual(fullNotificationConfig());
       expect(read(service)).toBe(bootstrapDefault);
@@ -548,10 +543,6 @@ describe('SettingsService — app-config version preservation on every write pat
     service.setDefaultUnits({ Speed: 'kph' });
     expect(patchSpy).toHaveBeenLastCalledWith('Array<IUnitDefaults>', { Speed: 'kph' });
 
-    const dataSets = [{ uuid: 'ds-new' }] as unknown as IDatasetServiceDatasetConfig[];
-    service.saveDataSets(dataSets);
-    expect(patchSpy).toHaveBeenLastCalledWith('Array<IDatasetDef>', dataSets);
-
     const notif = fullNotificationConfig();
     service.setNotificationConfig(notif);
     expect(patchSpy).toHaveBeenLastCalledWith('INotificationConfig', notif);
@@ -593,19 +584,6 @@ describe('SettingsService — granular patch dispatch (end-to-end through Storag
     storage.sharedConfigName = 'profileA';
     return { service, http };
   }
-
-  it('saveDataSets dispatches a JSON Patch replacing the profile app/dataSets sub-path', () => {
-    const { service, http } = setupLive();
-    const dataSets = [{ uuid: 'ds-1', path: 'self.speed' }] as unknown as IDatasetServiceDatasetConfig[];
-
-    service.saveDataSets(dataSets);
-
-    const req = http.expectOne((r) => r.method === 'POST');
-    expect(req.request.body).toEqual([{ op: 'replace', path: '/profileA/app/dataSets', value: [{ uuid: 'ds-1', path: 'self.speed' }] }]);
-    req.flush(null);
-    expect(service.getDataSets()).toEqual(dataSets);
-    http.verify();
-  });
 
   it('setNotificationConfig dispatches a JSON Patch replacing the profile app/notificationConfig sub-path', () => {
     const { service, http } = setupLive();
