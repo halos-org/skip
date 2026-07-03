@@ -22,7 +22,6 @@ import { DialogService } from './core/services/dialog.service';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NotificationsService } from './core/services/notifications.service';
 import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
-import { DatasetStreamService } from './core/services/dataset-stream.service';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { RemoteDashboardsService } from './core/services/remote-dashboards.service';
 import { ToastService } from './core/services/toast.service';
@@ -52,7 +51,6 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly _ssoRedirect = inject(SsoRedirectService);
   private readonly _historySeriesReconcile = inject(DashboardHistorySeriesSyncService);
   public readonly authenticationService = inject(AuthenticationService);
-  private readonly _dataSet = inject(DatasetStreamService);
 
   // ============================================================================
   // AppComponent - Services initialized by this component

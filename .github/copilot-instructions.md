@@ -26,7 +26,7 @@ Always load and apply instruction files in this order:
 
 - `best-practices.instructions.md`: Cross-cutting quality rules only (TypeScript quality, testing expectations, accessibility, documentation).
 - `angular.instructions.md`: Angular framework patterns only (signals, templates, DI, routing, forms).
-- `project.instructions.md`: KIP architecture and domain conventions only (Host2 widgets, Signal K data paths, dataset orchestration, base path).
+- `project.instructions.md`: KIP architecture and domain conventions only (Host2 widgets, Signal K data paths, base path).
 
 Do not duplicate detailed rules across files. Reference the owning file instead.
 
@@ -103,8 +103,6 @@ Use project skills plus Angular skills based on edit type:
   - `angular-tooling`
   - `kip-host2-widget`
   - `kip-widget-creation`
-- Dataset lifecycle, ownership cleanup, and dataset write paths:
-  - `kip-dataset-orchestration`
 - History series reconciliation and mapping flow changes:
   - `kip-history-series-reconcile`
 
