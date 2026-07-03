@@ -522,8 +522,7 @@ describe('WidgetSolarChargerComponent', () => {
 
   // End-to-end persistence round-trip for #1061, mirroring the exact KIP operations:
   //   dashboard.component.saveDashboard(): cloneDeep(grid.save(false,false))
-  //   settings.saveLDashboardsConfigToLocalStorage(): localStorage.setItem(JSON.stringify(dashboards))   [local config]
-  //   storage.patchConfig('Dashboards', dashboards): [{ op:'replace', path:'/<name>/dashboards', value }] [shared config]
+  //   storage.patchConfig('Dashboards', dashboards): [{ op:'replace', path:'/<name>/dashboards', value }]
   //   settings.loadConfigFromLocalStorage(): JSON.parse(...)
   //   widget-runtime.directive.options(): merge(cloneDeep(DEFAULT_CONFIG), cloneDeep(saved))
   // NOTE: the live-grid capture itself - gridstack grid.save(false,false) - cannot be exercised here
