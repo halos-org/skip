@@ -42,7 +42,7 @@ const isRfc3339StringDate = (date: Date | string): boolean => {
 };
 
 // Translate units from sk metadata to appropriate type category
-const typeFromUnits = (units: string): string => {
+const typeFromUnits = (units: string): string | undefined => {
   if (!units) {
     return undefined;
   }
@@ -390,7 +390,7 @@ export class DataService implements OnDestroy {
     // Find the path item in _skData or create a new one if it doesn't exist
     let pathItem = this._skData.get(updatePath);
     if (!pathItem) {
-      let pathType: string = dataPath.value === null ? undefined : typeof (dataPath.value);
+      let pathType: string | undefined = dataPath.value === null ? undefined : typeof (dataPath.value);
       if (pathType === "string" && isRfc3339StringDate(dataPath.value)) {
         pathType = "Date";
       }
@@ -717,20 +717,14 @@ export class DataService implements OnDestroy {
    */
   public timeoutPathObservable(path: string, pathType: string): void {
     const pathRegister = this._pathRegister.find(item => item.path == path);
-    if (pathRegister) {
-      let timeoutValue: IPathUpdate;
-
-      if (['string', 'Date', 'number', 'multiple'].includes(pathType)) {
-        timeoutValue = {
-          data: {
-            value: null,
-            timestamp: null
-          },
-          state: States.Normal
-        };
-      }
-
-      pathRegister.pathDataUpdate$.next(timeoutValue);
+    if (pathRegister && ['string', 'Date', 'number', 'multiple'].includes(pathType)) {
+      pathRegister.pathDataUpdate$.next({
+        data: {
+          value: null,
+          timestamp: null
+        },
+        state: States.Normal
+      });
     }
   }
 

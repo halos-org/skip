@@ -13,6 +13,7 @@ import { SignalKConnectionService } from "./signalk-connection.service";
 import { AuthenticationService, ILoginStatus } from './authentication.service';
 import { SsoRedirectService } from './sso-redirect.service';
 import { DefaultConnectionConfig } from '../../../default-config/config.blank.const';
+import { cloneDeep } from 'lodash-es';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { DataService } from './data.service';
 import { SignalKDeltaService } from './signalk-delta.service';
@@ -367,7 +368,7 @@ export class AppNetworkInitService implements OnDestroy {
     this.config = JSON.parse(localStorage.getItem(CONNECTION_CONFIG_KEY));
 
     if (!this.config) {
-      this.config = DefaultConnectionConfig;
+      this.config = cloneDeep(DefaultConnectionConfig);
       this.config.signalKUrl = window.location.origin;
       console.log(`[AppInit Network Service] Connection Configuration not found. Creating configuration using Auto-Discovery URL: ${this.config.signalKUrl}`);
       this.setLocalStorageConfig();

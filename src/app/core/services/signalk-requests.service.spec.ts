@@ -131,6 +131,19 @@ describe('SignalkRequestsService', () => {
     expect(received[0].statusCode).toBe(200);
   });
 
+  it('reports a described but unhandled status code (500) as unknown yet still dispatches it', () => {
+    const received: skRequest[] = [];
+    service.subscribeRequest().subscribe(r => received.push(r));
+
+    const requestId = service.putRequest('navigation.lights', true, 'widget-1')!;
+    requestUpdates$.next({ requestId, state: 'COMPLETED', statusCode: 500 });
+
+    expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('Unknown Request Status Code'), 0, false, 'error');
+    expect(received).toHaveLength(1);
+    expect(received[0].statusCode).toBe(500);
+    expect(received[0].statusCodeDescription).toBeUndefined();
+  });
+
   it('warns via toast when a response carries an unknown requestId', () => {
     const received: skRequest[] = [];
     service.subscribeRequest().subscribe(r => received.push(r));
