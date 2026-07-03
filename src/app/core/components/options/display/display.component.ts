@@ -1,11 +1,11 @@
-import { Component, inject, OnInit, viewChild, signal, Signal, model, computed } from '@angular/core';
+import { Component, inject, OnInit, viewChild, signal, Signal, model } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
 import { AppService } from '../../../services/app-service';
 import { ToastService } from '../../../services/toast.service';
 import { SettingsService } from '../../../services/settings.service';
 import { PluginConfigClientService } from '../../../services/plugin-config-client.service';
-import { IPluginApiFailure, IPluginConfigSaveRequest, ISignalkPlugin } from '../../../interfaces/signalk-plugin-config.interfaces';
+import { IPluginApiFailure, ISignalkPlugin } from '../../../interfaces/signalk-plugin-config.interfaces';
 import { FormsModule, NgForm } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
@@ -13,9 +13,6 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule, MatSlideToggleChange } from '@angular/material/slide-toggle';
-import { MatRadioModule } from '@angular/material/radio';
-import { SignalKConnectionService } from '../../../services/signalk-connection.service';
-import { compare } from 'compare-versions';
 
 
 @Component({
@@ -29,13 +26,11 @@ import { compare } from 'compare-versions';
         MatSliderModule,
         MatExpansionModule,
         MatInputModule,
-        MatSlideToggleModule,
-        MatRadioModule
+        MatSlideToggleModule
     ],
 })
 export class SettingsDisplayComponent implements OnInit {
   private readonly DERIVED_DATA_PLUGIN_ID = 'derived-data';
-  private readonly KIP_DATA_PLUGIN_ID = 'kip';
   private readonly LIGHT_THEME_NAME = "light-theme";
   private readonly displayForm = viewChild<NgForm>('displayForm');
   private readonly app = inject(AppService);
@@ -43,21 +38,14 @@ export class SettingsDisplayComponent implements OnInit {
   private readonly settings = inject(SettingsService);
   private readonly responsive = inject(BreakpointObserver);
   private readonly pluginConfig = inject(PluginConfigClientService);
-  private readonly server = inject(SignalKConnectionService);
   protected isPhonePortrait: Signal<BreakpointState>;
   protected nightBrightness = signal<number>(0.27);
-  protected isHistoryApiSupported = computed<boolean>(() => {
-    const version = this.server.serverVersion$.getValue();
-    return version ? compare(version, '2.22.1', ">=") : false;
-  });
   protected autoNightMode = model<boolean>(false);
   protected isRedNightMode = model<boolean>(false);
   protected isLightTheme = model<boolean>(false);
   protected isRemoteControl = model<boolean>(false);
   protected instanceName = model<string>('');
   protected browserTabTitle = model<string>('SKip');
-  protected providerMode = model<'kip' | 'other'>('other');
-  protected isKipHistoryProviderSelectable = signal<boolean>(false);
   protected isPathValidationDisabled = model<boolean>(this.settings.getDisablePathValidation());
   // Guards concurrent plugin enable checks to avoid stale promise handlers mutating state
   private _pluginCheckSeq = 0;
@@ -74,7 +62,6 @@ export class SettingsDisplayComponent implements OnInit {
     this.isRemoteControl.set(this.settings.getIsRemoteControl());
     this.instanceName.set(this.settings.getInstanceName());
     this.browserTabTitle.set(this.settings.getBrowserTabTitle());
-    void this.getKipPluginConfig();
   }
 
   protected saveAllSettings():void {
@@ -92,10 +79,10 @@ export class SettingsDisplayComponent implements OnInit {
       return;
     }
 
-    void this.applyAndSaveSettings();
+    this.applyAndSaveSettings();
   }
 
-  private async applyAndSaveSettings(): Promise<void> {
+  private applyAndSaveSettings(): void {
     this.settings.setAutoNightMode(this.autoNightMode());
     this.settings.setRedNightMode(this.isRedNightMode());
     this.settings.setNightModeBrightness(this.nightBrightness());
@@ -117,15 +104,7 @@ export class SettingsDisplayComponent implements OnInit {
     }
     this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());
-    // Await the server write; setKipPluginConfig() returns a Promise, so the old
-    // `if (!this.setKipPluginConfig())` was always false (a Promise is truthy) —
-    // the error branch was dead and "Configuration saved" lied on failure.
-    const ok = await this.setKipPluginConfig();
     this.displayForm()?.form.markAsPristine();
-    if (!ok) {
-      this.toast.show('Failed to save KIP plugin configuration on server.', 0, false, 'error');
-      return;
-    }
     this.toast.show("Configuration saved", 1000, true, 'message');
   }
 
@@ -134,43 +113,11 @@ export class SettingsDisplayComponent implements OnInit {
     if (seq !== this._pluginCheckSeq) return;
 
     if (isValid) {
-      await this.applyAndSaveSettings();
+      this.applyAndSaveSettings();
     } else {
       // Reset toggle and abort save
       this.autoNightMode.set(false);
     }
-  }
-
-  private async getKipPluginConfig(): Promise<void> {
-    const result = await this.pluginConfig.getPlugin(this.KIP_DATA_PLUGIN_ID);
-    if (!result.ok) {
-      this.toast.show(
-        `Failed to load KIP plugin configuration: ${(result as IPluginApiFailure).error.message}`,
-        0,
-        false,
-        'error'
-      );
-      return;
-    }
-
-    const pluginConfig = result.data.state.configuration;
-    const seriesEnabled = pluginConfig.historySeriesServiceEnabled === true;
-    this.isKipHistoryProviderSelectable.set((pluginConfig.nodeSqliteAvailable as boolean) ?? false);
-    this.providerMode.set(seriesEnabled && this.isKipHistoryProviderSelectable() ? 'kip' : 'other');
-
-  }
-
-  private async setKipPluginConfig(): Promise<boolean> {
-    const providerEnabled = this.isKipHistoryProviderSelectable();
-    const useKipProvider = this.providerMode() === 'kip' && providerEnabled;
-    const config: IPluginConfigSaveRequest = {
-      configuration: {
-        historySeriesServiceEnabled: useKipProvider,
-        registerAsHistoryApiProvider: useKipProvider
-      }
-    };
-    const result = await this.pluginConfig.savePluginConfig(this.KIP_DATA_PLUGIN_ID, config);
-    return result.ok;
   }
 
   protected isAutoNightModeSupported(e: MatSlideToggleChange): void {
