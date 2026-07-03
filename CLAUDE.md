@@ -19,6 +19,30 @@ Skip — an Angular 21 (zoneless, signals, new control flow) Signal K marine mul
 
 Node: the app builds on Node 20+; the kip-plugin's built-in history provider needs Node ≥22.5 (`node:sqlite`). CI runs the matrix 20/22/24.
 
+## Performance and freeze measurement (perf-harness/)
+
+Self-contained freeze/jank harness (own `package.json`, never touches app deps): builds the **real production bundle**, drives it in headless Chromium at **10× CPU throttle** (Pi-class HaLOS target) against a **mock Signal K server** on one origin. Use it for perf-sensitive changes to widgets, rendering, or the data pipeline, and for before/after numbers when replicating upstream perf work. Full operator docs: `perf-harness/README.md`.
+
+The three commands (from `perf-harness/`, after `npm install` there):
+
+```bash
+node run.mjs --public ../public --label dev --scenarios resize-storm --repeats 2  # quick, prebuilt ../public
+node run.mjs --branch main --label main       # full 7-scenario suite against any git ref
+node report.mjs --a pre-freeze-fixes --b main-freeze-fixes   # compare two labels
+```
+
+Traps that cost real time:
+
+- **Results accumulate per label**: scenarios merge into any existing `results/<label>.json`. Reusing a label for a different ref keeps the old ref's scenario entries under the new `branch` field — delete the file first.
+- **Blocking time and delta counts are raw sums over the probe window**, and the window self-extends while the throttled main thread is busy. Check the report's window-ms context row before claiming a regression from a small delta.
+- **Heap metrics are noise-dominated** (no forced GC; same-ref spreads of 5–21 MB observed). No leak claims from them without a sustained slope across repeats.
+- **AIS scenarios have large run-to-run variance** (same-build blocking spread 7.8–9.7 s observed) — never conclude from a single rep; compare against a same-build re-run (`results/diag-*.json` are committed examples).
+- **A boot-assertion failure** (`boot check failed: N widget-host2 rendered, expected M`) means the seeded config is wrong for that build (version or widget-schema drift) — not a flake. A mis-seeded config boots a plausible empty dashboard; the assert exists to catch exactly that.
+- `--branch` builds register **nested git worktrees** under `perf-harness/worktrees/`; `git worktree prune` alone does not deregister them — `git worktree remove` each one, or delete `perf-harness/worktrees/` and then prune.
+- Chrome path defaults to the macOS app bundle; set `CHROME_BIN` on other platforms.
+
+The mock serves Skip's full session/config surface (`loginStatus`, `applicationData`, `/plugins`) because Skip is session-SSO-only with server-side config — a localStorage-only bootstrap boots a degraded app; see the README. Committed baselines: `pre-freeze-fixes` (11f3fbd0, before the #119/#120/#121/#122/#135 freeze fixes) and `main-freeze-fixes` (2e358f17).
+
 ## Testing reality (read before touching specs)
 
 - The runner is **vitest** (`vitest.config.ts`, `environment: jsdom`) driven by `@angular/build:unit-test`. `src/test.ts` is the setup file and **monkey-patches `TestBed.configureTestingModule`** to inject a large set of global stubs/providers (SettingsService, AuthenticationService, SignalKConnectionService, ConnectionStateMachine, MatDialog refs, the widget host directives, etc.). Specs override these by listing their own local providers (local wins; globals are prepended).
