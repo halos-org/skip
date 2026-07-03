@@ -11,13 +11,12 @@ Skip — an Angular 21 (zoneless, signals, new control flow) Signal K marine mul
 ## Commands
 
 - `npm run dev` — dev server (serve-path `/@halos-org/skip/`).
-- `npm run build:prod` / `npm run build:dev` — Angular app build (output → `public/`). `npm run build:all` also builds the plugin.
+- `npm run build:prod` / `npm run build:dev` — Angular app build (output → `public/`).
 - `npm test` — full unit suite, headless (vitest via `@angular/build:unit-test`). `npm run test:interactive` for watch mode.
 - `npm run lint` — ESLint (flat config). `@typescript-eslint/no-explicit-any` is an **error**, and `no-unused-vars` does **not** ignore `_`-prefixed params — drop unused params, don't underscore them.
-- `npm run build:plugin` then `npm run test:plugin` — the server-side `kip-plugin/` (Node `--test`).
 - `npm run generate:widget` — schematic that scaffolds a Host2 widget (preferred over hand-writing one).
 
-Node: the app builds on Node 20+; the kip-plugin's built-in history provider needs Node ≥22.5 (`node:sqlite`). CI runs the matrix 20/22/24.
+Node: the app builds on Node 20+. CI runs the matrix 20/22/24.
 
 ## Performance and freeze measurement (perf-harness/)
 
@@ -61,7 +60,7 @@ The mock serves Skip's full session/config surface (`loginStatus`, `applicationD
 
 **Auth & profiles** (the fork's additions): `AuthenticationService` authenticates **only** through the same-origin Signal K server session (SSO behind the reverse proxy). The httpOnly session cookie is the sole credential — the HTTP interceptor sends it on same-origin requests, session state derives from `GET /skServer/loginStatus`, and `SsoRedirectService` owns the sign-in redirect. SKip never collects, stores, or transmits raw credentials or tokens. `ProfileService` adds **named configuration profiles decoupled from user accounts** (multiple dashboards/layouts under one identity), stored as user-scope applicationData slots. Write capability is gated on the session's `userLevel`, not on a read-only flag.
 
-**History & charts**: the SK **v2 History API** is consumed by `HistoryApiClientService` / `KipSeriesApiClientService`; `HistoryToChartMapperService` adapts history values to chart datapoints; `DashboardHistorySeriesSyncService` reconciles series; `HistoryChartStreamService` feeds the trend-chart widgets (History-API backfill plus a thin delta-stream live tail). `kip-plugin/` is an optional server-side history provider backed by `node:sqlite`.
+**History & charts**: the SK **v2 History API** is consumed by `HistoryApiClientService` / `KipSeriesApiClientService`; `HistoryToChartMapperService` adapts history values to chart datapoints; `DashboardHistorySeriesSyncService` reconciles series; `HistoryChartStreamService` feeds the trend-chart widgets (History-API backfill plus a thin delta-stream live tail). Skip ships no server-side history provider — the History API is served by an external provider (InfluxDB via `signalk-to-influxdb2`, or `signalk-parquet`), and charts render an empty state when none is present.
 
 ## Fork-specific gotchas
 

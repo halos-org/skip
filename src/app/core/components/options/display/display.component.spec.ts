@@ -138,27 +138,13 @@ describe('SettingsNotificationsComponent', () => {
         expect(toast.show).toHaveBeenCalledWith("To enable Automatic Night Mode, the Derived Data plugin must be enabled. Do you wish to enable the plugin?", 0, false, 'warn', 'Ok');
     });
 
-    it('shows an error and not a success toast when the KIP plugin config save fails', async () => {
-        const pluginService = TestBed.inject(PluginConfigClientService) as unknown as PluginConfigClientServiceMock;
-        pluginService.savePluginConfig.mockResolvedValue({ ok: false, error: { message: 'server rejected' } });
-
-        // Auto night mode is off -> straight to applyAndSaveSettings (the server save path).
-        component['saveAllSettings']();
-        await flushPromises();
-        await flushPromises();
-
-        expect(toast.show).toHaveBeenCalledWith('Failed to save KIP plugin configuration on server.', 0, false, 'error');
-        expect(toast.show).not.toHaveBeenCalledWith('Configuration saved', 1000, true, 'message');
-    });
-
-    it('shows the success toast when the KIP plugin config save succeeds', async () => {
-        // Default savePluginConfig mock resolves { ok: true }.
+    it('shows the success toast when saving with automatic night mode off', async () => {
+        // Auto night mode is off -> straight to applyAndSaveSettings (pure local settings write).
         component['saveAllSettings']();
         await flushPromises();
         await flushPromises();
 
         expect(toast.show).toHaveBeenCalledWith('Configuration saved', 1000, true, 'message');
-        expect(toast.show).not.toHaveBeenCalledWith('Failed to save KIP plugin configuration on server.', 0, false, 'error');
     });
 
     it('shows prompt for configuring sun flag only when plugin is enabled but sun flag is false', async () => {

@@ -5,7 +5,6 @@
 /dist
 /tmp
 /out-tsc
-/plugin
 
 # dependencies
 /node_modules
@@ -38,10 +37,8 @@ testem.log
 /typings
 yarn-error.log
 
-# plugin runtime and testing data
-/plugin-config-data
+# testing scratch data
 /.tmp
-/.tmp-kip-plugin-test-data
 
 # e2e
 /e2e/*.js
@@ -56,5 +53,3 @@ Thumbs.db
 
 # Playwright MCP / e2e scratch output
 .playwright-mcp/
-# kip-plugin test scratch dirs
-/.tmp-kip*

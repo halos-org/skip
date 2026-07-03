@@ -60,29 +60,6 @@ jobs:
         CI: '1'
       run: ng test --watch=false
 
-  plugin-node-test:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [20.x, 22.x, 24.x]
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm install
-
-    - name: Run KIP plugin tests
-      run: npm run test:plugin
-
   webapp-build:
     runs-on: ubuntu-latest
     needs: [lint, angular-vitest]
@@ -106,27 +83,3 @@ jobs:
 
     - name: Build webapp
       run: npm run build:prod
-
-  plugin-build:
-    runs-on: ubuntu-latest
-    needs: [lint, plugin-node-test]
-
-    strategy:
-      matrix:
-        node-version: [20.x, 22.x, 24.x]
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm install
-
-    - name: Build plugin
-      run: npm run build:plugin
