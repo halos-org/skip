@@ -1,6 +1,7 @@
 import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, ChangeDetectionStrategy } from '@angular/core';
-import { DatasetStreamService } from '../../core/services/dataset-stream.service';
-import { IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo, IDatasetServiceDatasetConfig } from '../../core/interfaces/dataset.interfaces';
+import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
+import { IDatasetServiceDatapoint, TimeScaleFormat } from '../../core/interfaces/dataset.interfaces';
+import { resolveWindowMs, deriveDataSourceInfo, IChartDataSourceInfo } from '../../core/utils/chart-window.util';
 import { Subscription } from 'rxjs';
 import { CanvasService } from '../../core/services/canvas.service';
 import { ITheme } from '../../core/services/app-service';
@@ -27,6 +28,10 @@ interface IDataSetRow {
   y: number
 }
 
+/** The numeric widget's background sparkline always shows the same short fixed window. */
+const MINICHART_TIME_SCALE: TimeScaleFormat = 'minute';
+const MINICHART_PERIOD = 0.2;
+
 @Component({
   selector: 'minichart',
   imports: [],
@@ -45,9 +50,8 @@ export class MinichartComponent implements OnDestroy {
   public yScaleMax: number = null;
   public inverseYAxis = false;
   public verticalChart = null;
-  public datasetUUID: string = null;
   protected unitsService = inject(UnitsService);
-  private readonly dsService = inject(DatasetStreamService);
+  private readonly historyStream = inject(HistoryChartStreamService);
   private readonly ngZone = inject(NgZone);
   private readonly canvasService = inject(CanvasService);
   readonly widgetDataChart = viewChild('widgetDataChart', { read: ElementRef });
@@ -71,9 +75,8 @@ export class MinichartComponent implements OnDestroy {
   }
   public lineChartType: ChartType = 'line';
   private chart;
-  private dsServiceSub: Subscription = null;
-  private datasetConfig: IDatasetServiceDatasetConfig = null;
-  private dataSourceInfo: IDatasetServiceDataSourceInfo = null;
+  private streamSub: Subscription = null;
+  private dataSourceInfo: IChartDataSourceInfo = null;
   private isDestroyed = false;
   private lastChartSignature: string | null = null;
 
@@ -92,7 +95,7 @@ export class MinichartComponent implements OnDestroy {
       const theme = this.theme();
       if (theme) {
         untracked(() => {
-          if (this.datasetConfig) {
+          if (this.chart) {
             this.setChartOptions();
             this.setDatasetsColors();
           }
@@ -102,41 +105,38 @@ export class MinichartComponent implements OnDestroy {
   }
 
   public startChart(): void {
-    if (this.isDestroyed || !this.datasetUUID) return;
-    this.datasetConfig = this.dsService.getDatasetConfig(this.datasetUUID);
-    this.dataSourceInfo = this.dsService.getDataSourceInfo(this.datasetUUID);
+    if (this.isDestroyed || !this.dataPath) return;
+    const windowMs = resolveWindowMs(MINICHART_TIME_SCALE, MINICHART_PERIOD);
+    this.dataSourceInfo = deriveDataSourceInfo(windowMs);
 
-    if (this.datasetConfig) {
-      const chartSignature = this.buildChartSignature();
-      if (this.chart && chartSignature === this.lastChartSignature) {
-        return;
-      }
-
-      if (this.chart && chartSignature !== this.lastChartSignature) {
-        this.destroyChart();
-      }
-
-      this.setChartOptions();
-      this.createDatasets();
-      const canvasEl = this.widgetDataChart()?.nativeElement as HTMLCanvasElement | undefined;
-      const ctx = canvasEl?.getContext('2d');
-      if (!ctx) return;
-
-      this.chart = new Chart(ctx, {
-        type: this.lineChartType,
-        data: this.lineChartData,
-        options: this.lineChartOptions
-      });
-
-      this.lastChartSignature = chartSignature;
-
-      this.startStreaming();
+    const chartSignature = this.buildChartSignature();
+    if (this.chart && chartSignature === this.lastChartSignature) {
+      return;
     }
+
+    if (this.chart && chartSignature !== this.lastChartSignature) {
+      this.destroyChart();
+    }
+
+    this.setChartOptions();
+    this.createDatasets();
+    const canvasEl = this.widgetDataChart()?.nativeElement as HTMLCanvasElement | undefined;
+    const ctx = canvasEl?.getContext('2d');
+    if (!ctx) return;
+
+    this.chart = new Chart(ctx, {
+      type: this.lineChartType,
+      data: this.lineChartData,
+      options: this.lineChartOptions
+    });
+
+    this.lastChartSignature = chartSignature;
+
+    this.startStreaming();
   }
 
   private buildChartSignature(): string {
     return [
-      this.datasetUUID,
       this.dataPath,
       this.dataSource,
       this.convertUnitTo,
@@ -191,7 +191,7 @@ export class MinichartComponent implements OnDestroy {
             display: false
           },
           time: {
-            unit: this.datasetConfig.timeScaleFormat as TimeUnit,
+            unit: MINICHART_TIME_SCALE as TimeUnit,
             minUnit: "second",
             round: "second",
             displayFormats: {
@@ -225,7 +225,7 @@ export class MinichartComponent implements OnDestroy {
             display: false
           },
           time: {
-            unit: this.datasetConfig.timeScaleFormat as TimeUnit,
+            unit: MINICHART_TIME_SCALE as TimeUnit,
             minUnit: "second",
             round: "second",
             displayFormats: {
@@ -286,7 +286,7 @@ export class MinichartComponent implements OnDestroy {
        streaming: {
         duration: this.dataSourceInfo.maxDataPoints * this.dataSourceInfo.sampleTime,
         delay: this.dataSourceInfo.sampleTime,
-        frameRate: this.datasetConfig.timeScaleFormat === "day" ? 5 : this.datasetConfig.timeScaleFormat === "hour" ? 8 : this.datasetConfig.timeScaleFormat === "minute" ? 15 : 30,
+        frameRate: MINICHART_TIME_SCALE === "day" ? 5 : MINICHART_TIME_SCALE === "hour" ? 8 : MINICHART_TIME_SCALE === "minute" ? 15 : 30,
        }
     }
   }
@@ -495,39 +495,41 @@ export class MinichartComponent implements OnDestroy {
   }
 
   private startStreaming(): void {
-    this.dsServiceSub?.unsubscribe();
+    this.streamSub?.unsubscribe();
 
-    const batchThenLive$ = this.dsService.getDatasetBatchThenLiveObservable(
-      this.datasetUUID
-    );
+    const info = this.dataSourceInfo;
+    const params: IHistoryChartStreamParams = {
+      path: this.dataPath,
+      source: this.dataSource ?? 'default',
+      windowMs: resolveWindowMs(MINICHART_TIME_SCALE, MINICHART_PERIOD),
+      sampleTime: info.sampleTime,
+      maxDataPoints: info.maxDataPoints,
+      smoothingPeriod: info.smoothingPeriod
+    };
 
-    this.dsServiceSub = batchThenLive$?.subscribe(dsPointOrBatch => {
+    this.streamSub = this.historyStream.getBackfillThenLive(params).subscribe(emission => {
       if (this.isDestroyed || !this.chart) return;
       const chartWithCtx = this.chart as { ctx?: CanvasRenderingContext2D | null };
       if (!chartWithCtx.ctx) return;
+      // No history provider: leave the sparkline empty rather than crashing.
+      if (isHistoryUnavailable(emission)) return;
 
-      if (Array.isArray(dsPointOrBatch)) {
-        // Initial batch: fill the chart with the last N points
-        const valueRows = this.transformDatasetRows(dsPointOrBatch, 0);
+      if (Array.isArray(emission)) {
+        // Initial backfill: fill the chart with the window's points.
+        const valueRows = this.transformDatasetRows(emission, 0);
         this.chart.data.datasets[0].data.push(...valueRows);
         if (this.config.showAverageData) {
-          const avgRows = this.transformDatasetRows(dsPointOrBatch, this.config.datasetAverageArray);
+          const avgRows = this.transformDatasetRows(emission, this.config.datasetAverageArray);
           this.chart.data.datasets[1].data.push(...avgRows);
         }
       } else {
         // Live: handle new single datapoint
-        const valueRow = this.transformDatasetRows([dsPointOrBatch], 0)[0];
+        const valueRow = this.transformDatasetRows([emission], 0)[0];
         this.chart.data.datasets[0].data.push(valueRow);
-        /* if (this.chart.data.datasets[0].data.length > this.dataSourceInfo.maxDataPoints) {
-          this.chart.data.datasets[0].data.shift();
-        } */
 
         if (this.config.showAverageData) {
-          const avgRow = this.transformDatasetRows([dsPointOrBatch], this.config.datasetAverageArray)[0];
+          const avgRow = this.transformDatasetRows([emission], this.config.datasetAverageArray)[0];
           this.chart.data.datasets[1].data.push(avgRow);
-          /* if (this.chart.data.datasets[1].data.length > this.dataSourceInfo.maxDataPoints) {
-            this.chart.data.datasets[1].data.shift();
-          } */
         }
       }
 
@@ -541,8 +543,8 @@ export class MinichartComponent implements OnDestroy {
   }
 
   private destroyChart(): void {
-    this.dsServiceSub?.unsubscribe();
-    this.dsServiceSub = null;
+    this.streamSub?.unsubscribe();
+    this.streamSub = null;
     this.chart?.destroy();
     this.chart = null;
     this.lastChartSignature = null;

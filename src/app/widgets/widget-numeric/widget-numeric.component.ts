@@ -6,7 +6,6 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
 import { CanvasService } from '../../core/services/canvas.service';
-import { WidgetDatasetOrchestratorService } from '../../core/services/widget-dataset-orchestrator.service';
 import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { States } from '../../core/interfaces/signalk-interfaces';
@@ -57,7 +56,6 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private readonly stream = inject(WidgetStreamsDirective);
 
   private readonly canvas = inject(CanvasService);
-  private readonly datasetLifecycle = inject(WidgetDatasetOrchestratorService);
   protected miniChart = viewChild(MinichartComponent);
   private canvasMainRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
 
@@ -163,7 +161,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
         if (sig) {
           this.stream?.observe('numericPath', this.onNumericValue);
           this.streamRegistered = true;
-          this.manageDatasetAndChart();
+          this.updateMiniChartVisibility();
         }
       });
     });
@@ -216,7 +214,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.streamRegistered && this.subscriptionSignature()) {
       this.stream?.observe('numericPath', this.onNumericValue);
       this.streamRegistered = true;
-      this.manageDatasetAndChart();
+      this.updateMiniChartVisibility();
     }
   }
 
@@ -227,18 +225,8 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     this.maxMinMaxTextHeight = Math.floor(this.cssHeight * 0.1);
   }
 
-  private manageDatasetAndChart(): void {
-    const cfg = this.runtime.options();
-    const pathInfo = cfg.paths['numericPath'];
-    const show = !!cfg.showMiniChart;
-    this.showMiniChart.set(show);
-    if (!show) {
-      this.datasetLifecycle.removeDatasetIfExists(this.id(), false);
-      return;
-    }
-    if (!pathInfo || !pathInfo.path) return;
-    const source = pathInfo.source ?? 'default';
-    this.datasetLifecycle.syncNumericMiniChartDataset(this.id(), pathInfo.path, source);
+  private updateMiniChartVisibility(): void {
+    this.showMiniChart.set(!!this.runtime.options().showMiniChart);
   }
 
   private setMiniChart(): void {
@@ -253,7 +241,6 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     this.miniChart().yScaleMax = cfg.yScaleMax;
     this.miniChart().inverseYAxis = cfg.inverseYAxis;
     this.miniChart().verticalChart = cfg.verticalChart;
-    this.miniChart().datasetUUID = this.id();
   }
 
   private setColors(): void {
@@ -384,7 +371,6 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
 
   ngOnDestroy(): void {
     this.isDestroyed = true;
-    this.datasetLifecycle.removeDatasetIfExists(this.id(), false);
     try { this.canvas.unregisterCanvas(this.canvasElement); } catch { /* ignore */ }
   }
 }
