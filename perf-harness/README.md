@@ -107,6 +107,9 @@ targets under view rotation) end-to-end.
   factory sets `displayScale` (upstream's top-level `minValue`/`maxValue` are
   dead in Skip and silently rendered a default 0–100 scale); dashboards drop
   Kip's `collapseSplitShell`.
+- `report.mjs` prints each label's median probe-window length per scenario: the
+  window self-extends while the throttled main thread is busy, so raw window
+  sums (blocking time) drift with it and small deltas need the window context.
 - The mock restarts live per-connection stream timers when a scenario changes
   `rateHz`: Skip opens its WS once at `APP_INITIALIZER` and keeps it, so
   upstream's connect-time rate snapshot would stream every scenario at the

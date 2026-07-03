@@ -26,6 +26,8 @@ const METRICS = [
   ['heapGrowthMB', 'Heap growth (MB)', true],
 ];
 
+const medOf = (vals) => { if (!vals.length) return 0; const s = [...vals].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+
 function pctChange(a, b) {
   if (a === 0 && b === 0) return '0%';
   if (a === 0) return b > 0 ? `+${b} (was 0)` : '0%';
@@ -39,6 +41,7 @@ lines.push(`# Freeze metrics: ${A} → ${B}`);
 lines.push('');
 lines.push(`- CPU throttle: ${a.throttle}× (${A}) / ${b.throttle}× (${B}); repeats: ${a.repeats}/${b.repeats}; Chrome ${a.chrome}`);
 lines.push('- Values are **medians** across repeats. Lower is better for every metric.');
+lines.push('- Blocking time is a raw sum over the probe window, and the window self-extends while the main thread is busy — compare the two labels\' median window lengths (context row) before trusting small blocking deltas.');
 lines.push('');
 
 const scenarios = Object.keys(a.scenarios).filter((s) => b.scenarios[s]);
@@ -53,7 +56,9 @@ for (const s of scenarios) {
     const va = sa[k]?.median ?? 0, vb = sb[k]?.median ?? 0;
     lines.push(`| ${label} | ${va} | ${vb} | ${pctChange(va, vb)} |`);
   }
-  lines.push(`| _(context: widgets / deltas)_ | ${sa.widgetCount?.median}/${sa.deltasSent?.median} | ${sb.widgetCount?.median}/${sb.deltasSent?.median} | |`);
+  const wa = Math.round(medOf((a.scenarios[s].raw ?? []).map((r) => r.windowMs)));
+  const wb = Math.round(medOf((b.scenarios[s].raw ?? []).map((r) => r.windowMs)));
+  lines.push(`| _(context: widgets / deltas / window ms)_ | ${sa.widgetCount?.median}/${sa.deltasSent?.median}/${wa} | ${sb.widgetCount?.median}/${sb.deltasSent?.median}/${wb} | |`);
   lines.push('');
 }
 

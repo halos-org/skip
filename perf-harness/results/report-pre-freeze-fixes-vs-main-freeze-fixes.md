@@ -2,6 +2,7 @@
 
 - CPU throttle: 10× (pre-freeze-fixes) / 10× (main-freeze-fixes); repeats: 4/4; Chrome 149.0.7827.201
 - Values are **medians** across repeats. Lower is better for every metric.
+- Blocking time is a raw sum over the probe window, and the window self-extends while the main thread is busy — compare the two labels' median window lengths (context row) before trusting small blocking deltas.
 
 ## idle-numeric-24
 _baseline render/CD load: 24 numeric widgets, low data rate (WS4 baseline)_
@@ -14,7 +15,7 @@ _baseline render/CD load: 24 numeric widgets, low data rate (WS4 baseline)_
 | p95 handler wait (ms) | 2 | 3 | +50% |
 | Dropped frames | 0 | 0 | 0% |
 | Heap growth (MB) | 4 | 4 | 0% |
-| _(context: widgets / deltas)_ | 24/16 | 24/16 | |
+| _(context: widgets / deltas / window ms)_ | 24/16/8007 | 24/16/8006 | |
 
 ## delta-storm-30x10
 _sustained ingestion: 30 paths @ 10Hz over a numeric+gauge dashboard (rank 2, delta coalescing)_
@@ -27,7 +28,7 @@ _sustained ingestion: 30 paths @ 10Hz over a numeric+gauge dashboard (rank 2, de
 | p95 handler wait (ms) | 2 | 3 | +50% |
 | Dropped frames | 0 | 0 | 0% |
 | Heap growth (MB) | 4 | 4 | 0% |
-| _(context: widgets / deltas)_ | 20/119 | 20/119 | |
+| _(context: widgets / deltas / window ms)_ | 20/119/12005 | 20/119/12006 | |
 
 ## reconnect-backlog
 _reconnect snapshot: one frame carrying 6000 values (rank 2, single synchronous parse+fan-out long task)_
@@ -40,7 +41,7 @@ _reconnect snapshot: one frame carrying 6000 values (rank 2, single synchronous 
 | p95 handler wait (ms) | 2 | 3 | +50% |
 | Dropped frames | 1 | 1 | 0% |
 | Heap growth (MB) | 5 | 5 | 0% |
-| _(context: widgets / deltas)_ | 20/29 | 20/29 | |
+| _(context: widgets / deltas / window ms)_ | 20/29/7008 | 20/29/7012 | |
 
 ## resize-storm
 _28 canvas widgets + repeated viewport resizes: shared ResizeObserver reallocates every canvas in one task (rank 1, the fullscreen enter/exit storm)_
@@ -53,7 +54,7 @@ _28 canvas widgets + repeated viewport resizes: shared ResizeObserver reallocate
 | p95 handler wait (ms) | 170 | 79 | -54% |
 | Dropped frames | 37 | 21 | -43% |
 | Heap growth (MB) | 4 | 4 | 0% |
-| _(context: widgets / deltas)_ | 28/15 | 28/15 | |
+| _(context: widgets / deltas / window ms)_ | 28/15/7540 | 28/15/7250 | |
 
 ## ais-radar-150
 _150 AIS targets @ 4Hz + streaming own-ship (ranks 4/5, radar render loops)_
@@ -66,7 +67,7 @@ _150 AIS targets @ 4Hz + streaming own-ship (ranks 4/5, radar render loops)_
 | p95 handler wait (ms) | 1180 | 1316 | +12% |
 | Dropped frames | 32 | 38 | +19% |
 | Heap growth (MB) | 10 | 13 | +30% |
-| _(context: widgets / deltas)_ | 1/7550 | 1/7701 | |
+| _(context: widgets / deltas / window ms)_ | 1/7550/12592 | 1/7701/12764 | |
 
 ## gauges-16
 _16 radial ng-canvas-gauges @ 4Hz (rank 7, animation duty cycle)_
@@ -79,7 +80,7 @@ _16 radial ng-canvas-gauges @ 4Hz (rank 7, animation duty cycle)_
 | p95 handler wait (ms) | 25 | 19 | -24% |
 | Dropped frames | 0 | 0 | 0% |
 | Heap growth (MB) | 4 | 3 | -25% |
-| _(context: widgets / deltas)_ | 16/40 | 16/40 | |
+| _(context: widgets / deltas / window ms)_ | 16/40/10009 | 16/40/10007 | |
 
 ## ais-growth-churn
 _AIS radar with 40 targets + 40 new MMSIs/sec churn for 30s (ranks 8/9, heap growth)_
@@ -92,4 +93,4 @@ _AIS radar with 40 targets + 40 new MMSIs/sec churn for 30s (ranks 8/9, heap gro
 | p95 handler wait (ms) | 6658 | 5091 | -24% |
 | Dropped frames | 33 | 41 | +24% |
 | Heap growth (MB) | 9 | 18 | +100% |
-| _(context: widgets / deltas)_ | 1/8183 | 1/7546 | |
+| _(context: widgets / deltas / window ms)_ | 1/8183/33771 | 1/7546/31073 | |
