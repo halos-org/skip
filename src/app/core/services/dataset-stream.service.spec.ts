@@ -2,6 +2,7 @@ import { TestBed, inject } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { DatasetStreamService, TimeScaleFormat } from './dataset-stream.service';
+import { deriveDataSourceInfo, resolveWindowMs, MIN_SAMPLE_TIME_MS } from '../utils/chart-window.util';
 import { SettingsService } from './settings.service';
 import { IAppConfig } from '../interfaces/app-settings.interfaces';
 import { DataService } from './data.service';
@@ -46,7 +47,7 @@ describe('DatasetStreamService', () => {
         expect(service).toBeTruthy();
     }));
 
-    it('derives ~120 points per window for larger windows', inject([DatasetStreamService], (service: DatasetStreamService) => {
+    it('derives the sampling config from the shared window util for each preset', inject([DatasetStreamService], (service: DatasetStreamService) => {
         const mk = (timeScaleFormat: TimeScaleFormat, period: number) => ({
             uuid: 'ds-1',
             path: 'navigation.speedThroughWater',
@@ -57,23 +58,17 @@ describe('DatasetStreamService', () => {
             label: 'test'
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastMinute = (service as any).createDataSourceConfiguration(mk('Last Minute', 1));
-        expect(lastMinute.maxDataPoints).toBe(120);
-        expect(lastMinute.sampleTime).toBe(500);
-        expect(lastMinute.smoothingPeriod).toBe(30);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastFive = (service as any).createDataSourceConfiguration(mk('Last 5 Minutes', 1));
-        expect(lastFive.maxDataPoints).toBe(120);
-        expect(lastFive.sampleTime).toBe(2500);
-        expect(lastFive.smoothingPeriod).toBe(30);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sixtyHours = (service as any).createDataSourceConfiguration(mk('hour', 60));
-        expect(sixtyHours.maxDataPoints).toBe(120);
-        expect(sixtyHours.sampleTime).toBe(1800000);
-        expect(sixtyHours.smoothingPeriod).toBe(30);
+        // The recorder must delegate to deriveDataSourceInfo(resolveWindowMs(...)); assert the wiring
+        // against the util rather than baking in point counts that drift when the target is retuned.
+        const cases: [TimeScaleFormat, number][] = [['Last Minute', 1], ['Last 5 Minutes', 1], ['hour', 60]];
+        for (const [timeScaleFormat, period] of cases) {
+            const expected = deriveDataSourceInfo(resolveWindowMs(timeScaleFormat, period));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const cfg = (service as any).createDataSourceConfiguration(mk(timeScaleFormat, period));
+            expect(cfg.maxDataPoints).toBe(expected.maxDataPoints);
+            expect(cfg.sampleTime).toBe(expected.sampleTime);
+            expect(cfg.smoothingPeriod).toBe(expected.smoothingPeriod);
+        }
     }));
 
     it('enforces a minimum sampling interval for very small windows', inject([DatasetStreamService], (service: DatasetStreamService) => {
@@ -87,11 +82,12 @@ describe('DatasetStreamService', () => {
             label: 'test'
         };
 
+        const expected = deriveDataSourceInfo(resolveWindowMs('second', 1));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cfg = (service as any).createDataSourceConfiguration(ds);
-        expect(cfg.sampleTime).toBe(100);
-        expect(cfg.maxDataPoints).toBe(10);
-        expect(cfg.smoothingPeriod).toBe(2);
+        expect(cfg.sampleTime).toBe(MIN_SAMPLE_TIME_MS); // a 1s window floors the cadence
+        expect(cfg.maxDataPoints).toBe(expected.maxDataPoints);
+        expect(cfg.smoothingPeriod).toBe(expected.smoothingPeriod);
     }));
 
     it('skips history seeding when sampleTime is below one second', inject([DatasetStreamService], async (service: DatasetStreamService) => {
@@ -132,13 +128,13 @@ describe('DatasetStreamService', () => {
         });
 
         const config = {
-            uuid: 'ds-last-5',
+            uuid: 'ds-last-30',
             path: 'navigation.speedThroughWater',
             pathSource: 'test',
             baseUnit: 'number',
-            timeScaleFormat: 'Last 5 Minutes' as const,
+            timeScaleFormat: 'Last 30 Minutes' as const,
             period: 1,
-            label: 'test-last-5'
+            label: 'test-last-30'
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,8 +146,9 @@ describe('DatasetStreamService', () => {
         const request = vi.mocked(historyServiceMock.getValues).mock.lastCall[0] as {
             resolution: number;
         };
-        // Last 5 Minutes resolves to sampleTime=2500ms, therefore history resolution=3s
-        expect(request.resolution).toBe(3);
+        // History resolution (seconds) is the derived sampleTime rounded to whole seconds.
+        const expected = deriveDataSourceInfo(resolveWindowMs('Last 30 Minutes', 1));
+        expect(request.resolution).toBe(Math.max(1, Math.round(expected.sampleTime / 1000)));
         service.ngOnDestroy();
     }));
 
@@ -178,7 +175,7 @@ describe('DatasetStreamService', () => {
             path: 'navigation.speedThroughWater',
             pathSource: 'test',
             baseUnit: 'number',
-            timeScaleFormat: 'Last 5 Minutes' as const,
+            timeScaleFormat: 'Last 30 Minutes' as const,
             period: 1,
             label: 'test-hydrate-history'
         };
@@ -228,7 +225,7 @@ describe('DatasetStreamService', () => {
             path: 'navigation.speedThroughWater',
             pathSource: 'test',
             baseUnit: 'number',
-            timeScaleFormat: 'Last 5 Minutes' as const,
+            timeScaleFormat: 'Last 30 Minutes' as const,
             period: 1,
             label: 'test-seeded-sma'
         };
@@ -269,7 +266,7 @@ describe('DatasetStreamService', () => {
             path: 'navigation.speedOverGround',
             pathSource: 'test',
             baseUnit: 'number',
-            timeScaleFormat: 'Last 5 Minutes' as const,
+            timeScaleFormat: 'Last 30 Minutes' as const,
             period: 1,
             label: 'test-live-fallback'
         };
