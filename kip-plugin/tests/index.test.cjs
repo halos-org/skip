@@ -2084,6 +2084,90 @@ test('history values does not create synthetic buckets for sparse data gaps', ()
   assert.equal(response.data[2][0], '2026-02-18T15:00:40.000Z');
 });
 
+test('history values :last returns the last raw sample per bucket, not the mean', () => {
+  const baseTs = Date.parse('2026-02-18T16:00:00.000Z');
+  const rows = [
+    { ts_ms: baseTs + 0, value: 10 },
+    { ts_ms: baseTs + 3000, value: 20 },
+    { ts_ms: baseTs + 6000, value: 355 },
+    { ts_ms: baseTs + 11000, value: 5 },
+    { ts_ms: baseTs + 18000, value: 359 }
+  ];
+
+  const response = computeSqliteHistoryResponse(rows, 'navigation.headingTrue:last', {
+    from: new Date(baseTs).toISOString(),
+    to: new Date(baseTs + 20000).toISOString(),
+    resolution: 10
+  });
+
+  assert.equal(response.values[0].method, 'last');
+  assert.equal(response.data.length, 2);
+  assert.equal(response.data[0][1], 355);
+  assert.equal(response.data[1][1], 359);
+});
+
+test('history values returns :sma and :last as independent columns (the chart backfill shape)', () => {
+  const baseTs = Date.parse('2026-02-18T20:00:00.000Z');
+  const rows = [
+    { ts_ms: baseTs + 0, value: 10 },
+    { ts_ms: baseTs + 3000, value: 20 },
+    { ts_ms: baseTs + 6000, value: 30 },
+    { ts_ms: baseTs + 11000, value: 40 }
+  ];
+
+  const response = computeSqliteHistoryResponse(
+    rows,
+    'navigation.speedOverGround:sma:2,navigation.speedOverGround:last',
+    {
+      from: new Date(baseTs).toISOString(),
+      to: new Date(baseTs + 20000).toISOString(),
+      resolution: 10
+    }
+  );
+
+  assert.equal(response.values[0].method, 'sma');
+  assert.equal(response.values[1].method, 'last');
+  assert.equal(response.data.length, 2);
+  // The :last column (index 2) is the final raw sample of each 10s bucket, independent of :sma.
+  assert.equal(response.data[0][2], 30);
+  assert.equal(response.data[1][2], 40);
+});
+
+test('history values :last passes through every raw sample when no resolution is given', () => {
+  const baseTs = Date.parse('2026-02-18T21:00:00.000Z');
+  const rows = [
+    { ts_ms: baseTs + 0, value: 10 },
+    { ts_ms: baseTs + 1000, value: 359 },
+    { ts_ms: baseTs + 2000, value: 5 }
+  ];
+
+  const response = computeSqliteHistoryResponse(rows, 'navigation.headingTrue:last', {
+    from: new Date(baseTs).toISOString(),
+    to: new Date(baseTs + 3000).toISOString()
+  });
+
+  assert.equal(response.data.length, 3);
+  assert.deepEqual(response.data.map((row) => row[1]), [10, 359, 5]);
+});
+
+test('history values :last skips a trailing non-finite sample and returns the last finite value', () => {
+  const baseTs = Date.parse('2026-02-18T22:00:00.000Z');
+  const rows = [
+    { ts_ms: baseTs + 0, value: 100 },
+    { ts_ms: baseTs + 3000, value: 200 },
+    { ts_ms: baseTs + 6000, value: NaN }
+  ];
+
+  const response = computeSqliteHistoryResponse(rows, 'navigation.speedOverGround:last', {
+    from: new Date(baseTs).toISOString(),
+    to: new Date(baseTs + 10000).toISOString(),
+    resolution: 10
+  });
+
+  assert.equal(response.data.length, 1);
+  assert.equal(response.data[0][1], 200);
+});
+
 test('history series enforces 1000ms minimum sampleTime for chart widgets', () => {
   const service = new HistorySeriesService(() => Date.now());
   service.upsertSeries({
