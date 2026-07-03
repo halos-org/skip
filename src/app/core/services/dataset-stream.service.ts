@@ -315,8 +315,9 @@ export class DatasetStreamService implements OnDestroy {
         resolution: historyResolutionSeconds
       };
 
-      // Fetch history data
-      const response = await this.history.getValues(query);
+      // Fetch history data. A transient failure (network/5xx/timeout) now throws; treat it like
+      // "no data" so the seed is skipped and the live recorder carries on.
+      const response = await this.history.getValues(query).catch(() => null);
 
       if (!response || !response.data || response.data.length === 0) {
         console.log(`[DatasetStreamService] No history data available for ${configuration.path}`);

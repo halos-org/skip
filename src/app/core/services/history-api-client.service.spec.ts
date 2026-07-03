@@ -3,7 +3,16 @@ import { beforeEach, describe, expect, it, afterEach } from 'vitest';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { BehaviorSubject } from 'rxjs';
 import { SignalKConnectionService, IEndpointStatus } from './signalk-connection.service';
-import { HistoryApiClientService } from './history-api-client.service';
+import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
+
+const CONNECTED_ENDPOINT: IEndpointStatus = {
+  operation: 2,
+  message: 'Connected',
+  serverDescription: 'Signal K',
+  httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
+  WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
+};
+const VALUES_URL = 'http://localhost:3000/signalk/v2/api/history/values';
 
 class SignalKConnectionServiceStub {
   public serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({
@@ -258,6 +267,42 @@ describe('HistoryApiClientService', () => {
 
     const response = await promise;
     expect(response).toBeNull();
+  });
+
+  it('getValues returns null when the endpoint returns 501 (no provider)', async () => {
+    connectionStub.serverServiceEndpoint$.next(CONNECTED_ENDPOINT);
+
+    const promise = service.getValues({ paths: 'navigation.speedThroughWater:avg', resolution: 1 });
+    await new Promise(resolve => setTimeout(resolve));
+
+    const req = httpMock.expectOne(request => request.url === VALUES_URL);
+    req.flush({ message: 'Not Implemented' }, { status: 501, statusText: 'Not Implemented' });
+
+    expect(await promise).toBeNull();
+  });
+
+  it('getValues throws HistoryRequestError on a 5xx (transient failure), not null', async () => {
+    connectionStub.serverServiceEndpoint$.next(CONNECTED_ENDPOINT);
+
+    const promise = service.getValues({ paths: 'navigation.speedThroughWater:avg', resolution: 1 });
+    await new Promise(resolve => setTimeout(resolve));
+
+    const req = httpMock.expectOne(request => request.url === VALUES_URL);
+    req.flush({ message: 'Server Error' }, { status: 503, statusText: 'Service Unavailable' });
+
+    await expect(promise).rejects.toBeInstanceOf(HistoryRequestError);
+  });
+
+  it('getValues throws HistoryRequestError (status 0) on a network error', async () => {
+    connectionStub.serverServiceEndpoint$.next(CONNECTED_ENDPOINT);
+
+    const promise = service.getValues({ paths: 'navigation.speedThroughWater:avg', resolution: 1 });
+    await new Promise(resolve => setTimeout(resolve));
+
+    const req = httpMock.expectOne(request => request.url === VALUES_URL);
+    req.error(new ProgressEvent('error'));
+
+    await expect(promise).rejects.toMatchObject({ name: 'HistoryRequestError', status: 0 });
   });
 
   it('should return null when history paths endpoint returns 500', async () => {

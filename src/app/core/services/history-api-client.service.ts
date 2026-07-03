@@ -1,9 +1,24 @@
 import { Injectable, inject, DestroyRef } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { firstValueFrom, timeout } from 'rxjs';
+
+/** A backfill request that hangs past this is treated as a transient failure, not left to spin forever. */
+const HISTORY_VALUES_TIMEOUT_MS = 30_000;
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { AggregateMethod, TimeRangeQueryParams } from '@signalk/server-api/history';
 import { SignalKConnectionService } from './signalk-connection.service';
+
+/**
+ * A History `getValues` request failed for a *transient* reason (network error, timeout, or a 5xx
+ * server error) — as opposed to the server having no history provider (see {@link HistoryApiClientService.getValues}).
+ * Callers distinguish this from a `null` return so a passing blip does not read as a permanent absence.
+ */
+export class HistoryRequestError extends Error {
+  constructor(public readonly status: number, public readonly reason?: unknown) {
+    super(`History API request failed (status ${status})`);
+    this.name = 'HistoryRequestError';
+  }
+}
 
 /**
  * Represents a single series metadata from the History API response.
@@ -193,7 +208,10 @@ export class HistoryApiClientService {
    *   - resolution: optional downsampling window
    *   - context: optional Signal K context (defaults to 'vessels.self')
    *
-   * @returns {Promise<IHistoryValuesResponse | null>} The history response, or null if the request fails.
+   * @returns {Promise<IHistoryValuesResponse | null>} The history response, or `null` when the server
+   *   has no history provider (no service URL, or a 404/501 response).
+   * @throws {HistoryRequestError} on a transient failure (network error, timeout, or 5xx) — distinct
+   *   from the no-provider `null` so callers can retry or fall back to live data.
    *
    * @example
    *   const response = await historyService.getValues({
@@ -242,14 +260,26 @@ export class HistoryApiClientService {
       console.log(`[HistoryApiClientService] GET ${fullUrl}`);
 
       const response = await firstValueFrom(
-        this.http.get<IHistoryValuesResponse>(historyUrl, { params: httpParams })
+        this.http.get<IHistoryValuesResponse>(historyUrl, { params: httpParams }).pipe(
+          timeout(HISTORY_VALUES_TIMEOUT_MS)
+        )
       );
 
       console.log(`[HistoryApiClientService] History fetch successful, received ${response.data?.length ?? 0} data points`);
       return response;
     } catch (error) {
+      const status = error instanceof HttpErrorResponse ? error.status : 0;
+      // 404 / 501: the server has no history provider (plugin/API missing) — a stable "unavailable",
+      // reported as null so trend charts degrade to a clean empty state.
+      if (status === 404 || status === 501) {
+        console.warn(`[HistoryApiClientService] History API not available (status ${status}); no provider`);
+        return null;
+      }
+      // Any other failure — network error, timeout (status 0), 5xx, or an unexpected 4xx — is surfaced
+      // as a request error rather than null, so the caller can fall back to live data instead of
+      // claiming history is permanently absent. Only the 404/501 above mean "no provider".
       console.error('[HistoryApiClientService] History API request failed:', error);
-      return null;
+      throw new HistoryRequestError(status, error);
     }
   }
 

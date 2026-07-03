@@ -195,12 +195,14 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     const convertUnitTo = this.resolveConvertUnitTo(rawPath);
 
     for (const candidate of requestCandidates) {
+      // A transient failure (network/5xx/timeout) now throws; treat it like an empty result so this
+      // candidate is skipped and the next one (or an empty chart) is tried.
       const response = await this.historyApiClient.getValues({
         paths: candidate.paths,
         context: candidate.context,
         duration,
         resolution: resolutionSeconds
-      });
+      }).catch(() => null);
 
       if (!response?.data?.length) {
         continue;
