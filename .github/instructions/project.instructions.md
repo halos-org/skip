@@ -14,14 +14,11 @@ Do not place generic Angular framework style rules here.
 
 - History series reconciliation pipeline:
   `DashboardService` -> `DashboardHistorySeriesSyncService` -> `KipSeriesApiClientService` -> plugin reconcile endpoint.
-- Dataset lifecycle write ownership is centralized in `WidgetDatasetOrchestratorService`.
 - History response to chart datapoint mapping is centralized in `HistoryToChartMapperService`.
-- Delete-path cleanup is owner UUID based; do not reintroduce selector-specific cleanup branches.
 
 ## Required Guardrails
 
-- Do not write dataset create/edit/remove directly from widget or dashboard flows; use `WidgetDatasetOrchestratorService` helpers.
-- Keep widget UUID ownership stable. Ownership drives dataset cleanup and series reconciliation.
+- Keep widget UUID ownership stable. Ownership drives history series reconciliation.
 - Route history mapping changes through `HistoryToChartMapperService` only.
 - Preserve existing plugin reconciliation behavior and endpoint contract.
 
@@ -93,7 +90,6 @@ When making architecture decisions, prioritize these services and their responsi
 - `SignalKConnectionService`
 - `SignalKDeltaService`
 - `DataService`
-- `WidgetDatasetOrchestratorService`
 - `HistoryToChartMapperService`
 - `DashboardHistorySeriesSyncService`
 - `KipSeriesApiClientService`

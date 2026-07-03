@@ -6,7 +6,7 @@
 * @usage must return a Promise in all cases or will block app from loading.
 * All execution in this service delays app start. Keep code small and simple.
 **/
-import { inject, Injectable, Injector, OnDestroy } from '@angular/core';
+import { inject, Injectable, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { IConfig, IConnectionConfig } from "../interfaces/app-settings.interfaces";
 import { SignalKConnectionService } from "./signalk-connection.service";
@@ -20,7 +20,6 @@ import { SignalKDeltaService } from './signalk-delta.service';
 import { IStorageRemoteBootstrapContext, StorageService } from './storage.service';
 import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { InternetReachabilityService } from './internet-reachability.service';
-import { DatasetStreamService } from './dataset-stream.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
 import { REMOTE_CONFIG_FILE_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
 
@@ -51,8 +50,6 @@ export class AppNetworkInitService implements OnDestroy {
   private readonly data = inject(DataService); // Init to get data before app starts
   private readonly storage = inject(StorageService); // Init to get data before app starts
   private readonly internetReachability = inject(InternetReachabilityService);
-  private readonly injector = inject(Injector);
-  private datasetService: DatasetStreamService | null = null;
   private readonly _bootstrapStatus$ = new BehaviorSubject<TBootstrapStatus>('starting');
   private readonly _bootstrapIssue$ = new BehaviorSubject<IBootstrapIssue>({ reason: 'none' });
 
@@ -196,10 +193,6 @@ export class AppNetworkInitService implements OnDestroy {
 
       this._bootstrapIssue$.next({ reason: 'none' });
 
-      // Seed datasets after authentication (if required) so History API calls are authenticated.
-      // This ensures all chart data is ready before any widget components are created.
-      await this.getDatasetService().waitUntilReady();
-
     } catch (error) {
       startupDegraded = true;
       if (error?.status === 0) {
@@ -278,13 +271,6 @@ export class AppNetworkInitService implements OnDestroy {
    */
   public get bootstrapIssue$(): Observable<IBootstrapIssue> {
     return this._bootstrapIssue$.asObservable();
-  }
-
-  private getDatasetService(): DatasetStreamService {
-    if (!this.datasetService) {
-      this.datasetService = this.injector.get(DatasetStreamService);
-    }
-    return this.datasetService;
   }
 
   private async waitForHttpRetryCompletion(timeoutMs?: number): Promise<ConnectionState | null> {

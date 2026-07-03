@@ -42,12 +42,10 @@ export interface IHistoryChartStreamParams {
 type StreamEmission = IDatasetServiceDatapoint[] | IDatasetServiceDatapoint | IHistoryUnavailable;
 
 /**
- * #64 prototype data path: History-API backfill + a thin SK delta-stream live tail, offered as an
- * alternative to `DatasetStreamService` for `widget-data-chart`. History owns the initial window; the
- * live tail is the delta stream with a minimal rolling buffer and the shared stats util — no second
- * recording engine, no `ReplaySubject._buffer` handoff. When no history provider is available the
- * stream emits {@link HISTORY_UNAVAILABLE} (trend charts degrade to a clean empty state; there is no
- * recorder-style live-only fallback).
+ * Trend-chart data path: History-API backfill for the initial window, then a thin SK delta-stream
+ * live tail with a minimal rolling buffer and the shared stats util. When no history provider is
+ * available the stream emits {@link HISTORY_UNAVAILABLE} and trend charts degrade to a clean empty
+ * state.
  */
 @Injectable({ providedIn: 'root' })
 export class HistoryChartStreamService {
@@ -171,7 +169,7 @@ export class HistoryChartStreamService {
     sub.add(merge(path$.pipe(take(1)), sampled$).subscribe(u => {
       const value = Number(u.data.value);
       if (!Number.isFinite(value)) return;
-      // Stamp with the client clock (like the recorder) so points sit on the chart's realtime axis;
+      // Stamp with the client clock so points sit on the chart's realtime axis;
       // server timestamps would drift the whole series under clock skew.
       const now = Date.now();
       const sourceTs = sourceTsOf(u);

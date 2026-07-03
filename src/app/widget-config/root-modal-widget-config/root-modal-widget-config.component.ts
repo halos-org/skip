@@ -15,8 +15,6 @@ import { DisplayChartOptionsComponent } from '../display-chart-options/display-c
 import { DatasetChartOptionsComponent } from '../dataset-chart-options/dataset-chart-options.component';
 import { IUnitGroup, UnitsService } from '../../core/services/units.service';
 import { AppService } from '../../core/services/app-service';
-import { DatasetStreamService } from '../../core/services/dataset-stream.service';
-import { IDatasetServiceDatasetConfig } from '../../core/interfaces/dataset.interfaces';
 import type { ElectricalTrackedDevice, IDynamicControl, IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { PathsOptionsComponent } from '../paths-options/paths-options.component';
 import { IDeleteEventObj } from '../boolean-control-config/boolean-control-config.component';
@@ -46,7 +44,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
   private static readonly KEY_CONVERT_UNIT_TO = 'convertUnitTo';
   private dialogRef = inject<MatDialogRef<RootModalWidgetConfigComponent>>(MatDialogRef);
   private fb = inject(UntypedFormBuilder);
-  private DatasetStreamService = inject(DatasetStreamService);
   private units = inject(UnitsService);
   private app = inject(AppService);
   private readonly destroyRef = inject(DestroyRef);
@@ -54,7 +51,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
 
   public titleDialog = "Widget Options";
   public formMaster: UntypedFormGroup;
-  public availableDataSets: IDatasetServiceDatasetConfig[];
   public unitList: { default?: string, conversions?: IUnitGroup[] } = {};
   public isPathArray = false;
   public addPathEvent: IAddNewPathObject;
@@ -70,11 +66,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
       this.dialogRef.close();
       return;
     }
-    this.availableDataSets = this.DatasetStreamService.list().sort((a, b) => {
-      const aLabel = (a as unknown as { label?: string }).label || '';
-      const bLabel = (b as unknown as { label?: string }).label || '';
-      return aLabel.localeCompare(bLabel, undefined, { sensitivity: 'base' });
-    });
     this.unitList = this.units.getConversionsForPath(''); // array of Group or Groups: "angle", "speed", etc...
     this.formMaster = this.generateFormGroups(this.widgetConfig);
     this.formMaster.statusChanges
