@@ -128,6 +128,62 @@ describe('ConfigurationUpgradeService', () => {
         }
     });
 
+    it('v12 upgrade drops the dataset registry, strips widget recorder vestige, and stamps v13', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 12, dataSets: [{ uuid: 'x' }] },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { config: { datasetUUID: 'x', chartEngine: 'recorder', datachartPath: 'self.foo' } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(12);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)[2];
+        expect(written.app.configVersion).toBe(13);
+        expect('dataSets' in written.app).toBe(false);
+        const widgetCfg = written.dashboards[0].configuration[0].input.widgetProperties.config;
+        expect('datasetUUID' in widgetCfg).toBe(false);
+        expect('chartEngine' in widgetCfg).toBe(false);
+        // Genuine chart inputs survive.
+        expect(widgetCfg.datachartPath).toBe('self.foo');
+    });
+
+    it('v12 upgrade reloads the app exactly once after persisting', async () => {
+        vi.useFakeTimers();
+        try {
+            mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+            mockStorage.getConfig.mockResolvedValue({
+                app: { configVersion: 12, dataSets: [] },
+                theme: { themeName: '' },
+                dashboards: []
+            });
+
+            await service.runUpgrade(12);
+            vi.advanceTimersByTime(1500);
+
+            expect(mockAppSettings.reloadApp).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('v12 upgrade skips a slot that is not at version 12 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: []
+        });
+
+        await service.runUpgrade(12);
+
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([

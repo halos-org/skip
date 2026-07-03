@@ -103,7 +103,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.settings.configUpgrade()) {
         const liveVersion = this.settings.getConfigVersion();
 
-        if (liveVersion === 11) {
+        if (liveVersion === 11 || liveVersion === 12) {
           this.upgrade.runUpgrade(liveVersion);
         }
 

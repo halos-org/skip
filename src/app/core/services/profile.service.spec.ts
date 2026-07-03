@@ -6,7 +6,7 @@ import { SettingsService } from './settings.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
 
 const cfg = (theme = 'x'): IConfig => ({
-  app: { configVersion: 12 } as IConfig['app'],
+  app: { configVersion: 13 } as IConfig['app'],
   theme: { themeName: theme },
   dashboards: [{ id: 'd' }]
 });

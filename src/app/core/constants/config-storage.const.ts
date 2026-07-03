@@ -28,6 +28,3 @@ export const SSO_REDIRECT_BUDGET_KEY = 'skip.ssoRedirectAttempts';
 
 /** Gesture-diagnostics debug flag key. */
 export const GESTURES_DEBUG_KEY = 'skip.gesturesDebug';
-
-/** Chart-engine A/B override flag key (#64 History-API prototype). */
-export const CHART_ENGINE_OVERRIDE_KEY = 'skip.chartEngine';

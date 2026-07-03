@@ -11,7 +11,6 @@ export const DefaultAppConfig: Readonly<IAppConfig> = {
   "autoNightMode": true,
   "redNightMode": false,
   "nightModeBrightness": 0.27,
-  "dataSets": [],
   "unitDefaults": DefaultUnitsConfig,
   "notificationConfig": DefaultNotificationConfig,
   "browserTabTitle": "SKip"

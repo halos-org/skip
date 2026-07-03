@@ -4,7 +4,6 @@ import { BehaviorSubject, Observable, filter } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { cloneDeep } from 'lodash-es';
 
-import { IDatasetServiceDatasetConfig } from '../interfaces/dataset.interfaces';
 import { IUnitDefaults } from './units.service';
 import { UUID } from '../utils/uuid.util';
 
@@ -69,7 +68,6 @@ export class SettingsService {
   private kipUUID = '';
   public signalkUrl: ISignalKUrl | undefined;
   private _dashboards: Dashboard[] = [];
-  private dataSets: IDatasetServiceDatasetConfig[] = [];
   public configUpgrade = signal<boolean>(false);
   private configVersion: number | undefined; // store actual config version from config version property in config
   private disablePathValidation = false; // used to disable path validation in path control component in widget options.
@@ -227,7 +225,6 @@ export class SettingsService {
     if (this.activeConfig.theme) {
       this._themeName.set(this.activeConfig.theme.themeName);
     }
-    this.dataSets = this.activeConfig.app.dataSets;
     this.applyUnitDefaults(this.activeConfig.app.unitDefaults);
     this.applyNotificationConfig(this.activeConfig.app.notificationConfig);
 
@@ -442,15 +439,6 @@ export class SettingsService {
     this._dashboards = dashboards;
   }
 
-  // DataSets
-  public saveDataSets(dataSets: IDatasetServiceDatasetConfig[]) {
-    this.dataSets = dataSets;
-    this.saveConfigSection('Array<IDatasetDef>', dataSets);
-  }
-  public getDataSets() {
-    return this.dataSets;
-  }
-
   // Notification Service Setting
   public getNotificationServiceConfigAsO(): Observable<INotificationConfig> {
     return this.notificationConfig$.asObservable();
@@ -553,7 +541,6 @@ export class SettingsService {
       autoNightMode: this.autoNightMode(),
       redNightMode: this.redNightMode(),
       nightModeBrightness: this.nightModeBrightness(),
-      dataSets: this.dataSets,
       unitDefaults: this.unitDefaults(),
       notificationConfig: this.notificationConfig(),
       browserTabTitle: this.browserTabTitle()

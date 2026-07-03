@@ -7,20 +7,18 @@ import { v10IConfig, v10IThemeConfig } from '../interfaces/v10-config-interface'
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
-
-interface DataChartConfigUpdate {
-  datachartPath: string;
-  datachartSource: string;
-  period: number;
-  timeScale: string;
-  datasetUUID: string;
-}
+import { REMOTE_CONFIG_FILE_VERSION } from '../constants/config-versions.const';
 
 // The app-config schema version the legacy v10/v11 transforms produce. Pinned on purpose:
 // bumping LATEST_APP_CONFIG_VERSION must not change what these transforms stamp — a newer
 // schema needs a chained migration step here, not a re-labeled output. Divergence fails loud:
 // a stamped config below latest re-raises the upgrade flag instead of masquerading as current.
 const MIGRATION_OUTPUT_VERSION = 12;
+
+// The v12 -> v13 transform output. Pinned the same way as MIGRATION_OUTPUT_VERSION: a fixed 13,
+// never LATEST_APP_CONFIG_VERSION, so a future schema bump re-raises the upgrade flag for a v13
+// config instead of relabeling it as current.
+const V13_MIGRATION_OUTPUT_VERSION = 13;
 
 // NOTE: This service encapsulates the app-config upgrades — the legacy migration (remote file
 // version 9 / app-config version 10) and the v11 remote upgrade — each stamping the upgraded
@@ -155,6 +153,30 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
+    } else if (version === 12) {
+      // Remote (Signal K) configs. v12 slots live in the same active file version as v11.
+      try {
+        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+
+        for (const item of configsList) {
+          try {
+            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V13_MIGRATION_OUTPUT_VERSION}.`);
+            const migratedConfig = this.upgradeConfigV12toV13(config);
+            if (!migratedConfig) continue; // skip if not a v12 slot
+
+            await this._storage.setConfig(item.scope, item.name, migratedConfig);
+          } catch (error) {
+            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
+          }
+        }
+        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
+        setTimeout(() => this._settings.reloadApp(), 1500);
+      } catch (error) {
+        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        this.upgrading.set(false);
+      }
+
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = { app: null, widget: null, layout: null, theme: null };
@@ -164,7 +186,6 @@ export class ConfigurationUpgradeService {
       localStorageConfig.theme = this._settings.loadConfigFromLocalStorage('themeConfig');
 
       const transformedApp = this.transformApp(localStorageConfig.app as IAppConfig);
-      const datasetInfo = this.extractAppDatasets(transformedApp);
       const transformedTheme = this.transformTheme(localStorageConfig.theme);
       const rootSplits = localStorageConfig.layout?.rootSplits || [];
       const splitSets = localStorageConfig.layout?.splitSets || [];
@@ -175,7 +196,6 @@ export class ConfigurationUpgradeService {
         return { id: rootSplitUUID, name: `Dashboard ${i + 1}`, configuration };
       });
 
-      this.migrateDatasetsToDataCharts(datasetInfo, dashboards);
       this.migrateUseNeedleToEnableNeedle(dashboards);
 
       localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(transformedApp));
@@ -239,7 +259,6 @@ export class ConfigurationUpgradeService {
       return null;
     }
     const transformedApp = this.transformApp(config.app as IAppConfig);
-    const datasetInfo = this.extractAppDatasets(transformedApp);
     const transformedTheme = this.transformTheme(config.theme);
     const rootSplits = config.layout?.rootSplits || [];
     const splitSets = config.layout?.splitSets || [];
@@ -248,7 +267,6 @@ export class ConfigurationUpgradeService {
       const configuration = this.extractWidgetsFromSplitSets(splitSets, widgets, rootSplitUUID);
       return { id: rootSplitUUID, name: `Dashboard ${i + 1}`, configuration };
     });
-    this.migrateDatasetsToDataCharts(datasetInfo, dashboards);
     this.migrateUseNeedleToEnableNeedle(dashboards);
     const oldConf: v10IConfig = cloneDeep(config);
     oldConf.app.configVersion = 0; // retired
@@ -258,70 +276,6 @@ export class ConfigurationUpgradeService {
       newConfiguration: { app: transformedApp, theme: transformedTheme, dashboards },
       oldConfiguration: oldConf
     };
-  }
-
-  private extractAppDatasets(transformedApp: IAppConfig): DataChartConfigUpdate[] {
-    if (!transformedApp || !Array.isArray(transformedApp.dataSets)) return [];
-    let updatedDatasetCount = 0;
-
-    // Find indices of datasets to extract and remove
-    const indicesToRemove: number[] = [];
-    const updates: DataChartConfigUpdate[] = [];
-
-    transformedApp.dataSets.forEach((ds, idx) => {
-      if (ds.editable === true || ds.editable === undefined) {
-        updates.push({
-          period: ds.period,
-          datachartPath: ds.path,
-          datachartSource: ds.pathSource,
-          timeScale: ds.timeScaleFormat,
-          datasetUUID: ds.uuid
-        });
-        indicesToRemove.push(idx);
-        updatedDatasetCount++;
-      }
-    });
-
-    // Remove in reverse order to avoid index shifting
-    for (let i = indicesToRemove.length - 1; i >= 0; i--) {
-      transformedApp.dataSets.splice(indicesToRemove[i], 1);
-    }
-
-    if (updatedDatasetCount) {
-      this.pushMsg(`[Upgrade] Retired ${updatedDatasetCount} Dataset(s).`);
-    }
-
-    return updates;
-  }
-
-  private migrateDatasetsToDataCharts(datasetInfo: DataChartConfigUpdate[], dashboards: Dashboard[]): void {
-    if (!Array.isArray(datasetInfo) || datasetInfo.length === 0) return;
-    if (!Array.isArray(dashboards)) return;
-
-    dashboards.forEach(dashboard => {
-      let updatedDatachartCount = 0;
-      if (dashboard && Array.isArray(dashboard.configuration)) {
-        dashboard.configuration.forEach((widget: NgGridStackWidget) => {
-          if (widget && typeof widget === 'object' && widget.input?.widgetProperties?.config) {
-            const dataset = datasetInfo.find(ds => ds.datasetUUID === widget.input?.widgetProperties?.config.datasetUUID);
-            if (dataset) {
-              // Add or replace all dataset properties except 'datasetUUID'
-              Object.entries(dataset).forEach(([key, value]) => {
-                if (key !== 'datasetUUID') {
-                  widget.input.widgetProperties.config[key] = value;
-                }
-              });
-              delete widget.input.widgetProperties.config?.datasetUUID;
-              delete widget.input.widgetProperties.config?.timeScaleFormat;
-              updatedDatachartCount++;
-            }
-          }
-        });
-        if (updatedDatachartCount) {
-          this.pushMsg(`[Upgrade] Migrated ${updatedDatachartCount} Realtime Data Chart widget(s).`);
-        }
-      }
-    });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -369,8 +323,6 @@ export class ConfigurationUpgradeService {
         return null;
       }
       this.removeSplitShellConfigKeys(config.app);
-      const datasetInfo = this.extractAppDatasets(config.app);
-      this.migrateDatasetsToDataCharts(datasetInfo, config.dashboards);
       this.migrateUseNeedleToEnableNeedle(config.dashboards);
       // Iterate dashboards and force widget selector to 'widget-host2'
       let updatedWidgetCount = 0;
@@ -431,6 +383,42 @@ export class ConfigurationUpgradeService {
 
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading ${config.app.configVersion}: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * v12 -> v13: retire the recorder's config footprint. The client-side chart recorder was removed,
+   * so the app-level dataset registry and the per-widget `datasetUUID` / `chartEngine` fields it fed
+   * are dead. Strip them and stamp v13. Genuine chart inputs (path/source/window/units) are untouched.
+   */
+  private upgradeConfigV12toV13(config: IConfig): IConfig | null {
+    try {
+      if (config.app.configVersion !== 12) {
+        this.pushError(`[Upgrade Service] Config version ${config.app.configVersion} is not an upgradable v12 config. Skipping...`);
+        return null;
+      }
+
+      delete (config.app as unknown as Record<string, unknown>).dataSets;
+
+      if (Array.isArray(config.dashboards)) {
+        for (const dash of config.dashboards) {
+          if (!dash || !Array.isArray(dash.configuration)) continue;
+          for (const widget of dash.configuration) {
+            const cfg = (widget as { input?: { widgetProperties?: { config?: Record<string, unknown> } } })
+              ?.input?.widgetProperties?.config;
+            if (cfg && typeof cfg === 'object') {
+              delete cfg.datasetUUID;
+              delete cfg.chartEngine;
+            }
+          }
+        }
+      }
+
+      config.app.configVersion = V13_MIGRATION_OUTPUT_VERSION;
+      return { app: config.app, theme: config.theme, dashboards: config.dashboards };
+    } catch (error) {
+      this.pushError(`[Upgrade Service] Error upgrading v12->v13: ${(error as Error).message}`);
       return null;
     }
   }

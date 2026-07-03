@@ -8,18 +8,6 @@ export const DemoAppConfig: IAppConfig = {
   "autoNightMode": false,
   "redNightMode": false,
   "nightModeBrightness": 0.27,
-  "dataSets": [
-    {
-      "uuid": "339698a7-2cff-4ab9-9b50-d8056f971471",
-      "path": "self.environment.depth.belowTransducer",
-      "pathSource": "default",
-      "baseUnit": "m",
-      "timeScaleFormat": "minute",
-      "period": 0.2,
-      "label": "simple-chart-339698a7-2cff-4ab9-9b50-d8056f971471",
-      "editable": false
-    }
-  ],
   "unitDefaults": {
     "Unitless": "unitless",
     "Speed": "knots",

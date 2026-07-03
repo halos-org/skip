@@ -94,16 +94,11 @@ describe('WidgetDataChartComponent', () => {
     expect(historyMock.getBackfillThenLive).toHaveBeenCalled();
   });
 
-  it('routes a stale chartEngine:"recorder" config to the History engine (field ignored)', async () => {
-    await setup(makeConfig({ chartEngine: 'recorder' }));
-    expect(historyMock.getBackfillThenLive).toHaveBeenCalled();
-  });
-
   it('renders the "History data unavailable" empty state on a HISTORY_UNAVAILABLE emission', async () => {
     const emissions$ = new Subject<typeof HISTORY_UNAVAILABLE>();
     historyMock.getBackfillThenLive.mockReturnValue(emissions$);
 
-    await setup(makeConfig({ chartEngine: 'history' }));
+    await setup(makeConfig());
     expect(historyMock.getBackfillThenLive).toHaveBeenCalled();
 
     emissions$.next(HISTORY_UNAVAILABLE);
