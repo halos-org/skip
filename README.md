@@ -239,7 +239,7 @@ In short: use KIP to see & act on live sailing information; use the complementar
 2. Check out this new branch.
 3. In a command shell (or in the Visual Studio Code Terminal window), go to the root of your local project folder, if not done automatically by your IDE.
 4. Install project dependencies using the NPM package and dependency manager: run `npm install`. NPM will read the KIP project dependencies, download, and install everything automatically for you.
-5. Build the app locally using Angular CLI: from that same project root folder, run `npm run build:all`. The CLI tool will build KIP.
+5. Build the app locally using Angular CLI: from that same project root folder, run `npm run build:prod`. The CLI tool will build KIP.
 
 **Code and Test**
 1. Fire up your local KIP development instance with `npm run dev`.

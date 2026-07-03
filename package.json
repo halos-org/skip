@@ -35,7 +35,6 @@
     "signalk-category-instruments",
     "signalk-category-notifications",
     "signalk-category-ais",
-    "signalk-node-server-plugin",
     "signal k",
     "signalk",
     "instruments",
@@ -47,9 +46,7 @@
     "appIcon": "assets/icon-72x72.png",
     "displayName": "Skip Instrument MFD"
   },
-  "main": "plugin/index.js",
   "files": [
-    "plugin/**",
     "public/**",
     "README.md",
     "LICENSE",
@@ -57,20 +54,16 @@
     "CONTRIBUTORS.md",
     "package.json"
   ],
-  "signalk-plugin-enabled-by-default": true,
   "scripts": {
     "test": "ng test --watch=false",
-    "test:plugin": "npm run build:plugin && node --test --test-concurrency=1 kip-plugin/tests/*.test.cjs",
     "test:interactive": "ng test",
     "test:headless": "CI=1 ng test --watch=false",
     "test:mcp-schema": "vitest run --config tools/gen-mcp-schema/vitest.config.ts",
     "gen:mcp-schema": "UPDATE_SCHEMA=1 npm run test:mcp-schema",
     "lint": "ng lint",
     "dev": "ng serve --configuration=dev --serve-path=/@halos-org/skip/",
-    "build:plugin": "tsc -p ./kip-plugin/tsconfig.plugin.json",
     "build:dev": "ng build --configuration=dev",
     "build:prod": "ng build --configuration=production",
-    "build:all": "npm run build:plugin && npm run build:prod",
     "generate:widget": "npx schematics ./tools/schematics/collection.json:create-host2-widget --dry-run=false"
   },
   "schematics": "tools/schematics/collection.json",
