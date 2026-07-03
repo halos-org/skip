@@ -8,7 +8,6 @@ import { StorageService } from './app/core/services/storage.service';
 import { provideMarkdown } from 'ngx-markdown';
 import { TimersService } from './app/core/services/timers.service';
 import { NotificationsService } from './app/core/services/notifications.service';
-import { SettingsService } from './app/core/services/settings.service';
 import { UnitsService } from './app/core/services/units.service';
 import { DashboardService } from './app/core/services/dashboard.service';
 import { DatasetStreamService } from './app/core/services/dataset-stream.service';
@@ -79,7 +78,6 @@ bootstrapApplication(AppComponent, {
     DashboardService,
     UnitsService,
     AppNetworkInitService,
-    SettingsService,
     NotificationsService,
     TimersService,
     StorageService,

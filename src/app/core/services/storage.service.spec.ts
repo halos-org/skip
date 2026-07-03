@@ -384,16 +384,6 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     req.flush(null);
   });
 
-  it('patchGlobal POSTs the operation to the given scope, keyed by config name', () => {
-    const { service } = setup();
-    const cfg = blankConfig();
-    service.patchGlobal('backup', 'global', cfg, 'add');
-    const req = http.expectOne(`${ENDPOINT}global/skip/11`);
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual([{ op: 'add', path: '/backup', value: cfg }]);
-    req.flush(null);
-  });
-
   it('removeItem POSTs a remove patch to the scoped, versioned URL', async () => {
     const { service } = setup();
     const p = service.removeItem('user', 'old-slot');
@@ -418,24 +408,6 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     service.patchConfig('IThemeConfig', { themeName: 'dark', extra: 'ignored' });
     const req = http.expectOne(`${ENDPOINT}user/skip/11`);
     expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/theme/themeName', value: 'dark' }]);
-    req.flush(null);
-  });
-
-  it('patchGlobal replace targets the config-name path', () => {
-    const { service } = setup();
-    const cfg = blankConfig();
-    service.patchGlobal('slot-a', 'user', cfg, 'replace');
-    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
-    expect(req.request.body).toEqual([{ op: 'replace', path: '/slot-a', value: cfg }]);
-    req.flush(null);
-  });
-
-  it('patchGlobal remove keeps a value field (unlike removeItem)', () => {
-    const { service } = setup();
-    const cfg = blankConfig();
-    service.patchGlobal('slot-b', 'global', cfg, 'remove');
-    const req = http.expectOne(`${ENDPOINT}global/skip/11`);
-    expect(req.request.body).toEqual([{ op: 'remove', path: '/slot-b', value: cfg }]);
     req.flush(null);
   });
 

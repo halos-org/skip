@@ -124,7 +124,7 @@ export class StorageService {
         }
       });
 
-    // Serial queue for ALL applicationData writes — JSON patches (patchConfig/patchGlobal/removeItem)
+    // Serial queue for ALL applicationData writes — JSON patches (patchConfig/removeItem)
     // and full-file replacements (setConfig) alike — so they never run over each other. SK does not
     // handle concurrent applicationData writes.
     this.patchQueue$
@@ -513,63 +513,6 @@ export class StorageService {
         appConfigVersionInValue: appVer,
         touchesConfigVersion
       });
-    }
-    this.enqueuePatch(patch);
-  }
-
-  /**
-   * Applies full KIP configuration entry file operations the server's Global Scope application storage.
-   *
-   * @param {string} configName name of the configuration.
-   * @param {string} scope the storage scope to use. Can either be: 'user' or 'global'.
-   * @param {string} operation string describing the type action to perform. values can be: 'add', 'replace' or 'remove'.
-   * @param {IConfig} config unstringified config object. The resulting outgoing POST request will automatically stringify.
-   * @param {number} fileVersion Configuration file version. Supported are 9 for current and 1 for old configs.
-   * @memberof StorageService
-   */
-  public patchGlobal(configName: string, scope: string, config: IConfig, operation: string, fileVersion?: number) {
-    this.ensureReady();
-    this.assertSlotName(configName, 'patchGlobal');
-    const ver = fileVersion ?? this.configFileVersion;
-  const url = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/" + ver;
-
-    let document;
-    switch (operation) {
-      case "add":
-        document =
-          [{
-            "op": "add",
-            "path": `/${configName}`,
-            "value": config
-          }]
-        break;
-
-      case "replace":
-        document =
-          [{
-            "op": "replace",
-            "path": `/${configName}`,
-            "value": config
-          }]
-        break;
-
-      case "remove":
-        document =
-          [{
-            "op": "remove",
-            "path": `/${configName}`,
-            "value": config
-          }]
-        break;
-
-      default: console.warn("[Storage Service] JSON Patch operation request type unknown");
-        break;
-    }
-
-    const patch: IPatchAction = { url, document };
-    if (this._logIO) {
-      const appVer: unknown = config?.app?.configVersion;
-      console.debug('[StorageService.patchGlobal]', { scope, configName, operation, ver, url, appConfigVersionInValue: appVer });
     }
     this.enqueuePatch(patch);
   }

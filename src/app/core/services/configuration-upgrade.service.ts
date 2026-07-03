@@ -210,7 +210,7 @@ export class ConfigurationUpgradeService {
             try {
               // Await the retire write for BOTH scopes so it completes before the
               // finally() block runs resetSettings() and reloads the page. The old
-              // 'global' branch scheduled a deferred, un-awaited patchGlobal (via
+              // 'global' branch scheduled a deferred, un-awaited write (via
               // setTimeout) that the reload aborted, leaving the legacy global config
               // un-retired. Mirror the awaited setConfig pattern used by runUpgrade().
               await this._storage.setConfig(rootConfig.scope, rootConfig.name, oldConfiguration, this.legacyFileVersion);

@@ -5,7 +5,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { cloneDeep } from 'lodash-es';
 
 import { IDatasetServiceDatasetConfig } from '../interfaces/dataset.interfaces';
-import { IWidget } from '../interfaces/widgets-interface';
 import { IUnitDefaults } from './units.service';
 import { UUID } from '../utils/uuid.util';
 
@@ -53,7 +52,6 @@ export class SettingsService {
 
   private kipUUID = '';
   public signalkUrl: ISignalKUrl | undefined;
-  private widgets: IWidget[] = [];
   private _dashboards: Dashboard[] = [];
   private dataSets: IDatasetServiceDatasetConfig[] = [];
   public configUpgrade = signal<boolean>(false);
@@ -92,37 +90,18 @@ export class SettingsService {
     }
   }
 
-  /**
-   * Whether config persistence should target the server's applicationData rather than localStorage.
-   * SKip runs same-origin with the SK server (SSO session cookie), so persistence always targets the
-   * server's applicationData; localStorage holds only the per-device connection config.
-   */
-  private readonly useServerStorage = true;
-
   private async startup(): Promise<void> {
-    if (this.useServerStorage) {
-      // A missing server config comes back as {} (not a 404), so guard on the presence of app config —
-      // an empty/appless object must not fall through to pushSettings() and dereference activeConfig.app.
-      if (!this.storage.isRemoteContextBootstrapped() || !this.storage.initConfig?.app) {
-        console.warn('[AppSettings Service] Shared configuration enabled but remote bootstrap handoff is missing or empty. Waiting for explicit recovery action.');
-        return;
-      }
-
-      this.configVersion = this.storage.initConfig?.app?.configVersion;
-      this.checkConfigUpgradeRequired(false, this.storage.initConfig?.app?.configVersion);
-      this.activeConfig = this.storage.initConfig;
-      this.pushSettings();
-    } else {
-      console.log("[AppSettings Service] LocalStorage enabled");
-      const localStorageConfig: IConfig = { app: null, theme: null, dashboards: [] };
-      localStorageConfig.app = this.loadConfigFromLocalStorage("appConfig");
-      this.configVersion = localStorageConfig.app?.configVersion;
-      this.checkConfigUpgradeRequired(true, localStorageConfig.app?.configVersion);
-      localStorageConfig.dashboards = this.loadConfigFromLocalStorage("dashboardsConfig");
-      localStorageConfig.theme = this.loadConfigFromLocalStorage("themeConfig");
-      this.activeConfig = localStorageConfig;
-      this.pushSettings();
+    // A missing server config comes back as {} (not a 404), so guard on the presence of app config —
+    // an empty/appless object must not fall through to pushSettings() and dereference activeConfig.app.
+    if (!this.storage.isRemoteContextBootstrapped() || !this.storage.initConfig?.app) {
+      console.warn('[AppSettings Service] Shared configuration enabled but remote bootstrap handoff is missing or empty. Waiting for explicit recovery action.');
+      return;
     }
+
+    this.configVersion = this.storage.initConfig?.app?.configVersion;
+    this.checkConfigUpgradeRequired(false, this.storage.initConfig?.app?.configVersion);
+    this.activeConfig = this.storage.initConfig;
+    this.pushSettings();
   }
 
   private loadConnectionConfig(): void {
@@ -277,12 +256,7 @@ export class SettingsService {
   }
   public setDefaultUnits(newDefaults: IUnitDefaults) {
     this.unitDefaults.next(newDefaults);
-    if (this.useServerStorage) {
-      this.storage.patchConfig('Array<IUnitDefaults>', newDefaults);
-
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.storage.patchConfig('Array<IUnitDefaults>', newDefaults);
   }
 
   // Configuration version
@@ -346,14 +320,10 @@ export class SettingsService {
 
   public setThemeName(newTheme: string) {
     this.themeName.next(newTheme);
-    if (this.useServerStorage) {
-      const theme: IThemeConfig = {
-        themeName: newTheme
-      }
-      this.storage.patchConfig('IThemeConfig', theme)
-    } else {
-      this.saveThemeConfigToLocalStorage();
+    const theme: IThemeConfig = {
+      themeName: newTheme
     }
+    this.storage.patchConfig('IThemeConfig', theme)
   }
 
   public getThemeName(): string {
@@ -368,12 +338,7 @@ export class SettingsService {
   public setAutoNightMode(enabled: boolean) {
     this.autoNightMode.next(enabled);
     const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.storage.patchConfig('IAppConfig', appConf);
   }
 
   public getAutoNightMode(): boolean {
@@ -392,12 +357,7 @@ export class SettingsService {
   public setRedNightMode(enabled: boolean) {
     this.redNightMode.next(enabled);
     const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.storage.patchConfig('IAppConfig', appConf);
   }
 
   // isRemoteControl mode
@@ -446,12 +406,7 @@ export class SettingsService {
     // trims for display; this keeps the saved config clean and blank values normalized to '').
     this.browserTabTitle.next((title ?? '').trim());
     const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.storage.patchConfig('IAppConfig', appConf);
   }
 
   public getDisablePathValidation(): boolean {
@@ -469,26 +424,12 @@ export class SettingsService {
   public setNightModeBrightness(brightness: number): void {
     this.nightModeBrightness.next(brightness);
     const appConf = this.buildAppStorageObject();
-
-    if (this.useServerStorage) {
-      this.storage.patchConfig('IAppConfig', appConf);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
-  }
-
-  // Widgets
-  public getWidgets() {
-    return this.widgets;
+    this.storage.patchConfig('IAppConfig', appConf);
   }
 
   public saveDashboards(dashboards: Dashboard[]) {
-    if (this.useServerStorage) {
-      if (this.storage.storageServiceReady$.getValue()) {
-        this.storage.patchConfig('Dashboards', dashboards);
-      }
-    } else {
-      this.saveLDashboardsConfigToLocalStorage(dashboards);
+    if (this.storage.storageServiceReady$.getValue()) {
+      this.storage.patchConfig('Dashboards', dashboards);
     }
     this._dashboards = dashboards;
   }
@@ -496,11 +437,7 @@ export class SettingsService {
   // DataSets
   public saveDataSets(dataSets: IDatasetServiceDatasetConfig[]) {
     this.dataSets = dataSets;
-    if (this.useServerStorage) {
-      this.storage.patchConfig('Array<IDatasetDef>', dataSets);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.storage.patchConfig('Array<IDatasetDef>', dataSets);
   }
   public getDataSets() {
     return this.dataSets;
@@ -515,11 +452,7 @@ export class SettingsService {
   }
   public setNotificationConfig(notificationConfig: INotificationConfig) {
     this.kipKNotificationConfig.next(notificationConfig);
-    if (this.useServerStorage) {
-      this.storage.patchConfig('INotificationConfig', notificationConfig);
-    } else {
-      this.saveAppConfigToLocalStorage();
-    }
+    this.storage.patchConfig('INotificationConfig', notificationConfig);
   }
 
   //Config manipulation: RAW and SignalK server - used by Settings Config Component
@@ -530,69 +463,14 @@ export class SettingsService {
     newDefaultConfig.theme = this.getDefaultThemeConfig();
     newDefaultConfig.dashboards = this.getDefaultDashboardsConfig();
 
-      if (this.useServerStorage) {
-        if (this.storage.storageServiceReady$.getValue()) {
-          this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
-            .then(() => {
-              console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
-              this.reloadApp();
-            })
-            .catch(error => {
-              console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
-              this.snackBar.open(
-                'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
-                'Close',
-                {
-                  duration: 0,
-                  verticalPosition: 'top'
-                }
-              );
-            });
-        }
-      } else {
-
-        this.reloadApp();
-      }
-  }
-
-  /**
-   * Updates keys of localStorage config and reloads apps if required to apply new config.
-   *
-   * IMPORTANT NOTE: Kip does not apply config unless app is reloaded
-   *
-   * @param configType String of either connectionConfig, appConfig, widgetConfig, dashboardConfig or themeConfig.
-   * @param newConfig Object containing config. Of type IAppConfig, IWidgetConfig, Dashboard[] or IThemeConfig
-   * @param reloadApp Optional Boolean. If True, the app will reload, else does nothing. Defaults to False.
-   */
-  public replaceConfig(configType: string, newConfig: IAppConfig | IConnectionConfig | IThemeConfig | Dashboard[], reloadApp?: boolean) {
-    const jsonConfig = JSON.stringify(newConfig);
-    localStorage.setItem(localConfigKey(configType), jsonConfig);
-    if (reloadApp) {
-      this.reloadApp();
-    }
-  }
-
-  public loadDemoConfig() {
-    if (this.useServerStorage) {
-      if (!this.storage.storageServiceReady$.getValue()) {
-        console.warn("[AppSettings Service] Storage not ready; cannot load demo configuration.");
-        return;
-      }
-      const demoConfig: IConfig = {
-        app: DemoAppConfig,
-        dashboards: DemoDashboardsConfig,
-        theme: DemoThemeConfig
-      };
-      console.log("[AppSettings Service] Loading Demo configuration settings as remote config: " + this.useServerStorage + " and reloading app.");
-      // Wait for the server write to land before reloading; reloading mid-request
-      // aborts the POST and leaves the previous configuration in place. Storage
-      // readiness is already guaranteed by the guard above.
-      this.storage.setConfig('user', this.sharedConfigName, demoConfig)
+    if (this.storage.storageServiceReady$.getValue()) {
+      this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
         .then(() => {
+          console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
           this.reloadApp();
         })
         .catch(error => {
-          console.error("[AppSettings Service] Error saving demo configuration to the server", error);
+          console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
           this.snackBar.open(
             'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
             'Close',
@@ -602,12 +480,38 @@ export class SettingsService {
             }
           );
         });
-    } else {
-      console.log("[AppSettings Service] Loading Demo configuration settings to LocalStorage");
-      this.replaceConfig("appConfig", DemoAppConfig);
-      this.replaceConfig("dashboardsConfig", DemoDashboardsConfig);
-      this.replaceConfig("themeConfig", DemoThemeConfig, true);
     }
+  }
+
+  public loadDemoConfig() {
+    if (!this.storage.storageServiceReady$.getValue()) {
+      console.warn("[AppSettings Service] Storage not ready; cannot load demo configuration.");
+      return;
+    }
+    const demoConfig: IConfig = {
+      app: DemoAppConfig,
+      dashboards: DemoDashboardsConfig,
+      theme: DemoThemeConfig
+    };
+    console.log("[AppSettings Service] Loading Demo configuration settings to the server and reloading app.");
+    // Wait for the server write to land before reloading; reloading mid-request
+    // aborts the POST and leaves the previous configuration in place. Storage
+    // readiness is already guaranteed by the guard above.
+    this.storage.setConfig('user', this.sharedConfigName, demoConfig)
+      .then(() => {
+        this.reloadApp();
+      })
+      .catch(error => {
+        console.error("[AppSettings Service] Error saving demo configuration to the server", error);
+        this.snackBar.open(
+          'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
+          'Close',
+          {
+            duration: 0,
+            verticalPosition: 'top'
+          }
+        );
+      });
   }
 
   public reloadApp() {
@@ -676,25 +580,9 @@ export class SettingsService {
     return storageObject;
   }
 
-  // Calls build methods and saves to LocalStorage
-  private saveAppConfigToLocalStorage() {
-    console.log("[AppSettings Service] Saving Application config to LocalStorage");
-    localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(this.buildAppStorageObject()));
-  }
-
   private saveConnectionConfigToLocalStorage() {
     console.log("[AppSettings Service] Saving Connection config to LocalStorage");
     localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.buildConnectionStorageObject()));
-  }
-
-  private saveLDashboardsConfigToLocalStorage(dashboards: Dashboard[]) {
-    console.log("[AppSettings Service] Saving Dashboard config to LocalStorage");
-    localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(dashboards));
-  }
-
-  private  saveThemeConfigToLocalStorage() {
-    console.log("[AppSettings Service] Saving Theme config to LocalStorage");
-    localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(this.buildThemeStorageObject()));
   }
 
   // Creates config from defaults and saves to LocalStorage
