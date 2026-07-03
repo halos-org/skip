@@ -107,7 +107,7 @@ export class ConfigurationUpgradeService {
         this.pushError('Error fetching configuration data: ' + (error as Error).message);
       }
 
-    } else if (version === 11 && this._settings.useSharedConfig) {
+    } else if (version === 11) {
       // Remote (Signal K) configs
       try {
         const configsList: Config[] = await this._storage.listConfigs(11);
@@ -144,27 +144,11 @@ export class ConfigurationUpgradeService {
         setTimeout(() => this._settings.reloadApp(), 1500);
       } catch (error) {
         this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        // Clear the blocking overlay so the error is visible; no reload — the server still holds
+        // v11, so the upgrade retries on the next boot instead of reload-looping on a dead link.
+        this.upgrading.set(false);
       }
 
-    } else if (version === 11 && !this._settings.useSharedConfig) {
-      // LocalStorage upgrade path for config version 11
-      const upgradedConfig: IConfig = { app: null, dashboards: null, theme: null };
-      upgradedConfig.app = this._settings.getAppConfig();
-      upgradedConfig.dashboards = this._settings.getDashboardConfig();
-      upgradedConfig.theme = this._settings.getThemeConfig();
-
-      upgradedConfig.app.configVersion = this.targetConfigVersion;
-      this.removeSplitShellConfigKeys(upgradedConfig.app);
-      const datasetInfo = this.extractAppDatasets(upgradedConfig.app);
-      this.upgradeDashboardWidgets(upgradedConfig.dashboards);
-      this.migrateDatasetsToDataCharts(datasetInfo, upgradedConfig.dashboards);
-      this.migrateUseNeedleToEnableNeedle(upgradedConfig.dashboards);
-
-      localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(upgradedConfig.app));
-      localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(upgradedConfig.dashboards));
-      localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(upgradedConfig.theme));
-      setTimeout(() => this._settings.reloadApp(), 1500);
-      this.upgrading.set(false);
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = { app: null, widget: null, layout: null, theme: null };
@@ -480,64 +464,6 @@ export class ConfigurationUpgradeService {
     delete raw['splitShellSide'];
     delete raw['splitShellWidth'];
     delete raw['splitShellSwipeDisabled'];
-  }
-
-  private upgradeDashboardWidgets(dashboards: Dashboard[]): void {
-    // Iterate dashboards:
-    // 1. Force widget selector to 'widget-host2'
-    // 2. Double grid metrics (x,y,w,h) if non-zero (leave zeros untouched)
-    let selectorUpdatedCount = 0;
-    let dimensionUpdatedCount = 0;
-    if (Array.isArray(dashboards)) {
-      for (const dash of dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
-          if (!widget || typeof widget !== 'object') continue;
-
-          // Ensure selector
-          if (widget.selector !== 'widget-host2') {
-            widget.selector = 'widget-host2';
-            selectorUpdatedCount++;
-          }
-
-          // Helper to safely double a numeric property if > 0 (handles undefined and numeric strings)
-          const maybeDouble = (prop: string) => {
-            const raw = widget[prop] as unknown;
-            const numVal = typeof raw === 'string' ? Number(raw) : (raw as number);
-            if (Number.isFinite(numVal) && numVal !== 0) {
-              widget[prop] = numVal * 2;
-              dimensionUpdatedCount++;
-            }
-          };
-          maybeDouble('w');
-          maybeDouble('h');
-          maybeDouble('x');
-          maybeDouble('y');
-
-          // If width/height were missing, add them using minW/minH (or 2) and scale to new grid (x2)
-          if (widget['w'] === undefined || widget['w'] === null) {
-            const minWRaw = widget['minW'] as unknown;
-            const minW = typeof minWRaw === 'string' ? Number(minWRaw) : (minWRaw as number);
-            const baseW = Number.isFinite(minW) && minW! > 0 ? (minW as number) : 2;
-            widget['w'] = baseW * 2;
-            dimensionUpdatedCount++;
-          }
-          if (widget['h'] === undefined || widget['h'] === null) {
-            const minHRaw = widget['minH'] as unknown;
-            const minH = typeof minHRaw === 'string' ? Number(minHRaw) : (minHRaw as number);
-            const baseH = Number.isFinite(minH) && minH! > 0 ? (minH as number) : 2;
-            widget['h'] = baseH * 2;
-            dimensionUpdatedCount++;
-          }
-        }
-      }
-    }
-    if (selectorUpdatedCount) {
-      this.pushMsg(`[Upgrade] Updated ${selectorUpdatedCount} localStorage widget selector(s) to 'widget-host2'.`);
-    }
-    if (dimensionUpdatedCount) {
-      this.pushMsg(`[Upgrade] Doubled grid metrics for ${dimensionUpdatedCount} non-zero (w/h/x/y) entries.`);
-    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

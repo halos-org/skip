@@ -15,7 +15,6 @@ interface DefaultConfigGetters {
 
 interface SeedOpts {
   sharedConfigName?: string;
-  useSharedConfig?: boolean;
   isRemoteControl?: boolean;
   instanceName?: string;
 }
@@ -28,7 +27,6 @@ function seedConfig(opts: SeedOpts = {}): void {
     signalKUrl: 'https://boat.example:3443',
     proxyEnabled: false,
     signalKSubscribeAll: false,
-    useSharedConfig: opts.useSharedConfig ?? false,
     sharedConfigName: opts.sharedConfigName ?? 'profileA',
     isRemoteControl: opts.isRemoteControl ?? false,
     instanceName: opts.instanceName ?? ''
@@ -64,7 +62,6 @@ function seedConnectionConfig(extra: Record<string, unknown> = {}): void {
       signalKSubscribeAll: false,
       useDeviceToken: false,
       loginName: 'pi',
-      useSharedConfig: true,
       sharedConfigName: 'default',
       ...extra
     })
@@ -120,9 +117,9 @@ describe('SettingsService — storage routing (server applicationData only)', ()
   beforeEach(() => ensureLocalStorage());
 
   // SKip runs same-origin with the SK server (SSO session), so config always persists to the
-  // server's applicationData regardless of the useSharedConfig flag.
-  function setup(connExtra: Record<string, unknown>) {
-    seedConnectionConfig(connExtra);
+  // server's applicationData.
+  function setup() {
+    seedConnectionConfig();
     localStorage.setItem('skip.appConfig', JSON.stringify({ configVersion: 12, dataSets: [], unitDefaults: {}, notificationConfig: {} }));
     localStorage.setItem('skip.dashboardsConfig', JSON.stringify([]));
     localStorage.setItem('skip.themeConfig', JSON.stringify({ themeName: '' }));
@@ -133,8 +130,8 @@ describe('SettingsService — storage routing (server applicationData only)', ()
     return { service, patchSpy };
   }
 
-  it('shared config routes a setting write to server applicationData, not localStorage', () => {
-    const { service, patchSpy } = setup({ useSharedConfig: true });
+  it('routes a setting write to server applicationData, not localStorage', () => {
+    const { service, patchSpy } = setup();
     localStorage.removeItem('skip.themeConfig');
 
     service.setThemeName('shared-theme');
@@ -143,20 +140,10 @@ describe('SettingsService — storage routing (server applicationData only)', ()
     expect(localStorage.getItem('skip.themeConfig')).toBeNull();
   });
 
-  it('local (useSharedConfig:false) also routes to server applicationData (single same-origin store)', () => {
-    const { service, patchSpy } = setup({ useSharedConfig: false });
-    localStorage.removeItem('skip.themeConfig');
-
-    service.setThemeName('local-theme');
-
-    expect(patchSpy).toHaveBeenCalledWith('IThemeConfig', { themeName: 'local-theme' });
-    expect(localStorage.getItem('skip.themeConfig')).toBeNull();
-  });
-
-  it('setBrowserTabTitle routes to server applicationData like every other setter (useSharedConfig:false)', () => {
+  it('setBrowserTabTitle routes to server applicationData like every other setter', () => {
     // Regression guard: setBrowserTabTitle must not diverge from the always-server invariant, or the
     // title would write to localStorage and be lost on the next (server-loaded) reload.
-    const { service, patchSpy } = setup({ useSharedConfig: false });
+    const { service, patchSpy } = setup();
     localStorage.removeItem('skip.appConfig');
 
     service.setBrowserTabTitle('Helm');
@@ -170,7 +157,7 @@ describe('SettingsService — config save failure reporting', () => {
   beforeEach(() => ensureLocalStorage());
 
   it('surfaces a snackbar when a routine config save to the server fails', async () => {
-    const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+    const service = createService({ sharedConfigName: 'profileA' });
     const storage = TestBed.inject(StorageService);
     const http = TestBed.inject(HttpTestingController);
     const snack = TestBed.inject(MatSnackBar);
@@ -189,7 +176,7 @@ describe('SettingsService — config save failure reporting', () => {
   });
 
   it('does not raise the alarm toast for an expected read-only 401 save denial', async () => {
-    const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+    const service = createService({ sharedConfigName: 'profileA' });
     const storage = TestBed.inject(StorageService);
     const http = TestBed.inject(HttpTestingController);
     const snack = TestBed.inject(MatSnackBar);
@@ -213,11 +200,11 @@ describe('SettingsService', () => {
     expect(createService({})).toBeTruthy();
   });
 
-  describe('active profile (local mode)', () => {
+  describe('active profile', () => {
     let service: SettingsService;
 
     beforeEach(() => {
-      service = createService({ useSharedConfig: false, sharedConfigName: 'profileA' });
+      service = createService({ sharedConfigName: 'profileA' });
     });
 
     it('getActiveProfileName returns the booted slot name', () => {
@@ -279,11 +266,11 @@ describe('SettingsService', () => {
     });
   });
 
-  describe('loadDemoConfig storage-readiness guard (server mode)', () => {
+  describe('loadDemoConfig storage-readiness guard', () => {
     beforeEach(() => { (window as unknown as Record<string, unknown>)['__KIP_TEST__'] = true; });
 
     it('does not write the demo config to the server when storage is not ready', () => {
-      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const service = createService({ sharedConfigName: 'profileA' });
       const storage = TestBed.inject(StorageService);
       storage.storageServiceReady$.next(false);
       const setSpy = vi.spyOn(storage, 'setConfig').mockImplementation(() => undefined);
@@ -292,7 +279,7 @@ describe('SettingsService', () => {
     });
 
     it('writes the demo config to the server when storage is ready', () => {
-      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const service = createService({ sharedConfigName: 'profileA' });
       const storage = TestBed.inject(StorageService);
       storage.storageServiceReady$.next(true);
       const setSpy = vi.spyOn(storage, 'setConfig').mockResolvedValue(undefined);
@@ -302,7 +289,7 @@ describe('SettingsService', () => {
     });
 
     it('reloads only after the demo config save resolves', async () => {
-      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const service = createService({ sharedConfigName: 'profileA' });
       const storage = TestBed.inject(StorageService);
       storage.storageServiceReady$.next(true);
       let resolveSave!: (value: unknown) => void;
@@ -325,7 +312,7 @@ describe('SettingsService', () => {
     });
 
     it('does not reload and surfaces an error when the demo config save fails', async () => {
-      const service = createService({ useSharedConfig: true, sharedConfigName: 'profileA' });
+      const service = createService({ sharedConfigName: 'profileA' });
       const storage = TestBed.inject(StorageService);
       storage.storageServiceReady$.next(true);
       vi.spyOn(storage, 'setConfig').mockRejectedValue(new Error('network down'));

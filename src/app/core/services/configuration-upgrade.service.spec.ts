@@ -15,7 +15,6 @@ describe('ConfigurationUpgradeService', () => {
     };
 
     const mockAppSettings = {
-        useSharedConfig: true,
         reloadApp: vi.fn(),
         getAppConfig: vi.fn().mockReturnValue({}),
         getDashboardConfig: vi.fn().mockReturnValue([]),
@@ -68,6 +67,65 @@ describe('ConfigurationUpgradeService', () => {
 
         expect(mockStorage.listConfigs).toHaveBeenCalledWith(9);
         expect(service.error()).toBeNull();
+    });
+
+    it('v11 upgrade backs up and persists every slot to the server (anti-loop)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 11 },
+            theme: { themeName: '' },
+            dashboards: []
+        });
+
+        await service.runUpgrade(11);
+
+        // Original v11 config is backed up to the 11.99 file version first...
+        expect(mockStorage.setConfig).toHaveBeenCalledWith(
+            'user', 'default',
+            expect.objectContaining({ app: expect.objectContaining({ configVersion: 11 }) }),
+            11.99);
+        // ...then the upgraded v12 result lands on the server's active file version. If the
+        // server copy stays v11 the upgrade re-triggers on every boot.
+        expect(mockStorage.setConfig).toHaveBeenCalledWith(
+            'user', 'default',
+            expect.objectContaining({ app: expect.objectContaining({ configVersion: 12 }) }));
+    });
+
+    it('v11 upgrade reloads the app exactly once after the slots are persisted', async () => {
+        vi.useFakeTimers();
+        try {
+            mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+            mockStorage.getConfig.mockResolvedValue({
+                app: { configVersion: 11 },
+                theme: { themeName: '' },
+                dashboards: []
+            });
+
+            await service.runUpgrade(11);
+            vi.advanceTimersByTime(1500);
+
+            expect(mockAppSettings.reloadApp).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('clears the blocking overlay when the v11 slot listing fails, without reloading', async () => {
+        vi.useFakeTimers();
+        try {
+            mockStorage.listConfigs.mockRejectedValueOnce(new Error('offline'));
+
+            await service.runUpgrade(11);
+
+            // The overlay is gated solely on upgrading(); leaving it set wedges the app behind
+            // a spinner with no dismiss. No reload either: the server still holds v11, so the
+            // upgrade retries next boot instead of reload-looping on a dead link.
+            expect(service.upgrading()).toBe(false);
+            vi.advanceTimersByTime(5000);
+            expect(mockAppSettings.reloadApp).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {

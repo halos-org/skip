@@ -66,7 +66,6 @@ describe('SettingsConfigComponent', () => {
         {
           provide: SettingsService,
           useValue: {
-            useSharedConfig: true,
             getAppConfig: vi.fn(),
             getDashboardConfig: vi.fn(),
             getThemeConfig: vi.fn(),
@@ -143,5 +142,28 @@ describe('SettingsConfigComponent', () => {
     profileMock.switchProfile.mockRejectedValueOnce(new Error('boom'));
     await component['switchProfile']('cockpit');
     expect(toastMock.show).toHaveBeenCalledWith('boom', 0, false, 'error');
+  });
+
+  it('exports the server-held config, never a stale localStorage copy', () => {
+    const settings = TestBed.inject(SettingsService) as unknown as {
+      getAppConfig: ReturnType<typeof vi.fn>;
+      getDashboardConfig: ReturnType<typeof vi.fn>;
+      getThemeConfig: ReturnType<typeof vi.fn>;
+      loadConfigFromLocalStorage: ReturnType<typeof vi.fn>;
+    };
+    const serverApp = { configVersion: 12, browserTabTitle: 'Server' };
+    settings.getAppConfig.mockReturnValue(serverApp);
+    settings.getDashboardConfig.mockReturnValue([{ id: 'dash-1' }]);
+    settings.getThemeConfig.mockReturnValue({ themeName: 'dark' });
+    settings.loadConfigFromLocalStorage.mockReturnValue({ stale: true });
+
+    const exported = component.getActiveConfig();
+
+    expect(exported).toEqual({
+      app: serverApp,
+      dashboards: [{ id: 'dash-1' }],
+      theme: { themeName: 'dark' }
+    });
+    expect(settings.loadConfigFromLocalStorage).not.toHaveBeenCalled();
   });
 });

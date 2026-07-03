@@ -143,22 +143,10 @@ export class SettingsConfigComponent {
   }
 
   public getActiveConfig(): IConfig {
-    return this.settings.useSharedConfig ? this.getLocalConfigFromMemory() : this.getLocalConfigFromLocalStorage();
-  }
-
-  public getLocalConfigFromMemory(): IConfig {
     return {
       app: this.settings.getAppConfig(),
       dashboards: this.settings.getDashboardConfig(),
       theme: this.settings.getThemeConfig()
-    };
-  }
-
-  public getLocalConfigFromLocalStorage(): IConfig {
-    return {
-      app: this.settings.loadConfigFromLocalStorage('appConfig'),
-      dashboards: this.settings.loadConfigFromLocalStorage('dashboardsConfig'),
-      theme: this.settings.loadConfigFromLocalStorage('themeConfig')
     };
   }
 

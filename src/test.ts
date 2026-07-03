@@ -335,7 +335,6 @@ class SettingsServiceStub {
     signalKUrl: 'http://localhost',
     proxyEnabled: false,
     signalKSubscribeAll: false,
-    useSharedConfig: false,
     sharedConfigName: '',
     kipUUID: 'test-uuid',
     isRemoteControl: false,

@@ -42,7 +42,6 @@ export class SettingsService {
 
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
-  public useSharedConfig = true;
   private sharedConfigName = 'default';
   // True once the user explicitly changes the remote-control identity this session; until then a
   // connection write preserves the stored (possibly migration-written) identity rather than the
@@ -121,7 +120,6 @@ export class SettingsService {
     this.signalkUrl = {url: config.signalKUrl, new: false};
     this.proxyEnabled = config.proxyEnabled;
     this.signalKSubscribeAll = config.signalKSubscribeAll;
-    this.useSharedConfig = config.useSharedConfig;
     this.sharedConfigName = config.sharedConfigName;
     this.kipUUID = config.kipUUID;
 
@@ -274,7 +272,6 @@ export class SettingsService {
   }
 
   public setConnectionConfig(value: IConnectionConfig) {
-    this.useSharedConfig = value.useSharedConfig;
     this.proxyEnabled = value.proxyEnabled;
     this.signalKSubscribeAll = value.signalKSubscribeAll;
     if (this.signalkUrl) {
@@ -551,7 +548,6 @@ export class SettingsService {
       signalKUrl: this.signalkUrl?.url ?? '',
       proxyEnabled: this.proxyEnabled,
       signalKSubscribeAll: this.signalKSubscribeAll,
-      useSharedConfig: this.useSharedConfig,
       sharedConfigName: this.sharedConfigName,
       // Preserve the stored (possibly migration-written) identity unless the user changed it this
       // session, so a connection write around the migration cannot revert the lifted value.
