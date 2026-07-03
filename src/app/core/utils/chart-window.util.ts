@@ -1,8 +1,11 @@
 import type { TimeScaleFormat } from '../services/dataset-stream.service';
 
-const TARGET_POINTS_PER_WINDOW = 120;
-const MIN_SAMPLE_TIME_MS = 100;
-const SMOOTHING_PERIOD_FACTOR = 0.25;
+/** Points a window aims for at its derived cadence, once above the sample-time floor. */
+export const TARGET_POINTS_PER_WINDOW = 500;
+/** Floor sampling interval; very small windows sample no faster than this. */
+export const MIN_SAMPLE_TIME_MS = 100;
+/** SMA window as a fraction of the buffer size. */
+export const SMOOTHING_PERIOD_FACTOR = 0.25;
 
 /** Sampling cadence + buffer size derived from a display window. */
 export interface IChartDataSourceInfo {
@@ -41,8 +44,9 @@ export function resolveWindowMs(timeScaleFormat: TimeScaleFormat, period: number
 }
 
 /**
- * Derive the sampling cadence and buffer size for a window, targeting a consistent ~120 points per
- * window with a floor sampling interval for very small windows.
+ * Derive the sampling cadence and buffer size for a window, targeting a consistent ~500 points per
+ * window with a floor sampling interval for very small windows. The point count tracks the target
+ * (never far above it), so no separate buffer cap is needed.
  */
 export function deriveDataSourceInfo(windowMs: number): IChartDataSourceInfo {
   const sampleTime = windowMs > 0
