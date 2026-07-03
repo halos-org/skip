@@ -4,7 +4,6 @@ import { DataService, IPathUpdate } from './data.service';
 import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { resolveAngleDomain } from '../utils/angle-domain.util';
-import { SettingsService } from './settings.service';
 import { IDatasetServiceDatapoint } from './dataset-stream.service';
 import { computeWindowStats, ChartStatsDomain } from '../utils/chart-stats.util';
 
@@ -55,12 +54,11 @@ export class HistoryChartStreamService {
   private readonly history = inject(HistoryApiClientService);
   private readonly mapper = inject(HistoryToChartMapperService);
   private readonly data = inject(DataService);
-  private readonly settings = inject(SettingsService);
 
   /**
    * Backfill (History API, one-shot) then a live delta tail. Emits the backfill as a single array,
    * then live datapoints one at a time. Emits {@link HISTORY_UNAVAILABLE} and stops when there is no
-   * history provider (or history is disabled). A *transient* backfill failure (network/5xx/timeout)
+   * history provider. A *transient* backfill failure (network/5xx/timeout)
    * does not disable the chart: it falls through to the live delta tail with no backfill seed.
    */
   public getBackfillThenLive(params: IHistoryChartStreamParams): Observable<StreamEmission> {
@@ -69,15 +67,6 @@ export class HistoryChartStreamService {
       let disposed = false;
       let liveSub: Subscription | null = null;
       const buffer: number[] = [];
-
-      // No history provider / history disabled: degrade gracefully. The delta stream could still feed
-      // a live-only chart, but the decision on #64 is not to maintain that path — surface the empty
-      // state instead.
-      if (this.settings.getWidgetHistoryDisabled()) {
-        subscriber.next(HISTORY_UNAVAILABLE);
-        subscriber.complete();
-        return () => { /* nothing to tear down */ };
-      }
 
       this.fetchBackfill(params, domain)
         .then(result => {

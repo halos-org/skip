@@ -57,7 +57,6 @@ export class SettingsDisplayComponent implements OnInit {
   protected instanceName = model<string>('');
   protected browserTabTitle = model<string>('SKip');
   protected providerMode = model<'kip' | 'other'>('other');
-  protected widgetHistoryDisabled = model<boolean>(false);
   protected isKipHistoryProviderSelectable = signal<boolean>(false);
   protected isPathValidationDisabled = model<boolean>(this.settings.getDisablePathValidation());
   // Guards concurrent plugin enable checks to avoid stale promise handlers mutating state
@@ -75,7 +74,6 @@ export class SettingsDisplayComponent implements OnInit {
     this.isRemoteControl.set(this.settings.getIsRemoteControl());
     this.instanceName.set(this.settings.getInstanceName());
     this.browserTabTitle.set(this.settings.getBrowserTabTitle());
-    this.widgetHistoryDisabled.set(this.settings.getWidgetHistoryDisabled());
     void this.getKipPluginConfig();
   }
 
@@ -117,7 +115,6 @@ export class SettingsDisplayComponent implements OnInit {
     } else {
       this.settings.setThemeName("");
     }
-    this.settings.setWidgetHistoryDisabled(this.widgetHistoryDisabled());
     this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());
     // Await the server write; setKipPluginConfig() returns a Promise, so the old

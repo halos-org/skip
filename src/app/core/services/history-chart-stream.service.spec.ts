@@ -5,7 +5,6 @@ import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavaila
 import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { DataService, IPathUpdate } from './data.service';
-import { SettingsService } from './settings.service';
 import { IDatasetServiceDatapoint } from './dataset-stream.service';
 
 const PARAMS: IHistoryChartStreamParams = {
@@ -22,7 +21,6 @@ describe('HistoryChartStreamService', () => {
   const history = { getValues: vi.fn() };
   const mapper = { mapValuesToChartDatapoints: vi.fn() };
   const data = { subscribePath: vi.fn(), getPathUnitType: vi.fn() };
-  const settings = { getWidgetHistoryDisabled: vi.fn() };
 
   function make(): HistoryChartStreamService {
     TestBed.configureTestingModule({
@@ -30,8 +28,7 @@ describe('HistoryChartStreamService', () => {
         HistoryChartStreamService,
         { provide: HistoryApiClientService, useValue: history },
         { provide: HistoryToChartMapperService, useValue: mapper },
-        { provide: DataService, useValue: data },
-        { provide: SettingsService, useValue: settings }
+        { provide: DataService, useValue: data }
       ]
     });
     return TestBed.inject(HistoryChartStreamService);
@@ -43,15 +40,6 @@ describe('HistoryChartStreamService', () => {
     mapper.mapValuesToChartDatapoints.mockReset().mockReturnValue([]);
     data.subscribePath.mockReset().mockReturnValue(path$);
     data.getPathUnitType.mockReset().mockReturnValue(null); // scalar unless a test overrides
-    settings.getWidgetHistoryDisabled.mockReset().mockReturnValue(false);
-  });
-
-  it('emits HISTORY_UNAVAILABLE (no live tail) when history is disabled', async () => {
-    settings.getWidgetHistoryDisabled.mockReturnValue(true);
-    const first = await firstValueFrom(make().getBackfillThenLive(PARAMS));
-    expect(isHistoryUnavailable(first)).toBe(true);
-    expect(history.getValues).not.toHaveBeenCalled();
-    expect(data.subscribePath).not.toHaveBeenCalled();
   });
 
   it('emits HISTORY_UNAVAILABLE when the History API returns null (no provider)', async () => {
