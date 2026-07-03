@@ -19,8 +19,6 @@ import { MatRadioChange, MatRadioModule } from '@angular/material/radio';
 export class DisplayChartOptionsComponent implements OnInit {
   private app = inject(AppService);
 
-  readonly displayName = input.required<UntypedFormControl>();
-  readonly showLabel = input.required<UntypedFormControl>();
   readonly convertUnitTo = input.required<UntypedFormControl>();
   readonly datasetAverageArray = input.required<UntypedFormControl>();
   readonly showAverageData = input.required<UntypedFormControl>();

@@ -11,8 +11,6 @@ describe('ChartOptionsComponent', () => {
 
     const applyRequiredInputs = (targetFixture: ComponentFixture<DisplayChartOptionsComponent>, overrides: Record<string, UntypedFormControl> = {}): Record<string, UntypedFormControl> => {
         const controls: Record<string, UntypedFormControl> = {
-            displayName: new UntypedFormControl('Test Chart'),
-            showLabel: new UntypedFormControl(true),
             convertUnitTo: new UntypedFormControl(''),
             datasetAverageArray: new UntypedFormControl([]),
             showAverageData: new UntypedFormControl(false),
