@@ -1,17 +1,14 @@
 import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/interfaces/dataset.interfaces';
 import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
-import { DatasetStreamService } from '../../core/services/dataset-stream.service';
 import { IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/interfaces/dataset.interfaces';
 import { Subscription } from 'rxjs';
 import { CanvasService } from '../../core/services/canvas.service';
 import { UnitsService } from '../../core/services/units.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { ITheme } from '../../core/services/app-service';
-import { WidgetDatasetOrchestratorService } from '../../core/services/widget-dataset-orchestrator.service';
 import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
 import { resolveWindowMs, deriveDataSourceInfo } from '../../core/utils/chart-window.util';
-import { CHART_ENGINE_OVERRIDE_KEY } from '../../core/constants/config-storage.const';
 
 import { Chart, ChartConfiguration, ChartData, ChartType, TimeUnit, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
@@ -51,11 +48,9 @@ export class WidgetDataChartComponent implements OnDestroy {
   // Host2 runtime directive (merged config)
   private readonly runtime = inject(WidgetRuntimeDirective);
 
-  private readonly dsService = inject(DatasetStreamService);
   private readonly ngZone = inject(NgZone);
   private readonly canvasService = inject(CanvasService);
   private readonly unitsService = inject(UnitsService);
-  private readonly datasetLifecycle = inject(WidgetDatasetOrchestratorService);
   private readonly historyStream = inject(HistoryChartStreamService);
   readonly widgetDataChart = viewChild('widgetDataChart', { read: ElementRef });
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -68,7 +63,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     convertUnitTo: null,
     timeScale: 'minute', // second | minute | hour
     period: 10,
-    chartEngine: 'recorder', // 'recorder' | 'history' (#64 prototype)
+    chartEngine: 'history',
     numDecimal: 1,
     inverseYAxis: false,
     datasetAverageArray: 'sma', // sma | ema | dema | avg
@@ -98,7 +93,7 @@ export class WidgetDataChartComponent implements OnDestroy {
   };
   public lineChartType: ChartType = 'line';
   private chart: Chart;
-  private dsServiceSub: Subscription | null = null;
+  private streamSub: Subscription | null = null;
   private datasetConfig: IDatasetServiceDatasetConfig | null = null;
   private dataSourceInfo: IDatasetServiceDataSourceInfo | null = null;
   private lastVerticalChart: boolean | null = null;
@@ -106,17 +101,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     const cfg = this.runtime.options();
     return !!cfg?.datachartPath;
   });
-  // #64 A/B toggle. A global override (localStorage['skip.chartEngine'] = 'history' | 'recorder',
-  // applied on reload) flips every data-chart at once for live testing; otherwise the per-widget
-  // config field wins, defaulting to the recorder.
-  protected chartEngine = computed<'recorder' | 'history'>(() => {
-    const cfg = this.runtime.options();
-    let override: string | null = null;
-    try { override = localStorage.getItem(CHART_ENGINE_OVERRIDE_KEY); } catch { override = null; }
-    if (override === 'history' || override === 'recorder') return override;
-    return cfg?.chartEngine ?? 'recorder';
-  });
-  // History engine only: true when no history provider is available, so the widget shows the
+  // True when no history provider is available, so the widget shows the
   // "history unavailable" empty state instead of a blank chart (no recorder live-only fallback).
   protected historyUnavailable = signal<boolean>(false);
   private pathSignature = computed<string | undefined>(() => {
@@ -124,7 +109,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (!cfg.datachartPath) {
       return undefined;
     }
-    return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange, cfg.chartEngine].join('|');
+    return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
   });
   private previousPathSignature: string | undefined = undefined;
 
@@ -179,31 +164,24 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (!cfg.datachartPath) return; // Widget not yet configured
     if (!this.widgetDataChart()) return; // View not ready yet
 
-    this.dsServiceSub?.unsubscribe(); // Cleanup old subscription & chart data
+    this.streamSub?.unsubscribe(); // Cleanup old subscription & chart data
     this.lineChartData.datasets = [];
     this.historyUnavailable.set(false);
 
-    if (this.chartEngine() === 'history') {
-      // History-API path: no recorder dataset; synthesize the config + cadence the axis/streaming
-      // options expect, derived from the same window as the recorder would use.
-      const windowMs = resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period);
-      this.dataSourceInfo = deriveDataSourceInfo(windowMs);
-      this.datasetConfig = {
-        uuid: this.id(),
-        path: cfg.datachartPath,
-        pathSource: cfg.datachartSource ?? 'default',
-        baseUnit: '',
-        timeScaleFormat: cfg.timeScale as TimeScaleFormat,
-        period: cfg.period,
-        label: '',
-        angleDomainOverride: cfg.datachartAngleRange ?? undefined
-      };
-    } else {
-      this.datasetLifecycle.syncDataChartDataset(this.id(), cfg, this.pathSignature());
-      this.datasetConfig = this.dsService.getDatasetConfig(this.id());
-      this.dataSourceInfo = this.dsService.getDataSourceInfo(this.id());
-      if (!this.datasetConfig) return; // dataset not ready yet
-    }
+    // Synthesize the config + cadence the axis/streaming options expect, derived from the widget's
+    // display window.
+    const windowMs = resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period);
+    this.dataSourceInfo = deriveDataSourceInfo(windowMs);
+    this.datasetConfig = {
+      uuid: this.id(),
+      path: cfg.datachartPath,
+      pathSource: cfg.datachartSource ?? 'default',
+      baseUnit: '',
+      timeScaleFormat: cfg.timeScale as TimeScaleFormat,
+      period: cfg.period,
+      label: '',
+      angleDomainOverride: cfg.datachartAngleRange ?? undefined
+    };
     this.createDatasets(cfg);
     this.setChartOptions(cfg);
     // Always recreate chart instance on rebuild to ensure orientation/scale axis changes apply
@@ -773,34 +751,28 @@ export class WidgetDataChartComponent implements OnDestroy {
   private startStreaming(): void {
     const cfg = this.runtime.options();
     if (!cfg?.datachartPath) return;
-    this.dsServiceSub?.unsubscribe();
+    this.streamSub?.unsubscribe();
 
-    if (this.chartEngine() === 'history') {
-      const info = this.dataSourceInfo;
-      const params: IHistoryChartStreamParams = {
-        path: cfg.datachartPath,
-        source: cfg.datachartSource ?? 'default',
-        angleDomainOverride: cfg.datachartAngleRange === 'signed' || cfg.datachartAngleRange === 'direction'
-          ? cfg.datachartAngleRange
-          : undefined,
-        windowMs: resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period),
-        sampleTime: info.sampleTime,
-        maxDataPoints: info.maxDataPoints,
-        smoothingPeriod: info.smoothingPeriod
-      };
-      this.dsServiceSub = this.historyStream.getBackfillThenLive(params).subscribe(emission => {
-        if (isHistoryUnavailable(emission)) {
-          this.historyUnavailable.set(true);
-          return;
-        }
-        this.historyUnavailable.set(false);
-        this.handleDatasetEmission(emission, cfg);
-      });
-      return;
-    }
-
-    const batchThenLive$ = this.dsService.getDatasetBatchThenLiveObservable(this.id());
-    this.dsServiceSub = batchThenLive$?.subscribe(dsPointOrBatch => this.handleDatasetEmission(dsPointOrBatch, cfg));
+    const info = this.dataSourceInfo;
+    const params: IHistoryChartStreamParams = {
+      path: cfg.datachartPath,
+      source: cfg.datachartSource ?? 'default',
+      angleDomainOverride: cfg.datachartAngleRange === 'signed' || cfg.datachartAngleRange === 'direction'
+        ? cfg.datachartAngleRange
+        : undefined,
+      windowMs: resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period),
+      sampleTime: info.sampleTime,
+      maxDataPoints: info.maxDataPoints,
+      smoothingPeriod: info.smoothingPeriod
+    };
+    this.streamSub = this.historyStream.getBackfillThenLive(params).subscribe(emission => {
+      if (isHistoryUnavailable(emission)) {
+        this.historyUnavailable.set(true);
+        return;
+      }
+      this.historyUnavailable.set(false);
+      this.handleDatasetEmission(emission, cfg);
+    });
   }
 
   private handleDatasetEmission(dsPointOrBatch: IDatasetServiceDatapoint[] | IDatasetServiceDatapoint, cfg: IWidgetSvcConfig): void {
@@ -896,7 +868,7 @@ export class WidgetDataChartComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.dsServiceSub?.unsubscribe();
+    this.streamSub?.unsubscribe();
     this.chart?.destroy();
     const canvas = this.widgetDataChart?.()?.nativeElement as HTMLCanvasElement | undefined;
     this.canvasService.releaseCanvas(canvas, { clear: true, removeFromDom: true });
