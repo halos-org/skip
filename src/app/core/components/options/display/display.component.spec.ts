@@ -37,7 +37,6 @@ class SettingsServiceMock {
     public getRedNightMode() { return false; }
     public getIsRemoteControl() { return false; }
     public getInstanceName() { return ''; }
-    public getWidgetHistoryDisabled() { return false; }
     public getBrowserTabTitle() { return 'KIP'; }
     public getDisablePathValidation() { return false; }
     public setAutoNightMode(): void { }
@@ -46,7 +45,6 @@ class SettingsServiceMock {
     public setIsRemoteControl(): void { }
     public setInstanceName(): void { }
     public setThemeName(): void { }
-    public setWidgetHistoryDisabled(): void { }
     public setBrowserTabTitle(): void { }
     public setDisablePathValidation(): void { }
 }

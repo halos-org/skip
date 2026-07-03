@@ -31,6 +31,3 @@ export const GESTURES_DEBUG_KEY = 'skip.gesturesDebug';
 
 /** Chart-engine A/B override flag key (#64 History-API prototype). */
 export const CHART_ENGINE_OVERRIDE_KEY = 'skip.chartEngine';
-
-/** Chart performance instrumentation flag key (#64 History-API prototype). */
-export const CHART_PERF_FLAG_KEY = 'skip.chartPerf';

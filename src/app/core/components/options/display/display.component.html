@@ -142,11 +142,6 @@
               Other: Use a different History API provider and configure data logging manually
             </mat-radio-button>
           </mat-radio-group>
-          <mat-slide-toggle class="full-width"
-            name="widgetHistoryDisabled"
-            [(ngModel)]="widgetHistoryDisabled">
-            Disable widget historical charts (two-finger tap or right-click to view history feature).
-          </mat-slide-toggle>
         } @else {
           <p>Historical data features requires both Signal K server version 2.22.1 or later.</p>
         }

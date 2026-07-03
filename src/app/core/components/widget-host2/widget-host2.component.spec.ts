@@ -11,7 +11,6 @@ import { WidgetService } from '../../services/widget.service';
 import { AppService } from '../../services/app-service';
 import { DashboardHistorySeriesSyncService } from '../../services/dashboard-history-series-sync.service';
 import { uiEventService } from '../../services/uiEvent.service';
-import { SettingsService } from '../../services/settings.service';
 import { UnitsService } from '../../services/units.service';
 import { KipSeriesApiClientService } from '../../services/kip-series-api-client.service';
 import { IWidget } from '../../interfaces/widgets-interface';
@@ -91,12 +90,6 @@ describe('WidgetHost2Component', () => {
             providers: [
                 { provide: DashboardService, useValue: dashboard },
                 { provide: DialogService, useValue: dialogServiceMock },
-                {
-                    provide: SettingsService,
-                    useValue: {
-                        getWidgetHistoryDisabled: () => false
-                    }
-                },
                 {
                     provide: UnitsService,
                     useValue: {
