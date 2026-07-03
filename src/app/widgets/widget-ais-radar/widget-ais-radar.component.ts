@@ -376,10 +376,6 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
     };
     const dataChanged = !this.lastRenderSignature || !this.signaturesEqual(this.lastRenderSignature, signature);
 
-    // Nothing to do: target data unchanged and the view rotation has settled.
-    if (!dataChanged && rotationSettled && this.hasRenderedOnce) return;
-    this.lastRenderSignature = signature;
-
     const viewRotation = viewMode === 'course-up'
       ? (hasOrientation ? this.smoothRotation(targetRotation) : 0)
       : 0;
@@ -389,36 +385,50 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
     this.lastViewRotation = viewRotation;
 
     // Cheap per-frame updates: rotate the target group + keep own-ship oriented.
-    this.svg.attr('viewBox', `${-width / 2} ${-height / 2} ${width} ${height}`);
-    this.root.attr('transform', `scale(${scale})`);
+    // Own-ship heading/COG/SOG are deliberately excluded from the render
+    // signature, so these O(1) updates run before the settled-frame early
+    // return — otherwise a heading or SOG change with an otherwise unchanged
+    // signature would leave the own-ship icon and motion vector stale.
     this.rotationGroup.attr('transform', `rotate(${this.wrapDegrees(-viewRotation)})`);
     const ownShipRotation = this.wrapDegrees((ownCog ?? ownHeading ?? 0) - viewRotation);
-    // Rings/labels/own-ship icon only change with data (size/range/theme/showSelf),
-    // never with rotation — so rebuild them only on a data change and just
-    // re-orient the own-ship icon (O(1)) on pure-rotation frames.
-    if (dataChanged) {
-      const ringColor = getColors(cfg.color, theme).dim;
-      this.renderRings(ringCount, rangeNm, radius, maxRingRadius, viewRotation, scale, radarCfg.showSelf ?? true, ownShipRotation, ringColor);
-    }
+    // renderRings() applies the same rotation when it (re)creates the group,
+    // so this pre-rebuild selection being empty on the first frame is fine.
     this.ownShipLayer?.select<SVGGElement>('g.radar-ownship').attr('transform', `rotate(${ownShipRotation})`);
-
     if (ownShip.position && this.hasValidPosition(ownShip.position)) {
       // Own-ship motion vector is O(1) and lives in the non-rotated own-ship
       // layer, so it is recomputed every frame with the current rotation.
       this.renderOwnShipVector(ownShip, rangeNm, radius, viewRotation, radarCfg);
+    }
 
-      if (dataChanged) {
-        const maxRangeNm = (maxRingRadius / radius) * rangeNm;
-        // Targets are built NORTH-UP (viewRotation = 0); the rotation group
-        // applies the course-up rotation as a single transform.
-        const renderTargets = this.buildTargets(targets, ownShip.position, rangeNm, maxRangeNm, radius, 0, radarCfg);
-        this.lastRenderTargets = renderTargets;
-        this.lastRenderScale = scale;
-        this.lastRenderSize = size;
-        this.renderTargetVectors(renderTargets, rangeNm, radius, 0, radarCfg);
-        this.renderTargets(renderTargets, scale);
-        this.renderSelected(renderTargets, scale);
-      }
+    // Target data unchanged and the view rotation has settled: the own-ship
+    // refresh above is all this frame needs — skip the O(targets) rebuild.
+    if (!dataChanged && rotationSettled && this.hasRenderedOnce) return;
+    this.lastRenderSignature = signature;
+
+    // viewBox and root scale derive solely from the size, which is in the
+    // render signature — a settled frame can never change them, so they stay
+    // behind the early return.
+    this.svg.attr('viewBox', `${-width / 2} ${-height / 2} ${width} ${height}`);
+    this.root.attr('transform', `scale(${scale})`);
+
+    // Rings/labels only change with data (size/range/theme/showSelf), never
+    // with rotation — rebuild them only on a data change.
+    if (dataChanged) {
+      const ringColor = getColors(cfg.color, theme).dim;
+      this.renderRings(ringCount, rangeNm, radius, maxRingRadius, viewRotation, scale, radarCfg.showSelf ?? true, ownShipRotation, ringColor);
+    }
+
+    if (dataChanged && ownShip.position && this.hasValidPosition(ownShip.position)) {
+      const maxRangeNm = (maxRingRadius / radius) * rangeNm;
+      // Targets are built NORTH-UP (viewRotation = 0); the rotation group
+      // applies the course-up rotation as a single transform.
+      const renderTargets = this.buildTargets(targets, ownShip.position, rangeNm, maxRangeNm, radius, 0, radarCfg);
+      this.lastRenderTargets = renderTargets;
+      this.lastRenderScale = scale;
+      this.lastRenderSize = size;
+      this.renderTargetVectors(renderTargets, rangeNm, radius, 0, radarCfg);
+      this.renderTargets(renderTargets, scale);
+      this.renderSelected(renderTargets, scale);
     }
 
     this.raiseOwnshipAndVector();
