@@ -1,6 +1,6 @@
 import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, ChangeDetectionStrategy } from '@angular/core';
-import { DatasetStreamService, IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/services/dataset-stream.service';
-import { IDatasetServiceDatasetConfig } from '../../core/services/dataset-stream.service';
+import { DatasetStreamService } from '../../core/services/dataset-stream.service';
+import { IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo, IDatasetServiceDatasetConfig } from '../../core/interfaces/dataset.interfaces';
 import { Subscription } from 'rxjs';
 import { CanvasService } from '../../core/services/canvas.service';
 import { ITheme } from '../../core/services/app-service';

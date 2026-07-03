@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { DatasetStreamService, IDatasetServiceDatasetConfig, TimeScaleFormat } from './dataset-stream.service';
+import { DatasetStreamService } from './dataset-stream.service';
+import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../interfaces/dataset.interfaces';
 import { IWidgetSvcConfig } from '../interfaces/widgets-interface';
 
 @Injectable({

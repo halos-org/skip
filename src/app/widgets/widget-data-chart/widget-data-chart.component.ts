@@ -1,7 +1,8 @@
-import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/services/dataset-stream.service';
+import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/interfaces/dataset.interfaces';
 import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
-import { DatasetStreamService, IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/services/dataset-stream.service';
+import { DatasetStreamService } from '../../core/services/dataset-stream.service';
+import { IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/interfaces/dataset.interfaces';
 import { Subscription } from 'rxjs';
 import { CanvasService } from '../../core/services/canvas.service';
 import { UnitsService } from '../../core/services/units.service';

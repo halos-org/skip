@@ -4,7 +4,7 @@ import { BehaviorSubject, Observable, filter } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { cloneDeep } from 'lodash-es';
 
-import { IDatasetServiceDatasetConfig } from './dataset-stream.service';
+import { IDatasetServiceDatasetConfig } from '../interfaces/dataset.interfaces';
 import { IWidget } from '../interfaces/widgets-interface';
 import { IUnitDefaults } from './units.service';
 import { UUID } from '../utils/uuid.util';

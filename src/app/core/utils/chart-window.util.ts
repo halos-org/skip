@@ -1,4 +1,4 @@
-import type { TimeScaleFormat } from '../services/dataset-stream.service';
+import type { TimeScaleFormat } from '../interfaces/dataset.interfaces';
 
 /** Points a window aims for at its derived cadence, once above the sample-time floor. */
 export const TARGET_POINTS_PER_WINDOW = 500;

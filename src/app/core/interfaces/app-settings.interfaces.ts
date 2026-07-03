@@ -1,4 +1,4 @@
-import { IDatasetServiceDatasetConfig } from '../services/dataset-stream.service';
+import { IDatasetServiceDatasetConfig } from './dataset.interfaces';
 import { IUnitDefaults } from '../services/units.service';
 import { Dashboard } from './../services/dashboard.service';
 

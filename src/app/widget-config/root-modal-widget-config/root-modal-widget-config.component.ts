@@ -15,7 +15,8 @@ import { DisplayChartOptionsComponent } from '../display-chart-options/display-c
 import { DatasetChartOptionsComponent } from '../dataset-chart-options/dataset-chart-options.component';
 import { IUnitGroup, UnitsService } from '../../core/services/units.service';
 import { AppService } from '../../core/services/app-service';
-import { DatasetStreamService, IDatasetServiceDatasetConfig } from '../../core/services/dataset-stream.service';
+import { DatasetStreamService } from '../../core/services/dataset-stream.service';
+import { IDatasetServiceDatasetConfig } from '../../core/interfaces/dataset.interfaces';
 import type { ElectricalTrackedDevice, IDynamicControl, IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { PathsOptionsComponent } from '../paths-options/paths-options.component';
 import { IDeleteEventObj } from '../boolean-control-config/boolean-control-config.component';

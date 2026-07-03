@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WidgetDatasetOrchestratorService } from './widget-dataset-orchestrator.service';
-import { DatasetStreamService, IDatasetServiceDatasetConfig } from './dataset-stream.service';
+import { DatasetStreamService } from './dataset-stream.service';
+import { IDatasetServiceDatasetConfig } from '../interfaces/dataset.interfaces';
 import { IWidgetSvcConfig } from '../interfaces/widgets-interface';
 
 describe('WidgetDatasetOrchestratorService', () => {

@@ -171,7 +171,7 @@ import type {
   ISignalkPlugin,
 } from './app/core/interfaces/signalk-plugin-config.interfaces';
 import type { IUnitDefaults } from './app/core/services/units.service';
-import type { IDatasetServiceDatasetConfig } from './app/core/services/dataset-stream.service';
+import type { IDatasetServiceDatasetConfig } from './app/core/interfaces/dataset.interfaces';
 // Global provider setup (HttpClient, RouterTestingModule, animation & material stubs, etc.)
 import { TestBed } from '@angular/core/testing';
 import type { Provider } from '@angular/core';

@@ -5,7 +5,7 @@ import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavaila
 import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { DataService, IPathUpdate } from './data.service';
-import { IDatasetServiceDatapoint } from './dataset-stream.service';
+import { IDatasetServiceDatapoint } from '../interfaces/dataset.interfaces';
 
 const PARAMS: IHistoryChartStreamParams = {
   path: 'navigation.speedOverGround',
