@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatIconRegistry } from '@angular/material/icon';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { signal } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import packageInfo from '../../../../package.json';
 import { States } from '../interfaces/signalk-interfaces';
@@ -9,14 +10,11 @@ import { DataService, IPathUpdate } from './data.service';
 import { SettingsService } from './settings.service';
 
 class SettingsServiceMock {
-  public themeName$ = new BehaviorSubject<string>('');
-  public autoNightMode$ = new BehaviorSubject<boolean>(false);
-  public redNightMode$ = new BehaviorSubject<boolean>(false);
+  public themeName = signal<string>('');
+  public autoNightMode = signal<boolean>(false);
+  public redNightMode = signal<boolean>(false);
   public nightModeBrightness = 0.27;
 
-  getThemeNameAsO(): Observable<string> { return this.themeName$.asObservable(); }
-  getAutoNightModeAsO(): Observable<boolean> { return this.autoNightMode$.asObservable(); }
-  getRedNightModeAsO(): Observable<boolean> { return this.redNightMode$.asObservable(); }
   getNightModeBrightness(): number { return this.nightModeBrightness; }
 }
 
@@ -88,15 +86,15 @@ describe('AppService', () => {
 
   describe('light-theme body class', () => {
     it('adds the light-theme class when the theme is light-theme', () => {
-      settings.themeName$.next('light-theme');
+      settings.themeName.set('light-theme');
       createService();
       expect(document.body.classList.contains('light-theme')).toBe(true);
     });
 
     it('removes the light-theme class when the theme changes away from light-theme', () => {
-      settings.themeName$.next('light-theme');
+      settings.themeName.set('light-theme');
       createService();
-      settings.themeName$.next('dark-theme');
+      settings.themeName.set('dark-theme');
       TestBed.tick();
       expect(document.body.classList.contains('light-theme')).toBe(false);
     });
@@ -138,7 +136,7 @@ describe('AppService', () => {
     });
 
     it('keeps the light-theme class in night mode when the theme is light', () => {
-      settings.themeName$.next('light-theme');
+      settings.themeName.set('light-theme');
       const service = createService();
       service.isNightMode.set(true);
       service.toggleDayNightMode();
@@ -146,7 +144,7 @@ describe('AppService', () => {
     });
 
     it('applies the red night theme at full brightness when red night mode is on', () => {
-      settings.redNightMode$.next(true);
+      settings.redNightMode.set(true);
       const service = createService();
       service.isNightMode.set(true);
       service.toggleDayNightMode();
@@ -167,7 +165,7 @@ describe('AppService', () => {
 
   describe('auto night mode from environment mode', () => {
     it('follows environment day/night transitions when auto night mode is on', () => {
-      settings.autoNightMode$.next(true);
+      settings.autoNightMode.set(true);
       const service = createService();
       expect(service.isNightMode()).toBe(false);
 
@@ -190,7 +188,7 @@ describe('AppService', () => {
     });
 
     it('does not reapply styling when the same mode is emitted again', () => {
-      settings.autoNightMode$.next(true);
+      settings.autoNightMode.set(true);
       const service = createService();
       const toggle = vi.spyOn(service, 'toggleDayNightMode');
 
@@ -211,7 +209,7 @@ describe('AppService', () => {
       TestBed.tick();
       expect(service.isNightMode()).toBe(false);
 
-      settings.autoNightMode$.next(true);
+      settings.autoNightMode.set(true);
       TestBed.tick();
       expect(service.isNightMode()).toBe(false);
 
@@ -228,11 +226,11 @@ describe('AppService', () => {
       const service = createService();
       service.isNightMode.set(true);
 
-      settings.redNightMode$.next(true);
+      settings.redNightMode.set(true);
       TestBed.tick();
       expect(document.body.classList.contains('night-theme')).toBe(true);
 
-      settings.redNightMode$.next(false);
+      settings.redNightMode.set(false);
       TestBed.tick();
       expect(document.body.classList.contains('night-theme')).toBe(false);
       expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toContain('sepia(0.5)');

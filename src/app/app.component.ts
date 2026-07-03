@@ -67,7 +67,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly _dialog = inject(DialogService);
   public readonly settings = inject(SettingsService);
   private readonly _titleService = inject(Title);
-  private readonly _browserTabTitle = toSignal(this.settings.getBrowserTabTitleAsO(), { initialValue: 'SKip' });
+  private readonly _browserTabTitle = this.settings.browserTabTitle;
   private readonly _responsive = inject(BreakpointObserver);
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _notificationOverlay = inject(NotificationOverlayService);

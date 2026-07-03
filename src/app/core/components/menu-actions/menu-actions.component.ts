@@ -35,7 +35,7 @@ export class MenuActionsComponent implements AfterViewInit, OnDestroy {
   protected dashboard = inject(DashboardService);
   protected app = inject(AppService);
   private _settings = inject(SettingsService);
-  protected isAutoNightMode = toSignal(this._settings.getAutoNightModeAsO(), { requireSync: true });
+  protected isAutoNightMode = this._settings.autoNightMode;
 
   // Reactive signal: true when URL is '/', '/dashboard', or any '/dashboard/*'
   private readonly _initialDashboardMatch = (() => {

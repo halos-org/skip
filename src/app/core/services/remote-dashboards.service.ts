@@ -63,8 +63,8 @@ export class RemoteDashboardsService {
   private readonly ACTIVE_SCREEN_PATH = `self.displays.${this.KIP_UUID}.screenIndex`;
   private readonly CHANGE_SCREEN_PATH = `self.displays.${this.KIP_UUID}.activeScreen`;
 
-  private readonly displayName = toSignal(this.settings.getInstanceNameAsO());
-  private readonly isRemoteControl = toSignal(this.settings.getIsRemoteControlAsO());
+  private readonly displayName = this.settings.instanceName;
+  private readonly isRemoteControl = this.settings.isRemoteControl;
   private readonly remoteScreenPosition = toSignal(this.data.subscribePath(this.ACTIVE_SCREEN_PATH, 'default'));
   private readonly changeDashboardTo = toSignal(this.data.subscribePath(this.CHANGE_SCREEN_PATH, 'default'));
   private previousIsRemoteControl = false;

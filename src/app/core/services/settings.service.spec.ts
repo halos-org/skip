@@ -9,6 +9,7 @@ import { DefaultAppConfig, DefaultConnectionConfig, DefaultThemeConfig } from '.
 import { IAppConfig, IConfig, IConnectionConfig, INotificationConfig, IThemeConfig } from '../interfaces/app-settings.interfaces';
 import { LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
 import { IDatasetServiceDatasetConfig } from '../interfaces/dataset.interfaces';
+import { IUnitDefaults } from './units.service';
 import { Dashboard } from './dashboard.service';
 
 interface DefaultConfigGetters {
@@ -758,5 +759,37 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
 
     expect(theme).toBe(DefaultThemeConfig);
     expect(JSON.parse(localStorage.getItem('skip.themeConfig') as string)).toEqual({ themeName: '' });
+  });
+});
+
+describe('SettingsService — retained observable bridges (units/notifications)', () => {
+  // The two bridges kept for the remaining .subscribe() consumers (units.service,
+  // notifications.service — removed by #79) must replay the current value synchronously to a
+  // fresh subscriber: notifications.service dereferences the emitted config in the same tick.
+  it('a fresh subscriber receives the current value synchronously from both bridges', () => {
+    const { service } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
+
+    let units: IUnitDefaults | undefined;
+    service.getDefaultUnitsAsO().subscribe((v) => { units = v; }).unsubscribe();
+    expect(units).toEqual({ Speed: 'knots' });
+
+    let notif: INotificationConfig | undefined;
+    service.getNotificationServiceConfigAsO().subscribe((v) => { notif = v; }).unsubscribe();
+    expect(notif).toEqual(fullNotificationConfig());
+  });
+
+  it('the bridges are fed by the write path: a post-write fresh subscriber sees the new value synchronously', () => {
+    const { service } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
+
+    service.setDefaultUnits({ Speed: 'kph' });
+    let units: IUnitDefaults | undefined;
+    service.getDefaultUnitsAsO().subscribe((v) => { units = v; }).unsubscribe();
+    expect(units).toEqual({ Speed: 'kph' });
+
+    const updated = { ...fullNotificationConfig(), menuGrouping: false };
+    service.setNotificationConfig(updated);
+    let notif: INotificationConfig | undefined;
+    service.getNotificationServiceConfigAsO().subscribe((v) => { notif = v; }).unsubscribe();
+    expect(notif).toEqual(updated);
   });
 });

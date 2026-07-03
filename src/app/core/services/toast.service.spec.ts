@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { MatSnackBar, MatSnackBarRef } from '@angular/material/snack-bar';
@@ -14,15 +15,7 @@ class MatSnackBarMock {
 }
 
 class SettingsServiceMock {
-    private readonly cfg = { sound: { disableSound: true } };
-
-    public getNotificationServiceConfigAsO() {
-        return new BehaviorSubject(this.cfg).asObservable();
-    }
-
-    public getNotificationConfig() {
-        return this.cfg;
-    }
+    public readonly notificationConfig = signal({ sound: { disableSound: true } });
 }
 
 describe('ToastService', () => {

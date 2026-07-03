@@ -348,10 +348,17 @@ class SettingsServiceStub {
     sound: { disableSound: true, muteNormal: true, muteNominal: true, muteWarn: true, muteAlert: true, muteAlarm: true, muteEmergency: true }
   });
 
-  // Observable getters used throughout the app
-  getThemeNameAsO(): Observable<string> { return this.themeNameSubject.asObservable(); }
-  getRedNightModeAsO(): Observable<boolean> { return this.redNightModeSubject.asObservable(); }
-  getAutoNightModeAsO(): Observable<boolean> { return this.autoNightModeSubject.asObservable(); }
+  // Readonly signal surface mirroring the real service (post-#17 rewrite); consumers read
+  // these directly, so the stub must expose them even while it stays DI-inert (#159).
+  public readonly unitDefaults = signal<Record<string, string>>({});
+  public readonly themeName = signal('light');
+  public readonly notificationConfig = signal(this._notificationConfig.value);
+  public readonly autoNightMode = signal(false);
+  public readonly redNightMode = signal(false);
+  public readonly nightModeBrightness = signal(0.2);
+  public readonly isRemoteControl = signal(false);
+  public readonly instanceName = signal('');
+  public readonly browserTabTitle = signal('SKip');
 
   // Synchronous getters for places not using observables
   getThemeName(): string { return this.themeNameSubject.value; }
@@ -359,9 +366,9 @@ class SettingsServiceStub {
   getAutoNightMode(): boolean { return this.autoNightModeSubject.value; }
 
   // Test utilities to control state from specs when needed
-  setThemeName(name: string): void { this.themeNameSubject.next(name); }
-  setRedNightMode(v: boolean): void { this.redNightModeSubject.next(v); }
-  setAutoNightMode(v: boolean): void { this.autoNightModeSubject.next(v); }
+  setThemeName(name: string): void { this.themeNameSubject.next(name); this.themeName.set(name); }
+  setRedNightMode(v: boolean): void { this.redNightModeSubject.next(v); this.redNightMode.set(v); }
+  setAutoNightMode(v: boolean): void { this.autoNightModeSubject.next(v); this.autoNightMode.set(v); }
 
   // Dashboards APIs used by DashboardService and specs
   getDashboardConfig(): unknown[] { return this.dashboards; }
@@ -370,21 +377,19 @@ class SettingsServiceStub {
   // Units defaults used by UnitsService
   getDefaultUnitsAsO(): Observable<Record<string, string>> { return this.unitDefaultsSubject.asObservable(); }
   getDefaultUnits(): Record<string, string> { return this.unitDefaultsSubject.value; }
-  setDefaultUnits(v: Record<string, string>): void { this.unitDefaultsSubject.next(v); }
+  setDefaultUnits(v: Record<string, string>): void { this.unitDefaultsSubject.next(v); this.unitDefaults.set(v); }
 
   // Instance name used by RemoteDashboardsService and others
-  getInstanceNameAsO(): Observable<string> { return this.instanceNameSubject.asObservable(); }
   getInstanceName(): string { return this.instanceNameSubject.value; }
-  setInstanceName(v: string): void { this.instanceNameSubject.next(v); }
+  setInstanceName(v: string): void { this.instanceNameSubject.next(v); this.instanceName.set(v); }
 
   // DataSets used by DatasetStreamService
   getDataSets(): unknown[] { return this.dataSets; }
   saveDataSets(d: unknown[]): void { this.dataSets = d; }
 
   // Remote control mode flag used by RemoteDashboardsService and others
-  getIsRemoteControlAsO(): Observable<boolean> { return this._isRemoteControlSubject.asObservable(); }
   getIsRemoteControl(): boolean { return this._isRemoteControlSubject.value; }
-  setIsRemoteControl(v: boolean): void { this._isRemoteControlSubject.next(v); }
+  setIsRemoteControl(v: boolean): void { this._isRemoteControlSubject.next(v); this.isRemoteControl.set(v); }
 
   // Minimal signal-like shim for configUpgrade used by DatasetStreamService cleanup logic
   // Supports both reading as a function and optional .set(boolean) for specs that toggle it
@@ -416,7 +421,7 @@ class SettingsServiceStub {
   public getConnectionConfig() { return this._connectionConfig; }
   public setConnectionConfig(v: typeof this._connectionConfig) { this._connectionConfig = { ...v }; }
   public getNightModeBrightness(): number { return this.nightModeBrightnessSubject.value; }
-  public setNightModeBrightness(v: number): void { this.nightModeBrightnessSubject.next(v); }
+  public setNightModeBrightness(v: number): void { this.nightModeBrightnessSubject.next(v); this.nightModeBrightness.set(v); }
   public getDisablePathValidation(): boolean { return false; }
   public setDisablePathValidation(): void { /* noop */ }
   public getNotificationServiceConfigAsO(): Observable<import('./app/core/interfaces/app-settings.interfaces').INotificationConfig> { return this._notificationConfig.asObservable(); }
