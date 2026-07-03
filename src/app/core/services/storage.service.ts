@@ -17,9 +17,13 @@ export interface Config {
   scope: string
 }
 
+export type TConfigObjectType =
+  'IAppConfig' | 'IThemeConfig' | 'IWidgetConfig' | 'ILayoutConfig' | 'Dashboards' |
+  'Array<IUnitDefaults>' | 'Array<IDatasetDef>' | 'INotificationConfig';
+
 export interface IPatchFailure {
   // Config target that failed to persist — patchConfig's ObjType, when known.
-  key?: string;
+  key?: TConfigObjectType;
   error: unknown;
 }
 
@@ -34,7 +38,7 @@ interface IPatchAction {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   document: any,
   // Config target of the patch, carried into patchFailure$ so a failed save names what was lost.
-  key?: string,
+  key?: TConfigObjectType,
   // Optional deferred handlers so callers can await a queued patch's completion.
   resolve?: () => void,
   reject?: (error: unknown) => void
@@ -391,12 +395,12 @@ export class StorageService {
   /**
    * Updates JSON configuration entry section in the server application storage. This uses the JSON Patch standard.
    *
-   * @param {string} ObjType string describing the type of configuration object. Value can be: IAppConfig, IThemeConfig, IWidgetConfig, ILayoutConfig, Array\<IUnitDefaults\>, Array\<IDataSet\>, Array\<IZone\>, IZonesConfig, INotificationConfig
+   * @param {TConfigObjectType} ObjType type of configuration object to patch. See TConfigObjectType for supported values.
    * @param {*} value unstringified update object. The resulting outgoing POST request will automatically stringify.
    * @memberof StorageService
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public patchConfig(ObjType: string, value: any, forceConfigFileVersion?: number) {
+  public patchConfig(ObjType: TConfigObjectType, value: any, forceConfigFileVersion?: number) {
     this.ensureReady();
     if (!this.sharedConfigName) {
       const error = new Error('[StorageService] Refusing patchConfig: active config slot name is unset.');
@@ -490,8 +494,12 @@ export class StorageService {
           }]
         break;
 
-      default: console.warn("[Storage Service] JSON Patch request type unknown");
+      default: {
+        // Compile-time exhaustiveness: adding a TConfigObjectType member without a case errors here.
+        const unhandled: never = ObjType;
+        console.warn(`[Storage Service] JSON Patch request type unknown: ${unhandled}`);
         break;
+      }
     }
 
     const patch: IPatchAction = { url, document, key: ObjType };
