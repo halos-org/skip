@@ -8,7 +8,7 @@ import { IDatasetServiceDatasetConfig } from '../interfaces/dataset.interfaces';
 import { IUnitDefaults } from './units.service';
 import { UUID } from '../utils/uuid.util';
 
-import { IConfig, IAppConfig, IConnectionConfig, IThemeConfig, INotificationConfig, ISignalKUrl, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from "../interfaces/app-settings.interfaces";
+import { IConfig, IAppConfig, IConnectionConfig, IThemeConfig, INotificationConfig, ISignalKUrl } from "../interfaces/app-settings.interfaces";
 import { DefaultAppConfig, DefaultConnectionConfig as DefaultConnectionConfig, DefaultThemeConfig } from '../../../default-config/config.blank.const';
 import { DefaultUnitsConfig } from '../../../default-config/config.blank.units.const'
 import { DefaultNotificationConfig } from '../../../default-config/config.blank.notification.const';
@@ -18,11 +18,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { StorageService } from './storage.service';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
+import { REMOTE_CONFIG_FILE_VERSION, LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from '../constants/config-versions.const';
 
 
 const defaultTheme = '';
-const configFileVersion = 11; // used to change the Signal K configuration storage file name (ie. 9.0.0.json) that contains the configuration definitions. Applies only to remote storage. Local storage has no file concept.
-const latestConfigVersion = 12; // used to set the configVersion property in the app config. This is used to manage config upgrades.
 @Injectable({
   providedIn: 'root'
 })
@@ -59,7 +58,7 @@ export class SettingsService {
 
   constructor() {
     console.log("[AppSettings Service] Service startup...");
-    this.storage.activeConfigFileVersion = configFileVersion;
+    this.storage.activeConfigFileVersion = REMOTE_CONFIG_FILE_VERSION;
 
     // Routine saves go through the fire-and-forget patchConfig queue, so a failed server write is
     // otherwise invisible: the setting applies in memory but reverts on the next reload. Surface it.
@@ -150,7 +149,7 @@ export class SettingsService {
   }
 
   private checkConfigUpgradeRequired(isLocalStorageConfig: boolean, storageVersion?: number): void {
-    if (storageVersion !== latestConfigVersion) {
+    if (storageVersion !== LATEST_APP_CONFIG_VERSION) {
       this.configUpgrade.set(true);
     }
   }
@@ -525,7 +524,7 @@ export class SettingsService {
   private buildAppStorageObject() {
 
     const storageObject: IAppConfig = {
-      configVersion: this.configVersion ?? latestConfigVersion,
+      configVersion: this.configVersion ?? LATEST_APP_CONFIG_VERSION,
       autoNightMode: this.autoNightMode.getValue(),
       redNightMode: this.redNightMode.getValue(),
       nightModeBrightness: this.nightModeBrightness.getValue(),
@@ -586,7 +585,7 @@ export class SettingsService {
     const config: IAppConfig = cloneDeep(DefaultAppConfig);
     config.notificationConfig = cloneDeep(DefaultNotificationConfig);
     config.unitDefaults = cloneDeep(DefaultUnitsConfig);
-    config.configVersion = latestConfigVersion;
+    config.configVersion = LATEST_APP_CONFIG_VERSION;
     localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(config));
     return config;
   }

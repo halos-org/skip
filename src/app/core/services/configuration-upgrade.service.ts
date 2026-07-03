@@ -16,8 +16,15 @@ interface DataChartConfigUpdate {
   datasetUUID: string;
 }
 
-// NOTE: This service encapsulates the legacy upgrade (fileVersion 9 / configVersion 10 -> 11)
-// and provides an extendable structure for future upgrades (eg. 11 -> 12 handled elsewhere).
+// The app-config schema version the legacy v10/v11 transforms produce. Pinned on purpose:
+// bumping LATEST_APP_CONFIG_VERSION must not change what these transforms stamp — a newer
+// schema needs a chained migration step here, not a re-labeled output. Divergence fails loud:
+// a stamped config below latest re-raises the upgrade flag instead of masquerading as current.
+const MIGRATION_OUTPUT_VERSION = 12;
+
+// NOTE: This service encapsulates the app-config upgrades — the legacy migration (remote file
+// version 9 / app-config version 10) and the v11 remote upgrade — each stamping the upgraded
+// config with MIGRATION_OUTPUT_VERSION.
 @Injectable({ providedIn: 'root' })
 export class ConfigurationUpgradeService {
   private _storage = inject(StorageService);
@@ -28,11 +35,10 @@ export class ConfigurationUpgradeService {
   public error = signal<string | null>(null);
   public messages = signal<string[]>([]);
 
-  // Source versions we support upgrading FROM (remote file version & app.configVersion)
+  // Source versions we support upgrading FROM (remote file version & app.configVersion).
+  // Upgrades target MIGRATION_OUTPUT_VERSION.
   private readonly legacyFileVersion = 9;
   private readonly legacyConfigVersion = 10;
-  // Target version for this migration step
-  private readonly targetConfigVersion = 12; // After upgrade we set to 12 (SettingsService may later handle 12 -> 13)
 
   // Static mapping of old widget.type to new selector values
   private static readonly widgetTypeToSelectorMap: Record<string, string> = {
@@ -96,7 +102,7 @@ export class ConfigurationUpgradeService {
               transformedConfig.oldConfiguration,
               this.legacyFileVersion
             );
-            this.pushMsg(`[Upgrade] Configuration ${transformedConfig.scope}/${transformedConfig.name} upgraded to version ${this.targetConfigVersion}. Old configuration patched to version 0.`);
+            this.pushMsg(`[Upgrade] Configuration ${transformedConfig.scope}/${transformedConfig.name} upgraded to version ${MIGRATION_OUTPUT_VERSION}. Old configuration patched to version 0.`);
           } catch (error) {
             this.pushError(`[Upgrade] Error saving configuration for ${rootConfig.name}: ${(error as Error).message}`);
           }
@@ -125,7 +131,7 @@ export class ConfigurationUpgradeService {
               11.99
             );
 
-            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${this.targetConfigVersion}.`);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${MIGRATION_OUTPUT_VERSION}.`);
             const migratedConfig = this.upgradeConfig(config);
             if (!migratedConfig) continue; // skip if not eligible
 
@@ -214,7 +220,7 @@ export class ConfigurationUpgradeService {
       const localStorageConfig: IConfig = { app: null, dashboards: null, theme: null };
       localStorageConfig.app = this._settings.loadConfigFromLocalStorage('appConfig');
       localStorageConfig.theme = this._settings.loadConfigFromLocalStorage('themeConfig');
-      localStorageConfig.app.configVersion = this.targetConfigVersion; // baseline fresh
+      localStorageConfig.app.configVersion = MIGRATION_OUTPUT_VERSION; // baseline fresh
       localStorageConfig.app.nightModeBrightness = 0.27;
       localStorageConfig.theme.themeName = '';
       localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(localStorageConfig.app));
@@ -344,7 +350,7 @@ export class ConfigurationUpgradeService {
   private transformApp(app: IAppConfig): IAppConfig {
     if (!app) return null;
     const clone = cloneDeep(app);
-    clone.configVersion = this.targetConfigVersion;
+    clone.configVersion = MIGRATION_OUTPUT_VERSION;
     clone.nightModeBrightness = 0.27;
     this.removeSplitShellConfigKeys(clone);
     return clone;
@@ -417,7 +423,7 @@ export class ConfigurationUpgradeService {
         this.pushMsg(`[Upgrade] Doubled widget grid metrics for ${dimensionUpdatedCount} non-zero (w/h/x/y) entries.`);
       }
 
-      config.app.configVersion = 12;
+      config.app.configVersion = MIGRATION_OUTPUT_VERSION;
 
       return {
         app: config.app, theme: config.theme, dashboards: config.dashboards

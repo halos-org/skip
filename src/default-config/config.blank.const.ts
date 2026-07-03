@@ -1,4 +1,5 @@
 import { IConfig ,IAppConfig, IConnectionConfig, IThemeConfig } from "../app/core/interfaces/app-settings.interfaces"
+import { LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION } from "../app/core/constants/config-versions.const";
 import { DefaultNotificationConfig } from './config.blank.notification.const';
 import { DefaultUnitsConfig } from "./config.blank.units.const";
 import { UUID } from "../app/core/utils/uuid.util";
@@ -6,7 +7,7 @@ import { UUID } from "../app/core/utils/uuid.util";
 // Immutable defaults: the settings getters and profile-import validation read these as a shared
 // baseline, so callers must clone before mutating rather than corrupt the singleton in place.
 export const DefaultAppConfig: Readonly<IAppConfig> = {
-  "configVersion": 12,
+  "configVersion": LATEST_APP_CONFIG_VERSION,
   "autoNightMode": true,
   "redNightMode": false,
   "nightModeBrightness": 0.27,
@@ -27,7 +28,7 @@ export const defaultConfig: IConfig = {
 }
 
 export const DefaultConnectionConfig: Readonly<IConnectionConfig> = {
-  "configVersion": 13,
+  "configVersion": CONNECTION_CONFIG_VERSION,
   "kipUUID": UUID.create(),
   "signalKUrl": null, // get's overwritten with host at getDefaultConnectionConfig()
   "proxyEnabled": false,
