@@ -198,9 +198,7 @@ export class HistoryChartStreamService {
     const normalizedPath = params.path.replace(/^(vessels\.)?self\./, '');
     const paths = [
       `${normalizedPath}:sma:${params.smoothingPeriod}`,
-      `${normalizedPath}:avg`,
-      `${normalizedPath}:min`,
-      `${normalizedPath}:max`
+      `${normalizedPath}:last`
     ].join(',');
     const resolutionSeconds = Math.max(1, Math.round(params.sampleTime / 1000));
 

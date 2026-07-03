@@ -58,10 +58,14 @@ describe('HistoryChartStreamService', () => {
     expect(Array.isArray(first)).toBe(true);
     expect((first as IDatasetServiceDatapoint[]).map(p => p.data.value)).toEqual([1, 3]);
     expect(history.getValues).toHaveBeenCalledTimes(1);
-    // Aggregation suffixes + a from-window are requested.
+    // The Value series is the raw per-bucket `:last` sample (angle-safe, seam-free with the live
+    // tail), plus the `:sma` overlay. The dead `:min`/`:max` columns are no longer requested.
     const query = history.getValues.mock.calls[0][0];
-    expect(query.paths).toContain(':avg');
+    expect(query.paths).toContain(':last');
     expect(query.paths).toContain(':sma:');
+    expect(query.paths).not.toContain(':avg');
+    expect(query.paths).not.toContain(':min');
+    expect(query.paths).not.toContain(':max');
     expect(query.from).toBeTruthy();
   });
 

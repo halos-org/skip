@@ -187,7 +187,8 @@
                 "max",
                 "avg",
                 "sma",
-                "ema"
+                "ema",
+                "last"
               ]
             }
           },

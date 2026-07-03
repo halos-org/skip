@@ -1049,7 +1049,7 @@ export class SqliteHistoryStorageService {
   private parseMethod(value?: string): THistoryMethod | undefined {
     if (!value) return undefined;
     const normalized = value.toLowerCase();
-    if (normalized === 'min' || normalized === 'max' || normalized === 'avg' || normalized === 'sma' || normalized === 'ema') {
+    if (normalized === 'min' || normalized === 'max' || normalized === 'avg' || normalized === 'sma' || normalized === 'ema' || normalized === 'last') {
       return normalized;
     }
     return undefined;
@@ -1159,7 +1159,7 @@ export class SqliteHistoryStorageService {
     if (rows.length === 0) return [];
 
     const method = request.method ?? 'avg';
-    if (method === 'min' || method === 'max' || method === 'avg') {
+    if (method === 'min' || method === 'max' || method === 'avg' || method === 'last') {
       return rows.map(entry => ({ timestamp: Number(entry.ts_ms), value: Number(entry.value) }));
     }
 
@@ -1233,6 +1233,12 @@ export class SqliteHistoryStorageService {
       return Math.max(...values);
     }
 
+    if (method === 'last') {
+      // Relies on bucket lists being timestamp-ascending, which holds because selectRowsForPaths
+      // fetches `ORDER BY path ASC, ts_ms ASC` and downsampleIfNeeded preserves that order.
+      return values[values.length - 1];
+    }
+
     const sum = values.reduce((acc, value) => acc + value, 0);
     return sum / values.length;
   }
@@ -1256,7 +1262,7 @@ export class SqliteHistoryStorageService {
     try {
       const parsed = JSON.parse(value);
       if (!Array.isArray(parsed)) return undefined;
-      const methods = parsed.filter(entry => entry === 'min' || entry === 'max' || entry === 'avg' || entry === 'sma' || entry === 'ema');
+      const methods = parsed.filter(entry => entry === 'min' || entry === 'max' || entry === 'avg' || entry === 'sma' || entry === 'ema' || entry === 'last');
       return methods.length > 0 ? methods as THistoryMethod[] : undefined;
     } catch {
       return undefined;

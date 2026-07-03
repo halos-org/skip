@@ -97,4 +97,54 @@ describe('HistoryToChartMapperService', () => {
     expect(final.lastMinimum).toBeCloseTo(3.0, 5);
     expect(final.lastMaximum).toBeCloseTo(-3.0, 5);
   });
+
+  it('prefers the :last column over :avg for the datapoint value', () => {
+    const response: IHistoryValuesResponse = {
+      context: 'vessels.self',
+      range: {
+        from: '2026-02-16T00:00:00.000Z',
+        to: '2026-02-16T00:02:00.000Z'
+      },
+      values: [
+        { path: 'navigation.headingTrue', method: 'avg' },
+        { path: 'navigation.headingTrue', method: 'last' }
+      ],
+      data: [
+        ['2026-02-16T00:00:00.000Z', 3.14, 6.2],
+        ['2026-02-16T00:01:00.000Z', 3.1, 0.05]
+      ]
+    };
+
+    const datapoints = service.mapValuesToChartDatapoints(response, {
+      domain: 'scalar'
+    });
+
+    expect(datapoints[0].data.value).toBe(6.2);
+    expect(datapoints[1].data.value).toBe(0.05);
+  });
+
+  it('does not plot a lone :sma column as the Value series', () => {
+    const response: IHistoryValuesResponse = {
+      context: 'vessels.self',
+      range: {
+        from: '2026-02-16T00:00:00.000Z',
+        to: '2026-02-16T00:02:00.000Z'
+      },
+      values: [
+        { path: 'navigation.headingTrue', method: 'sma' }
+      ],
+      data: [
+        ['2026-02-16T00:00:00.000Z', 1.5],
+        ['2026-02-16T00:01:00.000Z', 1.6]
+      ]
+    };
+
+    const datapoints = service.mapValuesToChartDatapoints(response, {
+      domain: 'scalar'
+    });
+
+    expect(datapoints[0].data.value).toBeNull();
+    expect(datapoints[1].data.value).toBeNull();
+    expect(datapoints[0].data.sma).toBe(1.5);
+  });
 });

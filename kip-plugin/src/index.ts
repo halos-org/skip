@@ -679,7 +679,7 @@ const start = (server: ServerAPI): Plugin => {
     if (raw === 'average') {
       return 'avg';
     }
-    if (raw === 'min' || raw === 'max' || raw === 'sma' || raw === 'ema' || raw === 'avg') {
+    if (raw === 'min' || raw === 'max' || raw === 'sma' || raw === 'ema' || raw === 'avg' || raw === 'last') {
       return raw;
     }
     return 'avg';

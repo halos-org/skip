@@ -1,4 +1,4 @@
-export type THistoryMethod = 'min' | 'max' | 'avg' | 'sma' | 'ema';
+export type THistoryMethod = 'min' | 'max' | 'avg' | 'sma' | 'ema' | 'last';
 
 export type TElectricalFamilyKey = 'batteries' | 'solar' | 'chargers' | 'inverters' | 'alternators' | 'ac';
 export type TElectricalExpansionMode = 'bms-battery-tree' | 'solar-tree' | 'charger-tree' | 'inverter-tree' | 'alternator-tree' | 'ac-tree';
