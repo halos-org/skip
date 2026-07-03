@@ -14,7 +14,6 @@ describe('ChartOptionsComponent', () => {
             displayName: new UntypedFormControl('Test Chart'),
             showLabel: new UntypedFormControl(true),
             convertUnitTo: new UntypedFormControl(''),
-            datasetUUID: new UntypedFormControl('dataset-1'),
             datasetAverageArray: new UntypedFormControl([]),
             showAverageData: new UntypedFormControl(false),
             showDataPoints: new UntypedFormControl(false),

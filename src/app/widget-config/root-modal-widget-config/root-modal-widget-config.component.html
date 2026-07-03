@@ -2,12 +2,25 @@
   <h6 mat-dialog-title>{{ titleDialog }}</h6>
   <mat-dialog-content class="widget-config-dialog-content">
     <mat-tab-group class="tab-group-content">
-      <mat-tab label="Display">
+      <mat-tab>
+        <ng-template mat-tab-label>
+          @if (formMaster.controls.datachartPath && !formMaster.controls.datachartPath.valid) {
+            <span class="warning fa fa-exclamation-circle"></span>
+          } Display
+        </ng-template>
         @if ((widgetConfig?.datachartPath !== undefined)) {
+          <config-dataset-chart-options
+            class="tab-content"
+            [filterSelfPaths]="filterSelfPathsToControl"
+            [datachartPath]="datachartPathControl"
+            [datachartSource]="datachartSourceControl"
+            [convertUnitTo]="convertUnitToControl"
+            [datachartAngleRange]="datachartAngleRangeControl"
+            [timeScale]="timeScaleControl"
+            [period]="periodControl" />
           <config-display-chart-options
             class="tab-content"
             [displayName]="displayNameToControl"
-            [datasetUUID]="datasetUUIDToControl"
             [convertUnitTo]="convertUnitToControl"
             [showDataPoints]="showDataPointsToControl"
             [showAverageData]="showAverageDataToControl"
@@ -862,26 +875,6 @@
       }
       <!-- End PUT Requests-->
 
-      <!-- Charts -->
-      @if (widgetConfig?.datachartPath !== undefined) {
-        <mat-tab label="Dataset">
-          <ng-template mat-tab-label>
-            @if (!formMaster.controls.datachartPath.valid) {
-            <span class="warning fa fa-exclamation-circle"></span>
-            } Dataset
-          </ng-template>
-          <config-dataset-chart-options
-            [filterSelfPaths]="filterSelfPathsToControl"
-            [datachartPath]="datachartPathControl"
-            [datachartSource]="datachartSourceControl"
-            [convertUnitTo]="convertUnitToControl"
-            [datachartAngleRange]="datachartAngleRangeControl"
-            [timeScale]="timeScaleControl"
-            [period]="periodControl">
-          </config-dataset-chart-options>
-        </mat-tab>
-      }
-      <!-- end Chart -->
       @if (widgetConfig?.bms) {
         <mat-tab label="BMS">
           <bms-bank-setup formGroupName="bms" class="tab-content" />
