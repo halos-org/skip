@@ -30,8 +30,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EMPTY, Subject } from 'rxjs';
 import { WidgetDataChartComponent } from './widget-data-chart.component';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
-import { DatasetStreamService } from '../../core/services/dataset-stream.service';
-import { WidgetDatasetOrchestratorService } from '../../core/services/widget-dataset-orchestrator.service';
 import { HistoryChartStreamService, HISTORY_UNAVAILABLE } from '../../core/services/history-chart-stream.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { UnitsService } from '../../core/services/units.service';
@@ -52,33 +50,17 @@ describe('WidgetDataChartComponent', () => {
   let fixture: ComponentFixture<WidgetDataChartComponent>;
 
   const runtimeMock = { options: vi.fn() };
-  const dsServiceMock = {
-    syncDataChartDataset: vi.fn(),
-    getDatasetConfig: vi.fn(),
-    getDataSourceInfo: vi.fn(),
-    getDatasetBatchThenLiveObservable: vi.fn()
-  };
-  const orchestratorMock = { syncDataChartDataset: vi.fn() };
   const historyMock = { getBackfillThenLive: vi.fn() };
   const unitsMock = { convertToUnit: (_unit: string, value: number) => value };
   const canvasMock = { releaseCanvas: vi.fn() };
 
   const setup = async (config: IWidgetSvcConfig): Promise<void> => {
     runtimeMock.options.mockReturnValue(config);
-    // Recorder path reads a live dataset config + source info before it streams.
-    dsServiceMock.getDatasetConfig.mockReturnValue({
-      uuid: 'w1', path: config.datachartPath, pathSource: 'default',
-      baseUnit: '', timeScaleFormat: 'minute', period: 10, label: ''
-    });
-    dsServiceMock.getDataSourceInfo.mockReturnValue({ sampleTime: 500, maxDataPoints: 100, smoothingPeriod: 5 });
-    dsServiceMock.getDatasetBatchThenLiveObservable.mockReturnValue(EMPTY);
 
     await TestBed.configureTestingModule({
       imports: [WidgetDataChartComponent],
       providers: [
         { provide: WidgetRuntimeDirective, useValue: runtimeMock },
-        { provide: DatasetStreamService, useValue: dsServiceMock },
-        { provide: WidgetDatasetOrchestratorService, useValue: orchestratorMock },
         { provide: HistoryChartStreamService, useValue: historyMock },
         { provide: UnitsService, useValue: unitsMock },
         { provide: CanvasService, useValue: canvasMock }
@@ -98,10 +80,6 @@ describe('WidgetDataChartComponent', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockReturnValue({} as unknown as CanvasRenderingContext2D);
     runtimeMock.options.mockReset();
-    dsServiceMock.syncDataChartDataset.mockReset();
-    dsServiceMock.getDatasetConfig.mockReset();
-    dsServiceMock.getDataSourceInfo.mockReset();
-    dsServiceMock.getDatasetBatchThenLiveObservable.mockReset();
     historyMock.getBackfillThenLive.mockReset().mockReturnValue(EMPTY);
   });
 
@@ -111,32 +89,14 @@ describe('WidgetDataChartComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  it('dispatches to the recorder engine for an explicit chartEngine of "recorder"', async () => {
-    await setup(makeConfig({ chartEngine: 'recorder' }));
-    expect(dsServiceMock.getDatasetBatchThenLiveObservable).toHaveBeenCalledWith('w1');
-    expect(historyMock.getBackfillThenLive).not.toHaveBeenCalled();
-  });
-
-  it('dispatches to the recorder engine when chartEngine is undefined (default)', async () => {
-    await setup(makeConfig({ chartEngine: undefined }));
-    expect(dsServiceMock.getDatasetBatchThenLiveObservable).toHaveBeenCalledWith('w1');
-    expect(historyMock.getBackfillThenLive).not.toHaveBeenCalled();
-  });
-
-  it('dispatches to the history engine for an explicit chartEngine of "history"', async () => {
-    await setup(makeConfig({ chartEngine: 'history' }));
+  it('streams from the History engine — the only engine', async () => {
+    await setup(makeConfig());
     expect(historyMock.getBackfillThenLive).toHaveBeenCalled();
-    expect(dsServiceMock.getDatasetBatchThenLiveObservable).not.toHaveBeenCalled();
   });
 
-  it('lets the localStorage chartEngine override beat the per-widget config', async () => {
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => (key === 'skip.chartEngine' ? 'history' : null)
-    });
-    // Config asks for the recorder, but the override forces the history engine.
+  it('routes a stale chartEngine:"recorder" config to the History engine (field ignored)', async () => {
     await setup(makeConfig({ chartEngine: 'recorder' }));
     expect(historyMock.getBackfillThenLive).toHaveBeenCalled();
-    expect(dsServiceMock.getDatasetBatchThenLiveObservable).not.toHaveBeenCalled();
   });
 
   it('renders the "History data unavailable" empty state on a HISTORY_UNAVAILABLE emission', async () => {
