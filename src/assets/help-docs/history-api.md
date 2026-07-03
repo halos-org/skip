@@ -1,19 +1,19 @@
-## Using an External History API Provider
+## Using a History API Provider
 
-If you disable KIP's built-in Time-Series features and install a compatible History API provider plugin, you can still:
+KIP reads historical data from an external Signal K History API provider plugin. With a compatible provider installed, KIP can:
 1. Pre-seed Data Chart and Wind Trends so they show recent trends immediately.
 2. Populate historical views for widgets in your dashboards that use numeric value paths.
 
-The tradeoff is that you must configure the provider plugin to capture the paths you want to chart, and it must have enough recorded data to cover your chart time span. This is not automatic when using an external provider.
+You must configure the provider plugin to capture the paths you want to chart, and it must have enough recorded data to cover your chart time span. This is not automatic.
 
-The benefit is greater control, including:
+Running a provider gives you full control, including:
 - Long-term record keeping.
 - Custom retention and sampling rules.
 - Analytics or integration with tools such as Grafana.
 
 ## Which Widgets Support History?
 
-As with KIP's built-in Time-Series, most widgets that use numeric paths support history when using an external History API provider, including Horizon, Battery Monitor, Solar, and similar numeric-based widgets. Your provider plugin must be configured to capture the paths you want to chart.
+Most widgets that use numeric paths support history, including Horizon, Battery Monitor, Solar, and similar numeric-based widgets. Your provider plugin must be configured to capture the paths you want to chart.
 
 ## Required Plugins and Signal K Version
 
@@ -78,7 +78,7 @@ Choose a sampling rate that supports chart durations of 5 and 30 minutes.
 
 ## Limitations
 
-To seed charts with historical data, you usually need to manually configure your provider to collect the required paths. Unlike KIP's built-in Time-Series, this is not automatic.
+To seed charts with historical data, you must configure your provider to collect the required paths. This is not automatic.
 
 ## Troubleshooting
 
