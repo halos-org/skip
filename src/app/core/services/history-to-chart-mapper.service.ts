@@ -35,7 +35,7 @@ export class HistoryToChartMapperService {
   /**
    * Maps a History API response payload into normalized chart datapoints.
    *
-   * - Detects aggregate columns (`avg`/`average`, `sma`) from `response.values`.
+   * - Detects the Value column (`last` preferred, else `avg`/`average`) and `sma` from `response.values`.
    * - Emits one datapoint per response row.
    * - Computes dataset-wide summary stats from mapped datapoint values and
    *   stores them on the final datapoint (`lastAverage`, `lastMinimum`, `lastMaximum`).
@@ -58,6 +58,7 @@ export class HistoryToChartMapperService {
     }
 
     let smaIndex = -1;
+    let lastIndex = -1;
     let avgIndex = -1;
     if (response.values && Array.isArray(response.values)) {
       for (let i = 0; i < response.values.length; i++) {
@@ -66,15 +67,25 @@ export class HistoryToChartMapperService {
         if (!method) continue;
         const index = i + 1; // +1 because index 0 is timestamp
         if (method === 'sma') smaIndex = index;
+        else if (method === 'last') lastIndex = index;
         else if (method === 'avg' || method === 'average') avgIndex = index;
       }
 
-      if (avgIndex < 0 && response.values.length === 1) {
+      // Single-column fallback: treat the lone column as the value only when it is not a
+      // recognized non-value method. Guarding on smaIndex stops a provider that returns just an
+      // `sma` column (e.g. one that silently drops an unsupported `:last`) from being plotted as
+      // the raw Value series.
+      if (lastIndex < 0 && avgIndex < 0 && smaIndex < 0 && response.values.length === 1) {
         avgIndex = 1;
       }
     } else if (rows[0]?.length > 1) {
       avgIndex = 1;
     }
+
+    // The Value series prefers the raw per-bucket `last` sample: it is angle-safe at the 0/360° wrap
+    // and seam-free against the client-stamped live tail. `avg`/`average` stays the fallback for
+    // callers (e.g. the history-chart dialog) that still request bucket means.
+    const valueIndex = lastIndex >= 0 ? lastIndex : avgIndex;
 
     const shouldNormalizeAngle = options.domain !== 'scalar';
     const normalizeAngle = shouldNormalizeAngle
@@ -96,18 +107,18 @@ export class HistoryToChartMapperService {
       const timestamp = Date.parse(row[0] as string);
 
       let smaValue = smaIndex >= 0 ? (row[smaIndex] as number | null) : null;
-      let avgValue = avgIndex >= 0 ? (row[avgIndex] as number | null) : null;
+      let columnValue = valueIndex >= 0 ? (row[valueIndex] as number | null) : null;
 
       if (shouldNormalizeAngle) {
         smaValue = Number.isFinite(smaValue) ? normalizeAngle!(smaValue as number) : null;
-        avgValue = Number.isFinite(avgValue) ? normalizeAngle!(avgValue as number) : null;
+        columnValue = Number.isFinite(columnValue) ? normalizeAngle!(columnValue as number) : null;
       } else {
         smaValue = Number.isFinite(smaValue) ? (smaValue as number) : null;
-        avgValue = Number.isFinite(avgValue) ? (avgValue as number) : null;
+        columnValue = Number.isFinite(columnValue) ? (columnValue as number) : null;
       }
 
-      if (Number.isFinite(avgValue)) {
-        const value = avgValue as number;
+      if (Number.isFinite(columnValue)) {
+        const value = columnValue as number;
         if (shouldNormalizeAngle) {
           angleValues.push(value);
         } else {
@@ -121,7 +132,7 @@ export class HistoryToChartMapperService {
       datapoints.push({
         timestamp,
         data: {
-          value: avgValue,
+          value: columnValue,
           sma: smaValue,
           ema: null,
           doubleEma: null,
