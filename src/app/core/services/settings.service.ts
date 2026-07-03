@@ -465,30 +465,43 @@ export class SettingsService {
 
   //Config manipulation: RAW and SignalK server - used by Settings Config Component
   public resetSettings() {
-
-    const newDefaultConfig: IConfig = { app: null, theme: null, dashboards: [] };
-    newDefaultConfig.app = this.getDefaultAppConfig();
-    newDefaultConfig.theme = this.getDefaultThemeConfig();
-    newDefaultConfig.dashboards = this.getDefaultDashboardsConfig();
-
-    if (this.storage.storageServiceReady$.getValue()) {
-      this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
-        .then(() => {
-          console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
-          this.reloadApp();
-        })
-        .catch(error => {
-          console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
-          this.snackBar.open(
-            'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
-            'Close',
-            {
-              duration: 0,
-              verticalPosition: 'top'
-            }
-          );
-        });
+    // The user asked for a reset: a storage that is not ready must fail loudly, not silently
+    // leave the previous configuration in place.
+    if (!this.storage.storageServiceReady$.getValue()) {
+      console.error("[AppSettings Service] Storage not ready; cannot reset configuration.");
+      this.snackBar.open(
+        'Cannot reset configuration: server storage is not ready. Reload the app and try again.',
+        'Close',
+        {
+          duration: 0,
+          verticalPosition: 'top'
+        }
+      );
+      return;
     }
+
+    const newDefaultConfig: IConfig = {
+      app: this.getDefaultAppConfig(),
+      theme: this.getDefaultThemeConfig(),
+      dashboards: this.getDefaultDashboardsConfig()
+    };
+
+    this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
+      .then(() => {
+        console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
+        this.reloadApp();
+      })
+      .catch(error => {
+        console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
+        this.snackBar.open(
+          'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
+          'Close',
+          {
+            duration: 0,
+            verticalPosition: 'top'
+          }
+        );
+      });
   }
 
   public loadDemoConfig() {
@@ -592,13 +605,14 @@ export class SettingsService {
     localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.buildConnectionStorageObject()));
   }
 
-  // Creates config from defaults and saves to LocalStorage
+  // Builders returning fresh default configs. Profile config persists to the server, so these
+  // write no localStorage mirrors — except the connection config, which is per-device
+  // localStorage scope and must persist where it lives.
   private getDefaultAppConfig(): IAppConfig {
     const config: IAppConfig = cloneDeep(DefaultAppConfig);
     config.notificationConfig = cloneDeep(DefaultNotificationConfig);
     config.unitDefaults = cloneDeep(DefaultUnitsConfig);
     config.configVersion = LATEST_APP_CONFIG_VERSION;
-    localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(config));
     return config;
   }
 
@@ -611,14 +625,10 @@ export class SettingsService {
   }
 
   private getDefaultDashboardsConfig(): Dashboard[] {
-    const config: Dashboard[] = [];
-    localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(config));
-    return config;
+    return [];
   }
 
   private getDefaultThemeConfig(): IThemeConfig {
-    const config: IThemeConfig = DefaultThemeConfig;
-    localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(config));
-    return config;
+    return cloneDeep(DefaultThemeConfig);
   }
 }

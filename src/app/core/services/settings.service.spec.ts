@@ -680,11 +680,9 @@ describe('SettingsService — resetSettings (characterization)', () => {
     expect(snackSpy).toHaveBeenCalled();
   });
 
-  // PHASE-B PIN (may be modified by the PR-4 rewrite, and ONLY by it): today, resetSettings with
-  // storage not ready is a SILENT no-op — no write, no reload, and no error surfaced to the user.
-  // Phase B intentionally changes this to raise a MatSnackBar error (issue #17, decision 5). This is
-  // one of the two flagged Phase-B-mutable pins; every other spec must stay green unmodified.
-  it('storage NOT ready: silently does nothing — no write, no reload, no error surfaced', () => {
+  // The user asked for a reset and must learn it did not happen: storage-not-ready raises the
+  // MatSnackBar error instead of silently doing nothing (issue #17, decision 5).
+  it('storage NOT ready: surfaces a snackbar error — no write, no reload', () => {
     const service = createService({ sharedConfigName: 'profileA' });
     const storage = TestBed.inject(StorageService);
     storage.storageServiceReady$.next(false);
@@ -697,7 +695,7 @@ describe('SettingsService — resetSettings (characterization)', () => {
 
     expect(setSpy).not.toHaveBeenCalled();
     expect(reloadSpy).not.toHaveBeenCalled();
-    expect(snackSpy).not.toHaveBeenCalled();
+    expect(snackSpy).toHaveBeenCalled();
   });
 });
 
@@ -707,15 +705,13 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
     (window as unknown as Record<string, unknown>)['__KIP_TEST__'] = true;
   });
 
-  // PHASE-B PIN (may be modified by the PR-4 rewrite, and ONLY by it): the getDefaultAppConfig /
-  // getDefaultThemeConfig / getDefaultDashboardsConfig helpers currently write localStorage mirrors
-  // as a side effect even in server mode. Phase B intentionally strips these three writes (issue
-  // #17, decision 5) — no live reader depends on them. The connectionConfig default write is NOT
-  // part of this pin: it is live device scope and stays (see the next test). This is the second of
-  // the two flagged Phase-B-mutable pins.
-  it('resetSettings (server mode) also overwrites the local appConfig/themeConfig/dashboardsConfig mirrors', () => {
-    // seedConfig plants distinct sentinels: appConfig{autoNightMode:false, nightModeBrightness:1},
-    // themeConfig 'light', dashboardsConfig [{id:'dash-1'}] — all visibly replaced by defaults.
+  // Config persists to the server; the app/theme/dashboards localStorage mirrors are dead weight
+  // no live reader depends on, so the getDefault* helpers write none of them (issue #17,
+  // decision 5). The connectionConfig default write is NOT part of this: it is live device scope
+  // and stays (see the next test).
+  it('resetSettings (server mode) leaves the local appConfig/themeConfig/dashboardsConfig mirrors untouched', () => {
+    // seedConfig plants sentinels distinct from the defaults: appConfig{autoNightMode:false,
+    // nightModeBrightness:1}, themeConfig 'light', dashboardsConfig [{id:'dash-1'}] — all survive.
     const service = createService({ sharedConfigName: 'profileA' });
     const storage = TestBed.inject(StorageService);
     storage.storageServiceReady$.next(true);
@@ -725,11 +721,10 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
     service.resetSettings();
 
     const app = JSON.parse(localStorage.getItem('skip.appConfig') as string);
-    expect(app.autoNightMode).toBe(DefaultAppConfig.autoNightMode);
-    expect(app.nightModeBrightness).toBe(DefaultAppConfig.nightModeBrightness);
-    expect(app.configVersion).toBe(LATEST_APP_CONFIG_VERSION);
-    expect(JSON.parse(localStorage.getItem('skip.themeConfig') as string)).toEqual({ themeName: '' });
-    expect(JSON.parse(localStorage.getItem('skip.dashboardsConfig') as string)).toEqual([]);
+    expect(app.autoNightMode).toBe(false);
+    expect(app.nightModeBrightness).toBe(1);
+    expect(JSON.parse(localStorage.getItem('skip.themeConfig') as string)).toEqual({ themeName: 'light' });
+    expect(JSON.parse(localStorage.getItem('skip.dashboardsConfig') as string)).toEqual([{ id: 'dash-1' }]);
   });
 
   // NOT Phase-B-mutable: the connectionConfig default write is live device scope and survives the
@@ -747,18 +742,18 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
     expect(cfg.kipUUID).toBe(persisted.kipUUID);
   });
 
-  // PHASE-B PIN (may be modified by the PR-4 rewrite, and ONLY by it — flagged alongside the mirror
-  // pin above): getDefaultThemeConfig currently returns the DefaultThemeConfig module const BY
-  // REFERENCE (aliasing) and writes the localStorage mirror. Phase B changes it to cloneDeep and
-  // strips the write (issue #17, decision 5 / PCS-08), flipping toBe → not.toBe here.
-  it('getDefaultThemeConfig returns the DefaultThemeConfig module const by reference (aliasing)', () => {
+  // getDefaultThemeConfig clones (issue #17, decision 5 / PCS-08): a caller mutating the result
+  // must never reach the shared DefaultThemeConfig module const, and no localStorage mirror is
+  // written.
+  it('getDefaultThemeConfig returns a fresh clone and writes no localStorage mirror', () => {
     const service = createService({});
     localStorage.removeItem('skip.themeConfig');
 
     const theme = service.loadConfigFromLocalStorage('themeConfig');
 
-    expect(theme).toBe(DefaultThemeConfig);
-    expect(JSON.parse(localStorage.getItem('skip.themeConfig') as string)).toEqual({ themeName: '' });
+    expect(theme).not.toBe(DefaultThemeConfig);
+    expect(theme).toEqual({ themeName: '' });
+    expect(localStorage.getItem('skip.themeConfig')).toBeNull();
   });
 });
 
