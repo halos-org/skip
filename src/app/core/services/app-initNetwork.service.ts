@@ -33,7 +33,6 @@ export interface IBootstrapIssue {
   reason: TBootstrapIssueReason;
   statusCode?: number;
   sharedConfigName?: string;
-  legacyUpgradeAvailable?: boolean;
   cause?: TAuthBlockedCause;
 }
 
@@ -154,17 +153,30 @@ export class AppNetworkInitService implements OnDestroy {
         if (!storageReady) {
           throw new Error('[AppInit Network Service] StorageService did not become ready in time. Cannot bootstrap remote configuration.');
         } else {
-          remoteConfig = await this.storage.getConfig('user', this.config.sharedConfigName, configFileVersion);
+          try {
+            remoteConfig = await this.storage.getConfig('user', this.config.sharedConfigName, configFileVersion);
+          } catch (error) {
+            // Only a 404 from the config fetch itself means "no shared configuration"; 404s from
+            // earlier bootstrap steps (e.g. /signalk/ discovery) must not offer config recovery.
+            if (error?.status === 404) {
+              startupDegraded = true;
+              this._bootstrapIssue$.next({
+                reason: 'missing-shared-config',
+                statusCode: 404,
+                sharedConfigName: this.config.sharedConfigName
+              });
+              this._bootstrapStatus$.next('degraded');
+              return;
+            }
+            throw error;
+          }
           if (!remoteConfig?.app) {
             // SK answers a never-created slot with 200 {} rather than a 404, so an appless config is
-            // the real "no shared configuration yet" signal. Surface recovery here; the 404 catch
-            // branch below remains only for servers that genuinely answer 404.
+            // the real "no shared configuration yet" signal.
             startupDegraded = true;
-            const legacyUpgradeAvailable = await this.probeLegacyUpgradeAvailability(this.config.sharedConfigName);
             this._bootstrapIssue$.next({
               reason: 'missing-shared-config',
-              sharedConfigName: this.config.sharedConfigName,
-              legacyUpgradeAvailable
+              sharedConfigName: this.config.sharedConfigName
             });
             this._bootstrapStatus$.next('degraded');
             return;
@@ -178,8 +190,8 @@ export class AppNetworkInitService implements OnDestroy {
         }
       }
 
-      // Lift remote-control identity to the per-device connectionConfig (once). Runs after the
-      // profile is loaded; skipped on a degraded shared boot (remoteConfig null) so it retries later.
+      // Lift remote-control identity to the per-device connectionConfig (once). Identity comes from
+      // the loaded profile, else the legacy local appConfig blob, else identity defaults.
       this.migrateRemoteControlToDevice(remoteConfig);
 
       this._bootstrapIssue$.next({ reason: 'none' });
@@ -190,15 +202,7 @@ export class AppNetworkInitService implements OnDestroy {
 
     } catch (error) {
       startupDegraded = true;
-      if (error?.status === 404 && this.config?.useSharedConfig) {
-        const legacyUpgradeAvailable = await this.probeLegacyUpgradeAvailability(this.config.sharedConfigName);
-        this._bootstrapIssue$.next({
-          reason: 'missing-shared-config',
-          statusCode: 404,
-          sharedConfigName: this.config.sharedConfigName,
-          legacyUpgradeAvailable
-        });
-      } else if (error?.status === 0) {
+      if (error?.status === 0) {
         this._bootstrapIssue$.next({ reason: 'network-unreachable', statusCode: 0 });
       } else if (error?.status === 401) {
         this._bootstrapIssue$.next({ reason: 'unauthorized', statusCode: 401 });
@@ -313,20 +317,6 @@ export class AppNetworkInitService implements OnDestroy {
     });
   }
 
-  private async probeLegacyUpgradeAvailability(sharedConfigName: string): Promise<boolean> {
-    if (!sharedConfigName) {
-      return false;
-    }
-
-    try {
-      const legacyConfig = await this.storage.getConfig('user', sharedConfigName, 9) as IConfig;
-      const legacyConfigVersion = legacyConfig?.app?.configVersion;
-      return legacyConfigVersion === 10;
-    } catch {
-      return false;
-    }
-  }
-
   private setLocalStorageConfig(): void {
     localStorage.setItem(CONNECTION_CONFIG_KEY, JSON.stringify(this.config));
   }
@@ -334,9 +324,9 @@ export class AppNetworkInitService implements OnDestroy {
   /**
    * One-time migration (connectionConfig version < 13 → 13): the remote-control identity
    * (isRemoteControl, instanceName) moved from the profile (IAppConfig) to the per-device
-   * connectionConfig. Lift the existing values from the active profile (shared mode) or the local
-   * appConfig (local mode). On a degraded shared boot the profile is unavailable, so the lift is
-   * deferred (version stays < 13) and retried on a later successful boot.
+   * connectionConfig. Lift the existing values from the profile loaded this boot, falling back to
+   * the legacy local appConfig blob when no profile is available; absent both, migrate with the
+   * identity defaults.
    *
    * @param {IConfig | null} remoteConfig The profile loaded this boot, or null when unavailable.
    */
@@ -347,15 +337,12 @@ export class AppNetworkInitService implements OnDestroy {
     // The fields still exist at runtime in pre-migration stored configs, but were removed from IAppConfig.
     let app: { isRemoteControl?: boolean; instanceName?: string } | null =
       (remoteConfig?.app as unknown as { isRemoteControl?: boolean; instanceName?: string }) ?? null;
-    if (!app && !this.config.useSharedConfig) {
+    if (!app) {
       try {
         app = JSON.parse(localStorage.getItem(LOCAL_CONFIG_KEYS.appConfig) ?? 'null');
       } catch {
         app = null;
       }
-    }
-    if (!app && this.config.useSharedConfig) {
-      return; // shared mode but the profile is not loaded (degraded) — retry on a later boot
     }
     this.config.isRemoteControl = app?.isRemoteControl ?? false;
     this.config.instanceName = app?.instanceName ?? '';

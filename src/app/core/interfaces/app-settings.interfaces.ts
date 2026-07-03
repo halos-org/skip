@@ -8,7 +8,6 @@ export interface IConnectionConfig {
   signalKUrl: string;
   proxyEnabled: boolean;
   signalKSubscribeAll: boolean;
-  useSharedConfig: boolean;
   sharedConfigName: string;
   // Remote-control identity is per-device: a profile switch must not change whether this display
   // participates in remote control or the name it advertises.

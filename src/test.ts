@@ -215,7 +215,7 @@ class MatBottomSheetRefStub { dismiss(): void { /* noop */ } }
 class MatDialogRefStub { close(): void { /* noop */ } }
 class AppNetworkInitServiceStub {
   private _bootstrapStatusSubject = new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready');
-  private _bootstrapIssueSubject = new BehaviorSubject<{ reason: 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked'; statusCode?: number; sharedConfigName?: string; legacyUpgradeAvailable?: boolean; cause?: 'budget-exhausted' | 'sign-in-required' }>({ reason: 'none' });
+  private _bootstrapIssueSubject = new BehaviorSubject<{ reason: 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked'; statusCode?: number; sharedConfigName?: string; cause?: 'budget-exhausted' | 'sign-in-required' }>({ reason: 'none' });
 
   public bootstrapStatus$ = this._bootstrapStatusSubject.asObservable();
   public bootstrapIssue$ = this._bootstrapIssueSubject.asObservable();
@@ -335,7 +335,6 @@ class SettingsServiceStub {
     signalKUrl: 'http://localhost',
     proxyEnabled: false,
     signalKSubscribeAll: false,
-    useSharedConfig: false,
     sharedConfigName: '',
     kipUUID: 'test-uuid',
     isRemoteControl: false,

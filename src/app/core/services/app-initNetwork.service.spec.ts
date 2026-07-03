@@ -148,9 +148,9 @@ describe('AppNetworkInitService', () => {
     }
 
     describe('migrateRemoteControlToDevice (connectionConfig v12 -> v13)', () => {
-        const baseV12: Partial<IConnectionConfig> = { configVersion: 12, useSharedConfig: true, isRemoteControl: false, instanceName: '' };
+        const baseV12: Partial<IConnectionConfig> = { configVersion: 12, isRemoteControl: false, instanceName: '' };
 
-        it('shared boot lifts the profile identity and stamps v13 once', () => {
+        it('boot with a loaded profile lifts its identity and stamps v13 once', () => {
             localStorage.removeItem('skip.connectionConfig');
             setConnConfig({ ...baseV12 });
             migrate({ app: { isRemoteControl: true, instanceName: 'Helm' } } as unknown as IConfig);
@@ -159,22 +159,24 @@ describe('AppNetworkInitService', () => {
             expect(storedConn()?.configVersion).toBe(13);
         });
 
-        it('local boot lifts the identity from the local appConfig', () => {
+        it('boot without a profile lifts the identity from the legacy local appConfig', () => {
             localStorage.removeItem('skip.connectionConfig');
             localStorage.setItem('skip.appConfig', JSON.stringify({ isRemoteControl: true, instanceName: 'Mast' }));
-            setConnConfig({ ...baseV12, useSharedConfig: false });
+            setConnConfig({ ...baseV12 });
             migrate(null);
             expect(storedConn()?.isRemoteControl).toBe(true);
             expect(storedConn()?.instanceName).toBe('Mast');
             expect(storedConn()?.configVersion).toBe(13);
         });
 
-        it('degraded shared boot (no profile) defers: version stays 12, nothing persisted', () => {
+        it('boot with neither profile nor local appConfig migrates with identity defaults', () => {
             localStorage.removeItem('skip.connectionConfig');
-            setConnConfig({ ...baseV12, useSharedConfig: true });
+            localStorage.removeItem('skip.appConfig');
+            setConnConfig({ ...baseV12, isRemoteControl: true, instanceName: 'stale' });
             migrate(null);
-            expect(storedConn()).toBeNull();
-            expect((service as unknown as { config: IConnectionConfig }).config.configVersion).toBe(12);
+            expect(storedConn()?.isRemoteControl).toBe(false);
+            expect(storedConn()?.instanceName).toBe('');
+            expect(storedConn()?.configVersion).toBe(13);
         });
 
         it('is a no-op when already migrated (version >= 13)', () => {
@@ -354,6 +356,25 @@ describe('AppNetworkInitService', () => {
             await service.initNetworkServices();
 
             expect(mockConnectionStateMachine.startWebSocketConnection).not.toHaveBeenCalled();
+        });
+
+        it('classifies a genuine storage 404 as missing-shared-config (recovery toast reachable)', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
+        });
+
+        it('classifies a discovery 404 as unknown — config recovery must not be offered', async () => {
+            // A 404 from GET /signalk/ (SK serving the app but not the API) reaches the same
+            // bootstrap catch; only the config fetch's own 404 may claim missing-shared-config.
+            mockConnection.initializeConnection.mockRejectedValueOnce({ status: 404 });
+
+            await service.initNetworkServices();
+
+            expect(latestIssue()).toEqual({ reason: 'unknown', statusCode: 404 });
         });
 
         it('starts the WebSocket once from a fresh HTTPConnected state', async () => {

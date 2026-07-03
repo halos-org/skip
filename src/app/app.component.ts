@@ -216,28 +216,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
       this.missingConfigPromptShown = true;
       const cfgName = issue.sharedConfigName || 'default';
-      const canUpgradeLegacy = issue.legacyUpgradeAvailable === true;
-      const actionLabel = canUpgradeLegacy ? 'Upgrade' : 'Create';
-      const message = canUpgradeLegacy
-        ? `Server is reachable, but no current version shared configuration '${cfgName}' exists for this user. A legacy configuration was found and can be upgraded. Upgrade now?`
-        : `Server is reachable, but no shared configuration '${cfgName}' exists for this user. Create a default configuration now?`;
       const ref = this.toast.show(
-        message,
+        `Server is reachable, but no shared configuration '${cfgName}' exists for this user. Create a default configuration now?`,
         0,
         true,
         'warn',
-        actionLabel
+        'Create'
       );
 
       ref.onAction()
         .pipe(takeUntilDestroyed(this._destroyRef))
-        .subscribe(() => {
-          if (canUpgradeLegacy) {
-            this.upgrade.runUpgrade();
-          } else {
-            this.settings.resetSettings();
-          }
-        });
+        .subscribe(() => this.settings.resetSettings());
     });
 
     // Cookie-mode auth blocked (SSO auto-login looped out of budget, or sign-in required): offer an

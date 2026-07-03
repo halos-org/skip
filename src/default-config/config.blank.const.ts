@@ -32,7 +32,6 @@ export const DefaultConnectionConfig: Readonly<IConnectionConfig> = {
   "signalKUrl": null, // get's overwritten with host at getDefaultConnectionConfig()
   "proxyEnabled": false,
   "signalKSubscribeAll": false,
-  "useSharedConfig": false,
   "sharedConfigName": "default",
   "isRemoteControl": false,
   "instanceName": ""

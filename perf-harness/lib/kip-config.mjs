@@ -42,7 +42,7 @@ export function connectionConfig(subscribeAll = false) {
     configVersion: 13, kipUUID: '00000000-0000-4000-8000-000000000001',
     signalKUrl: '__ORIGIN__', // replaced with the served origin at inject time
     proxyEnabled: false, signalKSubscribeAll: subscribeAll,
-    useSharedConfig: true, sharedConfigName: 'default',
+    sharedConfigName: 'default',
     isRemoteControl: false, instanceName: '',
   };
 }
