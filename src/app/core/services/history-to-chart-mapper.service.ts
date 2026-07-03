@@ -1,10 +1,12 @@
 import { Injectable } from '@angular/core';
 import { IHistoryValuesResponse } from './history-api-client.service';
-
-/**
- * Defines how angular/radian values are interpreted while mapping historical data.
- */
-export type THistoryChartAngleDomain = 'scalar' | 'direction' | 'signed';
+import {
+  ChartStatsDomain,
+  circularMeanRad,
+  circularMinMaxRad,
+  normalizeDirectionRad,
+  normalizeSignedRad
+} from '../utils/chart-stats.util';
 
 /**
  * Normalized historical datapoint shape used by chart-oriented consumers.
@@ -33,27 +35,22 @@ export class HistoryToChartMapperService {
   /**
    * Maps a History API response payload into normalized chart datapoints.
    *
-   * - Detects aggregate columns (`avg`/`average`, `sma`, `min`, `max`) from
-   *   `response.values`.
+   * - Detects aggregate columns (`avg`/`average`, `sma`) from `response.values`.
    * - Emits one datapoint per response row.
    * - Computes dataset-wide summary stats from mapped datapoint values and
    *   stores them on the final datapoint (`lastAverage`, `lastMinimum`, `lastMaximum`).
    *
-   * @param {IHistoryValuesResponse} response Raw History API response.
-   * @param {{ unit: string; domain: THistoryChartAngleDomain }} options Mapping options.
-   * @param {string} options.unit Base unit (e.g., `number`, `rad`) used to choose scalar vs circular math.
-   * @param {THistoryChartAngleDomain} options.domain Angular domain interpretation for `rad` values.
-   * @returns {IHistoryChartDatapoint[]} Normalized datapoints ready for chart/data prefill pipelines.
+   * Angular (`direction`/`signed`) domains use circular math from `chart-stats.util`, matching the
+   * live-tail statistics so backfill and live tail agree; `scalar` uses arithmetic aggregates.
    *
-   * @example
-   * const datapoints = adapter.mapValuesToChartDatapoints(response, {
-   *   unit: 'number',
-   *   domain: 'scalar'
-   * });
+   * @param {IHistoryValuesResponse} response Raw History API response.
+   * @param {{ domain: ChartStatsDomain }} options Mapping options.
+   * @param {ChartStatsDomain} options.domain Domain interpretation; `scalar` is plain numeric.
+   * @returns {IHistoryChartDatapoint[]} Normalized datapoints ready for chart/data prefill pipelines.
    */
   public mapValuesToChartDatapoints(
     response: IHistoryValuesResponse,
-    options: { unit: string; domain: THistoryChartAngleDomain }
+    options: { domain: ChartStatsDomain }
   ): IHistoryChartDatapoint[] {
     const rows = response?.data;
     if (!rows || rows.length === 0) {
@@ -79,11 +76,9 @@ export class HistoryToChartMapperService {
       avgIndex = 1;
     }
 
-    const shouldNormalizeAngle = options.unit === 'rad';
+    const shouldNormalizeAngle = options.domain !== 'scalar';
     const normalizeAngle = shouldNormalizeAngle
-      ? (options.domain === 'signed'
-        ? this.normalizeToSigned.bind(this)
-        : this.normalizeToDirection.bind(this))
+      ? (options.domain === 'signed' ? normalizeSignedRad : normalizeDirectionRad)
       : null;
 
     const datapoints: IHistoryChartDatapoint[] = [];
@@ -93,8 +88,6 @@ export class HistoryToChartMapperService {
     let scalarMax = Number.NEGATIVE_INFINITY;
     let scalarCount = 0;
 
-    let angleSumSin = 0;
-    let angleSumCos = 0;
     const angleValues: number[] = [];
 
     for (const row of rows) {
@@ -117,8 +110,6 @@ export class HistoryToChartMapperService {
         const value = avgValue as number;
         if (shouldNormalizeAngle) {
           angleValues.push(value);
-          angleSumSin += Math.sin(value);
-          angleSumCos += Math.cos(value);
         } else {
           scalarCount++;
           scalarSum += value;
@@ -147,18 +138,11 @@ export class HistoryToChartMapperService {
       let datasetMaximum: number | null = null;
 
       if (shouldNormalizeAngle && angleValues.length > 0) {
-        datasetAverage = Math.atan2(angleSumSin / angleValues.length, angleSumCos / angleValues.length);
-        const { min, max } = this.circularMinMaxRad(angleValues);
-
-        if (options.domain === 'signed') {
-          datasetAverage = this.normalizeToSigned(datasetAverage);
-          datasetMinimum = this.normalizeToSigned(min);
-          datasetMaximum = this.normalizeToSigned(max);
-        } else {
-          datasetAverage = this.normalizeToDirection(datasetAverage);
-          datasetMinimum = this.normalizeToDirection(min);
-          datasetMaximum = this.normalizeToDirection(max);
-        }
+        const wrap = options.domain === 'signed' ? normalizeSignedRad : normalizeDirectionRad;
+        const { min, max } = circularMinMaxRad(angleValues);
+        datasetAverage = wrap(circularMeanRad(angleValues));
+        datasetMinimum = wrap(min);
+        datasetMaximum = wrap(max);
       } else if (!shouldNormalizeAngle && scalarCount > 0) {
         datasetAverage = scalarSum / scalarCount;
         datasetMinimum = scalarMin;
@@ -174,45 +158,5 @@ export class HistoryToChartMapperService {
     }
 
     return datapoints;
-  }
-
-  private circularMinMaxRad(anglesRad: number[]): { min: number; max: number } {
-    if (anglesRad.length === 0) {
-      return { min: 0, max: 0 };
-    }
-
-    const degAngles = anglesRad
-      .map(angle => ((angle * 180 / Math.PI) + 360) % 360)
-      .sort((left, right) => left - right);
-
-    let maxGap = 0;
-    let minIdx = 0;
-    for (let i = 0; i < degAngles.length; i++) {
-      const next = (i + 1) % degAngles.length;
-      const gap = (degAngles[next] - degAngles[i] + 360) % 360;
-      if (gap > maxGap) {
-        maxGap = gap;
-        minIdx = next;
-      }
-    }
-
-    return {
-      min: degAngles[minIdx] * Math.PI / 180,
-      max: degAngles[(minIdx - 1 + degAngles.length) % degAngles.length] * Math.PI / 180
-    };
-  }
-
-  private mod(value: number, modulo: number): number {
-    return ((value % modulo) + modulo) % modulo;
-  }
-
-  private normalizeToDirection(rad: number): number {
-    const twoPi = 2 * Math.PI;
-    return this.mod(rad, twoPi);
-  }
-
-  private normalizeToSigned(rad: number): number {
-    const twoPi = 2 * Math.PI;
-    return this.mod(rad + Math.PI, twoPi) - Math.PI;
   }
 }

@@ -11,8 +11,6 @@ import { IDatasetServiceDatapoint } from './dataset-stream.service';
 const PARAMS: IHistoryChartStreamParams = {
   path: 'navigation.speedOverGround',
   source: 'default',
-  unit: 'number',
-  domain: 'scalar',
   windowMs: 60_000,
   sampleTime: 500,
   maxDataPoints: 3,
@@ -23,7 +21,7 @@ describe('HistoryChartStreamService', () => {
   let path$: Subject<IPathUpdate>;
   const history = { getValues: vi.fn() };
   const mapper = { mapValuesToChartDatapoints: vi.fn() };
-  const data = { subscribePath: vi.fn() };
+  const data = { subscribePath: vi.fn(), getPathUnitType: vi.fn() };
   const settings = { getWidgetHistoryDisabled: vi.fn() };
 
   function make(): HistoryChartStreamService {
@@ -44,6 +42,7 @@ describe('HistoryChartStreamService', () => {
     history.getValues.mockReset();
     mapper.mapValuesToChartDatapoints.mockReset().mockReturnValue([]);
     data.subscribePath.mockReset().mockReturnValue(path$);
+    data.getPathUnitType.mockReset().mockReturnValue(null); // scalar unless a test overrides
     settings.getWidgetHistoryDisabled.mockReset().mockReturnValue(false);
   });
 
@@ -168,5 +167,28 @@ describe('HistoryChartStreamService', () => {
     await Promise.resolve();
     expect(emissions.length).toBe(0); // the disposed guard prevents the batch
     expect(data.subscribePath).not.toHaveBeenCalled();
+  });
+
+  it('resolves a radian path with no override to a circular domain — live stats wrap correctly (#6)', async () => {
+    // navigation.headingTrue is a rad path, not on the signed allowlist -> direction domain.
+    data.getPathUnitType.mockReturnValue('rad');
+    history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+    mapper.mapValuesToChartDatapoints.mockReturnValue([
+      { timestamp: 1000, data: { value: (350 * Math.PI) / 180 } } // seeds the window with 350°
+    ]);
+
+    const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+    make().getBackfillThenLive({ ...PARAMS, path: 'navigation.headingTrue' }).subscribe(e => emissions.push(e));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Live value at 10°, over a window already holding 350°.
+    path$.next({ data: { value: (10 * Math.PI) / 180, timestamp: new Date(2000) }, state: 'normal' });
+
+    const last = emissions[emissions.length - 1] as IDatasetServiceDatapoint;
+    const avg = last.data.lastAverage as number;
+    // Circular mean of 350° and 10° is ~0° in the direction domain, NOT the ~180° a linear mean gives.
+    // Pre-#133 this path resolved to 'scalar' and lastAverage would be ~π.
+    expect(Math.min(avg, 2 * Math.PI - avg)).toBeLessThan(0.02);
   });
 });

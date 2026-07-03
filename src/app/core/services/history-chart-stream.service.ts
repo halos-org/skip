@@ -2,7 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, Subscription, filter, merge, take, timer, withLatestFrom } from 'rxjs';
 import { DataService } from './data.service';
 import { HistoryApiClientService } from './history-api-client.service';
-import { HistoryToChartMapperService, THistoryChartAngleDomain } from './history-to-chart-mapper.service';
+import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
+import { resolveAngleDomain } from '../utils/angle-domain.util';
 import { SettingsService } from './settings.service';
 import { IDatasetServiceDatapoint } from './dataset-stream.service';
 import { computeWindowStats, ChartStatsDomain } from '../utils/chart-stats.util';
@@ -22,9 +23,8 @@ export function isHistoryUnavailable(v: unknown): v is IHistoryUnavailable {
 export interface IHistoryChartStreamParams {
   path: string;
   source: string;
-  /** Base unit — `'rad'` selects circular aggregation. */
-  unit: string;
-  domain: ChartStatsDomain;
+  /** Raw per-chart angle-range override; combined with the path's base unit to resolve the domain. */
+  angleDomainOverride?: 'signed' | 'direction';
   windowMs: number;
   sampleTime: number;
   maxDataPoints: number;
@@ -56,6 +56,7 @@ export class HistoryChartStreamService {
   public getBackfillThenLive(params: IHistoryChartStreamParams): Observable<StreamEmission> {
     return new Observable<StreamEmission>(subscriber => {
       const perf = createChartPerfProbe('history');
+      const domain = resolveAngleDomain(params.path, this.data.getPathUnitType(params.path), params.angleDomainOverride);
       let disposed = false;
       let liveSub: Subscription | null = null;
       const buffer: number[] = [];
@@ -69,7 +70,7 @@ export class HistoryChartStreamService {
         return () => { /* nothing to tear down */ };
       }
 
-      this.fetchBackfill(params, perf)
+      this.fetchBackfill(params, domain, perf)
         .then(batch => {
           if (disposed) return;
           if (batch === null) {
@@ -82,7 +83,7 @@ export class HistoryChartStreamService {
             if (Number.isFinite(p.data.value)) buffer.push(p.data.value);
           }
           this.trim(buffer, params.maxDataPoints);
-          liveSub = this.startLive(params, buffer, perf, subscriber);
+          liveSub = this.startLive(params, domain, buffer, perf, subscriber);
         })
         .catch(() => {
           if (!disposed) {
@@ -100,6 +101,7 @@ export class HistoryChartStreamService {
 
   private startLive(
     params: IHistoryChartStreamParams,
+    domain: ChartStatsDomain,
     buffer: number[],
     perf: IChartPerfProbe,
     subscriber: { next: (v: StreamEmission) => void }
@@ -117,14 +119,14 @@ export class HistoryChartStreamService {
       if (!Number.isFinite(value)) return;
       buffer.push(value);
       this.trim(buffer, params.maxDataPoints);
-      const stats = computeWindowStats(buffer, params.smoothingPeriod, params.domain);
+      const stats = computeWindowStats(buffer, params.smoothingPeriod, domain);
       const timestamp = u.data.timestamp instanceof Date ? u.data.timestamp.getTime() : Date.now();
       perf.recordLive(timestamp);
       subscriber.next({ timestamp, data: { ...stats } });
     });
   }
 
-  private async fetchBackfill(params: IHistoryChartStreamParams, perf: IChartPerfProbe): Promise<IDatasetServiceDatapoint[] | null> {
+  private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain, perf: IChartPerfProbe): Promise<IDatasetServiceDatapoint[] | null> {
     const normalizedPath = params.path.replace(/^(vessels\.)?self\./, '');
     const paths = [
       `${normalizedPath}:sma:${params.smoothingPeriod}`,
@@ -144,8 +146,7 @@ export class HistoryChartStreamService {
       return null;
     }
     const mapped = this.mapper.mapValuesToChartDatapoints(response, {
-      unit: params.unit,
-      domain: params.domain as THistoryChartAngleDomain
+      domain
     });
     if (perf.enabled) {
       perf.endBackfill(mapped.length, JSON.stringify(response).length);

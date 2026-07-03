@@ -31,7 +31,6 @@ describe('HistoryToChartMapperService', () => {
     };
 
     const datapoints = service.mapValuesToChartDatapoints(response, {
-      unit: 'number',
       domain: 'scalar'
     });
 
@@ -58,7 +57,6 @@ describe('HistoryToChartMapperService', () => {
     };
 
     const datapoints = service.mapValuesToChartDatapoints(response, {
-      unit: 'rad',
       domain: 'direction'
     });
 
@@ -70,5 +68,33 @@ describe('HistoryToChartMapperService', () => {
     expect(final.lastAverage).toBeCloseTo(0.0174959160, 6);
     expect(final.lastMinimum).toBeCloseTo(6.1959188446, 6);
     expect(final.lastMaximum).toBeCloseTo(0.0872664626, 6);
+  });
+
+  it('computes circular summary stats in the signed domain, mapping the ±π boundary to +π', () => {
+    const response: IHistoryValuesResponse = {
+      context: 'vessels.self',
+      range: {
+        from: '2026-02-16T00:00:00.000Z',
+        to: '2026-02-16T00:02:00.000Z'
+      },
+      values: [
+        { path: 'steering.rudderAngle', method: 'avg' }
+      ],
+      data: [
+        ['2026-02-16T00:00:00.000Z', 3.0], // ~172°
+        ['2026-02-16T00:01:00.000Z', -3.0] // ~-172°
+      ]
+    };
+
+    const datapoints = service.mapValuesToChartDatapoints(response, {
+      domain: 'signed'
+    });
+
+    // Circular mean of +172° and -172° is 180°, which the shared atan2 normalizer maps to +π
+    // (the included end of (-π, π]), not the recorder's former mod-based -π.
+    const final = datapoints[1].data;
+    expect(final.lastAverage).toBeCloseTo(Math.PI, 5);
+    expect(final.lastMinimum).toBeCloseTo(3.0, 5);
+    expect(final.lastMaximum).toBeCloseTo(-3.0, 5);
   });
 });

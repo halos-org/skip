@@ -10,7 +10,6 @@ import { ITheme } from '../../core/services/app-service';
 import { WidgetDatasetOrchestratorService } from '../../core/services/widget-dataset-orchestrator.service';
 import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
 import { resolveWindowMs, deriveDataSourceInfo } from '../../core/utils/chart-window.util';
-import { ChartStatsDomain } from '../../core/utils/chart-stats.util';
 import { CHART_ENGINE_OVERRIDE_KEY } from '../../core/constants/config-storage.const';
 
 import { Chart, ChartConfiguration, ChartData, ChartType, TimeUnit, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle } from 'chart.js';
@@ -776,14 +775,13 @@ export class WidgetDataChartComponent implements OnDestroy {
     this.dsServiceSub?.unsubscribe();
 
     if (this.chartEngine() === 'history') {
-      const domain: ChartStatsDomain =
-        cfg.datachartAngleRange === 'signed' || cfg.datachartAngleRange === 'direction' ? cfg.datachartAngleRange : 'scalar';
       const info = this.dataSourceInfo;
       const params: IHistoryChartStreamParams = {
         path: cfg.datachartPath,
         source: cfg.datachartSource ?? 'default',
-        unit: domain === 'scalar' ? 'number' : 'rad',
-        domain,
+        angleDomainOverride: cfg.datachartAngleRange === 'signed' || cfg.datachartAngleRange === 'direction'
+          ? cfg.datachartAngleRange
+          : undefined,
         windowMs: resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period),
         sampleTime: info.sampleTime,
         maxDataPoints: info.maxDataPoints,
