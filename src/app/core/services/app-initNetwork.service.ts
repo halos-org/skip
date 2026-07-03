@@ -8,7 +8,7 @@
 **/
 import { inject, Injectable, Injector, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
-import { IConfig, IConnectionConfig, CONNECTION_CONFIG_VERSION } from "../interfaces/app-settings.interfaces";
+import { IConfig, IConnectionConfig } from "../interfaces/app-settings.interfaces";
 import { SignalKConnectionService } from "./signalk-connection.service";
 import { AuthenticationService, ILoginStatus } from './authentication.service';
 import { SsoRedirectService } from './sso-redirect.service';
@@ -22,8 +22,8 @@ import { ConnectionState, ConnectionStateMachine } from './connection-state-mach
 import { InternetReachabilityService } from './internet-reachability.service';
 import { DatasetStreamService } from './dataset-stream.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
+import { REMOTE_CONFIG_FILE_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
 
-const configFileVersion = 11; // used to change the Signal K configuration storage file name (ie. 9.0.0.json) that contains the configuration definitions. Applies only to remote storage.
 const CONNECTION_CONFIG_KEY = LOCAL_CONFIG_KEYS.connectionConfig;
 export type TBootstrapStatus = 'starting' | 'ready' | 'degraded';
 export type TBootstrapIssueReason = 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked';
@@ -154,7 +154,7 @@ export class AppNetworkInitService implements OnDestroy {
           throw new Error('[AppInit Network Service] StorageService did not become ready in time. Cannot bootstrap remote configuration.');
         } else {
           try {
-            remoteConfig = await this.storage.getConfig('user', this.config.sharedConfigName, configFileVersion);
+            remoteConfig = await this.storage.getConfig('user', this.config.sharedConfigName, REMOTE_CONFIG_FILE_VERSION);
           } catch (error) {
             // Only a 404 from the config fetch itself means "no shared configuration"; 404s from
             // earlier bootstrap steps (e.g. /signalk/ discovery) must not offer config recovery.
@@ -183,7 +183,7 @@ export class AppNetworkInitService implements OnDestroy {
           }
           const bootstrapContext: IStorageRemoteBootstrapContext = {
             sharedConfigName: this.config.sharedConfigName,
-            configFileVersion,
+            configFileVersion: REMOTE_CONFIG_FILE_VERSION,
             initConfig: remoteConfig
           };
           this.storage.bootstrapRemoteContext(bootstrapContext);

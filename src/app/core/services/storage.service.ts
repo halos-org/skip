@@ -413,12 +413,9 @@ export class StorageService {
     let document;
     // url already reflects forced version if provided
 
-    const incomingVer: unknown = value?.configVersion;
     if (this._logIO) {
-      console.warn('[StorageService.patchConfig] Suppressing app.configVersion write into v11 file', {
-        targetFileVersion: ver,
-        incomingAppConfigVersion: incomingVer
-      });
+      const incomingVer: unknown = value?.configVersion;
+      console.debug('[StorageService.patchConfig]', { objType: ObjType, targetFileVersion: ver, configVersion: incomingVer });
     }
 
     switch (ObjType) {

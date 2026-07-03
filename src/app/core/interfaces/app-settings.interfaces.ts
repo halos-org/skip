@@ -15,15 +15,6 @@ export interface IConnectionConfig {
   instanceName: string;
 }
 
-/**
- * Per-device connectionConfig schema version (its own version space, decoupled from the app config
- * version). Only the one-time migration in AppNetworkInitService advances a stored config to this —
- * nothing else may stamp it, or a write would prematurely mark the migration done and lose the lifted
- * remote-control identity.
- */
-export const CONNECTION_CONFIG_VERSION = 13;
-/** connectionConfig versions this build can load without forcing defaults. */
-export const SUPPORTED_CONNECTION_CONFIG_VERSIONS = [11, 12, 13];
 export interface IConfig {
   app: IAppConfig | null;
   theme: IThemeConfig | null;

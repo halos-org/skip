@@ -6,10 +6,10 @@
  * answer the applicationData GET with. Shapes are taken verbatim from
  * src/default-config/* and the widget registry.
  *
- * Three distinct version spaces (all from src/app/core/services):
- *  - applicationData URL path segment 11 (configFileVersion, app-initNetwork.service.ts)
- *  - app.configVersion 12 (latestConfigVersion, settings.service.ts)
- *  - connectionConfig.configVersion 13 (CONNECTION_CONFIG_VERSION, app-settings.interfaces.ts)
+ * Three distinct version spaces (all from src/app/core/constants/config-versions.const.ts):
+ *  - applicationData URL path segment 11 (REMOTE_CONFIG_FILE_VERSION)
+ *  - app.configVersion 12 (LATEST_APP_CONFIG_VERSION)
+ *  - connectionConfig.configVersion 13 (CONNECTION_CONFIG_VERSION)
  */
 export const SELF_URN = 'vessels.urn:mrn:signalk:uuid:11111111-1111-4111-8111-111111111111';
 

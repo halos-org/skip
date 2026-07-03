@@ -1,9 +1,10 @@
 import { Dashboard } from "../app/core/services/dashboard.service"
 import { IAppConfig, IThemeConfig } from "../app/core/interfaces/app-settings.interfaces"
+import { LATEST_APP_CONFIG_VERSION } from "../app/core/constants/config-versions.const";
 
 // Demo Mode config settings file
 export const DemoAppConfig: IAppConfig = {
-  "configVersion": 12,
+  "configVersion": LATEST_APP_CONFIG_VERSION,
   "autoNightMode": false,
   "redNightMode": false,
   "nightModeBrightness": 0.27,
