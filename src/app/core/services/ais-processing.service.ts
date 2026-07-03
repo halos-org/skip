@@ -561,8 +561,10 @@ export class AisProcessingService {
     if (existing) return existing;
 
     const created = this.createTrack(update.context, update.type, timestampMs, undefined);
-    this.contextIndex.set(update.context, created.id);
-    return created;
+    // At the cap, a newcomer older than every retained track is evicted inside
+    // createTrack; report it unresolvable so nothing downstream (e.g. applyMmsi)
+    // can index or mutate a dead track.
+    return this.tracks.has(created.id) ? created : null;
   }
 
   private createTrack(context: string, type: AisTargetType, timestampMs: number, mmsi?: string): AisTrack {
@@ -585,7 +587,10 @@ export class AisProcessingService {
         break;
     }
 
+    // Every index registration must precede cap enforcement: if the cap evicts
+    // this newborn track, removeTrack's sweep then cleans all its entries.
     this.tracks.set(track.id, track);
+    this.contextIndex.set(context, track.id);
     if (mmsi) this.addMmsiIndex(mmsi, track.id);
     this.enforceTargetCap();
     this.updateTargetsSignal();

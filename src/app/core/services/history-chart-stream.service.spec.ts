@@ -99,12 +99,14 @@ describe('HistoryChartStreamService', () => {
     await Promise.resolve();
     expect(emissions[0]).toEqual([]); // empty batch first
 
-    // First live value routes through take(1) — no timer needed.
-    path$.next({ data: { value: 5, timestamp: new Date(1000) }, state: 'normal' });
+    // First live value routes through take(1) — no timer needed. Fresh source timestamp (now).
+    const before = Date.now();
+    path$.next({ data: { value: 5, timestamp: new Date() }, state: 'normal' });
 
     expect(emissions.length).toBe(2);
     const point = emissions[1] as IDatasetServiceDatapoint;
-    expect(point.timestamp).toBe(1000);
+    // #131: stamped with the client clock at emit time, not the value's raw source timestamp.
+    expect(point.timestamp).toBeGreaterThanOrEqual(before);
     expect(point.data.value).toBe(5);
     expect(point.data.lastAverage).toBe(5);
     expect(point.data.lastMinimum).toBe(5);
@@ -124,7 +126,7 @@ describe('HistoryChartStreamService', () => {
     await Promise.resolve();
 
     // The live value aggregates over the seeded buffer [10, 20], not a fresh empty one.
-    path$.next({ data: { value: 30, timestamp: new Date(3000) }, state: 'normal' });
+    path$.next({ data: { value: 30, timestamp: new Date() }, state: 'normal' });
 
     const point = emissions[1] as IDatasetServiceDatapoint;
     expect(point.data.value).toBe(30);
@@ -132,6 +134,120 @@ describe('HistoryChartStreamService', () => {
     expect(point.data.lastMaximum).toBe(30);
     expect(point.data.lastAverage).toBeCloseTo(20); // (10 + 20 + 30) / 3
     expect(point.data.sma).toBeCloseTo(25); // mean of the last 2: (20 + 30) / 2
+  });
+
+  it('shifts backfill timestamps from server time into the client clock (#131 skew)', async () => {
+    const serverNow = Date.now() + 90_000; // server clock runs 90s ahead of this client (no NTP)
+    history.getValues.mockResolvedValue({
+      context: 'vessels.self',
+      range: { to: new Date(serverNow).toISOString() },
+      values: [],
+      data: []
+    });
+    mapper.mapValuesToChartDatapoints.mockReturnValue([
+      { timestamp: serverNow - 2000, data: { value: 1 } },
+      { timestamp: serverNow, data: { value: 2 } } // newest ~= server "now"
+    ]);
+
+    const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+    const before = Date.now();
+    make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const batch = emissions[0] as IDatasetServiceDatapoint[];
+    // Newest backfill point lands at ~client-now (inside the realtime window), not 90s in the future.
+    expect(batch[1].timestamp).toBeGreaterThanOrEqual(before);
+    expect(batch[1].timestamp).toBeLessThanOrEqual(Date.now() + 5);
+    // Inter-point spacing is preserved by the constant offset.
+    expect(batch[1].timestamp - batch[0].timestamp).toBe(2000);
+  });
+
+  it('holds a fresh value then breaks the trace with a gap once the source stops updating (#131)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    try {
+      history.getValues.mockResolvedValue({
+        context: 'vessels.self',
+        range: { to: new Date(1_000_000).toISOString() },
+        values: [],
+        data: []
+      });
+      mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+
+      const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+      make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+      await vi.advanceTimersByTimeAsync(0); // settle the (empty) backfill
+
+      // A fresh value (source timestamp = now) is drawn.
+      path$.next({ data: { value: 5, timestamp: new Date(Date.now()) }, state: 'normal' });
+      const first = emissions[emissions.length - 1] as IDatasetServiceDatapoint;
+      expect(first.data.value).toBe(5);
+
+      // One resample tick, value still fresh: holds the value and advances x in client time.
+      await vi.advanceTimersByTimeAsync(PARAMS.sampleTime);
+      const held = emissions[emissions.length - 1] as IDatasetServiceDatapoint;
+      expect(held.data.value).toBe(5);
+      expect(held.timestamp).toBeGreaterThan(first.timestamp);
+
+      // Source silent past the bootstrap staleness window: the trace breaks once with a NaN gap.
+      await vi.advanceTimersByTimeAsync(31_000);
+      const gap = emissions.find(
+        e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+      );
+      expect(gap).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not gap a slow-but-alive source whose interval exceeds the chart cadence (#131)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    try {
+      history.getValues.mockResolvedValue({
+        context: 'vessels.self',
+        range: { to: new Date(1_000_000).toISOString() },
+        values: [],
+        data: []
+      });
+      mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+
+      const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+      make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Source updates every 5s — far slower than sampleTime (500ms). It must never false-gap.
+      for (let i = 1; i <= 4; i++) {
+        vi.setSystemTime(1_000_000 + i * 5_000);
+        path$.next({ data: { value: i, timestamp: new Date(Date.now()) }, state: 'normal' });
+        await vi.advanceTimersByTimeAsync(5_000);
+      }
+
+      const gaps = emissions.filter(
+        e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+      );
+      expect(gaps.length).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gaps a stale cached value replayed on subscribe instead of drawing it as fresh (#131)', async () => {
+    history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+    mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+
+    const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+    make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The first live value is an hour-old cached reading (a dead sensor's last value replayed).
+    path$.next({ data: { value: 5, timestamp: new Date(Date.now() - 3_600_000) }, state: 'normal' });
+
+    // It must not be drawn as a fresh point; a NaN gap marker is emitted instead.
+    const last = emissions[emissions.length - 1] as IDatasetServiceDatapoint;
+    expect(Number.isNaN(last.data.value)).toBe(true);
   });
 
   it('emits HISTORY_UNAVAILABLE and starts no live tail when the backfill request rejects', async () => {
