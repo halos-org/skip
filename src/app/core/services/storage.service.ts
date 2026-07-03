@@ -18,7 +18,7 @@ export interface Config {
 }
 
 export type TConfigObjectType =
-  'IAppConfig' | 'IThemeConfig' | 'IWidgetConfig' | 'ILayoutConfig' | 'Dashboards' |
+  'IAppConfig' | 'IThemeConfig' | 'Dashboards' |
   'Array<IUnitDefaults>' | 'Array<IDatasetDef>' | 'INotificationConfig';
 
 export interface IPatchFailure {
@@ -434,24 +434,6 @@ export class StorageService {
             "op": "replace",
             "path": `/${this.sharedConfigName}/theme/themeName`,
             "value": value.themeName
-          }]
-        break;
-
-      case "IWidgetConfig":
-        document =
-          [{
-            "op": "replace",
-            "path": `/${this.sharedConfigName}/widget`,
-            "value": value
-          }]
-        break;
-
-      case "ILayoutConfig":
-        document =
-          [{
-            "op": "replace",
-            "path": `/${this.sharedConfigName}/layout`,
-            "value": value
           }]
         break;
 
