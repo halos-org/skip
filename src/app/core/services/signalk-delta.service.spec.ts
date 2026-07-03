@@ -32,6 +32,7 @@ class CsmStub {
 interface DeltaInternals {
   buildWebSocketUrl(): string;
   processWebsocketMessage(message: ISignalKDeltaMessage): void;
+  handleStreamFrame(frame: unknown): void;
 }
 
 function setup() {
@@ -361,6 +362,130 @@ describe('SignalKDeltaService', () => {
         { context: CTX, path: 'navigation.speedOverGround', source: 'gps.1', timestamp: '2024-01-01T00:00:00Z', value: 1 },
         { context: CTX, path: 'environment.wind.speedApparent', source: 'wind.2', timestamp: '2024-01-02T00:00:00Z', value: 2 },
       ]);
+    });
+
+    describe('malformed frames', () => {
+      function handleFrame(service: SignalKDeltaService, frame: unknown): void {
+        (service as unknown as DeltaInternals).handleStreamFrame(frame);
+      }
+
+      function collectAll(service: SignalKDeltaService) {
+        const data = collectData(service);
+        const metas: IMeta[] = [];
+        const reqs: ISignalKDeltaMessage[] = [];
+        const notes: ISignalKDataValueUpdate[] = [];
+        const selves: string[] = [];
+        service.subscribeMetadataUpdates().subscribe(v => metas.push(v));
+        service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
+        service.subscribeNotificationsUpdates().subscribe(v => notes.push(v));
+        service.subscribeSelfUpdates().subscribe(v => selves.push(v));
+        return { data, metas, reqs, notes, selves };
+      }
+
+      it('drops and logs a junk frame without discriminator fields at the boundary', () => {
+        const { service } = setup();
+        const streams = collectAll(service);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        expect(() => handleFrame(service, { foo: 'bar', baz: 42 })).not.toThrow();
+        expect(warn).toHaveBeenCalled();
+        expect(streams).toEqual({ data: [], metas: [], reqs: [], notes: [], selves: [] });
+        warn.mockRestore();
+      });
+
+      it('drops non-object frames (string, number, null, array) without throwing', () => {
+        const { service } = setup();
+        const streams = collectAll(service);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        for (const frame of ['junk', 42, null, undefined, [1, 2]]) {
+          expect(() => handleFrame(service, frame)).not.toThrow();
+        }
+        expect(streams).toEqual({ data: [], metas: [], reqs: [], notes: [], selves: [] });
+        warn.mockRestore();
+      });
+
+      it('passes a valid update frame through the boundary guard unchanged', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        handleFrame(service, { context: CTX, updates: [update([{ path: 'navigation.speedOverGround', value: 3.2 }])] });
+        expect(out).toEqual([
+          { context: CTX, path: 'navigation.speedOverGround', source: 'src.1', timestamp: TS, value: 3.2 },
+        ]);
+      });
+
+      it('passes a valid hello/self frame through the boundary guard unchanged', () => {
+        const { service } = setup();
+        const selves: string[] = [];
+        service.subscribeSelfUpdates().subscribe(v => selves.push(v));
+        handleFrame(service, { self: 'vessels.urn:mrn:signalk:uuid:self', name: 'sk', version: '2.0.0' });
+        expect(selves).toEqual(['vessels.urn:mrn:signalk:uuid:self']);
+      });
+
+      it('passes a valid request-response frame through the boundary guard unchanged', () => {
+        const { service } = setup();
+        const reqs: ISignalKDeltaMessage[] = [];
+        service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
+        const msg: ISignalKDeltaMessage = { requestId: 'req-1', state: 'COMPLETED', statusCode: 200 };
+        handleFrame(service, msg);
+        expect(reqs).toEqual([msg]);
+      });
+
+      it('accepts an errorMessage frame at the boundary instead of dropping it', () => {
+        const { service } = setup();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        handleFrame(service, { errorMessage: 'stream error' });
+        expect(warn).toHaveBeenCalledWith('[Delta Service] Service received stream error message: stream error');
+        expect(warn).not.toHaveBeenCalledWith('[Delta Service] Dropping malformed stream frame:', expect.anything());
+        warn.mockRestore();
+      });
+
+      it('drops a value item with a null path and keeps processing the rest of the update', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        const badItem = { path: null, value: 1 } as unknown as ISignalKDataValueUpdate;
+        expect(() => parse(service, { context: CTX, updates: [update([badItem, { path: 'navigation.speedOverGround', value: 2 }])] })).not.toThrow();
+        expect(out).toEqual([
+          { context: CTX, path: 'navigation.speedOverGround', source: 'src.1', timestamp: TS, value: 2 },
+        ]);
+      });
+
+      it('drops a value item with a missing path without throwing', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        const badItem = { value: 1 } as unknown as ISignalKDataValueUpdate;
+        expect(() => parse(service, { context: CTX, updates: [update([badItem])] })).not.toThrow();
+        expect(out).toEqual([]);
+      });
+
+      it('ignores a null update entry and non-array values without throwing', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        const badUpdates = [
+          null as unknown as ISignalKUpdateMessage,
+          { $source: 'src.1', timestamp: TS, values: 'junk' as unknown as ISignalKDataValueUpdate[] },
+        ];
+        expect(() => parse(service, { context: CTX, updates: badUpdates })).not.toThrow();
+        expect(out).toEqual([]);
+      });
+
+      it('drops a meta item whose value is missing without throwing', () => {
+        const { service } = setup();
+        const metas: IMeta[] = [];
+        service.subscribeMetadataUpdates().subscribe(v => metas.push(v));
+        const meta = [{ path: 'navigation.position' } as unknown as ISignalKMeta];
+        expect(() => parse(service, { context: CTX, updates: [update([], { meta })] })).not.toThrow();
+        expect(metas).toEqual([]);
+      });
+
+      it('falls back to a single meta emission when properties is null', () => {
+        const { service } = setup();
+        const metas: IMeta[] = [];
+        service.subscribeMetadataUpdates().subscribe(v => metas.push(v));
+        const value = { units: 'm/s', description: 'Speed over ground', properties: null };
+        parse(service, { context: CTX, updates: [update([], { meta: [skMeta('navigation.speedOverGround', value)] })] });
+        expect(metas).toEqual([
+          { context: CTX, path: 'navigation.speedOverGround', meta: value },
+        ]);
+      });
     });
   });
 });

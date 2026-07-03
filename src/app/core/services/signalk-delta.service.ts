@@ -26,6 +26,22 @@ export interface IStreamStatus {
   message: string;
 }
 
+/**
+ * Narrows a raw WebSocket frame to ISignalKDeltaMessage by checking the
+ * discriminator fields of the frame types the stream can carry: data/meta
+ * updates, request/response, server hello and stream errors.
+ */
+function isDeltaFrame(frame: unknown): frame is ISignalKDeltaMessage {
+  if (typeof frame !== 'object' || frame === null) {
+    return false;
+  }
+  const msg = frame as Record<string, unknown>;
+  return Array.isArray(msg.updates)
+    || typeof msg.requestId === 'string'
+    || typeof msg.self === 'string'
+    || typeof msg.errorMessage === 'string';
+}
+
 @Injectable({
     providedIn: 'root'
   })
@@ -201,7 +217,7 @@ export class SignalKDeltaService implements OnDestroy {
 
     this.socketWS$.pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe({
-        next: msgWS => this.processWebsocketMessage(msgWS),
+        next: msgWS => this.handleStreamFrame(msgWS),
         error: err => {
           console.error('[Delta Service] WebSocket error:', err);
           // Note: ConnectionStateMachine error reporting is handled in the close event handler
@@ -306,6 +322,14 @@ export class SignalKDeltaService implements OnDestroy {
     }
   }
 
+  private handleStreamFrame(frame: unknown): void {
+    if (!isDeltaFrame(frame)) {
+      console.warn("[Delta Service] Dropping malformed stream frame:", frame);
+      return;
+    }
+    this.processWebsocketMessage(frame);
+  }
+
   private processWebsocketMessage(message: ISignalKDeltaMessage) {
     if (message.updates) {
       this.parseUpdates(message.updates, message.context);
@@ -338,12 +362,16 @@ export class SignalKDeltaService implements OnDestroy {
     // }
 
     updates.forEach(update => {
-      if (update.meta !== undefined) {
+      if (Array.isArray(update?.meta)) {
         update.meta.forEach(meta => this.parseSkMeta(meta, context));
       }
 
-      if (update.values !== undefined) {
+      if (Array.isArray(update?.values)) {
         update.values.forEach(item => {
+          if (typeof item?.path !== 'string') {
+            console.warn("[Delta Service] Dropping value update without a string path:", item);
+            return;
+          }
           if (item.path.startsWith("notifications.")) {  // It's a notification message, pass to notification service
             this._skNotificationsMsg$.next(item);
           } else {
@@ -453,7 +481,11 @@ export class SignalKDeltaService implements OnDestroy {
   }
 
   private parseSkMeta(metadata: ISignalKMeta, context: string) {
-    if (metadata.value.properties !== undefined) {
+    if (metadata?.value == null) {
+      console.warn("[Delta Service] Dropping metadata update without a value:", metadata);
+      return;
+    }
+    if (metadata.value.properties != null) {
       Object.keys(metadata.value.properties).forEach(key => {
         this._skMetadata$.next({
           context: context,
