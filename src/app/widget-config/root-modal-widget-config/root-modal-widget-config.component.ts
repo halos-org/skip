@@ -312,10 +312,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return this.formMaster.get('startScaleAtZero') as UntypedFormControl;
   }
 
-  get showLabelToControl(): UntypedFormControl {
-    return this.formMaster.get('showLabel') as UntypedFormControl;
-  }
-
   get showTimeScaleToControl(): UntypedFormControl {
     return this.formMaster.get('showTimeScale') as UntypedFormControl;
   }
@@ -350,9 +346,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
 
   get showAverageDataToControl(): UntypedFormControl {
     return this.formMaster.get('showAverageData') as UntypedFormControl;
-  }
-  get displayNameToControl(): UntypedFormControl {
-    return this.formMaster.get('displayName') as UntypedFormControl;
   }
 
   get numDecimalToControl(): UntypedFormControl {
