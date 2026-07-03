@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RootModalWidgetConfigComponent } from './root-modal-widget-config.component';
 import { IConversionPathList, UnitsService } from '../../core/services/units.service';
 import { AppService } from '../../core/services/app-service';
-import { DatasetStreamService } from '../../core/services/dataset-stream.service';
 import { ensureTestIconsReady } from '../../../test-helpers/icon-test-utils';
 import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 
@@ -22,9 +21,6 @@ describe('ModalWidgetComponent', () => {
   const unitsServiceStub: Pick<UnitsService, 'getConversionsForPath'> = {
     getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }),
   };
-  const datasetStreamStub: Pick<DatasetStreamService, 'list'> = {
-    list: () => []
-  };
   const appServiceStub: Pick<AppService, 'configurableThemeColors'> = {
     configurableThemeColors: []
   };
@@ -34,7 +30,6 @@ describe('ModalWidgetComponent', () => {
       imports: [RootModalWidgetConfigComponent],
       providers: [
         { provide: UnitsService, useValue: unitsServiceStub },
-        { provide: DatasetStreamService, useValue: datasetStreamStub },
         { provide: AppService, useValue: appServiceStub },
         { provide: MAT_DIALOG_DATA, useValue: widgetConfig },
         { provide: MatDialogRef, useValue: dialogRefSpy },

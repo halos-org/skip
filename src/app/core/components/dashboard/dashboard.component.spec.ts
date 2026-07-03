@@ -9,7 +9,6 @@ import { DashboardComponent } from './dashboard.component';
 import { DashboardService } from '../../services/dashboard.service';
 import { ToastService } from '../../services/toast.service';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
-import { WidgetDatasetOrchestratorService } from '../../services/widget-dataset-orchestrator.service';
 import { DialogService } from '../../services/dialog.service';
 import { uiEventService } from '../../services/uiEvent.service';
 
@@ -75,9 +74,6 @@ describe('DashboardComponent', () => {
             getPlugin: vi.fn().mockName("PluginConfigClientService.getPlugin"),
             setPluginEnabled: vi.fn().mockName("PluginConfigClientService.setPluginEnabled")
         };
-        const mockDatasetLifecycleService = {
-            removeOwnedDatasets: vi.fn().mockName("WidgetDatasetOrchestratorService.removeOwnedDatasets")
-        };
         const mockDialogService = {
             openFrameDialog: vi.fn().mockName("DialogService.openFrameDialog")
         };
@@ -95,7 +91,6 @@ describe('DashboardComponent', () => {
                 { provide: DashboardService, useValue: mockDashboardService },
                 { provide: ToastService, useValue: mockToastService },
                 { provide: PluginConfigClientService, useValue: mockPluginConfigService },
-                { provide: WidgetDatasetOrchestratorService, useValue: mockDatasetLifecycleService },
                 { provide: DialogService, useValue: mockDialogService },
                 { provide: uiEventService, useValue: mockUiEventService }
             ]

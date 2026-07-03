@@ -19,8 +19,7 @@ export interface IChartDataSourceInfo {
 
 /**
  * Window length in ms for a time-scale format + period. `Last *` presets ignore `period`.
- * Shared by the client-side recorder (`DatasetStreamService`) and the History-API chart path so
- * both derive an identical window from the same widget config.
+ * Derives the chart's display window from the widget config.
  */
 export function resolveWindowMs(timeScaleFormat: TimeScaleFormat, period: number): number {
   switch (timeScaleFormat) {

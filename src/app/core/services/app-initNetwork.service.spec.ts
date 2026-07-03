@@ -13,8 +13,6 @@ import { SignalKDeltaService } from './signalk-delta.service';
 import { DataService } from './data.service';
 import { StorageService } from './storage.service';
 import { InternetReachabilityService } from './internet-reachability.service';
-import { DatasetStreamService } from './dataset-stream.service';
-import { Injector } from '@angular/core';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
 import { DefaultConnectionConfig } from '../../../default-config/config.blank.const';
 
@@ -73,19 +71,6 @@ describe('AppNetworkInitService', () => {
         start: vi.fn()
     };
 
-    const mockDatasetService = {
-        waitUntilReady: vi.fn().mockResolvedValue(undefined)
-    };
-
-    const mockInjector = {
-        get: vi.fn().mockImplementation((token: unknown) => {
-            if (token === DatasetStreamService) {
-                return mockDatasetService;
-            }
-            return null;
-        })
-    };
-
     beforeEach(() => {
         ensureLocalStorage();
         isLoggedIn$.next(false);
@@ -115,8 +100,7 @@ describe('AppNetworkInitService', () => {
                 { provide: SignalKDeltaService, useValue: {} },
                 { provide: DataService, useValue: {} },
                 { provide: StorageService, useValue: mockStorage },
-                { provide: InternetReachabilityService, useValue: mockInternetReachability },
-                { provide: Injector, useValue: mockInjector }
+                { provide: InternetReachabilityService, useValue: mockInternetReachability }
             ]
         });
         service = TestBed.inject(AppNetworkInitService);

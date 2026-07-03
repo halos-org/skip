@@ -10,7 +10,6 @@ import { TimersService } from './app/core/services/timers.service';
 import { NotificationsService } from './app/core/services/notifications.service';
 import { UnitsService } from './app/core/services/units.service';
 import { DashboardService } from './app/core/services/dashboard.service';
-import { DatasetStreamService } from './app/core/services/dataset-stream.service';
 import { SignalKDeltaService } from './app/core/services/signalk-delta.service';
 import { SignalKConnectionService } from './app/core/services/signalk-connection.service';
 import { DataService } from './app/core/services/data.service';
@@ -74,7 +73,6 @@ bootstrapApplication(AppComponent, {
     SignalKConnectionService,
     SignalKDeltaService,
     ConnectionStateMachine,
-    DatasetStreamService,
     DashboardService,
     UnitsService,
     AppNetworkInitService,

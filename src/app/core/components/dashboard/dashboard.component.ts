@@ -1,6 +1,6 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, inject, OnDestroy, viewChild, ElementRef, computed, effect, untracked, signal } from '@angular/core';
 import { GestureDirective } from '../../directives/gesture.directive';
-import { GridstackComponent, NgGridStackNode, NgGridStackWidget, NgGridStackOptions, } from 'gridstack/dist/angular';
+import { GridstackComponent, NgGridStackWidget, NgGridStackOptions, } from 'gridstack/dist/angular';
 import { GridItemHTMLElement, GridStackOptions } from 'gridstack';
 import { DashboardService, widgetOperation } from '../../services/dashboard.service';
 import { DashboardScrollerComponent } from "../dashboard-scroller/dashboard-scroller.component";
@@ -16,7 +16,6 @@ import { uiEventService } from '../../services/uiEvent.service';
 import { WidgetDescription } from '../../services/widget.service';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { Router } from '@angular/router';
-import { WidgetDatasetOrchestratorService } from '../../services/widget-dataset-orchestrator.service';
 import { WidgetHost2Component } from '../widget-host2/widget-host2.component';
 import { GroupWidgetComponent } from '../group-widget/group-widget.component';
 import { DashboardClipboardBottomSheetComponent } from '../dashboard-clipboard-bottom-sheet/dashboard-clipboard-bottom-sheet.component';
@@ -47,7 +46,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   protected readonly dashboard = inject(DashboardService);
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _uiEvent = inject(uiEventService);
-  private readonly datasetLifecycle = inject(WidgetDatasetOrchestratorService);
   private readonly _pluginConfig = inject(PluginConfigClientService);
   protected readonly _router = inject(Router);
   private readonly _hostEl = inject(ElementRef<HTMLElement>);
@@ -670,13 +668,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   private deleteWidget(item: GridItemHTMLElement): void {
-    const ngNode = item.gridstackNode as NgGridStackNode;
-
     this._gridstack().grid.removeWidget(item);
-
-    if (ngNode?.id) {
-      this.datasetLifecycle.removeOwnedDatasets(ngNode.id, true);
-    }
   }
 
   protected nextDashboard(): void {

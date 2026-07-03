@@ -377,7 +377,7 @@ class SettingsServiceStub {
   getInstanceName(): string { return this.instanceNameSubject.value; }
   setInstanceName(v: string): void { this.instanceNameSubject.next(v); }
 
-  // DataSets used by DatasetStreamService
+  // DataSets config registry accessors (mirror SettingsService)
   getDataSets(): unknown[] { return this.dataSets; }
   saveDataSets(d: unknown[]): void { this.dataSets = d; }
 
@@ -386,7 +386,7 @@ class SettingsServiceStub {
   getIsRemoteControl(): boolean { return this._isRemoteControlSubject.value; }
   setIsRemoteControl(v: boolean): void { this._isRemoteControlSubject.next(v); }
 
-  // Minimal signal-like shim for configUpgrade used by DatasetStreamService cleanup logic
+  // Minimal signal-like shim for the configUpgrade flag
   // Supports both reading as a function and optional .set(boolean) for specs that toggle it
   // Strongly-typed signal-like shim for configUpgrade
   private _buildConfigUpgradeShim() {
