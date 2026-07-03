@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, Subscription, filter, merge, shareReplay, take, timer, withLatestFrom } from 'rxjs';
 import { DataService, IPathUpdate } from './data.service';
-import { HistoryApiClientService } from './history-api-client.service';
+import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { resolveAngleDomain } from '../utils/angle-domain.util';
 import { SettingsService } from './settings.service';
@@ -61,7 +61,8 @@ export class HistoryChartStreamService {
   /**
    * Backfill (History API, one-shot) then a live delta tail. Emits the backfill as a single array,
    * then live datapoints one at a time. Emits {@link HISTORY_UNAVAILABLE} and stops when there is no
-   * history provider (or history is disabled) — no live-only fallback.
+   * history provider (or history is disabled). A *transient* backfill failure (network/5xx/timeout)
+   * does not disable the chart: it falls through to the live delta tail with no backfill seed.
    */
   public getBackfillThenLive(params: IHistoryChartStreamParams): Observable<StreamEmission> {
     return new Observable<StreamEmission>(subscriber => {
@@ -97,11 +98,21 @@ export class HistoryChartStreamService {
           const newestBackfillTs = points.length ? points[points.length - 1].timestamp : null;
           liveSub = this.startLive(params, domain, buffer, offsetMs, newestBackfillTs, perf, subscriber);
         })
-        .catch(() => {
-          if (!disposed) {
-            subscriber.next(HISTORY_UNAVAILABLE);
-            subscriber.complete();
+        .catch(err => {
+          if (disposed) return;
+          if (err instanceof HistoryRequestError) {
+            // Transient backfill failure (network blip, 5xx, timeout): don't disable the chart. Ride
+            // the live delta tail with no seed so live data still renders; a reconnect re-backfill
+            // (#85) fills the gap. Only a genuine no-provider (null result above) degrades to empty.
+            // offsetMs is null (no backfill anchor) → startLive derives it from the first live sample.
+            liveSub = this.startLive(params, domain, buffer, null, null, perf, subscriber);
+            return;
           }
+          // An unexpected error (e.g. a mapper/logic bug), not a known request failure: degrade to
+          // empty but log it so a real bug is not indistinguishable from a legitimate no-provider.
+          console.error('[HistoryChartStreamService] Unexpected backfill error; degrading to history-unavailable:', err);
+          subscriber.next(HISTORY_UNAVAILABLE);
+          subscriber.complete();
         });
 
       return () => {
@@ -115,7 +126,7 @@ export class HistoryChartStreamService {
     params: IHistoryChartStreamParams,
     domain: ChartStatsDomain,
     buffer: number[],
-    offsetMs: number,
+    offsetMs: number | null,
     newestBackfillTs: number | null,
     perf: IChartPerfProbe,
     subscriber: { next: (v: StreamEmission) => void }
@@ -127,10 +138,16 @@ export class HistoryChartStreamService {
       shareReplay({ bufferSize: 1, refCount: true })
     );
 
+    // Server→client clock offset. Backfill supplies it (from range.to); in the transient-failure
+    // fallback there is no backfill, so `offsetMs` is null and we anchor on the first live sample —
+    // otherwise the staleness check below would measure clock skew, not age, and gap a healthy source.
+    let resolvedOffsetMs = offsetMs;
     // A value's source timestamp shifted into the client clock; NaN when the delta carries no timestamp.
     const sourceTsOf = (u: IPathUpdate): number => {
       const t = u?.data?.timestamp instanceof Date ? u.data.timestamp.getTime() : NaN;
-      return Number.isFinite(t) ? t + offsetMs : NaN;
+      if (!Number.isFinite(t)) return NaN;
+      if (resolvedOffsetMs === null) resolvedOffsetMs = Date.now() - t;
+      return t + resolvedOffsetMs;
     };
 
     let prevSourceTs: number | null = null;

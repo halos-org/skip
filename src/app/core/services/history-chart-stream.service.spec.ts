@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Subject, firstValueFrom } from 'rxjs';
 import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from './history-chart-stream.service';
-import { HistoryApiClientService } from './history-api-client.service';
+import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { DataService, IPathUpdate } from './data.service';
 import { SettingsService } from './settings.service';
@@ -250,8 +250,62 @@ describe('HistoryChartStreamService', () => {
     expect(Number.isNaN(last.data.value)).toBe(true);
   });
 
-  it('emits HISTORY_UNAVAILABLE and starts no live tail when the backfill request rejects', async () => {
-    history.getValues.mockRejectedValue(new Error('network down'));
+  it('on a transient HistoryRequestError, does not disable the chart — rides the live tail with no backfill seed (#130)', async () => {
+    history.getValues.mockRejectedValue(new HistoryRequestError(503));
+
+    const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+    make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+    await new Promise(resolve => setTimeout(resolve)); // let the rejected backfill settle → live fallback
+
+    // The transient failure must NOT surface HISTORY_UNAVAILABLE; the live tail is subscribed instead.
+    expect(emissions.some(e => !Array.isArray(e) && 'unavailable' in e)).toBe(false);
+    expect(data.subscribePath).toHaveBeenCalled();
+
+    // A live delta still renders, so the chart keeps working through the blip.
+    const before = Date.now();
+    path$.next({ data: { value: 7, timestamp: new Date() }, state: 'normal' });
+    const last = emissions[emissions.length - 1] as IDatasetServiceDatapoint;
+    expect(last.data.value).toBe(7);
+    expect(last.timestamp).toBeGreaterThanOrEqual(before);
+  });
+
+  it('transient fallback derives the clock offset from live samples so a skewed source is not false-gapped (#130)', async () => {
+    // The fallback has no backfill to anchor the server→client offset. With a naive offset of 0 the
+    // staleness check would read the server-behind-client skew as age and gap every healthy delta —
+    // exactly the just-restarted-marine-server case that triggers the fallback. The offset must be
+    // derived from the first live sample instead.
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    try {
+      history.getValues.mockRejectedValue(new HistoryRequestError(503));
+
+      const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+      make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+      await vi.advanceTimersByTimeAsync(0); // settle the rejected backfill → live fallback subscribes
+
+      const SKEW_MS = 60_000; // server clock trails this client by 60s (no NTP)
+      const SRC_INTERVAL_MS = 1_000;
+      // First live value (drawn immediately via take(1)); source timestamp is 60s behind the client.
+      path$.next({ data: { value: 10, timestamp: new Date(Date.now() - SKEW_MS) }, state: 'normal' });
+      // A second value one source-interval later, then a resample tick to emit it.
+      vi.setSystemTime(1_000_000 + SRC_INTERVAL_MS);
+      path$.next({ data: { value: 11, timestamp: new Date(Date.now() - SKEW_MS) }, state: 'normal' });
+      await vi.advanceTimersByTimeAsync(PARAMS.sampleTime);
+
+      const points = emissions.filter(
+        (e): e is IDatasetServiceDatapoint => !Array.isArray(e) && !('unavailable' in e)
+      );
+      // No gap markers despite the 60s skew, and the real values render.
+      expect(points.some(p => Number.isNaN(p.data.value))).toBe(false);
+      expect(points.map(p => p.data.value)).toContain(10);
+      expect(points.map(p => p.data.value)).toContain(11);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('on an unexpected (non-transient) backfill error, emits HISTORY_UNAVAILABLE and starts no live tail', async () => {
+    history.getValues.mockRejectedValue(new Error('boom'));
     const first = await firstValueFrom(make().getBackfillThenLive(PARAMS));
     expect(isHistoryUnavailable(first)).toBe(true);
     expect(data.subscribePath).not.toHaveBeenCalled();
