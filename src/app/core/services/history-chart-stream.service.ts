@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, Subscription, filter, merge, take, timer, withLatestFrom } from 'rxjs';
-import { DataService } from './data.service';
+import { Observable, Subscription, filter, merge, shareReplay, take, timer, withLatestFrom } from 'rxjs';
+import { DataService, IPathUpdate } from './data.service';
 import { HistoryApiClientService } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { resolveAngleDomain } from '../utils/angle-domain.util';
@@ -18,6 +18,16 @@ export const HISTORY_UNAVAILABLE: IHistoryUnavailable = { unavailable: true };
 export function isHistoryUnavailable(v: unknown): v is IHistoryUnavailable {
   return !!v && typeof v === 'object' && (v as IHistoryUnavailable).unavailable === true;
 }
+
+/** A source value is treated as a dropout once it is older than this many observed update intervals. */
+const STALE_INTERVAL_FACTOR = 3;
+/** Never fabricate a gap before this much wall-clock silence, whatever the source cadence. */
+const MIN_STALE_MS = 3_000;
+/** Staleness threshold used before the source's update interval has been observed. */
+const BOOTSTRAP_STALE_MS = 30_000;
+
+/** Emitted once to break the trace when the source goes silent, so a dropout reads as a gap. */
+const GAP_POINT = { value: NaN, sma: NaN, lastAverage: NaN, lastMinimum: NaN, lastMaximum: NaN } as const;
 
 /** Inputs for one chart's History-API-backed data stream. */
 export interface IHistoryChartStreamParams {
@@ -71,19 +81,21 @@ export class HistoryChartStreamService {
       }
 
       this.fetchBackfill(params, domain, perf)
-        .then(batch => {
+        .then(result => {
           if (disposed) return;
-          if (batch === null) {
+          if (result === null) {
             subscriber.next(HISTORY_UNAVAILABLE);
             subscriber.complete();
             return;
           }
-          subscriber.next(batch);
-          for (const p of batch) {
+          const { points, offsetMs } = result;
+          subscriber.next(points);
+          for (const p of points) {
             if (Number.isFinite(p.data.value)) buffer.push(p.data.value);
           }
           this.trim(buffer, params.maxDataPoints);
-          liveSub = this.startLive(params, domain, buffer, perf, subscriber);
+          const newestBackfillTs = points.length ? points[points.length - 1].timestamp : null;
+          liveSub = this.startLive(params, domain, buffer, offsetMs, newestBackfillTs, perf, subscriber);
         })
         .catch(() => {
           if (!disposed) {
@@ -103,30 +115,84 @@ export class HistoryChartStreamService {
     params: IHistoryChartStreamParams,
     domain: ChartStatsDomain,
     buffer: number[],
+    offsetMs: number,
+    newestBackfillTs: number | null,
     perf: IChartPerfProbe,
     subscriber: { next: (v: StreamEmission) => void }
   ): Subscription {
+    // One shared upstream so the freshness tracker, the immediate first value and the resampler all
+    // draw from a single path subscription.
     const path$ = this.data.subscribePath(params.path, params.source).pipe(
-      filter(u => u?.data?.value !== null && u?.data?.value !== undefined)
+      filter(u => u?.data?.value !== null && u?.data?.value !== undefined),
+      shareReplay({ bufferSize: 1, refCount: true })
     );
-    // Zero-order hold: resample the latest value at the derived cadence, emitting immediately on the
-    // first value so the live tail starts without waiting a full sample interval.
+
+    // A value's source timestamp shifted into the client clock; NaN when the delta carries no timestamp.
+    const sourceTsOf = (u: IPathUpdate): number => {
+      const t = u?.data?.timestamp instanceof Date ? u.data.timestamp.getTime() : NaN;
+      return Number.isFinite(t) ? t + offsetMs : NaN;
+    };
+
+    let prevSourceTs: number | null = null;
+    let intervalMs: number | null = null;
+    let gapMarked = false;
+    // Staleness is keyed to the SOURCE's observed update interval, not the chart's render cadence, so a
+    // slow-but-alive sensor holds while a genuinely dead one (or a stale value replayed on subscribe)
+    // gaps. Until an interval is observed, only a long silence counts as a dropout.
+    const staleAfterMs = (): number =>
+      intervalMs === null ? BOOTSTRAP_STALE_MS : Math.max(MIN_STALE_MS, STALE_INTERVAL_FACTOR * intervalMs);
+
+    const sub = new Subscription();
+    // Learn the source interval from the spacing of consecutive delta timestamps.
+    sub.add(path$.subscribe(u => {
+      const ts = sourceTsOf(u);
+      if (!Number.isFinite(ts)) return;
+      if (prevSourceTs !== null) {
+        const gap = ts - prevSourceTs;
+        if (gap > 0) intervalMs = intervalMs === null ? gap : 0.3 * gap + 0.7 * intervalMs;
+      }
+      prevSourceTs = ts;
+    }));
+
+    // Backfill ended well before now (a dropout captured in history): break the trace at the seam so it
+    // doesn't draw as a straight connecting line into the resumed live data.
+    if (newestBackfillTs !== null && Date.now() - newestBackfillTs > BOOTSTRAP_STALE_MS) {
+      subscriber.next({ timestamp: Date.now(), data: { ...GAP_POINT } });
+      gapMarked = true;
+    }
+
+    // Zero-order hold: emit immediately on the first value, then resample the latest value at cadence.
     const sampled$ = timer(params.sampleTime, params.sampleTime).pipe(
       withLatestFrom(path$, (tick, u) => u)
     );
-    return merge(path$.pipe(take(1)), sampled$).subscribe(u => {
+    sub.add(merge(path$.pipe(take(1)), sampled$).subscribe(u => {
       const value = Number(u.data.value);
       if (!Number.isFinite(value)) return;
+      // Stamp with the client clock (like the recorder) so points sit on the chart's realtime axis;
+      // server timestamps would drift the whole series under clock skew.
+      const now = Date.now();
+      const sourceTs = sourceTsOf(u);
+      const dataAge = Number.isFinite(sourceTs) ? now - sourceTs : 0;
+      if (dataAge > staleAfterMs()) {
+        // The latest value is too old (dead source, or a stale cached value replayed on subscribe):
+        // break the trace once, then stop advancing until fresh data resumes.
+        if (!gapMarked) {
+          gapMarked = true;
+          subscriber.next({ timestamp: now, data: { ...GAP_POINT } });
+        }
+        return;
+      }
+      gapMarked = false;
       buffer.push(value);
       this.trim(buffer, params.maxDataPoints);
       const stats = computeWindowStats(buffer, params.smoothingPeriod, domain);
-      const timestamp = u.data.timestamp instanceof Date ? u.data.timestamp.getTime() : Date.now();
-      perf.recordLive(timestamp);
-      subscriber.next({ timestamp, data: { ...stats } });
-    });
+      perf.recordLive(now);
+      subscriber.next({ timestamp: now, data: { ...stats } });
+    }));
+    return sub;
   }
 
-  private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain, perf: IChartPerfProbe): Promise<IDatasetServiceDatapoint[] | null> {
+  private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain, perf: IChartPerfProbe): Promise<{ points: IDatasetServiceDatapoint[]; offsetMs: number } | null> {
     const normalizedPath = params.path.replace(/^(vessels\.)?self\./, '');
     const paths = [
       `${normalizedPath}:sma:${params.smoothingPeriod}`,
@@ -151,10 +217,17 @@ export class HistoryChartStreamService {
     if (perf.enabled) {
       perf.endBackfill(mapped.length, JSON.stringify(response).length);
     }
-    return mapped
+    // History timestamps are server time; shift them into the client clock so backfill lines up with
+    // the client-stamped live tail and the client-driven realtime axis (survives clock skew). Prefer
+    // range.to (the server's "now"); fall back to the newest sample so a missing range still de-skews.
+    const serverTo = Date.parse(response.range?.to ?? '');
+    const newestServerTs = mapped.length ? mapped[mapped.length - 1].timestamp : NaN;
+    const anchorTs = Number.isFinite(serverTo) ? serverTo : newestServerTs;
+    const offsetMs = Number.isFinite(anchorTs) ? Date.now() - anchorTs : 0;
+    const points = mapped
       .filter(m => m.data.value !== null && m.data.value !== undefined)
       .map(m => ({
-        timestamp: m.timestamp,
+        timestamp: m.timestamp + offsetMs,
         data: {
           value: m.data.value as number,
           sma: m.data.sma ?? undefined,
@@ -163,6 +236,7 @@ export class HistoryChartStreamService {
           lastMaximum: m.data.lastMaximum ?? undefined
         }
       }));
+    return { points, offsetMs };
   }
 
   private trim(buffer: number[], maxDataPoints: number): void {
