@@ -33,7 +33,6 @@ export interface IBootstrapIssue {
   reason: TBootstrapIssueReason;
   statusCode?: number;
   sharedConfigName?: string;
-  legacyUpgradeAvailable?: boolean;
   cause?: TAuthBlockedCause;
 }
 
@@ -160,11 +159,9 @@ export class AppNetworkInitService implements OnDestroy {
             // the real "no shared configuration yet" signal. Surface recovery here; the 404 catch
             // branch below remains only for servers that genuinely answer 404.
             startupDegraded = true;
-            const legacyUpgradeAvailable = await this.probeLegacyUpgradeAvailability(this.config.sharedConfigName);
             this._bootstrapIssue$.next({
               reason: 'missing-shared-config',
-              sharedConfigName: this.config.sharedConfigName,
-              legacyUpgradeAvailable
+              sharedConfigName: this.config.sharedConfigName
             });
             this._bootstrapStatus$.next('degraded');
             return;
@@ -191,12 +188,10 @@ export class AppNetworkInitService implements OnDestroy {
     } catch (error) {
       startupDegraded = true;
       if (error?.status === 404 && this.config?.useSharedConfig) {
-        const legacyUpgradeAvailable = await this.probeLegacyUpgradeAvailability(this.config.sharedConfigName);
         this._bootstrapIssue$.next({
           reason: 'missing-shared-config',
           statusCode: 404,
-          sharedConfigName: this.config.sharedConfigName,
-          legacyUpgradeAvailable
+          sharedConfigName: this.config.sharedConfigName
         });
       } else if (error?.status === 0) {
         this._bootstrapIssue$.next({ reason: 'network-unreachable', statusCode: 0 });
@@ -311,20 +306,6 @@ export class AppNetworkInitService implements OnDestroy {
         resolve(state);
       });
     });
-  }
-
-  private async probeLegacyUpgradeAvailability(sharedConfigName: string): Promise<boolean> {
-    if (!sharedConfigName) {
-      return false;
-    }
-
-    try {
-      const legacyConfig = await this.storage.getConfig('user', sharedConfigName, 9) as IConfig;
-      const legacyConfigVersion = legacyConfig?.app?.configVersion;
-      return legacyConfigVersion === 10;
-    } catch {
-      return false;
-    }
   }
 
   private setLocalStorageConfig(): void {
