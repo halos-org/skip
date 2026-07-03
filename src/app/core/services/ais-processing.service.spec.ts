@@ -282,6 +282,48 @@ describe('AisProcessingService target eviction (bounds unbounded growth)', () =>
     expect(internals().contextIndex.has(contexts[3])).toBe(true);
     expect(internals().contextIndex.has(contexts[4])).toBe(true);
   });
+
+  /**
+   * A track evicted at birth: the map is at the cap and the newcomer's first
+   * timestamp is older than every retained track's lastUpdateAt (e.g. a
+   * buffered/replayed delta), so enforceTargetCap removes the just-created
+   * track inside createTrack. No index may keep referencing it afterwards.
+   */
+  function fillToCap(cap: number): void {
+    internals().maxTargets = cap;
+    for (let i = 0; i < cap; i++) {
+      pushAt(`vessels.urn:mrn:imo:mmsi:${300000001 + i}.navigation.position.latitude`, 10 + i, EVENT_TS + (i + 1) * 1000);
+    }
+    expect(internals().tracks.size).toBe(cap);
+  }
+
+  it('leaves no dangling contextIndex entry for a track evicted at birth', () => {
+    fillToCap(3);
+
+    const stillborn = 'vessels.urn:mrn:imo:mmsi:300000099';
+    pushAt(`${stillborn}.navigation.position.latitude`, 20, EVENT_TS);
+
+    expect(internals().tracks.size).toBe(3);
+    expect(internals().contextIndex.has(stillborn)).toBe(false);
+    for (const [context, id] of internals().contextIndex.entries()) {
+      expect(internals().tracks.has(id), `contextIndex entry for ${context} points at a missing track`).toBe(true);
+    }
+  });
+
+  it('leaves no dangling mmsiIndex entry when the first update of a track evicted at birth is an mmsi', () => {
+    fillToCap(3);
+
+    const stillborn = 'vessels.urn:mrn:imo:mmsi:300000099';
+    pushAt(`${stillborn}.mmsi`, '300000099', EVENT_TS);
+
+    expect(internals().tracks.size).toBe(3);
+    expect(internals().mmsiIndex.has('300000099')).toBe(false);
+    for (const [mmsi, ids] of internals().mmsiIndex.entries()) {
+      for (const id of ids) {
+        expect(internals().tracks.has(id), `mmsiIndex entry for ${mmsi} points at a missing track`).toBe(true);
+      }
+    }
+  });
 });
 
 /**
