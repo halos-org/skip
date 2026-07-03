@@ -1,16 +1,440 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { DashboardService } from './dashboard.service';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
+import { Subject } from 'rxjs';
+import { ActivatedRouteSnapshot, convertToParamMap, NavigationEnd, Router } from '@angular/router';
+import { NgGridStackWidget } from 'gridstack/dist/angular';
+import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
+import { SettingsService } from './settings.service';
+import { Dashboard, DashboardService, widgetOperation } from './dashboard.service';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+const makeWidget = (uuid: string): NgGridStackWidget => ({
+  id: uuid,
+  x: 0, y: 0, w: 2, h: 2,
+  selector: 'widget-host2',
+  input: { widgetProperties: { type: 'widget-numeric', uuid, config: { displayName: uuid } } }
+});
+
+const makeDashboard = (id: string, name: string, configuration: NgGridStackWidget[] = []): Dashboard =>
+  ({ id, name, icon: 'dashboard-dashboard', configuration });
+
+const seed = (): Dashboard[] => [
+  makeDashboard('d-0', 'One'),
+  makeDashboard('d-1', 'Two'),
+  makeDashboard('d-2', 'Three')
+];
+
+const widgetsOf = (dashboard: Dashboard): NgGridStackWidget[] => dashboard.configuration as NgGridStackWidget[];
+
+function makeRouterStub(idParam: string | null) {
+  // Mirrors the app's top-level `dashboard/:id` route: the id param lives on a
+  // child snapshot, never on the root, so getRouteParam must walk firstChild.
+  const snapshotRoot = (id: string | null): ActivatedRouteSnapshot =>
+    ({
+      paramMap: convertToParamMap({}),
+      firstChild: id === null ? null : { paramMap: convertToParamMap({ id }), firstChild: null }
+    } as unknown as ActivatedRouteSnapshot);
+  const events = new Subject<NavigationEnd>();
+  let navId = 0;
+  const stub = {
+    events,
+    routerState: { snapshot: { root: snapshotRoot(idParam) } },
+    navigate: vi.fn<(commands: unknown[]) => Promise<boolean>>(() => Promise.resolve(true)),
+    setIdParam: (id: string | null): void => { stub.routerState.snapshot.root = snapshotRoot(id); },
+    emitNavigationEnd: (): void => { navId++; events.next(new NavigationEnd(navId, '/dashboard', '/dashboard')); }
+  };
+  return stub;
+}
+
+function makeSettingsMock(dashboards: Dashboard[]) {
+  return {
+    getDashboardConfig: vi.fn<() => Dashboard[]>(() => dashboards),
+    saveDashboards: vi.fn<(dashboards: Dashboard[]) => void>()
+  };
+}
 
 describe('DashboardService', () => {
   let service: DashboardService;
+  let settings: ReturnType<typeof makeSettingsMock>;
+  let router: ReturnType<typeof makeRouterStub>;
+  let consoleWarn: MockInstance;
+  let consoleError: MockInstance;
+
+  function setup(dashboards: Dashboard[] = seed(), routeId: string | null = null): void {
+    settings = makeSettingsMock(dashboards);
+    router = makeRouterStub(routeId);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: SettingsService, useValue: settings },
+        { provide: Router, useValue: router }
+      ]
+    });
+    service = TestBed.inject(DashboardService);
+  }
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(DashboardService);
+    consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('initialization', () => {
+    it('seeds a blank default dashboard with a fresh UUID when settings has none', () => {
+      setup([]);
+      const dashboards = service.dashboards();
+      expect(dashboards).toHaveLength(1);
+      expect(dashboards[0].name).toBe('Dashboard 1');
+      expect(dashboards[0].id).toMatch(UUID_PATTERN);
+      expect(widgetsOf(dashboards[0])[0].input.widgetProperties.type).toBe('widget-tutorial');
+      // Pins today's aliasing: the blank dashboard shares its configuration array with the DefaultDashboard constant.
+      expect(dashboards[0].configuration).toBe(DefaultDashboard[0].configuration);
+      expect(consoleWarn).toHaveBeenCalled();
+    });
+
+    it('adopts the settings dashboards array as-is when present', () => {
+      const stored = seed();
+      setup(stored);
+      expect(service.dashboards()).toBe(stored);
+    });
+  });
+
+  describe('active dashboard from route', () => {
+    it('applies a snapshot id param at construction', () => {
+      setup(seed(), '2');
+      expect(service.activeDashboard()).toBe(2);
+    });
+
+    it('stays unset until the first NavigationEnd, then defaults to 0', () => {
+      setup();
+      expect(service.activeDashboard()).toBeNull();
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(0);
+    });
+
+    it('uses the id param present at the first NavigationEnd', () => {
+      setup();
+      router.setIdParam('1');
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(1);
+    });
+
+    it('defaults to 0 when the first NavigationEnd param is not numeric', () => {
+      setup();
+      router.setIdParam('not-a-number');
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(0);
+    });
+
+    it('follows id param changes on later navigations', () => {
+      setup();
+      router.emitNavigationEnd();
+      router.setIdParam('2');
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(2);
+    });
+
+    it('keeps the current index when a later param is non-numeric or out of range', () => {
+      setup();
+      router.emitNavigationEnd();
+      router.setIdParam('1');
+      router.emitNavigationEnd();
+      router.setIdParam('not-a-number');
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(1);
+      router.setIdParam('9');
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(1);
+      expect(consoleError).toHaveBeenCalled();
+    });
+  });
+
+  describe('setActiveDashboardIndex', () => {
+    beforeEach(() => setup());
+
+    it('activates in-bounds indexes and rejects out-of-bounds ones with an error', () => {
+      service.setActiveDashboardIndex(1);
+      expect(service.activeDashboard()).toBe(1);
+      service.setActiveDashboardIndex(3);
+      service.setActiveDashboardIndex(-1);
+      expect(service.activeDashboard()).toBe(1);
+      expect(consoleError).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('add and update', () => {
+    it('appends a dashboard with a fresh UUID and returns its index', () => {
+      setup();
+      const index = service.add('New One', []);
+      expect(index).toBe(3);
+      const added = service.dashboards()[3];
+      expect(added.name).toBe('New One');
+      expect(added.icon).toBe('dashboard-dashboard');
+      expect(added.id).toMatch(UUID_PATTERN);
+      expect(service.add('Iconic', [], 'custom-icon')).toBe(4);
+      expect(service.dashboards()[4].icon).toBe('custom-icon');
+    });
+
+    it('rewrites name and icon only, preserving id and configuration', () => {
+      const config = [makeWidget('w-0')];
+      setup([makeDashboard('d-0', 'One', config), makeDashboard('d-1', 'Two')]);
+      service.update(0, 'Renamed', 'new-icon');
+      const updated = service.dashboards()[0];
+      expect(updated.name).toBe('Renamed');
+      expect(updated.icon).toBe('new-icon');
+      expect(updated.id).toBe('d-0');
+      expect(updated.configuration).toBe(config);
+      expect(service.dashboards()[1].name).toBe('Two');
+    });
+  });
+
+  describe('delete', () => {
+    it('removes the dashboard without remapping the active index', () => {
+      setup();
+      service.setActiveDashboardIndex(1);
+      service.delete(0);
+      expect(service.dashboards().map(d => d.id)).toEqual(['d-1', 'd-2']);
+      // Pins today's bookkeeping: the index is not shifted down, so it now points at the former third dashboard.
+      expect(service.activeDashboard()).toBe(1);
+    });
+
+    it('clamps the active index when it falls past the end', () => {
+      setup();
+      service.setActiveDashboardIndex(2);
+      service.delete(2);
+      expect(service.activeDashboard()).toBe(1);
+    });
+
+    it('recreates a blank dashboard and resets active when the last one is deleted', () => {
+      setup([makeDashboard('d-only', 'Solo')]);
+      service.setActiveDashboardIndex(0);
+      service.delete(0);
+      const dashboards = service.dashboards();
+      expect(dashboards).toHaveLength(1);
+      expect(dashboards[0].id).not.toBe('d-only');
+      expect(dashboards[0].name).toBe('Dashboard 1');
+      expect(dashboards[0].configuration).toEqual([]);
+      expect(service.activeDashboard()).toBe(0);
+    });
+  });
+
+  describe('duplicate', () => {
+    it('returns -1 and leaves the list unchanged for an out-of-bounds index', () => {
+      setup();
+      expect(service.duplicate(5, 'Copy', 'icon')).toBe(-1);
+      expect(service.duplicate(-1, 'Copy', 'icon')).toBe(-1);
+      expect(service.dashboards()).toHaveLength(3);
+      expect(consoleError).toHaveBeenCalledTimes(2);
+    });
+
+    it('deep clones with fresh dashboard and widget UUIDs kept in sync', () => {
+      setup([makeDashboard('d-src', 'Source', [makeWidget('w-src')])]);
+      const index = service.duplicate(0, 'Copy', '');
+      expect(index).toBe(1);
+      const copy = service.dashboards()[1];
+      expect(copy.name).toBe('Copy');
+      expect(copy.icon).toBe('dashboard-dashboard');
+      expect(copy.id).toMatch(UUID_PATTERN);
+      const copiedWidget = widgetsOf(copy)[0];
+      expect(copiedWidget.id).not.toBe('w-src');
+      expect(copiedWidget.input.widgetProperties.uuid).toBe(copiedWidget.id);
+      const sourceWidget = widgetsOf(service.dashboards()[0])[0];
+      expect(sourceWidget.id).toBe('w-src');
+      expect(sourceWidget.input.widgetProperties.uuid).toBe('w-src');
+    });
+
+    it('replaces a missing configuration with an empty array', () => {
+      setup([{ id: 'd-src', name: 'Source' }]);
+      service.duplicate(0, 'Copy', 'icon');
+      expect(service.dashboards()[1].configuration).toEqual([]);
+      expect(consoleError).toHaveBeenCalled();
+    });
+
+    it('keeps the original widget id when widgetProperties are missing', () => {
+      setup([makeDashboard('d-src', 'Source', [{ id: 'w-bare', w: 1, h: 1, selector: 'widget-host2' }])]);
+      service.duplicate(0, 'Copy', 'icon');
+      expect(widgetsOf(service.dashboards()[1])[0].id).toBe('w-bare');
+      expect(consoleError).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateConfiguration', () => {
+    beforeEach(() => setup());
+
+    it('stores a deep clone of the new configuration and treats null as empty', () => {
+      const next = [makeWidget('w-next')];
+      service.updateConfiguration(0, next);
+      const stored = service.dashboards()[0].configuration;
+      expect(stored).toEqual(next);
+      expect(stored).not.toBe(next);
+      next[0].w = 99;
+      expect(widgetsOf(service.dashboards()[0])[0].w).toBe(2);
+      service.updateConfiguration(0, null);
+      expect(service.dashboards()[0].configuration).toEqual([]);
+    });
+
+    it('keeps the previous array identity when nothing changed', () => {
+      service.updateConfiguration(0, [makeWidget('w-a')]);
+      const before = service.dashboards();
+      service.updateConfiguration(0, [makeWidget('w-a')]);
+      expect(service.dashboards()).toBe(before);
+    });
+  });
+
+  describe('dashboard cycling', () => {
+    beforeEach(() => setup());
+
+    // Direction is pinned as implemented and is inverted relative to the method
+    // names and their JSDoc: previousDashboard advances, nextDashboard retreats.
+    it('previousDashboard advances the active index, wrapping to the first', () => {
+      service.setActiveDashboardIndex(1);
+      service.previousDashboard();
+      expect(service.activeDashboard()).toBe(2);
+      service.previousDashboard();
+      expect(service.activeDashboard()).toBe(0);
+    });
+
+    it('nextDashboard retreats the active index, wrapping to the last', () => {
+      service.setActiveDashboardIndex(1);
+      service.nextDashboard();
+      expect(service.activeDashboard()).toBe(0);
+      service.nextDashboard();
+      expect(service.activeDashboard()).toBe(2);
+    });
+  });
+
+  describe('router navigation', () => {
+    beforeEach(() => setup());
+
+    it('navigateToActive routes to the active dashboard index', () => {
+      service.setActiveDashboardIndex(1);
+      service.navigateToActive();
+      expect(router.navigate).toHaveBeenCalledWith(['/dashboard', 1]);
+    });
+
+    it('navigateTo routes to an in-bounds index and rejects others with an error', () => {
+      service.navigateTo(2);
+      expect(router.navigate).toHaveBeenCalledWith(['/dashboard', 2]);
+      service.navigateTo(3);
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalled();
+    });
+
+    // Same pinned direction swap as previousDashboard/nextDashboard.
+    it('navigateToNextDashboard routes backward and navigateToPreviousDashboard forward, with wrap', () => {
+      service.setActiveDashboardIndex(0);
+      service.navigateToNextDashboard();
+      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 2]);
+      service.navigateToPreviousDashboard();
+      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 1]);
+      service.setActiveDashboardIndex(2);
+      service.navigateToPreviousDashboard();
+      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 0]);
+      service.setActiveDashboardIndex(1);
+      service.navigateToNextDashboard();
+      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 0]);
+    });
+  });
+
+  describe('widget actions', () => {
+    beforeEach(() => setup());
+
+    it('replays null to subscribers before any action', () => {
+      const seen: widgetOperation[] = [];
+      const subscription = service.widgetAction$.subscribe(op => seen.push(op));
+      expect(seen).toEqual([null]);
+      subscription.unsubscribe();
+    });
+
+    it('emits one operation per action call', () => {
+      const seen: widgetOperation[] = [];
+      const subscription = service.widgetAction$.subscribe(op => seen.push(op));
+      service.deleteWidget('w-1');
+      service.duplicateWidget('w-2');
+      service.copyWidget('w-3');
+      service.cutWidget('w-4');
+      expect(seen.slice(1)).toEqual([
+        { id: 'w-1', operation: 'delete' },
+        { id: 'w-2', operation: 'duplicate' },
+        { id: 'w-3', operation: 'copy' },
+        { id: 'w-4', operation: 'cut' }
+      ]);
+      subscription.unsubscribe();
+    });
+  });
+
+  describe('widget clipboard', () => {
+    beforeEach(() => setup());
+
+    it('stores a sanitized snapshot with a cloned config and clipboard uuid', () => {
+      const node = makeWidget('w-src');
+      node.x = 5;
+      node.y = 6;
+      service.setWidgetClipboardFromNode(node);
+      expect(service.widgetClipboard()).toEqual({
+        w: 2, h: 2,
+        selector: 'widget-host2',
+        input: { widgetProperties: { type: 'widget-numeric', uuid: 'clipboard', config: { displayName: 'w-src' } } }
+      });
+      node.input.widgetProperties.config.displayName = 'mutated';
+      expect(service.widgetClipboard().input.widgetProperties.config.displayName).toBe('w-src');
+      service.clearWidgetClipboard();
+      expect(service.widgetClipboard()).toBeNull();
+    });
+
+    it('ignores nodes without a widget type', () => {
+      service.setWidgetClipboardFromNode({ w: 1, h: 1, selector: 'widget-host2' });
+      service.setWidgetClipboardFromNode(null);
+      expect(service.widgetClipboard()).toBeNull();
+    });
+  });
+
+  describe('layout state', () => {
+    beforeEach(() => setup());
+
+    it('toggles and sets the static flag', () => {
+      expect(service.isDashboardStatic()).toBe(true);
+      service.toggleStaticDashboard();
+      expect(service.isDashboardStatic()).toBe(false);
+      service.setStaticDashboard(true);
+      expect(service.isDashboardStatic()).toBe(true);
+    });
+
+    it('counts layout edit save and cancel notifications', () => {
+      expect(service.layoutEditSaved()).toBe(0);
+      expect(service.layoutEditCanceled()).toBe(0);
+      service.notifyLayoutEditSaved();
+      service.notifyLayoutEditSaved();
+      service.notifyLayoutEditCanceled();
+      expect(service.layoutEditSaved()).toBe(2);
+      expect(service.layoutEditCanceled()).toBe(1);
+    });
+  });
+
+  describe('persistence', () => {
+    it('saves dashboards through settings whenever the list changes', () => {
+      setup();
+      TestBed.tick();
+      expect(settings.saveDashboards).toHaveBeenCalledTimes(1);
+      expect(settings.saveDashboards).toHaveBeenLastCalledWith(service.dashboards());
+      service.add('Fourth', []);
+      TestBed.tick();
+      expect(settings.saveDashboards).toHaveBeenCalledTimes(2);
+      expect(settings.saveDashboards.mock.lastCall[0]).toHaveLength(4);
+    });
+
+    it('does not re-save when an update leaves the list deep-equal', () => {
+      setup();
+      TestBed.tick();
+      expect(settings.saveDashboards).toHaveBeenCalledTimes(1);
+      service.updateConfiguration(0, []);
+      TestBed.tick();
+      expect(settings.saveDashboards).toHaveBeenCalledTimes(1);
+    });
   });
 });
