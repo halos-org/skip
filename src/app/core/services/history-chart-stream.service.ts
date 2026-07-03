@@ -5,7 +5,7 @@ import { HistoryApiClientService, HistoryRequestError } from './history-api-clie
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { resolveAngleDomain } from '../utils/angle-domain.util';
 import { IDatasetServiceDatapoint } from '../interfaces/dataset.interfaces';
-import { computeWindowStats, ChartStatsDomain } from '../utils/chart-stats.util';
+import { computeWindowStats, windowSma, ChartStatsDomain } from '../utils/chart-stats.util';
 
 /** Emitted (instead of datapoints) when trend history cannot be served — no history provider. */
 export interface IHistoryUnavailable {
@@ -196,10 +196,9 @@ export class HistoryChartStreamService {
 
   private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain): Promise<{ points: IDatasetServiceDatapoint[]; offsetMs: number } | null> {
     const normalizedPath = params.path.replace(/^(vessels\.)?self\./, '');
-    const paths = [
-      `${normalizedPath}:sma:${params.smoothingPeriod}`,
-      `${normalizedPath}:last`
-    ].join(',');
+    // Only the raw per-bucket value is fetched; the SMA overlay is derived client-side below so it
+    // uses the same circular-aware smoothing as the live tail (#162).
+    const paths = `${normalizedPath}:last`;
     const resolutionSeconds = Math.max(1, Math.round(params.sampleTime / 1000));
 
     const response = await this.history.getValues({
@@ -220,18 +219,22 @@ export class HistoryChartStreamService {
     const newestServerTs = mapped.length ? mapped[mapped.length - 1].timestamp : NaN;
     const anchorTs = Number.isFinite(serverTo) ? serverTo : newestServerTs;
     const offsetMs = Number.isFinite(anchorTs) ? Date.now() - anchorTs : 0;
-    const points = mapped
-      .filter(m => m.data.value !== null && m.data.value !== undefined)
-      .map(m => ({
-        timestamp: m.timestamp + offsetMs,
-        data: {
-          value: m.data.value as number,
-          sma: m.data.sma ?? undefined,
-          lastAverage: m.data.lastAverage ?? undefined,
-          lastMinimum: m.data.lastMinimum ?? undefined,
-          lastMaximum: m.data.lastMaximum ?? undefined
-        }
-      }));
+    const mappedPoints = mapped.filter(m => m.data.value !== null && m.data.value !== undefined);
+    // Derive the SMA overlay client-side from the :last samples with the same shared trailing-window
+    // smoothing the live tail uses (circular for angle domains), so the line is angle-correct at the
+    // 0/360° wrap and continuous across the backfill→live seam.
+    const values = mappedPoints.map(m => m.data.value as number);
+    const smoothingPeriod = Math.max(1, params.smoothingPeriod);
+    const points = mappedPoints.map((m, i) => ({
+      timestamp: m.timestamp + offsetMs,
+      data: {
+        value: m.data.value as number,
+        sma: windowSma(values.slice(Math.max(0, i - smoothingPeriod + 1), i + 1), domain),
+        lastAverage: m.data.lastAverage ?? undefined,
+        lastMinimum: m.data.lastMinimum ?? undefined,
+        lastMaximum: m.data.lastMaximum ?? undefined
+      }
+    }));
     return { points, offsetMs };
   }
 

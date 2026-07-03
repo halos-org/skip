@@ -48,6 +48,19 @@ export function circularMinMaxRad(anglesRad: number[]): { min: number; max: numb
 }
 
 /**
+ * SMA over a trailing window (newest last): arithmetic mean for `scalar`, circular mean wrapped to
+ * the domain for `direction`/`signed`. Shared by the live tail and the History backfill so both
+ * smooth identically. The window must already be sliced to the smoothing period.
+ */
+export function windowSma(window: number[], domain: ChartStatsDomain): number {
+  if (domain === 'scalar') {
+    return window.reduce((s, v) => s + v, 0) / window.length;
+  }
+  const wrap = domain === 'signed' ? normalizeSignedRad : normalizeDirectionRad;
+  return wrap(circularMeanRad(window));
+}
+
+/**
  * Compute value + SMA + window average/min/max over a numeric buffer (newest last). Scalar uses
  * arithmetic aggregates; `direction`/`signed` use circular math and wrap the outputs to their domain.
  * Shared by the History-API chart live tail; mirrors the recorder's per-point statistics.
@@ -58,15 +71,14 @@ export function computeWindowStats(buffer: number[], smoothingPeriod: number, do
 
   if (domain === 'scalar') {
     const avg = buffer.reduce((s, v) => s + v, 0) / buffer.length;
-    const sma = smaWindow.reduce((s, v) => s + v, 0) / smaWindow.length;
-    return { value, sma, lastAverage: avg, lastMinimum: Math.min(...buffer), lastMaximum: Math.max(...buffer) };
+    return { value, sma: windowSma(smaWindow, domain), lastAverage: avg, lastMinimum: Math.min(...buffer), lastMaximum: Math.max(...buffer) };
   }
 
   const wrap = domain === 'signed' ? normalizeSignedRad : normalizeDirectionRad;
   const { min, max } = circularMinMaxRad(buffer);
   return {
     value: wrap(value),
-    sma: wrap(circularMeanRad(smaWindow)),
+    sma: windowSma(smaWindow, domain),
     lastAverage: wrap(circularMeanRad(buffer)),
     lastMinimum: wrap(min),
     lastMaximum: wrap(max)

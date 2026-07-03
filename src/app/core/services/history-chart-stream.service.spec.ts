@@ -58,15 +58,48 @@ describe('HistoryChartStreamService', () => {
     expect(Array.isArray(first)).toBe(true);
     expect((first as IDatasetServiceDatapoint[]).map(p => p.data.value)).toEqual([1, 3]);
     expect(history.getValues).toHaveBeenCalledTimes(1);
-    // The Value series is the raw per-bucket `:last` sample (angle-safe, seam-free with the live
-    // tail), plus the `:sma` overlay. The dead `:min`/`:max` columns are no longer requested.
+    // Only the raw per-bucket `:last` sample is requested; the SMA overlay is derived client-side, so
+    // no `:sma`/`:avg`/`:min`/`:max` aggregate columns are asked of the server (#162).
     const query = history.getValues.mock.calls[0][0];
     expect(query.paths).toContain(':last');
-    expect(query.paths).toContain(':sma:');
+    expect(query.paths).not.toContain(':sma');
     expect(query.paths).not.toContain(':avg');
     expect(query.paths).not.toContain(':min');
     expect(query.paths).not.toContain(':max');
     expect(query.from).toBeTruthy();
+  });
+
+  it('derives the backfill SMA circularly for direction paths (no server :sma)', async () => {
+    history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+    // Direction samples straddling the 0/360° wrap: ~355°, ~5°, ~3°.
+    mapper.mapValuesToChartDatapoints.mockReturnValue([
+      { timestamp: 1000, data: { value: 6.19591884457987 } },
+      { timestamp: 2000, data: { value: 0.08726646259971647 } },
+      { timestamp: 3000, data: { value: 0.05235987755982989 } }
+    ]);
+    const params: IHistoryChartStreamParams = { ...PARAMS, angleDomainOverride: 'direction', smoothingPeriod: 3 };
+    const first = await firstValueFrom(make().getBackfillThenLive(params));
+    const points = first as IDatasetServiceDatapoint[];
+    // The 3-sample SMA is the CIRCULAR mean (~1°/0.0175 rad). The server-side arithmetic :sma over
+    // the same radians would be ~2.11 rad — so this proves the smoothing line is angle-correct.
+    expect(points[2].data.sma).toBeCloseTo(0.0174959160, 4);
+    expect(points[2].data.sma).not.toBeCloseTo(2.11, 1);
+  });
+
+  it('derives a scalar backfill SMA as the arithmetic mean of the trailing window (clamps early)', async () => {
+    history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+    mapper.mapValuesToChartDatapoints.mockReturnValue([
+      { timestamp: 1000, data: { value: 2 } },
+      { timestamp: 2000, data: { value: 4 } },
+      { timestamp: 3000, data: { value: 6 } }
+    ]);
+    // Scalar domain (getPathUnitType → null), smoothingPeriod 2.
+    const params: IHistoryChartStreamParams = { ...PARAMS, smoothingPeriod: 2 };
+    const first = await firstValueFrom(make().getBackfillThenLive(params));
+    const points = first as IDatasetServiceDatapoint[];
+    expect(points[0].data.sma).toBe(2); // window clamps to [2]
+    expect(points[1].data.sma).toBe(3); // trailing window [2, 4]
+    expect(points[2].data.sma).toBe(5); // trailing window [4, 6]
   });
 
   it('drops null-valued backfill points', async () => {
