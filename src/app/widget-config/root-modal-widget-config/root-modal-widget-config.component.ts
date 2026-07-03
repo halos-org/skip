@@ -146,17 +146,14 @@ export class RootModalWidgetConfigComponent implements OnInit {
         if (parent === RootModalWidgetConfigComponent.KEY_CONVERT_UNIT_TO) {
           // If we are building units list
           const unitConfig = (formData as Record<string, unknown>)[key] as IWidgetPath;
-          if (unitConfig && (unitConfig as IWidgetPath).pathType == "number" || ('datasetUUID' in this.widgetConfig)) {
-            groups.addControl(key, new UntypedFormControl(value)); //only add control if it's a number or historical graph. Strings and booleans don't have units and conversions yet...
+          if (unitConfig && (unitConfig as IWidgetPath).pathType == "number") {
+            groups.addControl(key, new UntypedFormControl(value)); //only add control if it's a number. Strings and booleans don't have units and conversions yet...
           }
         } else {
           // not building Units list
           // Use switch in case we will need more Required form validator at some point.
           switch (key) {
             case "path": groups.addControl(key, new UntypedFormControl(value));
-              break;
-
-            case "datasetUUID": groups.addControl(key, new UntypedFormControl(value, Validators.required));
               break;
 
             case "dataTimeout": groups.addControl(key, new UntypedFormControl(value, Validators.required));
@@ -269,10 +266,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
 
   get periodControl(): UntypedFormControl {
     return this.formMaster.get('period') as UntypedFormControl;
-  }
-
-  get datasetUUIDToControl(): UntypedFormControl {
-    return this.formMaster.get('datasetUUID') as UntypedFormControl;
   }
 
   get filterSelfPathsToControl(): UntypedFormControl {

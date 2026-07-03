@@ -22,7 +22,6 @@ export class DisplayChartOptionsComponent implements OnInit {
   readonly displayName = input.required<UntypedFormControl>();
   readonly showLabel = input.required<UntypedFormControl>();
   readonly convertUnitTo = input.required<UntypedFormControl>();
-  readonly datasetUUID = input.required<UntypedFormControl>();
   readonly datasetAverageArray = input.required<UntypedFormControl>();
   readonly showAverageData = input.required<UntypedFormControl>();
   readonly showDataPoints = input.required<UntypedFormControl>();
