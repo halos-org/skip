@@ -71,9 +71,9 @@ export class AppService {
   private readonly _iconRegistry = inject(MatIconRegistry);
   private readonly _sanitizer = inject(DomSanitizer);
   public isNightMode = signal<boolean>(false);
-  private _useAutoNightMode = toSignal(this._settings.getAutoNightModeAsO(), { requireSync: true });
-  private _theme = toSignal(this._settings.getThemeNameAsO(), { requireSync: true });
-  private _redNightMode = toSignal(this._settings.getRedNightModeAsO(), { requireSync: true });
+  private _useAutoNightMode = this._settings.autoNightMode;
+  private _theme = this._settings.themeName;
+  private _redNightMode = this._settings.redNightMode;
   private _environmentMode = toSignal(this._data.subscribePath(this.MODE_PATH, 'default'));
 
   private previousEnvironmentMode: string | null = null;

@@ -153,6 +153,23 @@ describe('AppNetworkInitService', () => {
             expect(storedConn()?.configVersion).toBe(13);
         });
 
+        it('a default-blob appConfig (getDefault* side-effect shape) contributes nothing — identity defaults apply', () => {
+            // Pins decision 5's safety argument (issue #17): the fallback read wants previously-stored
+            // legacy identity. A blob written by SettingsService.getDefaultAppConfig carries no
+            // isRemoteControl/instanceName (removed from IAppConfig), so its presence yields exactly
+            // what its absence would — stripping that side-effect write is unobservable here.
+            localStorage.removeItem('skip.connectionConfig');
+            localStorage.setItem('skip.appConfig', JSON.stringify({
+                configVersion: 12, autoNightMode: true, redNightMode: false, nightModeBrightness: 0.27,
+                dataSets: [], unitDefaults: {}, notificationConfig: {}, browserTabTitle: 'SKip'
+            }));
+            setConnConfig({ ...baseV12, isRemoteControl: true, instanceName: 'stale' });
+            migrate(null);
+            expect(storedConn()?.isRemoteControl).toBe(false);
+            expect(storedConn()?.instanceName).toBe('');
+            expect(storedConn()?.configVersion).toBe(13);
+        });
+
         it('boot with neither profile nor local appConfig migrates with identity defaults', () => {
             localStorage.removeItem('skip.connectionConfig');
             localStorage.removeItem('skip.appConfig');

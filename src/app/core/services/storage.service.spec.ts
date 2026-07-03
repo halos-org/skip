@@ -384,6 +384,24 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     req.flush(null);
   });
 
+  it('patchConfig maps Array<IDatasetDef> to the app/dataSets sub-path', () => {
+    const { service } = setup();
+    service.patchConfig('Array<IDatasetDef>', [{ uuid: 'ds-1' }]);
+    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app/dataSets', value: [{ uuid: 'ds-1' }] }]);
+    req.flush(null);
+  });
+
+  it('patchConfig maps INotificationConfig to the app/notificationConfig sub-path', () => {
+    const { service } = setup();
+    service.patchConfig('INotificationConfig', { disableNotifications: true });
+    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app/notificationConfig', value: { disableNotifications: true } }]);
+    req.flush(null);
+  });
+
   it('removeItem POSTs a remove patch to the scoped, versioned URL', async () => {
     const { service } = setup();
     const p = service.removeItem('user', 'old-slot');

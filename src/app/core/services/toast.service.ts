@@ -1,8 +1,6 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, computed, signal, inject } from '@angular/core';
 import { MatSnackBar, MatSnackBarRef } from '@angular/material/snack-bar';
 import { SettingsService } from './settings.service';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs/operators';
 import { ToastSnackbarComponent, type ToastSeverity, type ToastSnackbarData } from '../components/toast-snackbar/toast-snackbar.component';
 
 export interface SnackItem {
@@ -17,12 +15,7 @@ export interface SnackItem {
 export class ToastService {
   private readonly snackBar = inject(MatSnackBar);
   private readonly app = inject(SettingsService);
-  private readonly soundDisabled = toSignal(
-    this.app.getNotificationServiceConfigAsO().pipe(
-      map(config => config.sound.disableSound)
-    ),
-    { initialValue: this.app.getNotificationConfig().sound.disableSound }
-  );
+  private readonly soundDisabled = computed(() => this.app.notificationConfig().sound.disableSound);
   private toastAudio: HTMLAudioElement | null = null;
   private audioBlockedNotificationShown = false;
 

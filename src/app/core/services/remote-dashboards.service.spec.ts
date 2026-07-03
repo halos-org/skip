@@ -25,10 +25,8 @@ const DASHBOARDS: Dashboard[] = [
 
 class SettingsServiceStub {
   public readonly KipUUID = KIP_UUID;
-  public readonly instanceName$ = new BehaviorSubject<string>('Helm Display');
-  public readonly isRemoteControl$ = new BehaviorSubject<boolean>(false);
-  getInstanceNameAsO(): Observable<string> { return this.instanceName$.asObservable(); }
-  getIsRemoteControlAsO(): Observable<boolean> { return this.isRemoteControl$.asObservable(); }
+  public readonly instanceName = signal<string>('Helm Display');
+  public readonly isRemoteControl = signal<boolean>(false);
 }
 
 class DashboardServiceStub {
@@ -92,7 +90,7 @@ describe('RemoteDashboardsService', () => {
   }
 
   function enableRemoteControl(): void {
-    settings.isRemoteControl$.next(true);
+    settings.isRemoteControl.set(true);
     TestBed.tick();
   }
 
@@ -180,7 +178,7 @@ describe('RemoteDashboardsService', () => {
       enableRemoteControl();
       requests.putRequest.mockClear();
 
-      settings.isRemoteControl$.next(false);
+      settings.isRemoteControl.set(false);
       TestBed.tick();
 
       expect(callsTo(SET_SCREEN_INDEX_PATH)).toEqual([
@@ -198,7 +196,7 @@ describe('RemoteDashboardsService', () => {
       enableRemoteControl();
       requests.putRequest.mockClear();
 
-      settings.instanceName$.next('Nav Station');
+      settings.instanceName.set('Nav Station');
       TestBed.tick();
 
       const displayCalls = callsTo(SET_DISPLAY_PATH);
@@ -212,7 +210,7 @@ describe('RemoteDashboardsService', () => {
       enableRemoteControl();
       requests.putRequest.mockClear();
 
-      settings.instanceName$.next('Nav Station');
+      settings.instanceName.set('Nav Station');
       TestBed.tick();
 
       expect(callsTo(SET_SCREEN_INDEX_PATH)).toEqual([
@@ -224,7 +222,7 @@ describe('RemoteDashboardsService', () => {
       createService();
       requests.putRequest.mockClear();
 
-      settings.instanceName$.next('Nav Station');
+      settings.instanceName.set('Nav Station');
       TestBed.tick();
 
       expect(requests.putRequest).not.toHaveBeenCalled();

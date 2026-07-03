@@ -15,7 +15,7 @@ import { DefaultNotificationConfig } from '../../../default-config/config.blank.
 import { DemoAppConfig, DemoThemeConfig, DemoDashboardsConfig } from '../../../default-config/config.demo.const';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { StorageService } from './storage.service';
+import { StorageService, TConfigObjectType } from './storage.service';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
 import { REMOTE_CONFIG_FILE_VERSION, LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from '../constants/config-versions.const';
@@ -29,15 +29,33 @@ export class SettingsService {
   private readonly storage = inject(StorageService);
   private readonly snackBar = inject(MatSnackBar);
 
-  private unitDefaults: BehaviorSubject<IUnitDefaults> = new BehaviorSubject<IUnitDefaults>({});
-  private themeName: BehaviorSubject<string> = new BehaviorSubject<string>(defaultTheme);
-  private kipKNotificationConfig: BehaviorSubject<INotificationConfig> = new BehaviorSubject<INotificationConfig>(DefaultNotificationConfig);
-  private autoNightMode: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  private redNightMode: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  private nightModeBrightness: BehaviorSubject<number> = new BehaviorSubject<number>(1);
-  private isRemoteControl: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  private instanceName: BehaviorSubject<string> = new BehaviorSubject<string>('');
-  private browserTabTitle: BehaviorSubject<string> = new BehaviorSubject<string>('SKip');
+  // Source-of-truth signals for the profile/app-scope settings and the per-device identity.
+  private readonly _unitDefaults = signal<IUnitDefaults>({});
+  private readonly _themeName = signal<string>(defaultTheme);
+  private readonly _notificationConfig = signal<INotificationConfig>(DefaultNotificationConfig);
+  private readonly _autoNightMode = signal<boolean>(false);
+  private readonly _redNightMode = signal<boolean>(false);
+  private readonly _nightModeBrightness = signal<number>(1);
+  private readonly _isRemoteControl = signal<boolean>(false);
+  private readonly _instanceName = signal<string>('');
+  private readonly _browserTabTitle = signal<string>('SKip');
+
+  public readonly unitDefaults = this._unitDefaults.asReadonly();
+  public readonly themeName = this._themeName.asReadonly();
+  public readonly notificationConfig = this._notificationConfig.asReadonly();
+  public readonly autoNightMode = this._autoNightMode.asReadonly();
+  public readonly redNightMode = this._redNightMode.asReadonly();
+  public readonly nightModeBrightness = this._nightModeBrightness.asReadonly();
+  public readonly isRemoteControl = this._isRemoteControl.asReadonly();
+  public readonly instanceName = this._instanceName.asReadonly();
+  public readonly browserTabTitle = this._browserTabTitle.asReadonly();
+
+  // Observable bridges for the two remaining .subscribe() consumers (units.service,
+  // notifications.service — removed by #79). A fresh subscriber must receive the current value
+  // synchronously (notifications.service dereferences it in the same tick), which bare
+  // toObservable(signal) does not provide, so the write path feeds these alongside the signals.
+  private readonly unitDefaults$ = new BehaviorSubject<IUnitDefaults>(this._unitDefaults());
+  private readonly notificationConfig$ = new BehaviorSubject<INotificationConfig>(this._notificationConfig());
 
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
@@ -139,8 +157,8 @@ export class SettingsService {
     localStorage.removeItem('authorization_token');
 
     // Remote-control identity is per-device: read from connectionConfig, not the profile.
-    this.isRemoteControl.next(config.isRemoteControl ?? false);
-    this.instanceName.next(config.instanceName ?? '');
+    this._isRemoteControl.set(config.isRemoteControl ?? false);
+    this._instanceName.set(config.instanceName ?? '');
   }
 
   public resetConnection() {
@@ -207,28 +225,28 @@ export class SettingsService {
 
   private pushSettings(): void {
     if (this.activeConfig.theme) {
-      this.themeName.next(this.activeConfig.theme.themeName);
+      this._themeName.set(this.activeConfig.theme.themeName);
     }
     this.dataSets = this.activeConfig.app.dataSets;
-    this.unitDefaults.next(this.activeConfig.app.unitDefaults);
-    this.kipKNotificationConfig.next(this.activeConfig.app.notificationConfig);
+    this.applyUnitDefaults(this.activeConfig.app.unitDefaults);
+    this.applyNotificationConfig(this.activeConfig.app.notificationConfig);
 
     if (this.activeConfig.app.autoNightMode === undefined) {
       this.setAutoNightMode(false);
     } else {
-      this.autoNightMode.next(this.activeConfig.app.autoNightMode);
+      this._autoNightMode.set(this.activeConfig.app.autoNightMode);
     }
 
     if (this.activeConfig.app.redNightMode === undefined) {
       this.setRedNightMode(false);
     } else {
-      this.redNightMode.next(this.activeConfig.app.redNightMode);
+      this._redNightMode.set(this.activeConfig.app.redNightMode);
     }
 
     if (this.activeConfig.app.nightModeBrightness === undefined) {
       this.setNightModeBrightness(0.2);
     } else {
-      this.nightModeBrightness.next(this.activeConfig.app.nightModeBrightness);
+      this._nightModeBrightness.set(this.activeConfig.app.nightModeBrightness);
     }
 
     if (this.activeConfig.dashboards === undefined) {
@@ -238,22 +256,47 @@ export class SettingsService {
     }
 
     if (this.activeConfig.app.browserTabTitle === undefined) {
-      this.browserTabTitle.next('SKip');
+      this._browserTabTitle.set('SKip');
     } else {
-      this.browserTabTitle.next(this.activeConfig.app.browserTabTitle);
+      this._browserTabTitle.set(this.activeConfig.app.browserTabTitle);
     }
   }
 
-  //UnitDefaults
-  public getDefaultUnitsAsO() {
-    return this.unitDefaults.asObservable();
+  // Update the two bridged values through one point so the signal and its observable bridge can
+  // never diverge.
+  private applyUnitDefaults(value: IUnitDefaults): void {
+    this._unitDefaults.set(value);
+    this.unitDefaults$.next(value);
   }
-  public getDefaultUnits() {
-    return this.unitDefaults.getValue();
+
+  private applyNotificationConfig(value: INotificationConfig): void {
+    this._notificationConfig.set(value);
+    this.notificationConfig$.next(value);
+  }
+
+  /**
+   * Single write path for whole-blob app-scope saves: rebuilds the full IAppConfig from current
+   * state (preserving the loaded configVersion) and queues it as one replace patch.
+   */
+  private saveAppConfig(): void {
+    this.storage.patchConfig('IAppConfig', this.buildAppStorageObject());
+  }
+
+  /** Single write path for granular (sub-app-scope) profile saves. */
+  private saveConfigSection(objType: TConfigObjectType, value: unknown): void {
+    this.storage.patchConfig(objType, value);
+  }
+
+  //UnitDefaults
+  public getDefaultUnitsAsO(): Observable<IUnitDefaults> {
+    return this.unitDefaults$.asObservable();
+  }
+  public getDefaultUnits(): IUnitDefaults {
+    return this.unitDefaults();
   }
   public setDefaultUnits(newDefaults: IUnitDefaults) {
-    this.unitDefaults.next(newDefaults);
-    this.storage.patchConfig('Array<IUnitDefaults>', newDefaults);
+    this.applyUnitDefaults(newDefaults);
+    this.saveConfigSection('Array<IUnitDefaults>', newDefaults);
   }
 
   // Configuration version
@@ -310,99 +353,69 @@ export class SettingsService {
   }
 
   // Themes
-  public getThemeNameAsO() {
-    return this.themeName.asObservable();
-  }
-
   public setThemeName(newTheme: string) {
-    this.themeName.next(newTheme);
-    const theme: IThemeConfig = {
-      themeName: newTheme
-    }
-    this.storage.patchConfig('IThemeConfig', theme)
+    this._themeName.set(newTheme);
+    this.saveConfigSection('IThemeConfig', { themeName: newTheme });
   }
 
   public getThemeName(): string {
-    return this.themeName.getValue();;
+    return this.themeName();
   }
 
   // Auto night mode
-  public getAutoNightModeAsO() {
-    return this.autoNightMode.asObservable();
-  }
-
   public setAutoNightMode(enabled: boolean) {
-    this.autoNightMode.next(enabled);
-    const appConf = this.buildAppStorageObject();
-    this.storage.patchConfig('IAppConfig', appConf);
+    this._autoNightMode.set(enabled);
+    this.saveAppConfig();
   }
 
   public getAutoNightMode(): boolean {
-    return this.autoNightMode.getValue();
+    return this.autoNightMode();
   }
 
   // Red night mode
-  public getRedNightModeAsO() {
-    return this.redNightMode.asObservable();
-  }
-
   public getRedNightMode(): boolean {
-    return this.redNightMode.getValue();
+    return this.redNightMode();
   }
 
   public setRedNightMode(enabled: boolean) {
-    this.redNightMode.next(enabled);
-    const appConf = this.buildAppStorageObject();
-    this.storage.patchConfig('IAppConfig', appConf);
+    this._redNightMode.set(enabled);
+    this.saveAppConfig();
   }
 
   // isRemoteControl mode
-  public getIsRemoteControlAsO() {
-    return this.isRemoteControl.asObservable();
-  }
-
   public getIsRemoteControl(): boolean {
-    return this.isRemoteControl.getValue();
+    return this.isRemoteControl();
   }
 
   public setIsRemoteControl(enabled: boolean) {
-    this.isRemoteControl.next(enabled);
+    this._isRemoteControl.set(enabled);
     this.connectionIdentityDirty = true;
     // Remote-control identity is per-device: persist to connectionConfig, never the profile.
     this.saveConnectionConfigToLocalStorage();
   }
 
   // Remote Control Instance Name
-  public getInstanceNameAsO() {
-    return this.instanceName.asObservable();
-  }
-
   public getInstanceName(): string {
-    return this.instanceName.getValue();
+    return this.instanceName();
   }
 
   public setInstanceName(name: string) {
-    this.instanceName.next(name);
+    this._instanceName.set(name);
     this.connectionIdentityDirty = true;
     // Remote-control identity is per-device: persist to connectionConfig, never the profile.
     this.saveConnectionConfigToLocalStorage();
   }
 
   // Browser tab title (document.title)
-  public getBrowserTabTitleAsO() {
-    return this.browserTabTitle.asObservable();
-  }
-
   public getBrowserTabTitle(): string {
-    return this.browserTabTitle.getValue();
+    return this.browserTabTitle();
   }
 
   public setBrowserTabTitle(title: string) {
     // Trim before storing so a padded/whitespace-only value isn't persisted (the resolver already
     // trims for display; this keeps the saved config clean and blank values normalized to '').
-    this.browserTabTitle.next((title ?? '').trim());
-    const appConf = this.buildAppStorageObject();
-    this.storage.patchConfig('IAppConfig', appConf);
+    this._browserTabTitle.set((title ?? '').trim());
+    this.saveAppConfig();
   }
 
   public getDisablePathValidation(): boolean {
@@ -414,18 +427,17 @@ export class SettingsService {
   }
 
   public getNightModeBrightness(): number {
-    return this.nightModeBrightness.getValue();
+    return this.nightModeBrightness();
   }
 
   public setNightModeBrightness(brightness: number): void {
-    this.nightModeBrightness.next(brightness);
-    const appConf = this.buildAppStorageObject();
-    this.storage.patchConfig('IAppConfig', appConf);
+    this._nightModeBrightness.set(brightness);
+    this.saveAppConfig();
   }
 
   public saveDashboards(dashboards: Dashboard[]) {
     if (this.storage.storageServiceReady$.getValue()) {
-      this.storage.patchConfig('Dashboards', dashboards);
+      this.saveConfigSection('Dashboards', dashboards);
     }
     this._dashboards = dashboards;
   }
@@ -433,7 +445,7 @@ export class SettingsService {
   // DataSets
   public saveDataSets(dataSets: IDatasetServiceDatasetConfig[]) {
     this.dataSets = dataSets;
-    this.storage.patchConfig('Array<IDatasetDef>', dataSets);
+    this.saveConfigSection('Array<IDatasetDef>', dataSets);
   }
   public getDataSets() {
     return this.dataSets;
@@ -441,42 +453,55 @@ export class SettingsService {
 
   // Notification Service Setting
   public getNotificationServiceConfigAsO(): Observable<INotificationConfig> {
-    return this.kipKNotificationConfig.asObservable();
+    return this.notificationConfig$.asObservable();
   }
   public getNotificationConfig(): INotificationConfig {
-    return this.kipKNotificationConfig.getValue();
+    return this.notificationConfig();
   }
   public setNotificationConfig(notificationConfig: INotificationConfig) {
-    this.kipKNotificationConfig.next(notificationConfig);
-    this.storage.patchConfig('INotificationConfig', notificationConfig);
+    this.applyNotificationConfig(notificationConfig);
+    this.saveConfigSection('INotificationConfig', notificationConfig);
   }
 
   //Config manipulation: RAW and SignalK server - used by Settings Config Component
   public resetSettings() {
-
-    const newDefaultConfig: IConfig = { app: null, theme: null, dashboards: [] };
-    newDefaultConfig.app = this.getDefaultAppConfig();
-    newDefaultConfig.theme = this.getDefaultThemeConfig();
-    newDefaultConfig.dashboards = this.getDefaultDashboardsConfig();
-
-    if (this.storage.storageServiceReady$.getValue()) {
-      this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
-        .then(() => {
-          console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
-          this.reloadApp();
-        })
-        .catch(error => {
-          console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
-          this.snackBar.open(
-            'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
-            'Close',
-            {
-              duration: 0,
-              verticalPosition: 'top'
-            }
-          );
-        });
+    // The user asked for a reset: a storage that is not ready must fail loudly, not silently
+    // leave the previous configuration in place.
+    if (!this.storage.storageServiceReady$.getValue()) {
+      console.error("[AppSettings Service] Storage not ready; cannot reset configuration.");
+      this.snackBar.open(
+        'Cannot reset configuration: server storage is not ready. Reload the app and try again.',
+        'Close',
+        {
+          duration: 0,
+          verticalPosition: 'top'
+        }
+      );
+      return;
     }
+
+    const newDefaultConfig: IConfig = {
+      app: this.getDefaultAppConfig(),
+      theme: this.getDefaultThemeConfig(),
+      dashboards: this.getDefaultDashboardsConfig()
+    };
+
+    this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
+      .then(() => {
+        console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
+        this.reloadApp();
+      })
+      .catch(error => {
+        console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
+        this.snackBar.open(
+          'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
+          'Close',
+          {
+            duration: 0,
+            verticalPosition: 'top'
+          }
+        );
+      });
   }
 
   public loadDemoConfig() {
@@ -525,13 +550,13 @@ export class SettingsService {
 
     const storageObject: IAppConfig = {
       configVersion: this.configVersion ?? LATEST_APP_CONFIG_VERSION,
-      autoNightMode: this.autoNightMode.getValue(),
-      redNightMode: this.redNightMode.getValue(),
-      nightModeBrightness: this.nightModeBrightness.getValue(),
+      autoNightMode: this.autoNightMode(),
+      redNightMode: this.redNightMode(),
+      nightModeBrightness: this.nightModeBrightness(),
       dataSets: this.dataSets,
-      unitDefaults: this.unitDefaults.getValue(),
-      notificationConfig: this.kipKNotificationConfig.getValue(),
-      browserTabTitle: this.browserTabTitle.getValue()
+      unitDefaults: this.unitDefaults(),
+      notificationConfig: this.notificationConfig(),
+      browserTabTitle: this.browserTabTitle()
     }
     return storageObject;
   }
@@ -550,8 +575,8 @@ export class SettingsService {
       sharedConfigName: this.sharedConfigName,
       // Preserve the stored (possibly migration-written) identity unless the user changed it this
       // session, so a connection write around the migration cannot revert the lifted value.
-      isRemoteControl: this.connectionIdentityDirty ? this.isRemoteControl.getValue() : (stored?.isRemoteControl ?? this.isRemoteControl.getValue()),
-      instanceName: this.connectionIdentityDirty ? this.instanceName.getValue() : (stored?.instanceName ?? this.instanceName.getValue())
+      isRemoteControl: this.connectionIdentityDirty ? this.isRemoteControl() : (stored?.isRemoteControl ?? this.isRemoteControl()),
+      instanceName: this.connectionIdentityDirty ? this.instanceName() : (stored?.instanceName ?? this.instanceName())
     }
     return storageObject;
   }
@@ -570,7 +595,7 @@ export class SettingsService {
 
   private buildThemeStorageObject() {
     const storageObject: IThemeConfig = {
-      themeName: this.themeName.getValue()
+      themeName: this.themeName()
       }
     return storageObject;
   }
@@ -580,13 +605,14 @@ export class SettingsService {
     localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.buildConnectionStorageObject()));
   }
 
-  // Creates config from defaults and saves to LocalStorage
+  // Builders returning fresh default configs. Profile config persists to the server, so these
+  // write no localStorage mirrors — except the connection config, which is per-device
+  // localStorage scope and must persist where it lives.
   private getDefaultAppConfig(): IAppConfig {
     const config: IAppConfig = cloneDeep(DefaultAppConfig);
     config.notificationConfig = cloneDeep(DefaultNotificationConfig);
     config.unitDefaults = cloneDeep(DefaultUnitsConfig);
     config.configVersion = LATEST_APP_CONFIG_VERSION;
-    localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(config));
     return config;
   }
 
@@ -599,14 +625,10 @@ export class SettingsService {
   }
 
   private getDefaultDashboardsConfig(): Dashboard[] {
-    const config: Dashboard[] = [];
-    localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(config));
-    return config;
+    return [];
   }
 
   private getDefaultThemeConfig(): IThemeConfig {
-    const config: IThemeConfig = DefaultThemeConfig;
-    localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(config));
-    return config;
+    return cloneDeep(DefaultThemeConfig);
   }
 }
