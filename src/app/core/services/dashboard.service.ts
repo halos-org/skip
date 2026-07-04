@@ -183,7 +183,7 @@ export class DashboardService {
     this.dashboards.update(dashboards => dashboards.filter((_, i) => i !== itemIndex));
 
     if (this.dashboards().length === 0) {
-      this.add('Dashboard ' + (this.dashboards().length + 1), []);
+      this.add('Page ' + (this.dashboards().length + 1), []);
       this.activeDashboard.set(0);
     } else if (this.activeDashboard() > this.dashboards().length - 1) {
       this.activeDashboard.set(this.dashboards().length - 1);

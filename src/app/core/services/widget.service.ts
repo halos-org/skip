@@ -535,7 +535,7 @@ export class WidgetService {
     },
     {
       name: 'Tutorial',
-      description: 'An instructional widget that guides new users through basic navigation, gestures, and dashboard editing steps.',
+      description: 'An instructional widget that guides new users through basic navigation, gestures, and page editing steps.',
       icon: 'helpWidget',
       minWidth: 4,
       minHeight: 4,
@@ -587,7 +587,7 @@ export class WidgetService {
     },
     {
       name: 'Racer - Start Timer',
-      description: 'An advanced racing countdown timer that indicates OCS (On Course Side) status. Set the start line, choose or adjust the duration, or specify the exact start time. Automatically switches to the target dashboard at the start unless over early.',
+      description: 'An advanced racing countdown timer that indicates OCS (On Course Side) status. Set the start line, choose or adjust the duration, or specify the exact start time. Automatically switches to the target page at the start unless over early.',
       icon: 'racertimerWidget',
       minWidth: 4,
       minHeight: 4,

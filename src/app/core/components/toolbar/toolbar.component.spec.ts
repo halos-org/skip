@@ -97,7 +97,7 @@ describe('ToolbarComponent', () => {
 
   it('enters edit mode and opens notifications', () => {
     init();
-    byLabel('Edit dashboard')!.click();
+    byLabel('Edit page')!.click();
     expect(dashboard.setStaticDashboard).toHaveBeenCalledWith(false);
     byLabel('Notifications')!.click();
     expect(dialog.openNotifications).toHaveBeenCalled();

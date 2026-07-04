@@ -42,8 +42,8 @@ export class DashboardsEditorComponent {
 
   protected addDashboard(): void {
     this._dialog.openDashboardPageEditorDialog({
-      title: 'New Dashboard',
-      name: `Dashboard ${this._dashboard.dashboards().length + 1}`,
+      title: 'New Page',
+      name: `Page ${this._dashboard.dashboards().length + 1}`,
       icon: 'dashboard-dashboard',
       confirmBtnText: 'Create',
       cancelBtnText: 'Cancel'
@@ -83,7 +83,7 @@ export class DashboardsEditorComponent {
   protected editDashboard(itemIndex: number): void {
     const dashboard = this._dashboard.dashboards()[itemIndex];
     this._dialog.openDashboardPageEditorDialog({
-      title: 'Dashboard Options',
+      title: 'Page Options',
       name: dashboard.name,
       icon: dashboard.icon || 'dashboard-dashboard',
       confirmBtnText: 'Save',
@@ -101,7 +101,7 @@ export class DashboardsEditorComponent {
   protected duplicateDashboard(itemIndex: number, currentName: string): void {
     const originalDashboard = this._dashboard.dashboards()[itemIndex];
     this._dialog.openDashboardPageEditorDialog({
-      title: 'Duplicate Dashboard',
+      title: 'Duplicate Page',
       name: `${currentName} copy`,
       icon: originalDashboard.icon || 'dashboard-dashboard',
       confirmBtnText: 'Save',

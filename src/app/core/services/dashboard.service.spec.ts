@@ -89,7 +89,7 @@ describe('DashboardService', () => {
       setup([]);
       const dashboards = service.dashboards();
       expect(dashboards).toHaveLength(1);
-      expect(dashboards[0].name).toBe('Dashboard 1');
+      expect(dashboards[0].name).toBe('Page 1');
       expect(dashboards[0].id).toMatch(UUID_PATTERN);
       expect(widgetsOf(dashboards[0])[0].input.widgetProperties.type).toBe('widget-tutorial');
       // Pins today's aliasing: the blank dashboard shares its configuration array with the DefaultDashboard constant.
@@ -217,7 +217,7 @@ describe('DashboardService', () => {
       const dashboards = service.dashboards();
       expect(dashboards).toHaveLength(1);
       expect(dashboards[0].id).not.toBe('d-only');
-      expect(dashboards[0].name).toBe('Dashboard 1');
+      expect(dashboards[0].name).toBe('Page 1');
       expect(dashboards[0].configuration).toEqual([]);
       expect(service.activeDashboard()).toBe(0);
     });
