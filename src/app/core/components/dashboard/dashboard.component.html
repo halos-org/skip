@@ -4,9 +4,10 @@
   [options]="gridOptions()"
   (addedCB)="onGridItemsChanged()"
   (removedCB)="onGridItemsChanged()"
-  (tap)="addNewWidget($event)"
+  (tap)="onEmptyAreaTap($event)"
 >
 </gridstack>
+<action-menu #actionMenu [items]="emptyAreaActions()" (selected)="onEmptyAreaAction($event)" />
 @if (gridIsEmpty()) {
   <div
     class="dashboard-empty-state-container"
@@ -15,12 +16,12 @@
     [enablePress]="false"
     [enableTap]="dashboardStatic === false"
     [enableDoubleTap]="false"
-    (tap)="addNewWidget($event)"
+    (tap)="onEmptyAreaTap($event)"
   >
     <div class="dashboard-empty-state-action">
       <mat-icon class="empty-state-icon">dashboard</mat-icon>
       @if (!dashboardStatic) {
-        <p class="empty-state-text"><strong>Long press/click and hold anywhere</strong> to add widgets</p>
+        <p class="empty-state-text"><strong>Tap anywhere</strong> to add widgets</p>
         <mat-icon class="touch-icon">touch_app</mat-icon>
       } @else {
         <p class="empty-state-text">This empty dashboard is ready to be customized.</p>

@@ -262,7 +262,7 @@ describe('DashboardComponent', () => {
         expect(helpButton?.textContent).toContain('Get Help');
     });
 
-    it('should render empty dashboard edit state long-press guidance and hide customize button', () => {
+    it('should render empty dashboard edit state tap guidance and hide customize button', () => {
         mockDashboardService.isDashboardStatic.set(false);
         gridMock.grid.getGridItems.mockReturnValue([]);
 
@@ -272,35 +272,47 @@ describe('DashboardComponent', () => {
         const guidance = root.textContent ?? '';
         const customizeButton = root.querySelector('.empty-state-button');
 
-        expect(guidance).toContain('Long press/click and hold anywhere');
+        expect(guidance).toContain('Tap anywhere');
         expect(customizeButton).toBeFalsy();
     });
 
-    it('should open add widget flow on empty-area single-tap at the tapped cell in edit mode', () => {
+    it('opens the action menu at the tapped cell on empty-area single-tap in edit mode', () => {
         mockDashboardService.isDashboardStatic.set(false);
-        gridMock.grid.getGridItems.mockReturnValue([]);
+        const openMenu = vi.spyOn(component as unknown as {
+            openActionMenu: (x: number, y: number) => void;
+        }, 'openActionMenu').mockImplementation(() => undefined);
 
-        const openAddWidgetDialogSpy = vi.spyOn(component as unknown as {
-            openAddWidgetDialog: (x: number, y: number) => void;
-        }, 'openAddWidgetDialog').mockImplementation(() => undefined);
+        (component as unknown as { onEmptyAreaTap: (e: Event) => void })
+            .onEmptyAreaTap(new CustomEvent('tap', { detail: { center: { x: 120, y: 240 } } }));
 
-        (component as unknown as { addNewWidget: (e: Event) => void })
-            .addNewWidget(new CustomEvent('tap', { detail: { center: { x: 120, y: 240 } } }));
-
-        expect(openAddWidgetDialogSpy).toHaveBeenCalledWith(1, 1);
+        expect(openMenu).toHaveBeenCalledWith(120, 240);
     });
 
-    it('should ignore empty-area single-tap in static mode', () => {
+    it('ignores empty-area single-tap in static mode', () => {
         mockDashboardService.isDashboardStatic.set(true);
-        gridMock.grid.getGridItems.mockReturnValue([]);
+        const openMenu = vi.spyOn(component as unknown as {
+            openActionMenu: (x: number, y: number) => void;
+        }, 'openActionMenu').mockImplementation(() => undefined);
 
+        (component as unknown as { onEmptyAreaTap: (e: Event) => void })
+            .onEmptyAreaTap(new CustomEvent('tap', { detail: { center: { x: 12, y: 24 } } }));
+
+        expect(openMenu).not.toHaveBeenCalled();
+    });
+
+    it('routes the Add Widget menu action to the add dialog at the pending cell', () => {
+        mockDashboardService.isDashboardStatic.set(false);
         const openAddWidgetDialogSpy = vi.spyOn(component as unknown as {
             openAddWidgetDialog: (x: number, y: number) => void;
         }, 'openAddWidgetDialog').mockImplementation(() => undefined);
 
-        (component as unknown as { addNewWidget: (e: Event) => void })
-            .addNewWidget(new CustomEvent('tap', { detail: { center: { x: 12, y: 24 } } }));
+        const api = component as unknown as {
+            onEmptyAreaTap: (e: Event) => void;
+            onEmptyAreaAction: (id: string) => void;
+        };
+        api.onEmptyAreaTap(new CustomEvent('tap', { detail: { center: { x: 120, y: 240 } } }));
+        api.onEmptyAreaAction('add');
 
-        expect(openAddWidgetDialogSpy).not.toHaveBeenCalled();
+        expect(openAddWidgetDialogSpy).toHaveBeenCalledWith(1, 1);
     });
 });

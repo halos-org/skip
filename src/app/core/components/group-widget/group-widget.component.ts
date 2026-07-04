@@ -1,18 +1,18 @@
-import { Component, inject, Input, ChangeDetectionStrategy, OnInit } from '@angular/core';
+import { Component, inject, Input, ChangeDetectionStrategy, OnInit, viewChild } from '@angular/core';
 import { WidgetTitleComponent } from '../widget-title/widget-title.component';
 import { DashboardService } from '../../services/dashboard.service';
 import { GestureDirective } from "../../directives/gesture.directive";
 import { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../directives/widget-runtime.directive';
 import { DialogService } from '../../services/dialog.service';
-import { WidgetHostBottomSheetComponent } from '../widget-host-bottom-sheet/widget-host-bottom-sheet.component';
-import { MatBottomSheet } from '@angular/material/bottom-sheet';
+import { ActionMenuComponent } from '../action-menu/action-menu.component';
+import { WIDGET_ACTIONS } from '../action-menu/widget-actions';
 import { cloneDeep } from 'lodash-es';
 import { BaseWidget, NgCompInputs } from 'gridstack/dist/angular';
 
 @Component({
   selector: 'group-widget',
-  imports: [WidgetTitleComponent, GestureDirective],
+  imports: [WidgetTitleComponent, GestureDirective, ActionMenuComponent],
   templateUrl: './group-widget.component.html',
   styleUrl: './group-widget.component.scss',
   hostDirectives: [
@@ -25,14 +25,14 @@ export class GroupWidgetComponent extends BaseWidget implements OnInit {
   @Input({ required: true }) protected widgetProperties!: IWidget;
   protected readonly dashboard = inject(DashboardService);
   private readonly _dialog = inject(DialogService);
-  private readonly _bottomSheet = inject(MatBottomSheet);
   protected readonly runtime = inject(WidgetRuntimeDirective);
+  private readonly _actionMenu = viewChild.required(ActionMenuComponent);
+  protected readonly widgetActions = WIDGET_ACTIONS;
 
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     displayName: 'Gauge Label',
     color: 'contrast'
   };
-  private _sheetOpen = false;
   private _optionsOpen = false;
 
   constructor() {
@@ -95,41 +95,33 @@ export class GroupWidgetComponent extends BaseWidget implements OnInit {
     }
   }
 
-  /**
-   * Open the bottom sheet for widget management (delete / duplicate actions).
-   * @param e Event used to stop propagation.
-   */
-  public openBottomSheet(e: Event | CustomEvent): void {
+  /** Single tap in edit mode opens the group action menu at the tap point. */
+  public onSingleTap(e: Event | CustomEvent): void {
     (e as Event).stopPropagation();
+    if (this.dashboard.isDashboardStatic()) return;
+    const detail = (e as CustomEvent).detail as { center?: { x: number; y: number } } | undefined;
+    this._actionMenu().open(detail?.center?.x ?? 0, detail?.center?.y ?? 0);
+  }
 
-    if (!this.dashboard.isDashboardStatic()) {
-      if (this._sheetOpen) return;
-
-      this._sheetOpen = true;
-      const sheetRef = this._bottomSheet.open(WidgetHostBottomSheetComponent);
-      sheetRef.afterDismissed().subscribe((action) => {
-        this._sheetOpen = false;
-
-        switch (action) {
-          case 'settings':
-            this.openWidgetOptions(new Event('widget-settings'));
-            break;
-          case 'duplicate':
-            this.dashboard.duplicateWidget(this.widgetProperties.uuid);
-            break;
-          case 'copy':
-            this.dashboard.copyWidget(this.widgetProperties.uuid);
-            break;
-          case 'cut':
-            this.dashboard.cutWidget(this.widgetProperties.uuid);
-            break;
-          case 'delete':
-            this.dashboard.deleteWidget(this.widgetProperties.uuid);
-            break;
-          default:
-            break;
-        }
-      });
+  protected onWidgetAction(action: string): void {
+    switch (action) {
+      case 'settings':
+        this.openWidgetOptions(new Event('widget-settings'));
+        break;
+      case 'duplicate':
+        this.dashboard.duplicateWidget(this.widgetProperties.uuid);
+        break;
+      case 'copy':
+        this.dashboard.copyWidget(this.widgetProperties.uuid);
+        break;
+      case 'cut':
+        this.dashboard.cutWidget(this.widgetProperties.uuid);
+        break;
+      case 'delete':
+        this.dashboard.deleteWidget(this.widgetProperties.uuid);
+        break;
+      default:
+        break;
     }
   }
 }

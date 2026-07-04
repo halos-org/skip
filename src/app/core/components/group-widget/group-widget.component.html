@@ -5,6 +5,7 @@
 @if (!dashboard.isDashboardStatic()) {
   <div class="widgetOverlay"
     kipGestures mode="press" [enablePress]="false" [enableTap]="true" [enableDoubleTap]="false"
-    (tap)="openBottomSheet($event)">
+    (tap)="onSingleTap($event)">
   </div>
 }
+<action-menu #actionMenu [items]="widgetActions" (selected)="onWidgetAction($event)" />

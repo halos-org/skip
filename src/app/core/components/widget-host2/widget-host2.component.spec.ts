@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
-import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { WidgetHost2Component } from './widget-host2.component';
 import { DialogService } from '../../services/dialog.service';
 import { DashboardService } from '../../services/dashboard.service';
@@ -39,9 +38,6 @@ describe('WidgetHost2Component', () => {
     };
     let kipSeriesMock: {
         getSeriesDefinitions: Mock;
-    };
-    let bottomSheetMock: {
-        open: Mock;
     };
     let testWidget: IWidget;
 
@@ -83,12 +79,6 @@ describe('WidgetHost2Component', () => {
                     }
                 },
                 {
-                    provide: MatBottomSheet,
-                    useValue: (bottomSheetMock = {
-                        open: vi.fn().mockReturnValue({ afterDismissed: () => of(null) })
-                    })
-                },
-                {
                     provide: WidgetService,
                     useValue: {
                         getComponentType: vi.fn().mockReturnValue(undefined)
@@ -109,11 +99,7 @@ describe('WidgetHost2Component', () => {
                 { provide: DashboardHistorySeriesSyncService, useValue: historySyncMock },
                 { provide: KipSeriesApiClientService, useValue: kipSeriesMock }
             ]
-        })
-            // MatBottomSheet is pulled in via the component's MatBottomSheetModule import,
-            // which shadows a plain provider; overrideProvider forces the mock to win.
-            .overrideProvider(MatBottomSheet, { useValue: bottomSheetMock })
-            .compileComponents();
+        }).compileComponents();
 
         fixture = TestBed.createComponent(WidgetHost2Component);
         component = fixture.componentInstance;
@@ -173,36 +159,44 @@ describe('WidgetHost2Component', () => {
         expect(dialogServiceMock.openWidgetOptions).not.toHaveBeenCalled();
     });
 
-    it('opens the action popup on single-tap when the dashboard is unlocked', () => {
+    it('opens the action menu on single-tap when the dashboard is unlocked', () => {
         dashboard.isDashboardStatic.set(false);
+        const openMenu = vi.spyOn(component as unknown as { openActionMenu: (x: number, y: number) => void }, 'openActionMenu').mockImplementation(() => undefined);
 
-        component.openBottomSheet(new CustomEvent('tap'));
+        component.onSingleTap(new CustomEvent('tap', { detail: { center: { x: 30, y: 40 } } }));
 
-        expect(bottomSheetMock.open).toHaveBeenCalledTimes(1);
+        expect(openMenu).toHaveBeenCalledWith(30, 40);
     });
 
-    it('does not open the action popup on single-tap when the dashboard is locked', () => {
+    it('does not open the action menu on single-tap when the dashboard is locked', () => {
         dashboard.isDashboardStatic.set(true);
+        const openMenu = vi.spyOn(component as unknown as { openActionMenu: (x: number, y: number) => void }, 'openActionMenu').mockImplementation(() => undefined);
 
-        component.openBottomSheet(new CustomEvent('tap'));
+        component.onSingleTap(new CustomEvent('tap', { detail: { center: { x: 30, y: 40 } } }));
 
-        expect(bottomSheetMock.open).not.toHaveBeenCalled();
+        expect(openMenu).not.toHaveBeenCalled();
     });
 
-    it('routes the popup Settings action to the widget options dialog', () => {
+    it('does not open the action menu on single-tap while a drag is in flight', () => {
         dashboard.isDashboardStatic.set(false);
-        bottomSheetMock.open.mockReturnValue({ afterDismissed: () => of('settings') });
+        TestBed.inject(uiEventService).isDragging.set(true);
+        const openMenu = vi.spyOn(component as unknown as { openActionMenu: (x: number, y: number) => void }, 'openActionMenu').mockImplementation(() => undefined);
 
-        component.openBottomSheet(new CustomEvent('tap'));
+        component.onSingleTap(new CustomEvent('tap', { detail: { center: { x: 30, y: 40 } } }));
+
+        expect(openMenu).not.toHaveBeenCalled();
+    });
+
+    it('routes the Settings action to the widget options dialog', () => {
+        dashboard.isDashboardStatic.set(false);
+
+        (component as unknown as { onWidgetAction: (id: string) => void }).onWidgetAction('settings');
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
     });
 
-    it('routes the popup Delete action to the dashboard service', () => {
-        dashboard.isDashboardStatic.set(false);
-        bottomSheetMock.open.mockReturnValue({ afterDismissed: () => of('delete') });
-
-        component.openBottomSheet(new CustomEvent('tap'));
+    it('routes the Delete action to the dashboard service', () => {
+        (component as unknown as { onWidgetAction: (id: string) => void }).onWidgetAction('delete');
 
         expect(dashboard.deleteWidget).toHaveBeenCalledWith('widget-1');
     });
@@ -335,15 +329,6 @@ describe('WidgetHost2Component', () => {
         expect(dialogServiceMock.openWidgetHistoryDialog).toHaveBeenCalledTimes(1);
     });
 
-    it('suppresses bottom sheet opening while dragging', () => {
-        dashboard.isDashboardStatic.set(false);
-        const uiEvents = TestBed.inject(uiEventService);
-        uiEvents.isDragging.set(true);
-
-        component.openBottomSheet(new Event('press'));
-
-        expect(bottomSheetMock.open).not.toHaveBeenCalled();
-    });
 
     it('auto-opens options once on init for brand-new widgets', async () => {
         dashboard.isDashboardStatic.set(false);

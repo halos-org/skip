@@ -1,0 +1,8 @@
+// A zero-size fixed anchor the pop-over menu attaches to at the tap point.
+.action-menu-anchor {
+  position: fixed;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+}

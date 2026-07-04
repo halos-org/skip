@@ -1,0 +1,61 @@
+import { ChangeDetectionStrategy, Component, ElementRef, inject, input, output, viewChild } from '@angular/core';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
+import { MatIconModule } from '@angular/material/icon';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { WidgetHostBottomSheetComponent } from '../widget-host-bottom-sheet/widget-host-bottom-sheet.component';
+import { ActionMenuItem } from './action-menu-item';
+
+/** Below this width the menu is a bottom drawer; above it, a pop-over at the tap point. */
+const PHONE_QUERY = '(max-width: 599.98px)';
+
+/**
+ * Responsive action menu. Embed it once in a host and call {@link open} with the
+ * tap coordinates: on phones it slides up as a bottom drawer, on larger screens
+ * it opens as a Material menu anchored at the tap point. Emits the chosen item id
+ * via {@link selected} (a plain Cancel/backdrop dismissal emits nothing).
+ */
+@Component({
+  selector: 'action-menu',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatMenuModule, MatIconModule],
+  templateUrl: './action-menu.component.html',
+  styleUrl: './action-menu.component.scss',
+})
+export class ActionMenuComponent {
+  public readonly items = input<ActionMenuItem[]>([]);
+  public readonly selected = output<string>();
+
+  private readonly _breakpoint = inject(BreakpointObserver);
+  private readonly _bottomSheet = inject(MatBottomSheet);
+  private readonly _anchor = viewChild.required<ElementRef<HTMLElement>>('anchor');
+  private readonly _trigger = viewChild.required(MatMenuTrigger);
+
+  public open(x: number, y: number): void {
+    if (this._breakpoint.isMatched(PHONE_QUERY)) {
+      // Linux Firefox ghost-clicks the backdrop right after the opening tap and
+      // would auto-dismiss the drawer; disable backdrop-close there (the always
+      // present Cancel row is the exit).
+      const isLinuxFirefox = typeof navigator !== 'undefined' &&
+        /Linux/.test(navigator.platform) && /Firefox/.test(navigator.userAgent);
+      this._bottomSheet.open(WidgetHostBottomSheetComponent, {
+        data: { items: this.items() },
+        ...(isLinuxFirefox ? { disableClose: true } : {}),
+      })
+        .afterDismissed()
+        .subscribe((id?: string) => {
+          if (id && id !== 'cancel') this.selected.emit(id);
+        });
+      return;
+    }
+    const el = this._anchor().nativeElement;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    this._trigger().openMenu();
+  }
+
+  protected onSelect(id: string): void {
+    this._trigger().closeMenu();
+    this.selected.emit(id);
+  }
+}

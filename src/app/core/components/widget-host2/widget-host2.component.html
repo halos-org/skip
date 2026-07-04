@@ -1,6 +1,6 @@
-<mat-card kipGestures mode="press" [enableTap]="true" [enableDoubleTap]="false" appearance="raised" class="widget-container kip-widget-card-colors" [style.border]="dashboardStaticView() ? '1px dashed transparent' : '1px dashed var(--mat-sys-outline)'"
+<mat-card kipGestures mode="press" [enablePress]="dashboardStaticView()" [enableTap]="true" [enableDoubleTap]="false" [longPressMs]="400" appearance="raised" class="widget-container kip-widget-card-colors" [style.border]="dashboardStaticView() ? '1px dashed transparent' : '1px dashed var(--mat-sys-outline)'"
   (press)="onWidgetLongPress($event)"
-  (tap)="openBottomSheet($event)">
+  (tap)="onSingleTap($event)">
   <ng-container #childOutlet></ng-container>
   @if (loadFailed()) {
     <button type="button" class="widget-load-error" (click)="retryWidgetLoad()">
@@ -9,3 +9,4 @@
     </button>
   }
 </mat-card>
+<action-menu #actionMenu [items]="widgetActions" (selected)="onWidgetAction($event)" />

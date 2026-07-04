@@ -1,0 +1,9 @@
+<div #anchor class="action-menu-anchor" [matMenuTriggerFor]="menu"></div>
+<mat-menu #menu="matMenu">
+  @for (item of items(); track item.id) {
+    <button mat-menu-item (click)="onSelect(item.id)">
+      <mat-icon>{{ item.icon }}</mat-icon>
+      <span>{{ item.label }}</span>
+    </button>
+  }
+</mat-menu>
