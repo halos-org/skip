@@ -15,6 +15,7 @@ import { GestureDirective } from './core/directives/gesture.directive';
 import { ChromeIntent, PageNavDirection, ScrollNavDirective } from './core/directives/scroll-nav.directive';
 import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
 import { DashboardService } from './core/services/dashboard.service';
+import { AppService } from './core/services/app-service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
 import { NotificationsService } from './core/services/notifications.service';
@@ -51,6 +52,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly _notifications = inject(NotificationsService);
   private readonly _uiEvent = inject(uiEventService);
+  private readonly _app = inject(AppService);
   protected readonly chrome = inject(ChromeVisibilityService);
   private readonly _dialog = inject(DialogService);
   public readonly settings = inject(SettingsService);
@@ -77,7 +79,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private missingConfigPromptShown = false;
   private authBlockedPromptShown = false;
 
-  private readonly _hotkeyHandler = (key: string) => this.handleKeyDown(key);
+  private readonly _hotkeyHandler = (key: string, event: KeyboardEvent) => this.handleKeyDown(key, event);
   private _lastPeekAt = Number.NEGATIVE_INFINITY;
 
   constructor() {
@@ -196,21 +198,38 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
+    // Single hotkey registration for the whole shell (always mounted):
+    // Ctrl+←/→ page nav, Ctrl+Shift+E/F/N edit/fullscreen/night. Shift
+    // disambiguates the two groups within the one keydown listener.
     this._uiEvent.addHotkeyListener(
       this._hotkeyHandler,
-      { ctrlKey: true, keys: ['arrowright', 'arrowleft'] }
+      { ctrlKey: true, keys: ['arrowright', 'arrowleft', 'e', 'f', 'n'] }
     );
   }
 
-  private handleKeyDown(key: string): void {
+  private handleKeyDown(key: string, event: KeyboardEvent): void {
     switch (key) {
       case 'arrowright':
-        this.pageNav('next');
+        if (!event.shiftKey) this.pageNav('next');
         break;
       case 'arrowleft':
-        this.pageNav('prev');
+        if (!event.shiftKey) this.pageNav('prev');
+        break;
+      case 'e':
+        if (event.shiftKey) this._dashboard.setStaticDashboard(false);
+        break;
+      case 'f':
+        if (event.shiftKey) this._uiEvent.toggleFullScreen();
+        break;
+      case 'n':
+        if (event.shiftKey) this.toggleNightMode();
         break;
     }
+  }
+
+  private toggleNightMode(): void {
+    this._app.isNightMode.set(!this._app.isNightMode());
+    this._app.toggleDayNightMode();
   }
 
   /** Navigate pages, honoring locked mode and suppressing during a drag. */
