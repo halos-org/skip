@@ -302,20 +302,6 @@ describe('DashboardComponent', () => {
         expect(customizeButton).toBeFalsy();
     });
 
-    it('should navigate dashboards on empty-state swipe gestures in static mode', () => {
-        mockDashboardService.isDashboardStatic.set(true);
-        gridMock.grid.getGridItems.mockReturnValue([]);
-
-        fixture.detectChanges();
-
-        const overlay = fixture.nativeElement.querySelector('.dashboard-empty-state-container') as HTMLElement;
-        overlay.dispatchEvent(new CustomEvent('swipeup', { bubbles: true }));
-        overlay.dispatchEvent(new CustomEvent('swipedown', { bubbles: true }));
-
-        expect(mockDashboardService.navigateToPreviousDashboard).toHaveBeenCalled();
-        expect(mockDashboardService.navigateToNextDashboard).toHaveBeenCalled();
-    });
-
     it('should open add widget flow on empty-state press in edit mode', () => {
         mockDashboardService.isDashboardStatic.set(false);
         gridMock.grid.getGridItems.mockReturnValue([]);

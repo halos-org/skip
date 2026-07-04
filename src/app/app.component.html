@@ -1,14 +1,24 @@
-<mat-sidenav-container kipGestures [mode]="'horizontal'" [bridgeUiEvents]="true" class="sidenav-container" (swipeleft)="onSwipeLeft()" (swiperight)="onSwipeRight()" (backdropClick)="backdropClicked()">
-  <mat-sidenav class="sidenav-notifications" [(opened)]="notificationsSidenavOpened" (keydown)="escapeKeyPressed($event.key)" mode="over" position="start" autoFocus="true" disableClose>
-    <menu-notifications />
-  </mat-sidenav>
-  <mat-sidenav #actionsSidenav class="sidenav-actions" [(opened)]="actionsSidenavOpened" (keydown)="escapeKeyPressed($event.key)" mode="over" position="end" autoFocus="true" disableClose>
-    <menu-actions [actionsSidenav]="actionsSidenav" />
-  </mat-sidenav>
-  <mat-sidenav-content>
-    <router-outlet class="router-outlet-container" />
-  </mat-sidenav-content>
-</mat-sidenav-container>
+<div
+  class="app-shell"
+  kipGestures
+  [mode]="'all'"
+  [enablePress]="false"
+  [enableDoubleTap]="false"
+  kipScrollNav
+  [navEnabled]="dashboardStatic()"
+  [suspended]="isDragging()"
+  (swipeup)="onChromeIntent('reveal')"
+  (swipedown)="onChromeIntent('hide')"
+  (swipeleft)="pageNav('next')"
+  (swiperight)="pageNav('prev')"
+  (pageNav)="pageNav($event)"
+  (chromeIntent)="onChromeIntent($event)"
+  (pointerdown)="chrome.pulsePeek()"
+  (mousemove)="onMouseActivity()"
+>
+  <app-toolbar />
+  <router-outlet class="router-outlet-container" />
+</div>
 
 @if (upgrade.upgrading()) {
   <div class="config-upgrade-overlay" role="alert" aria-live="polite">

@@ -1,31 +1,16 @@
-@use '@angular/material' as mat;
-
-.sidenav-container {
+.app-shell {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
-  @include mat.sidenav-overrides((
-    scrim-color: color-mix(in srgb, var(--mat-sys-neutral-variant20) 70%, transparent), // Override the default scrim color to be fully transparent
-  ));
+  overflow: hidden;
+  position: relative;
 }
 
-mat-sidenav-content {
- overflow-y: hidden;
- overflow-x: hidden;
-}
-
-mat-sidenav {
-  box-shadow: 0px 0px 1px 0px var(--kip-contrast-color); // subtle inner shadow for depth
-}
-
-mat-sidenav.sidenav-notifications {
-  width: 230px;
-  z-index: 1200; // ensure sidenav sits above the notification overlay panel
-}
-
-mat-sidenav.sidenav-actions {
-  width: 135px;
-  z-index: 1200; // ensure actions sidenav stacks above overlay
-  overflow-x: hidden; // Ensure action sidenav content doesn't overflow horizontally
+// The toolbar overlays (position: fixed); the routed content fills the shell.
+.app-shell > *:not(app-toolbar) {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Configuration Upgrade Overlay */
