@@ -122,7 +122,7 @@ export class DashboardService {
     if (itemIndex === this.activeDashboard()) return;
     // No change if the same dashboard is selected to prevent unnecessary cascading updates
 
-    if (itemIndex >= 0 && itemIndex < this.dashboards().length) {
+    if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex < this.dashboards().length) {
       this.activeDashboard.set(itemIndex);
     } else {
       console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
@@ -180,14 +180,26 @@ export class DashboardService {
    * @param itemIndex The index of the dashboard to delete.
    */
   public delete(itemIndex: number): void {
+    if (itemIndex < 0 || itemIndex >= this.dashboards().length) {
+      console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
+      return;
+    }
+
+    const active = this.activeDashboard();
     this.dashboards.update(dashboards => dashboards.filter((_, i) => i !== itemIndex));
 
     if (this.dashboards().length === 0) {
       this.add('Page ' + (this.dashboards().length + 1), []);
       this.activeDashboard.set(0);
-    } else if (this.activeDashboard() > this.dashboards().length - 1) {
-      this.activeDashboard.set(this.dashboards().length - 1);
+      return;
     }
+
+    if (active === null) return;
+
+    // Deleting a dashboard below the active one shifts everything down; follow the
+    // active dashboard to its new index, then clamp if the active one was the last.
+    const shifted = itemIndex < active ? active - 1 : active;
+    this.activeDashboard.set(Math.min(shifted, this.dashboards().length - 1));
   }
 
   /**
@@ -229,11 +241,11 @@ export class DashboardService {
           widget.id = UUID.create();
           widget.input.widgetProperties.uuid = widget.id;
         } else {
-          console.error("Dashboard Service] Widget configuration is missing required properties:", widget);
+          console.error("[Dashboard Service] Widget configuration is missing required properties:", widget);
         }
       });
     } else {
-      console.error("Dashboard Service] Dashboard configuration is not an array:", newDashboard.configuration);
+      console.error("[Dashboard Service] Dashboard configuration is not an array:", newDashboard.configuration);
       newDashboard.configuration = [];
     }
 
