@@ -92,8 +92,10 @@ describe('DashboardService', () => {
       expect(dashboards[0].name).toBe('Page 1');
       expect(dashboards[0].id).toMatch(UUID_PATTERN);
       expect(widgetsOf(dashboards[0])[0].input.widgetProperties.type).toBe('widget-tutorial');
-      // Pins today's aliasing: the blank dashboard shares its configuration array with the DefaultDashboard constant.
-      expect(dashboards[0].configuration).toBe(DefaultDashboard[0].configuration);
+      // The blank dashboard deep-clones the DefaultDashboard constant so later in-place edits cannot corrupt the shared default.
+      expect(dashboards[0].configuration).not.toBe(DefaultDashboard[0].configuration);
+      expect(widgetsOf(dashboards[0])[0]).not.toBe(DefaultDashboard[0].configuration![0]);
+      expect(dashboards[0].configuration).toEqual(DefaultDashboard[0].configuration);
       expect(consoleWarn).toHaveBeenCalled();
     });
 
