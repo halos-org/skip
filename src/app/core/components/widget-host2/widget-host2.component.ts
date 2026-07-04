@@ -338,16 +338,15 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
       if (!this.acquireOverlay('sheet')) {
         return;
       }
-      const isLinuxFirefox = typeof navigator !== 'undefined' &&
-        /Linux/.test(navigator.platform) &&
-        /Firefox/.test(navigator.userAgent);
-
       try {
-        const sheetRef = this.bottomSheet.open(WidgetHostBottomSheetComponent, isLinuxFirefox ? { disableClose: true, data: { showCancel: true } } : {});
+        const sheetRef = this.bottomSheet.open(WidgetHostBottomSheetComponent);
         sheetRef.afterDismissed().subscribe((action) => {
           this.releaseOverlay('sheet');
           this.debug('bottom sheet dismissed', { widgetId: this.widgetProperties?.uuid, action });
           switch (action) {
+            case 'settings':
+              this.openWidgetOptions(new Event('widget-settings'));
+              break;
             case 'delete':
               this.dashboard.deleteWidget(this.widgetProperties.uuid);
               break;

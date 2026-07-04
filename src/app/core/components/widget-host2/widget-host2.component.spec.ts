@@ -189,6 +189,24 @@ describe('WidgetHost2Component', () => {
         expect(bottomSheetMock.open).not.toHaveBeenCalled();
     });
 
+    it('routes the popup Settings action to the widget options dialog', () => {
+        dashboard.isDashboardStatic.set(false);
+        bottomSheetMock.open.mockReturnValue({ afterDismissed: () => of('settings') });
+
+        component.openBottomSheet(new CustomEvent('tap'));
+
+        expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
+    });
+
+    it('routes the popup Delete action to the dashboard service', () => {
+        dashboard.isDashboardStatic.set(false);
+        bottomSheetMock.open.mockReturnValue({ afterDismissed: () => of('delete') });
+
+        component.openBottomSheet(new CustomEvent('tap'));
+
+        expect(dashboard.deleteWidget).toHaveBeenCalledWith('widget-1');
+    });
+
     it('does not open history dialog when widget has no numeric paths', async () => {
         dashboard.isDashboardStatic.set(true);
         testWidget.config.paths = {

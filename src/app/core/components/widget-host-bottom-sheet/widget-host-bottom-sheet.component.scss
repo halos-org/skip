@@ -1,0 +1,19 @@
+// A large, motion-tolerant Cancel: full width and tall so a shaky tap still
+// lands it, and it always dismisses (no backdrop needed on any platform).
+.widget-action-cancel {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin: 4px 0 env(safe-area-inset-bottom, 0);
+  border: 0;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface);
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.widget-action-cancel:active {
+  background: var(--mat-sys-surface-container-high);
+}

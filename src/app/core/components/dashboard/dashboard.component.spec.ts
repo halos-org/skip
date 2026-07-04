@@ -276,7 +276,7 @@ describe('DashboardComponent', () => {
         expect(customizeButton).toBeFalsy();
     });
 
-    it('should open add widget flow on empty-state press in edit mode', () => {
+    it('should open add widget flow on empty-area single-tap at the tapped cell in edit mode', () => {
         mockDashboardService.isDashboardStatic.set(false);
         gridMock.grid.getGridItems.mockReturnValue([]);
 
@@ -284,15 +284,13 @@ describe('DashboardComponent', () => {
             openAddWidgetDialog: (x: number, y: number) => void;
         }, 'openAddWidgetDialog').mockImplementation(() => undefined);
 
-        fixture.detectChanges();
-
-        const overlay = fixture.nativeElement.querySelector('.dashboard-empty-state-container') as HTMLElement;
-        overlay.dispatchEvent(new CustomEvent('press', { detail: { x: 120, y: 240 }, bubbles: true }));
+        (component as unknown as { addNewWidget: (e: Event) => void })
+            .addNewWidget(new CustomEvent('tap', { detail: { center: { x: 120, y: 240 } } }));
 
         expect(openAddWidgetDialogSpy).toHaveBeenCalledWith(1, 1);
     });
 
-    it('should ignore empty-state press in static mode', () => {
+    it('should ignore empty-area single-tap in static mode', () => {
         mockDashboardService.isDashboardStatic.set(true);
         gridMock.grid.getGridItems.mockReturnValue([]);
 
@@ -300,10 +298,8 @@ describe('DashboardComponent', () => {
             openAddWidgetDialog: (x: number, y: number) => void;
         }, 'openAddWidgetDialog').mockImplementation(() => undefined);
 
-        fixture.detectChanges();
-
-        const overlay = fixture.nativeElement.querySelector('.dashboard-empty-state-container') as HTMLElement;
-        overlay.dispatchEvent(new CustomEvent('press', { detail: { x: 12, y: 24 }, bubbles: true }));
+        (component as unknown as { addNewWidget: (e: Event) => void })
+            .addNewWidget(new CustomEvent('tap', { detail: { center: { x: 12, y: 24 } } }));
 
         expect(openAddWidgetDialogSpy).not.toHaveBeenCalled();
     });

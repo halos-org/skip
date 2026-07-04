@@ -1,10 +1,10 @@
 @let dashboardStatic = dashboardStaticView() ?? true;
-<gridstack kipGestures [mode]="dashboardStatic === true ? 'press' : 'editor'" [enablePress]="dashboardStatic === false" [enableDoubleTap]="false" #grid
+<gridstack kipGestures [mode]="dashboardStatic === true ? 'press' : 'editor'" [enablePress]="false" [enableTap]="dashboardStatic === false" [enableDoubleTap]="false" #grid
   [isEmpty]="false"
   [options]="gridOptions()"
   (addedCB)="onGridItemsChanged()"
   (removedCB)="onGridItemsChanged()"
-  (press)="addNewWidget($event)"
+  (tap)="addNewWidget($event)"
 >
 </gridstack>
 @if (gridIsEmpty()) {
@@ -12,9 +12,10 @@
     class="dashboard-empty-state-container"
     kipGestures
     [mode]="dashboardStatic === true ? 'press' : 'editor'"
-    [enablePress]="dashboardStatic === false"
+    [enablePress]="false"
+    [enableTap]="dashboardStatic === false"
     [enableDoubleTap]="false"
-    (press)="addNewWidget($event)"
+    (tap)="addNewWidget($event)"
   >
     <div class="dashboard-empty-state-action">
       <mat-icon class="empty-state-icon">dashboard</mat-icon>

@@ -106,14 +106,23 @@ export class GroupWidgetComponent extends BaseWidget implements OnInit {
       if (this._sheetOpen) return;
 
       this._sheetOpen = true;
-      const isLinuxFirefox = typeof navigator !== 'undefined' &&
-        /Linux/.test(navigator.platform) &&
-        /Firefox/.test(navigator.userAgent);
-      const sheetRef = this._bottomSheet.open(WidgetHostBottomSheetComponent, isLinuxFirefox ? { disableClose: true, data: { showCancel: true } } : {});
+      const sheetRef = this._bottomSheet.open(WidgetHostBottomSheetComponent);
       sheetRef.afterDismissed().subscribe((action) => {
         this._sheetOpen = false;
 
         switch (action) {
+          case 'settings':
+            this.openWidgetOptions(new Event('widget-settings'));
+            break;
+          case 'duplicate':
+            this.dashboard.duplicateWidget(this.widgetProperties.uuid);
+            break;
+          case 'copy':
+            this.dashboard.copyWidget(this.widgetProperties.uuid);
+            break;
+          case 'cut':
+            this.dashboard.cutWidget(this.widgetProperties.uuid);
+            break;
           case 'delete':
             this.dashboard.deleteWidget(this.widgetProperties.uuid);
             break;

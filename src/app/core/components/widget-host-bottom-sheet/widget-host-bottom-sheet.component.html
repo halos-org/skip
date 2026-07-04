@@ -1,4 +1,8 @@
 <mat-action-list>
+  <button mat-list-item (click)="clickAction('settings')">
+    <mat-icon matListItemIcon>settings</mat-icon>
+    <span>Settings</span>
+  </button>
   <button mat-list-item (click)="clickAction('duplicate')">
     <mat-icon matListItemIcon>add_to_photos</mat-icon>
     <span>Duplicate</span>
@@ -15,10 +19,8 @@
     <mat-icon matListItemIcon>delete_forever</mat-icon>
     <span>Delete</span>
   </button>
-  @if (showCancel) {
-    <button mat-list-item (click)="clickAction('cancel')">
-      <mat-icon matListItemIcon>close</mat-icon>
-      <span>Close</span>
-    </button>
-  }
 </mat-action-list>
+
+<button type="button" class="widget-action-cancel" (click)="clickAction('cancel')">
+  Cancel
+</button>
