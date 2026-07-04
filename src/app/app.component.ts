@@ -234,6 +234,16 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     else this.chrome.hide();
   }
 
+  /**
+   * A press anywhere outside the toolbar dismisses it when shown, or flashes the
+   * edge-peek cue when hidden. Presses on the toolbar itself do neither.
+   */
+  protected onShellPointerDown(event: Event): void {
+    if ((event.target as Element | null)?.closest('app-toolbar')) return;
+    if (this.chrome.revealed()) this.chrome.hide();
+    else this.chrome.pulsePeek();
+  }
+
   /** Throttled edge-peek cue on pointer activity. */
   protected onMouseActivity(): void {
     const now = performance.now();

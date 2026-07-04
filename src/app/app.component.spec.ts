@@ -7,11 +7,13 @@ import { AppNetworkInitService } from './core/services/app-initNetwork.service';
 import { DashboardService } from './core/services/dashboard.service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { AppService } from './core/services/app-service';
+import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
 
-// Access the component's private hotkey surface without widening the class API.
+// Access the component's private surface without widening the class API.
 interface AppComponentHotkeyApi {
   dashboardVisible: { set: (v: boolean) => void };
   handleKeyDown: (key: string, event: { shiftKey: boolean }) => void;
+  onShellPointerDown: (event: { target: { closest: (sel: string) => unknown } }) => void;
 }
 
 describe('AppComponent', () => {
@@ -36,6 +38,12 @@ describe('AppComponent', () => {
     toggleFullScreen: ReturnType<typeof vi.fn>;
   };
   let appService: { toggleNightMode: ReturnType<typeof vi.fn> };
+  let chrome: {
+    revealed: ReturnType<typeof signal<boolean>>;
+    reveal: ReturnType<typeof vi.fn>;
+    hide: ReturnType<typeof vi.fn>;
+    pulsePeek: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     dashboard = {
@@ -54,6 +62,7 @@ describe('AppComponent', () => {
       toggleFullScreen: vi.fn(),
     };
     appService = { toggleNightMode: vi.fn() };
+    chrome = { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],
@@ -62,6 +71,7 @@ describe('AppComponent', () => {
         { provide: DashboardService, useValue: dashboard },
         { provide: uiEventService, useValue: uiEvent },
         { provide: AppService, useValue: appService },
+        { provide: ChromeVisibilityService, useValue: chrome },
       ],
     }).compileComponents();
   });
@@ -122,6 +132,35 @@ describe('AppComponent', () => {
       expect(dashboard.setStaticDashboard).toHaveBeenCalledTimes(1);
       expect(uiEvent.toggleFullScreen).toHaveBeenCalledTimes(1);
       expect(appService.toggleNightMode).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('press-outside dismissal', () => {
+    const outside = { target: { closest: () => null } };
+    const onToolbar = { target: { closest: (sel: string) => (sel === 'app-toolbar' ? {} : null) } };
+
+    it('dismisses the shown toolbar on a press outside it', () => {
+      const app = create();
+      chrome.revealed.set(true);
+      app.onShellPointerDown(outside);
+      expect(chrome.hide).toHaveBeenCalledTimes(1);
+      expect(chrome.pulsePeek).not.toHaveBeenCalled();
+    });
+
+    it('flashes the peek on a press outside while the toolbar is hidden', () => {
+      const app = create();
+      chrome.revealed.set(false);
+      app.onShellPointerDown(outside);
+      expect(chrome.pulsePeek).toHaveBeenCalledTimes(1);
+      expect(chrome.hide).not.toHaveBeenCalled();
+    });
+
+    it('ignores presses on the toolbar itself', () => {
+      const app = create();
+      chrome.revealed.set(true);
+      app.onShellPointerDown(onToolbar);
+      expect(chrome.hide).not.toHaveBeenCalled();
+      expect(chrome.pulsePeek).not.toHaveBeenCalled();
     });
   });
 });

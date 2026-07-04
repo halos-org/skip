@@ -13,7 +13,7 @@
   (swiperight)="pageNav('prev')"
   (pageNav)="pageNav($event)"
   (chromeIntent)="onChromeIntent($event)"
-  (pointerdown)="chrome.pulsePeek()"
+  (pointerdown)="onShellPointerDown($event)"
   (mousemove)="onMouseActivity()"
 >
   @if (dashboardVisible()) {
