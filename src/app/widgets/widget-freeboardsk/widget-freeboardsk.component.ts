@@ -123,10 +123,10 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
     if (event.data.gesture && event.data.eventData?.instanceId === instanceId) {
       switch (event.data.gesture) {
         case 'swipeup':
-          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToPreviousDashboard();
+          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToNextDashboard();
           break;
         case 'swipedown':
-          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToNextDashboard();
+          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToPreviousDashboard();
           break;
         case 'swipeleft':
           window.document.dispatchEvent(new Event('openLeftSidenav', { bubbles: true, cancelable: true }));

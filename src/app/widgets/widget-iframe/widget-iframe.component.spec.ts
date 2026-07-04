@@ -63,18 +63,18 @@ describe('WidgetIframeComponent', () => {
   it('acts on a gesture message from its own iframe', () => {
     const { fixture, dashboard } = mount();
     swipeDownFrom(iframeWindow(fixture), window.location.origin);
-    expect(dashboard.navigateToNextDashboard).toHaveBeenCalledTimes(1);
+    expect(dashboard.navigateToPreviousDashboard).toHaveBeenCalledTimes(1);
   });
 
   it('ignores a gesture message from a foreign window source', () => {
     const { dashboard } = mount();
     swipeDownFrom(window, window.location.origin);
-    expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+    expect(dashboard.navigateToPreviousDashboard).not.toHaveBeenCalled();
   });
 
   it('ignores a gesture message whose origin is not the iframe origin', () => {
     const { fixture, dashboard } = mount();
     swipeDownFrom(iframeWindow(fixture), 'https://evil.invalid');
-    expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+    expect(dashboard.navigateToPreviousDashboard).not.toHaveBeenCalled();
   });
 });
