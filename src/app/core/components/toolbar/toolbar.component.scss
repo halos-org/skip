@@ -1,6 +1,6 @@
 :host {
   --toolbar-height: 56px;
-  --peek-height: 6px;
+  --peek-height: 8px;
 }
 
 .toolbar-host {
@@ -42,6 +42,7 @@
   padding: 0;
   border: 0;
   background: var(--mat-sys-primary, #6ea8fe);
+  box-shadow: 0 1px 8px 0 var(--mat-sys-primary, #6ea8fe);
   opacity: 0;
   transform: translateY(-100%);
   transition: transform 160ms ease, opacity 160ms ease;
@@ -53,6 +54,13 @@
   opacity: 0.92;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+// Night mode dims the app to a warm cast; a bright blue cue fights it, so
+// recolor the edge-peek to the amber accent already used in night mode.
+:host-context(.night-theme) .peek-strip {
+  background: var(--mat-sys-tertiary, #eec12c);
+  box-shadow: 0 1px 8px 0 var(--mat-sys-tertiary, #eec12c);
 }
 
 .toolbar-group {
