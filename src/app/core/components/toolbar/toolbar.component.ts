@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -27,7 +27,7 @@ import { PageNavControlComponent } from '../page-nav-control/page-nav-control.co
   templateUrl: './toolbar.component.html',
   styleUrl: './toolbar.component.scss',
 })
-export class ToolbarComponent {
+export class ToolbarComponent implements OnDestroy {
   protected readonly chrome = inject(ChromeVisibilityService);
   private readonly dashboard = inject(DashboardService);
   protected readonly uiEvent = inject(uiEventService);
@@ -50,8 +50,7 @@ export class ToolbarComponent {
   }
 
   protected toggleNightMode(): void {
-    this.app.isNightMode.set(!this.app.isNightMode());
-    this.app.toggleDayNightMode();
+    this.app.toggleNightMode();
   }
 
   protected openSettings(): void {
@@ -71,10 +70,23 @@ export class ToolbarComponent {
   }
 
   protected onPointerEnter(): void {
+    if (this._hideSuppressed) return;
+    this._hideSuppressed = true;
     this.chrome.suppressHide();
   }
 
   protected onPointerLeave(): void {
+    if (!this._hideSuppressed) return;
+    this._hideSuppressed = false;
     this.chrome.allowHide();
   }
+
+  // Releasing on destroy matters: routing away from the toolbar (e.g. tapping
+  // Settings) unmounts it mid-hover, so `mouseleave` never fires. Without this
+  // the ref-count on the singleton service would leak and pin the toolbar open.
+  ngOnDestroy(): void {
+    this.onPointerLeave();
+  }
+
+  private _hideSuppressed = false;
 }

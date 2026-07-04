@@ -5,7 +5,6 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { OverlayModule } from '@angular/cdk/overlay';
-import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
 import { Title } from '@angular/platform-browser';
 import { AuthenticationService } from './core/services/authentication.service';
 import { SettingsService } from './core/services/settings.service';
@@ -58,7 +57,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   public readonly settings = inject(SettingsService);
   private readonly _titleService = inject(Title);
   private readonly _browserTabTitle = this.settings.browserTabTitle;
-  private readonly _responsive = inject(BreakpointObserver);
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _notificationOverlay = inject(NotificationOverlayService);
   private readonly _router = inject(Router);
@@ -75,7 +73,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   protected readonly bootstrapStatus = toSignal(this._appNetworkInit.bootstrapStatus$, { initialValue: 'starting' });
   protected readonly bootstrapIssue: Signal<IBootstrapIssue> = toSignal(this._appNetworkInit.bootstrapIssue$, { initialValue: { reason: 'none' } as IBootstrapIssue });
   protected dashboardVisible = signal<boolean>(false);
-  protected isPhonePortrait: Signal<BreakpointState>;
   private missingConfigPromptShown = false;
   private authBlockedPromptShown = false;
 
@@ -142,8 +139,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
         else this._notificationOverlay.close();
       } catch { /* ignore */ }
     });
-
-    this.isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait));
 
     this._connectionStateMachine.status$
       .pipe(takeUntilDestroyed(this._destroyRef))
@@ -222,14 +217,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
         if (event.shiftKey) this._uiEvent.toggleFullScreen();
         break;
       case 'n':
-        if (event.shiftKey) this.toggleNightMode();
+        if (event.shiftKey) this._app.toggleNightMode();
         break;
     }
-  }
-
-  private toggleNightMode(): void {
-    this._app.isNightMode.set(!this._app.isNightMode());
-    this._app.toggleDayNightMode();
   }
 
   /** Navigate pages, honoring locked mode and suppressing during a drag. */

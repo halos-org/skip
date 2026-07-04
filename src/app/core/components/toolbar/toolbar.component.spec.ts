@@ -30,7 +30,7 @@ const uiEvent = {
   fullscreenSupported: signal(true),
   fullscreenStatus: signal(false),
 };
-const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn() };
+const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn() };
 const settings = { autoNightMode: signal(false) };
 const dialog = { openNotifications: vi.fn() };
 const router = { navigate: vi.fn() };
@@ -48,7 +48,7 @@ describe('ToolbarComponent', () => {
     for (const spy of [
       chrome.reveal, chrome.suppressHide, chrome.allowHide,
       dashboard.navigateTo, dashboard.setStaticDashboard,
-      uiEvent.toggleFullScreen, app.toggleDayNightMode, dialog.openNotifications, router.navigate,
+      uiEvent.toggleFullScreen, app.toggleDayNightMode, app.toggleNightMode, dialog.openNotifications, router.navigate,
     ]) spy.mockClear();
     chrome.revealed.set(false);
     chrome.peeking.set(false);
@@ -92,8 +92,7 @@ describe('ToolbarComponent', () => {
     byLabel('Enter fullscreen')!.click();
     expect(uiEvent.toggleFullScreen).toHaveBeenCalled();
     byLabel('Night mode')!.click();
-    expect(app.isNightMode()).toBe(true);
-    expect(app.toggleDayNightMode).toHaveBeenCalled();
+    expect(app.toggleNightMode).toHaveBeenCalled();
   });
 
   it('enters edit mode and opens notifications', () => {
@@ -113,6 +112,14 @@ describe('ToolbarComponent', () => {
     expect(chrome.suppressHide).toHaveBeenCalled();
     bar.dispatchEvent(new MouseEvent('mouseleave'));
     expect(chrome.allowHide).toHaveBeenCalled();
+  });
+
+  it('releases a held hide-suppression when destroyed mid-hover', () => {
+    init();
+    el.querySelector<HTMLElement>('.toolbar')!.dispatchEvent(new MouseEvent('mouseenter'));
+    expect(chrome.suppressHide).toHaveBeenCalledTimes(1);
+    fixture.destroy();
+    expect(chrome.allowHide).toHaveBeenCalledTimes(1);
   });
 
   it('reflects revealed state as a class', () => {
