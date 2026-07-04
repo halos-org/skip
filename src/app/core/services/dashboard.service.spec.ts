@@ -92,8 +92,10 @@ describe('DashboardService', () => {
       expect(dashboards[0].name).toBe('Page 1');
       expect(dashboards[0].id).toMatch(UUID_PATTERN);
       expect(widgetsOf(dashboards[0])[0].input.widgetProperties.type).toBe('widget-tutorial');
-      // Pins today's aliasing: the blank dashboard shares its configuration array with the DefaultDashboard constant.
-      expect(dashboards[0].configuration).toBe(DefaultDashboard[0].configuration);
+      // The blank dashboard deep-clones the DefaultDashboard constant so later in-place edits cannot corrupt the shared default.
+      expect(dashboards[0].configuration).not.toBe(DefaultDashboard[0].configuration);
+      expect(widgetsOf(dashboards[0])[0]).not.toBe(DefaultDashboard[0].configuration![0]);
+      expect(dashboards[0].configuration).toEqual(DefaultDashboard[0].configuration);
       expect(consoleWarn).toHaveBeenCalled();
     });
 
@@ -165,6 +167,13 @@ describe('DashboardService', () => {
       expect(service.activeDashboard()).toBe(1);
       expect(consoleError).toHaveBeenCalledTimes(2);
     });
+
+    it('rejects a fractional index instead of activating a non-integer dashboard', () => {
+      service.setActiveDashboardIndex(1);
+      service.setActiveDashboardIndex(1.5);
+      expect(service.activeDashboard()).toBe(1);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('add and update', () => {
@@ -194,13 +203,41 @@ describe('DashboardService', () => {
   });
 
   describe('delete', () => {
-    it('removes the dashboard without remapping the active index', () => {
+    it('shifts the active index down so it follows the same dashboard when a lower one is removed', () => {
       setup();
       service.setActiveDashboardIndex(1);
       service.delete(0);
       expect(service.dashboards().map(d => d.id)).toEqual(['d-1', 'd-2']);
-      // Pins today's bookkeeping: the index is not shifted down, so it now points at the former third dashboard.
+      // The active dashboard (d-1) shifts from index 1 to index 0; the active index follows it.
+      expect(service.activeDashboard()).toBe(0);
+      expect(service.dashboards()[service.activeDashboard()!].id).toBe('d-1');
+    });
+
+    it('leaves the active index unchanged when a higher-indexed dashboard is removed', () => {
+      setup();
+      service.setActiveDashboardIndex(1);
+      service.delete(2);
       expect(service.activeDashboard()).toBe(1);
+      expect(service.dashboards()[service.activeDashboard()!].id).toBe('d-1');
+    });
+
+    it('keeps the active index on the dashboard that slides up when the active, non-last one is deleted', () => {
+      setup();
+      service.setActiveDashboardIndex(1);
+      service.delete(1);
+      expect(service.dashboards().map(d => d.id)).toEqual(['d-0', 'd-2']);
+      expect(service.activeDashboard()).toBe(1);
+      expect(service.dashboards()[service.activeDashboard()!].id).toBe('d-2');
+    });
+
+    it('ignores an out-of-range index without touching the active dashboard', () => {
+      setup();
+      service.setActiveDashboardIndex(0);
+      service.delete(-1);
+      service.delete(5);
+      expect(service.dashboards().map(d => d.id)).toEqual(['d-0', 'd-1', 'd-2']);
+      expect(service.activeDashboard()).toBe(0);
+      expect(consoleError).toHaveBeenCalledTimes(2);
     });
 
     it('clamps the active index when it falls past the end', () => {
