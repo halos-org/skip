@@ -1,0 +1,14 @@
+@for (page of pages(); track page.index) {
+  <tile-large-icon
+    class="page-tile"
+    [svgIcon]="page.svgIcon"
+    [iconSize]="iconSize"
+    [label]="page.label"
+    [active]="page.active"
+    [ariaCurrent]="page.active"
+    [iconOnly]="true"
+    [compact]="true"
+    [attr.aria-label]="page.label"
+    (click)="navigateTo(page.index)"
+  />
+}

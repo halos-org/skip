@@ -77,7 +77,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     subGridOpts: this.subGridOptions,
     children: []
   });
-  private _boundHandleKeyDown = this.handleKeyDown.bind(this);
   private _resizeObserver?: ResizeObserver;
   private _pendingResizeRaf: number | null = null;
   private _lastContainerHeight = 0;
@@ -118,10 +117,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.syncGridEmptyState();
     this.resizeGridColumns();
     this.setupResizeObserver();
-    this._uiEvent.addHotkeyListener(
-      this._boundHandleKeyDown,
-      { ctrlKey: true, keys: ['arrowdown', 'arrowup'] } // Filter for arrow keys with Ctrl
-    );
 
     // Hook Gridstack drag lifecycle early to suppress long-press during slow drags
     try {
@@ -189,14 +184,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       });
       this._resizeObserver.observe(host);
     } catch { /* ignore if ResizeObserver unsupported */ }
-  }
-
-  private handleKeyDown(key: string): void {
-    if (key === 'arrowdown') {
-      this.previousDashboard();
-    } else if (key === 'arrowup') {
-      this.nextDashboard();
-    }
   }
 
   protected resizeGridColumns(): void {
@@ -671,18 +658,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this._gridstack().grid.removeWidget(item);
   }
 
-  protected nextDashboard(): void {
-    if (this.dashboard.isDashboardStatic()) {
-      this.dashboard.navigateToNextDashboard();
-    }
-  }
-
-  protected previousDashboard(): void {
-    if (this.dashboard.isDashboardStatic()) {
-      this.dashboard.navigateToPreviousDashboard();
-    }
-  }
-
   protected editDashboard(): void {
     this.dashboard.setStaticDashboard(false);
   }
@@ -709,7 +684,5 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       cancelAnimationFrame(this._pendingResizeRaf);
       this._pendingResizeRaf = null;
     }
-
-    this._uiEvent.removeHotkeyListener(this._boundHandleKeyDown);
   }
 }

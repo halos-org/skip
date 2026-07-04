@@ -1,50 +1,44 @@
-import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, inject, AfterViewInit, effect, Signal, model, DestroyRef, signal, viewChild, ElementRef } from '@angular/core';
-import { Router, NavigationEnd } from '@angular/router';
+import { ChangeDetectionStrategy, Component, OnDestroy, inject, AfterViewInit, effect, Signal, DestroyRef, signal, viewChild, ElementRef } from '@angular/core';
+import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { filter } from 'rxjs/operators';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { OverlayModule } from '@angular/cdk/overlay';
+import { Title } from '@angular/platform-browser';
 import { AuthenticationService } from './core/services/authentication.service';
 import { SettingsService } from './core/services/settings.service';
 import { SignalKDeltaService } from './core/services/signalk-delta.service';
 import { ConnectionStateMachine, IConnectionStatus } from './core/services/connection-state-machine.service';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatButtonModule } from '@angular/material/button';
-import { MenuNotificationsComponent } from './core/components/menu-notifications/menu-notifications.component';
-import { NotificationOverlayService } from './core/services/notification-overlay.service';
-import { OverlayModule } from '@angular/cdk/overlay';
-import { RouterModule } from '@angular/router';
-import { MatIconModule } from '@angular/material/icon';
-import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { GestureDirective } from './core/directives/gesture.directive';
-import { MenuActionsComponent } from './core/components/menu-actions/menu-actions.component';
+import { ChromeIntent, PageNavDirection, ScrollNavDirective } from './core/directives/scroll-nav.directive';
+import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
 import { DashboardService } from './core/services/dashboard.service';
+import { AppService } from './core/services/app-service';
 import { uiEventService } from './core/services/uiEvent.service';
-import { DialogService } from './core/services/dialog.service';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
 import { NotificationsService } from './core/services/notifications.service';
-import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { RemoteDashboardsService } from './core/services/remote-dashboards.service';
 import { ToastService } from './core/services/toast.service';
 import { AppNetworkInitService, IBootstrapIssue } from './core/services/app-initNetwork.service';
 import { SsoRedirectService } from './core/services/sso-redirect.service';
 import { DashboardHistorySeriesSyncService } from './core/services/dashboard-history-series-sync.service';
-import { Title } from '@angular/platform-browser';
+import { NotificationOverlayService } from './core/services/notification-overlay.service';
+import { DialogService } from './core/services/dialog.service';
 import { resolveBrowserTabTitle } from './core/utils/browser-tab-title.util';
+
+const MOUSE_PEEK_THROTTLE_MS = 250;
 
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
-  imports: [MenuNotificationsComponent, MenuActionsComponent, MatButtonModule, MatMenuModule, MatIconModule, RouterModule, MatSidenavModule, GestureDirective, OverlayModule, MatProgressSpinnerModule]
+  imports: [RouterModule, MatIconModule, MatProgressSpinnerModule, OverlayModule, GestureDirective, ScrollNavDirective, ToolbarComponent]
 })
-export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
-  // ============================================================================
-  // APP_INITIALIZER - Services pre-initialized in AppNetworkInitService
-  // ============================================================================
-  // These services are fully initialized and ready when AppComponent is created.
-  // No sequencing needed; dependencies are already resolved.
-
+export class AppComponent implements AfterViewInit, OnDestroy {
+  // Services pre-initialized via APP_INITIALIZER; injected here for their lifecycle.
   private readonly _deltaService = inject(SignalKDeltaService);
   private readonly _connectionStateMachine = inject(ConnectionStateMachine);
   private readonly _appNetworkInit = inject(AppNetworkInitService);
@@ -52,46 +46,38 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly _historySeriesReconcile = inject(DashboardHistorySeriesSyncService);
   public readonly authenticationService = inject(AuthenticationService);
 
-  // ============================================================================
-  // AppComponent - Services initialized by this component
-  // ============================================================================
-  // These services are initialized on-demand when AppComponent is created.
-
   private readonly _dashboard = inject(DashboardService);
   private readonly _remoteControl = inject(RemoteDashboardsService);
   private readonly toast = inject(ToastService);
   private readonly _notifications = inject(NotificationsService);
   private readonly _uiEvent = inject(uiEventService);
+  private readonly _app = inject(AppService);
+  protected readonly chrome = inject(ChromeVisibilityService);
   private readonly _dialog = inject(DialogService);
   public readonly settings = inject(SettingsService);
   private readonly _titleService = inject(Title);
   private readonly _browserTabTitle = this.settings.browserTabTitle;
-  private readonly _responsive = inject(BreakpointObserver);
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _notificationOverlay = inject(NotificationOverlayService);
   private readonly _router = inject(Router);
   protected readonly upgrade = inject(ConfigurationUpgradeService); // expose for template overlay
 
   private upgradeMessagesRef = viewChild<ElementRef<HTMLUListElement> | undefined>('upgradeMessages');
-
   private _upgradeShown = false;
 
-  protected actionsSidenavOpened = model<boolean>(false);
-  protected notificationsSidenavOpened = model<boolean>(false);
+  // Exposed for the shell template.
+  protected readonly dashboardStatic = this._dashboard.isDashboardStatic;
+  protected readonly isDragging = this._uiEvent.isDragging;
+
   protected readonly notificationsInfo = toSignal(this._notifications.observerNotificationsInfo());
   protected readonly bootstrapStatus = toSignal(this._appNetworkInit.bootstrapStatus$, { initialValue: 'starting' });
   protected readonly bootstrapIssue: Signal<IBootstrapIssue> = toSignal(this._appNetworkInit.bootstrapIssue$, { initialValue: { reason: 'none' } as IBootstrapIssue });
   protected dashboardVisible = signal<boolean>(false);
-  protected isPhonePortrait: Signal<BreakpointState>;
-  private scheduledOpen: number | null = null;
-  private readonly OPEN_DELAY_MS = 300; // should match/ exceed sidenav close animation time
   private missingConfigPromptShown = false;
   private authBlockedPromptShown = false;
 
-  // Stable handler refs (prevent leak from rebinding)
-  private readonly _swipeLeftHandler = () => this.onSwipeLeft();
-  private readonly _swipeRightHandler = () => this.onSwipeRight();
-  private readonly _hotkeyHandler = (key: string) => this.handleKeyDown(key);
+  private readonly _hotkeyHandler = (key: string, event: KeyboardEvent) => this.handleKeyDown(key, event);
+  private _lastPeekAt = Number.NEGATIVE_INFINITY;
 
   constructor() {
     // Keep the browser tab title (document.title) in sync with the user setting (#1055).
@@ -123,22 +109,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
     effect(() => {
       const msg = this.upgrade.messages();
-      // Only run if the overlay is visible and there are messages
       if (this.upgrade.upgrading() && msg.length && this.upgradeMessagesRef()) {
         const ul = this.upgradeMessagesRef().nativeElement;
-        // Scroll to the bottom
         ul.scrollTop = ul.scrollHeight;
       }
     });
-
-    // Sequencing: only open overlay when notifications sidenav is closed.
-    // Also ensure overlay is closed if the sidenav opens.
-    // Use effects to react to relevant signals in an injection context.
-    // Effect: open/close overlay based on dashboard static state and notificationsInfo,
-    // but only when the notifications sidenav is closed.
-    // We'll delay opening the overlay until after the sidenav close animation completes
-    // to avoid visual overlap during the closing transition. If the sidenav re-opens
-    // before the delay expires, cancel the scheduled open.
 
     // initialize dashboardVisible from current URL
     try {
@@ -154,53 +129,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         } catch { /* ignore */ }
       });
 
+    // Persistent alarm badge: shown whenever an alarm is active on a locked
+    // dashboard, independent of the (removed) sidenav and the auto-hiding
+    // toolbar. This is the one piece of always-visible chrome, for safety.
     effect(() => {
-      const shouldShowBadge = this.dashboardVisible() && this._dashboard.isDashboardStatic() && this.notificationsInfo().alarmCount > 0;
-      const sidenavOpen = this.notificationsSidenavOpened();
-
-      // If sidenav is open, immediately close overlay and cancel any scheduled open
-      if (sidenavOpen) {
-        if (this.scheduledOpen) {
-          clearTimeout(this.scheduledOpen as unknown as number);
-          this.scheduledOpen = null;
-        }
-        try { this._notificationOverlay.close(); } catch { /* ignore */ }
-        return;
-      }
-
-      // Sidenav is closed: if we need to show the badge, schedule an open after delay
-      if (shouldShowBadge) {
-        if (this.scheduledOpen) {
-          // already scheduled
-          return;
-        }
-        this.scheduledOpen = window.setTimeout(() => {
-          this.scheduledOpen = null;
-          try { this._notificationOverlay.open(); } catch { /* ignore */ }
-        }, this.OPEN_DELAY_MS);
-      } else {
-        // Nothing to show: ensure no scheduled open is pending and overlay closed
-        if (this.scheduledOpen) {
-          clearTimeout(this.scheduledOpen as unknown as number);
-          this.scheduledOpen = null;
-        }
-        try { this._notificationOverlay.close(); } catch { /* ignore */ }
-      }
+      const shouldShowBadge = this.dashboardVisible() && this._dashboard.isDashboardStatic() && (this.notificationsInfo()?.alarmCount ?? 0) > 0;
+      try {
+        if (shouldShowBadge) this._notificationOverlay.open();
+        else this._notificationOverlay.close();
+      } catch { /* ignore */ }
     });
-
-    // Ensure immediate closure if user programmatically opens the sidenav elsewhere.
-    effect(() => {
-      const sidenavOpen = this.notificationsSidenavOpened();
-      if (sidenavOpen) {
-        try {
-          this._notificationOverlay.close();
-        } catch {
-          // ignore
-        }
-      }
-    });
-
-    this.isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait));
 
     this._connectionStateMachine.status$
       .pipe(takeUntilDestroyed(this._destroyRef))
@@ -247,48 +185,71 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private isUrlDashboard(url: string | null | undefined): boolean {
     if (!url) return false;
-    // Normalize trailing slash
     const path = url.split('?')[0].replace(/\/+$/, '');
-    // Matches dashboard-like views where the notification badge overlay is allowed.
-    // - / (root)
-    // - /dashboard and /dashboard/<id>
     return (
       path === '/' ||
       /^\/dashboard(\/\d+)?$/.test(path)
     );
   }
 
-  ngOnInit() {
-    this._uiEvent.addGestureListeners(
-      this._swipeLeftHandler,
-      this._swipeRightHandler
-    );
-  }
-
   ngAfterViewInit(): void {
+    // Single hotkey registration for the whole shell (always mounted):
+    // Ctrl+←/→ page nav, Ctrl+Shift+E/F/N edit/fullscreen/night. Shift
+    // disambiguates the two groups within the one keydown listener.
     this._uiEvent.addHotkeyListener(
       this._hotkeyHandler,
-      { ctrlKey: true, keys: ['arrowright', 'arrowleft'] }
+      { ctrlKey: true, keys: ['arrowright', 'arrowleft', 'e', 'f', 'n'] }
     );
   }
 
-  private handleKeyDown(key: string): void {
+  private handleKeyDown(key: string, event: KeyboardEvent): void {
     switch (key) {
       case 'arrowright':
-  this.onSwipeRight();
+        if (!event.shiftKey) this.pageNav('next');
         break;
       case 'arrowleft':
-  this.onSwipeLeft();
+        if (!event.shiftKey) this.pageNav('prev');
         break;
-      case 'escape':
-        this.backdropClicked();
+      case 'e':
+        if (event.shiftKey) this._dashboard.setStaticDashboard(false);
+        break;
+      case 'f':
+        if (event.shiftKey) this._uiEvent.toggleFullScreen();
+        break;
+      case 'n':
+        if (event.shiftKey) this._app.toggleNightMode();
         break;
     }
   }
 
-  protected escapeKeyPressed(key: string): void {
-    key = key.toLowerCase();
-    if (key === 'escape') this.backdropClicked();
+  /** Navigate pages, honoring locked mode and suppressing during a drag. */
+  protected pageNav(direction: PageNavDirection): void {
+    if (!this.dashboardVisible() || !this._dashboard.isDashboardStatic() || this._uiEvent.isDragging()) return;
+    if (direction === 'next') this._dashboard.navigateToNextDashboard();
+    else this._dashboard.navigateToPreviousDashboard();
+  }
+
+  protected onChromeIntent(intent: ChromeIntent): void {
+    if (intent === 'reveal') this.chrome.reveal();
+    else this.chrome.hide();
+  }
+
+  /**
+   * A press anywhere outside the toolbar dismisses it when shown, or flashes the
+   * edge-peek cue when hidden. Presses on the toolbar itself do neither.
+   */
+  protected onShellPointerDown(event: Event): void {
+    if ((event.target as Element | null)?.closest('app-toolbar')) return;
+    if (this.chrome.revealed()) this.chrome.hide();
+    else this.chrome.pulsePeek();
+  }
+
+  /** Throttled edge-peek cue on pointer activity. */
+  protected onMouseActivity(): void {
+    const now = performance.now();
+    if (now - this._lastPeekAt < MOUSE_PEEK_THROTTLE_MS) return;
+    this._lastPeekAt = now;
+    this.chrome.pulsePeek();
   }
 
   private displayConnectionsStatusNotification(connectionStatus: IConnectionStatus) {
@@ -316,45 +277,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  protected onSwipeRight(): void {
-    if (this._dashboard.isDashboardStatic() && !this._uiEvent.isDragging()) {
-      if (this.isPhonePortrait().matches) {
-        this.actionsSidenavOpened.set(false);
-        this.notificationsSidenavOpened.set(true);
-      } else {
-        this.actionsSidenavOpened.set(false);
-        this.notificationsSidenavOpened.update(o => !o);
-      }
-    }
-  }
-
-  protected backdropClicked(): void {
-    this.notificationsSidenavOpened.update(o => o ? !o : false);
-    this.actionsSidenavOpened.update(o => o ? !o : false);
-  }
-
-  protected onSwipeLeft(): void {
-    if (this._dashboard.isDashboardStatic() && !this._uiEvent.isDragging()) {
-      if (this.isPhonePortrait().matches) {
-        this.notificationsSidenavOpened.set(false);
-        this.actionsSidenavOpened.set(true);
-      } else {
-        this.notificationsSidenavOpened.set(false);
-        this.actionsSidenavOpened.update(o => !o);
-      }
-    }
-  }
-
   ngOnDestroy() {
-    this._uiEvent.removeGestureListeners(
-      this._swipeLeftHandler,
-      this._swipeRightHandler
-    );
     this._uiEvent.removeHotkeyListener(this._hotkeyHandler);
-    // clear any pending scheduled open to avoid orphaned timer running after destroy
-    if (this.scheduledOpen) {
-      clearTimeout(this.scheduledOpen as unknown as number);
-      this.scheduledOpen = null;
-    }
   }
 }

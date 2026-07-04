@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatBadgeModule } from '@angular/material/badge';
 import { NotificationsService } from '../../services/notifications.service';
+import { DialogService } from '../../services/dialog.service';
 
 @Component({
   selector: 'notification-badge',
@@ -14,11 +15,11 @@ import { NotificationsService } from '../../services/notifications.service';
 export class NotificationBadgeComponent {
   protected badgeButton = viewChild.required<ElementRef<HTMLButtonElement>>('badgeButton');
   private readonly _notifications = inject(NotificationsService);
+  private readonly _dialog = inject(DialogService);
   protected readonly notificationsInfo = toSignal(this._notifications.observerNotificationsInfo());
 
   protected openNotificationMenu(): void {
-    const sidenavEvent = new Event('openRightSidenav', { bubbles: true, cancelable: true });
-    window.document.dispatchEvent(sidenavEvent);
+    this._dialog.openNotifications();
   }
 
   protected onKeyDown(e: KeyboardEvent): void {

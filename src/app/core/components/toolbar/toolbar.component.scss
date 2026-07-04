@@ -1,0 +1,78 @@
+:host {
+  --toolbar-height: 56px;
+  --peek-height: 8px;
+}
+
+.toolbar-host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  // Transparent outside the bar so taps reach the dashboard beneath.
+  pointer-events: none;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--toolbar-height);
+  padding: 0 8px;
+  box-sizing: border-box;
+  background: var(--mat-sys-surface-container-high, #23262b);
+  color: var(--mat-sys-on-surface, #e6e6e6);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  transform: translateY(-100%);
+  transition: transform 180ms ease;
+  pointer-events: auto;
+}
+
+.toolbar-host.revealed .toolbar {
+  transform: translateY(0);
+}
+
+.peek-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--peek-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  // Reads as the top sliver of the toolbar itself: same fill + shadow.
+  background: var(--mat-sys-surface-container-high, #23262b);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: transform 300ms ease, opacity 300ms ease;
+  pointer-events: none;
+  cursor: pointer;
+}
+
+.toolbar-host.peeking:not(.revealed) .peek-strip {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.peek-strip:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+  outline: 2px solid var(--mat-sys-on-surface, #e6e6e6);
+  outline-offset: -2px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-center {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}

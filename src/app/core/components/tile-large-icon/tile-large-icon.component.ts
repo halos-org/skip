@@ -22,6 +22,7 @@ export class TileLargeIconComponent {
   public iconOnly = input<boolean>(false);
   public compact = input<boolean>(false);
   public active = input<boolean>(false);
+  public ariaCurrent = input<boolean>(false);
 
   protected onKeyboardActivate(event: Event): void {
     if (event instanceof KeyboardEvent) {

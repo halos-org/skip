@@ -2,6 +2,7 @@ import { AfterViewInit, Component, effect, ElementRef, inject, OnDestroy, signal
 import { ChangeDetectionStrategy } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { DashboardService } from '../../core/services/dashboard.service';
+import { ChromeVisibilityService } from '../../core/services/chrome-visibility.service';
 import { generateSwipeScript } from '../../core/utils/iframe-inputs-inject.utils';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
@@ -22,6 +23,7 @@ export class WidgetIframeComponent implements AfterViewInit, OnDestroy {
   // Runtime directive (config merge done by container)
   protected readonly runtime = inject(WidgetRuntimeDirective);
   protected readonly _dashboard = inject(DashboardService);
+  private readonly _chrome = inject(ChromeVisibilityService);
   private readonly _sanitizer = inject(DomSanitizer);
 
   // Static default config (legacy parity)
@@ -104,21 +106,17 @@ export class WidgetIframeComponent implements AfterViewInit, OnDestroy {
     if (event.data.gesture) {
       switch (event.data.gesture) {
         case 'swipeup':
-          this._dashboard.navigateToNextDashboard();
+          this._chrome.hide();
           break;
         case 'swipedown':
-          this._dashboard.navigateToPreviousDashboard();
+          this._chrome.reveal();
           break;
-        case 'swipeleft': {
-          const leftSidebarEvent = new Event('openLeftSidenav', { bubbles: true, cancelable: true });
-          window.document.dispatchEvent(leftSidebarEvent);
+        case 'swipeleft':
+          if (this._dashboard.isDashboardStatic()) this._dashboard.navigateToNextDashboard();
           break;
-        }
-        case 'swiperight': {
-          const rightSidebarEvent = new Event('openRightSidenav', { bubbles: true, cancelable: true });
-          window.document.dispatchEvent(rightSidebarEvent);
+        case 'swiperight':
+          if (this._dashboard.isDashboardStatic()) this._dashboard.navigateToPreviousDashboard();
           break;
-        }
         default:
           break;
       }

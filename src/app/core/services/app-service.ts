@@ -193,6 +193,11 @@ export class AppService {
     appFilterWrapper.style.setProperty('--kip-nightModeFilters', additionalFilters);
   }
 
+  public toggleNightMode(): void {
+    this.isNightMode.set(!this.isNightMode());
+    this.toggleDayNightMode();
+  }
+
   public toggleDayNightMode(): void {
     if (this.isNightMode()) {
       if (this._redNightMode()) {
