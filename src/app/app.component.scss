@@ -1,4 +1,4 @@
-.app-shell {
+.kip-app-shell {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -8,7 +8,7 @@
 }
 
 // The toolbar overlays (position: fixed); the routed content fills the shell.
-.app-shell > *:not(app-toolbar) {
+.kip-app-shell > *:not(app-toolbar) {
   flex: 1 1 auto;
   min-height: 0;
 }
