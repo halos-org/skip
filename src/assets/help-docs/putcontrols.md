@@ -98,4 +98,4 @@ Use these guides next as needed.
 
 - **Node-RED beginners:** [Node-RED Control Flows for KIP Widgets (Beginner Guide)](#/help/nodered-control-flows.md)
 - **Path discovery and validation:** [Data Inspector](#/help/datainspector.md)
-- **Widget overview and placement:** [Dashboards and Layout](#/help/dashboards.md)
+- **Widget overview and placement:** [Pages and Layout](#/help/dashboards.md)

@@ -4,7 +4,7 @@ KIP widgets are community-powered. If you need a widget that does not exist yet,
 
 ## For End Users
 
-- Check [Dashboards and Layout](#/help/dashboards.md) to confirm the current widget catalog.
+- Check [Pages and Layout](#/help/dashboards.md) to confirm the current widget catalog.
 - Ask in the community first before building from scratch; someone may already have a branch or reusable approach.
 - Use [The Embed Page Viewer](#/help/embedwidget.md) when your requirement is best served by an external web dashboard.
 

@@ -2,7 +2,7 @@
 
 KIP reads historical data from an external Signal K History API provider plugin. With a compatible provider installed, KIP can:
 1. Pre-seed Data Chart and Wind Trends so they show recent trends immediately.
-2. Populate historical views for widgets in your dashboards that use numeric value paths.
+2. Populate historical views for widgets on your pages that use numeric value paths.
 
 You must configure the provider plugin to capture the paths you want to chart, and it must have enough recorded data to cover your chart time span. This is not automatic.
 

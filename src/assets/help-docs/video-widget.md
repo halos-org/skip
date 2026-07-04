@@ -1,10 +1,10 @@
 ## The Video Widget
 
-The Video widget puts live cameras and saved video clips right on your dashboard. Use it to keep an
+The Video widget puts live cameras and saved video clips right on your page. Use it to keep an
 eye on the water while docking, watch the foredeck under sail, check the engine room, or look back at
 a clip you saved earlier.
 
-<img src="assets/help-docs/img/video/widget-playing.png" alt="A Video widget playing a live camera on a KIP dashboard" title="A live camera on the dashboard" width="100%">
+<img src="assets/help-docs/img/video/widget-playing.png" alt="A Video widget playing a live camera on a KIP page" title="A live camera on the page" width="100%">
 
 There are three kinds of video you can show:
 
@@ -114,7 +114,7 @@ balance you want:
 - **Best quality** — the smoothest, sharpest picture, with a bit more delay.
 
 If a live stream drops out, the widget quietly tries again a few times before showing a **Retry**
-button. To save battery and keep things cool, video pauses automatically when its dashboard isn't on
+button. To save battery and keep things cool, video pauses automatically when its page isn't on
 screen.
 
 ---
@@ -150,4 +150,4 @@ hazard or remember a dock. You control this under **Snapshot** in the settings:
   square — for example "can't reach the camera" or "this stream can't play in this browser." Check the
   address, the camera's login, or try a different **Delivery** option.
 - **One widget shows one camera.** To watch several at once, add several Video widgets to your
-  dashboard.
+  page.

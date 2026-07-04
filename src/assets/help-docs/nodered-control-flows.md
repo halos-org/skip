@@ -122,4 +122,4 @@ Use these guides next as needed.
 - SignalK signalk-node-red: [Show and tell](https://github.com/SignalK/signalk-node-red/discussions/categories/show-and-tell)
 - Path requirements and widget compatibility: [Digital Switching and PUT Path Setup](#/help/putcontrols.md)
 - Finding paths and checking PUT support: [Data Inspector](#/help/datainspector.md)
-- Adding and configuring widgets: [Dashboards and Layout](#/help/dashboards.md)
+- Adding and configuring widgets: [Pages and Layout](#/help/dashboards.md)

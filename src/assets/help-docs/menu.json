@@ -1,7 +1,7 @@
 [
   { "title": "The basics", "file": "welcome.md" },
   { "title": "Login & Configurations", "file": "configuration.md" },
-  { "title": "Dashboards and Layout", "file": "dashboards.md" },
+  { "title": "Pages and Layout", "file": "dashboards.md" },
   { "title": "Data Inspector", "file": "datainspector.md" },
   { "title": "Zones, Notifications and Highlights", "file": "zones.md" },
   { "title": "Digital Switching and PUT", "file": "putcontrols.md" },
