@@ -4,15 +4,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WidgetIframeComponent } from './widget-iframe.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { DashboardService } from '../../core/services/dashboard.service';
+import { ChromeVisibilityService } from '../../core/services/chrome-visibility.service';
 import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 
 const INSTANCE_ID = 'test-iframe-id';
 const EMBED_URL = `${window.location.origin}/embed`;
 
-function swipeDownFrom(source: MessageEventSource | null, origin: string): void {
+function gestureFrom(
+  gesture: string,
+  source: MessageEventSource | null,
+  origin: string
+): void {
   window.dispatchEvent(
     new MessageEvent('message', {
-      data: { gesture: 'swipedown', eventData: { instanceId: INSTANCE_ID } },
+      data: { gesture, eventData: { instanceId: INSTANCE_ID } },
       origin,
       source
     })
@@ -26,11 +31,13 @@ function mount(url: string | null = EMBED_URL) {
     navigateToNextDashboard: vi.fn(),
     navigateToPreviousDashboard: vi.fn()
   };
+  const chrome = { reveal: vi.fn(), hide: vi.fn() };
   TestBed.configureTestingModule({
     imports: [WidgetIframeComponent],
     providers: [
       { provide: WidgetRuntimeDirective, useValue: { options } },
-      { provide: DashboardService, useValue: dashboard }
+      { provide: DashboardService, useValue: dashboard },
+      { provide: ChromeVisibilityService, useValue: chrome }
     ]
   });
   const fixture = TestBed.createComponent(WidgetIframeComponent);
@@ -38,7 +45,7 @@ function mount(url: string | null = EMBED_URL) {
   fixture.componentRef.setInput('type', 'widget-iframe');
   fixture.componentRef.setInput('theme', null);
   fixture.detectChanges();
-  return { fixture, dashboard };
+  return { fixture, dashboard, chrome };
 }
 
 function iframeWindow(fixture: ComponentFixture<WidgetIframeComponent>): Window {
@@ -60,21 +67,27 @@ describe('WidgetIframeComponent', () => {
     expect(iframe.getAttribute('sandbox')).toBe('allow-same-origin allow-scripts allow-forms');
   });
 
-  it('acts on a gesture message from its own iframe', () => {
+  it('navigates pages on a horizontal gesture from its own iframe', () => {
     const { fixture, dashboard } = mount();
-    swipeDownFrom(iframeWindow(fixture), window.location.origin);
-    expect(dashboard.navigateToPreviousDashboard).toHaveBeenCalledTimes(1);
+    gestureFrom('swipeleft', iframeWindow(fixture), window.location.origin);
+    expect(dashboard.navigateToNextDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('reveals the chrome on an upward gesture from its own iframe', () => {
+    const { fixture, chrome } = mount();
+    gestureFrom('swipeup', iframeWindow(fixture), window.location.origin);
+    expect(chrome.reveal).toHaveBeenCalledTimes(1);
   });
 
   it('ignores a gesture message from a foreign window source', () => {
     const { dashboard } = mount();
-    swipeDownFrom(window, window.location.origin);
-    expect(dashboard.navigateToPreviousDashboard).not.toHaveBeenCalled();
+    gestureFrom('swipeleft', window, window.location.origin);
+    expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
   });
 
   it('ignores a gesture message whose origin is not the iframe origin', () => {
     const { fixture, dashboard } = mount();
-    swipeDownFrom(iframeWindow(fixture), 'https://evil.invalid');
-    expect(dashboard.navigateToPreviousDashboard).not.toHaveBeenCalled();
+    gestureFrom('swipeleft', iframeWindow(fixture), 'https://evil.invalid');
+    expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
   });
 });

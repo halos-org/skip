@@ -1,4 +1,5 @@
 import { DashboardService } from './../../core/services/dashboard.service';
+import { ChromeVisibilityService } from './../../core/services/chrome-visibility.service';
 import { SettingsService } from './../../core/services/settings.service';
 import { AfterViewInit, Component, ElementRef, effect, inject, input, OnDestroy, viewChild, untracked } from '@angular/core';
 import { ChangeDetectionStrategy } from '@angular/core';
@@ -35,6 +36,7 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
   private readonly appSettings = inject(SettingsService);
   private readonly app = inject(AppService);
   protected readonly dashboard = inject(DashboardService);
+  private readonly _chrome = inject(ChromeVisibilityService);
 
   protected iframe = viewChild.required<ElementRef<HTMLIFrameElement>>('freeboardSkIframe');
 
@@ -123,16 +125,16 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
     if (event.data.gesture && event.data.eventData?.instanceId === instanceId) {
       switch (event.data.gesture) {
         case 'swipeup':
-          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToNextDashboard();
+          this._chrome.reveal();
           break;
         case 'swipedown':
-          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToPreviousDashboard();
+          this._chrome.hide();
           break;
         case 'swipeleft':
-          window.document.dispatchEvent(new Event('openLeftSidenav', { bubbles: true, cancelable: true }));
+          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToNextDashboard();
           break;
         case 'swiperight':
-          window.document.dispatchEvent(new Event('openRightSidenav', { bubbles: true, cancelable: true }));
+          if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToPreviousDashboard();
           break;
       }
     }
