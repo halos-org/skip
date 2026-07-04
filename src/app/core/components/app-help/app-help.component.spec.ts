@@ -175,11 +175,11 @@ describe('AppHelpComponent', () => {
         expect(component['helpFiles']().length).toBe(0);
     });
 
-    it('should navigate to dashboard on closePage', async () => {
+    it('should navigate to the page route on closePage', async () => {
         fixture.detectChanges();
         await flushMenu();
         component['closePage']();
         expect(router.navigateCalls.length).toBe(1);
-        expect(router.navigateCalls[0][0]).toEqual(['/dashboard']);
+        expect(router.navigateCalls[0][0]).toEqual(['/page']);
     });
 });

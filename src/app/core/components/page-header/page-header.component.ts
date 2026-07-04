@@ -20,6 +20,6 @@ export class PageHeaderComponent {
   }
 
   protected closePage() {
-    this._router.navigate(['/dashboard']);
+    this._router.navigate(['/page']);
   }
 }

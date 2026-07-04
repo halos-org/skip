@@ -188,7 +188,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     const path = url.split('?')[0].replace(/\/+$/, '');
     return (
       path === '/' ||
-      /^\/dashboard(\/\d+)?$/.test(path)
+      /^\/page(\/\d+)?$/.test(path)
     );
   }
 

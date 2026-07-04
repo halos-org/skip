@@ -25,7 +25,7 @@ export class SettingsComponent {
   protected isPhoneLandscape = computed(() => this._isPhoneLandscape().matches);
 
   protected closePage() {
-    this._router.navigate(['/dashboard']);
+    this._router.navigate(['/page']);
   }
 
   protected onActionItem(action: string): void {
