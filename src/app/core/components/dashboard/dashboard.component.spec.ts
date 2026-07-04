@@ -14,8 +14,6 @@ import { uiEventService } from '../../services/uiEvent.service';
 
 interface DashboardComponentPrivateApi {
     saveDashboard: () => void;
-    nextDashboard: () => void;
-    previousDashboard: () => void;
     _gridstack: () => {
         grid: {
             save: (saveContent: boolean, saveGridOpt: boolean) => unknown;
@@ -133,30 +131,6 @@ describe('DashboardComponent', () => {
 
         expect(privateApi._gridstack().grid.save).toHaveBeenCalledWith(false, false);
         expect(mockDashboardService.updateConfiguration).toHaveBeenCalledWith(0, []);
-    });
-
-    it('should navigate to next dashboard when static', () => {
-        mockDashboardService.isDashboardStatic.set(true);
-
-        privateApi.nextDashboard();
-
-        expect(mockDashboardService.navigateToNextDashboard).toHaveBeenCalled();
-    });
-
-    it('should navigate to previous dashboard when static', () => {
-        mockDashboardService.isDashboardStatic.set(true);
-
-        privateApi.previousDashboard();
-
-        expect(mockDashboardService.navigateToPreviousDashboard).toHaveBeenCalled();
-    });
-
-    it('should not navigate when dashboard is not static', () => {
-        mockDashboardService.isDashboardStatic.set(false);
-
-        privateApi.nextDashboard();
-
-        expect(mockDashboardService.navigateToNextDashboard).not.toHaveBeenCalled();
     });
 
     it('should mark newly added host widget to auto-open options on create', () => {

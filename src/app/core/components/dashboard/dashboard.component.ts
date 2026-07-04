@@ -658,18 +658,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this._gridstack().grid.removeWidget(item);
   }
 
-  protected nextDashboard(): void {
-    if (this.dashboard.isDashboardStatic()) {
-      this.dashboard.navigateToNextDashboard();
-    }
-  }
-
-  protected previousDashboard(): void {
-    if (this.dashboard.isDashboardStatic()) {
-      this.dashboard.navigateToPreviousDashboard();
-    }
-  }
-
   protected editDashboard(): void {
     this.dashboard.setStaticDashboard(false);
   }
