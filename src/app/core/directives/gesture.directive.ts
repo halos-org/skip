@@ -447,8 +447,9 @@ export class GestureDirective {
     const allowV = this.modeAllowsVertical();
     let allowPress = this.modeAllowsPress();
     let allowDT = this.modeAllowsDoubleTap();
-    // Prefer child widgets for press/doubletap when the target is inside a widget container and
-    // this host is not that widget container. Applies across modes so widget long-press wins.
+    let allowTap = this.modeAllowsTap();
+    // Prefer child widgets for press/tap/doubletap when the target is inside a widget container and
+    // this host is not that widget container. Applies across modes so widget long-press/tap wins.
     {
       const targetEl = ev.target as Element | null;
       const hostEl = this.host.nativeElement as Element;
@@ -458,9 +459,10 @@ export class GestureDirective {
       if (widgetEl && widgetEl !== hostEl) {
         allowPress = false;
         allowDT = false;
+        allowTap = false;
       }
-      // Additionally: if host is the grid root and the press originates inside a grid item,
-      // let the item's overlay/child own press/doubletap instead of the grid.
+      // Additionally: if host is the grid root and the gesture originates inside a grid item,
+      // let the item's overlay/child own press/tap/doubletap instead of the grid.
       const hostIsGridRoot = (hostEl as HTMLElement).classList?.contains('grid-stack') ||
         (hostEl as HTMLElement).tagName?.toLowerCase() === 'gridstack';
       const inGridItem = targetEl && typeof (targetEl as Element).closest === 'function'
@@ -469,19 +471,20 @@ export class GestureDirective {
       if (hostIsGridRoot && inGridItem) {
         allowPress = false;
         allowDT = false;
-        this.debug('suppress grid-root press/doubletap for event inside grid-stack-item', {
+        allowTap = false;
+        this.debug('suppress grid-root press/tap/doubletap for event inside grid-stack-item', {
           host: this.elDesc(hostEl as HTMLElement),
           target: this.elDesc(targetEl ?? undefined),
           inGridItem: this.elDesc(inGridItem as HTMLElement)
         });
       }
     }
-    if (!allowH && !allowV && !allowPress && !allowDT) {
+    if (!allowH && !allowV && !allowPress && !allowDT && !allowTap) {
       this.debug('ignoring pointerdown: no gestures enabled for current mode');
       return;
     }
     // Try to acquire lanes for this pointer
-    const wantP = allowPress || allowDT;
+    const wantP = allowPress || allowDT || allowTap;
     const ownersMap = (this.constructor as typeof GestureDirective)._laneOwners;
     // If this is the first handler seeing this pointerId for this sequence, clear any stale owners
     if (!hadPointer && ownersMap.has(ev.pointerId)) {
