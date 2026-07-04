@@ -73,6 +73,18 @@ export class WidgetAnchorAlarmComponent implements AfterViewInit, OnDestroy {
   private handleIframeGesture = (event: MessageEvent) => {
     if (!event.data) return;
 
+    // Only accept messages from this widget's own iframe; a foreign window that
+    // guessed the widget UUID must not drive navigation, toggle chrome, or
+    // inject synthetic key events. The plugin iframe is always same-origin.
+    let iframeWindow: Window | null = null;
+    try {
+      iframeWindow = this.iframe()?.nativeElement?.contentWindow ?? null;
+    } catch {
+      iframeWindow = null;
+    }
+    if (!iframeWindow || event.source !== iframeWindow) return;
+    if (event.origin !== window.location.origin) return;
+
     const instanceId = event.data?.eventData?.instanceId || event.data?.keyEventData?.instanceId;
     if (!instanceId || instanceId !== this.id()) return;
 
