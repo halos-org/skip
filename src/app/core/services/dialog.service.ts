@@ -10,6 +10,7 @@ import { WidgetsListComponent } from '../components/widgets-list/widgets-list.co
 import { UpgradeConfigComponent } from '../components/upgrade-config/upgrade-config.component';
 import { DialogDashboardPageEditorComponent } from '../components/dialog-dashboard-page-editor/dialog-dashboard-page-editor.component';
 import { DialogAisTargetComponent } from '../../widgets/widget-ais-radar/dialog-ais-target/dialog-ais-target.component';
+import { MenuNotificationsComponent } from '../components/menu-notifications/menu-notifications.component';
 import type { IWidgetHistoryChartDialogData, WidgetHistoryChartDialogComponent } from '../components/widget-history-chart-dialog/widget-history-chart-dialog.component';
 
 @Injectable({
@@ -18,6 +19,18 @@ import type { IWidgetHistoryChartDialogData, WidgetHistoryChartDialogComponent }
 export class DialogService {
   private dialog = inject(MatDialog);
 
+
+  /** Open the notifications list in a dialog (replaces the retired sidenav). */
+  public openNotifications(): Observable<boolean> {
+    return this.dialog.open(DialogFrameComponent, {
+      data: {
+        title: 'Notifications',
+        component: 'notifications',
+        componentType: MenuNotificationsComponent,
+      } as DialogComponentData,
+      autoFocus: false,
+    }).afterClosed();
+  }
 
   public openFrameDialog(data: DialogComponentData, fullscreen: boolean): Observable<boolean> {
     switch (data.component) {

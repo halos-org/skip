@@ -1,0 +1,58 @@
+<div class="toolbar-host" [class.revealed]="chrome.revealed()" [class.peeking]="chrome.peeking()">
+  <button
+    type="button"
+    class="peek-strip"
+    aria-label="Show navigation toolbar"
+    (click)="reveal()"
+  ></button>
+
+  <div
+    class="toolbar"
+    role="toolbar"
+    aria-label="Navigation"
+    (mouseenter)="onPointerEnter()"
+    (mouseleave)="onPointerLeave()"
+  >
+    <div class="toolbar-group toolbar-start">
+      <button mat-icon-button aria-label="Settings" (click)="openSettings()">
+        <mat-icon svgIcon="kip" />
+      </button>
+      @if (fullscreenSupported()) {
+        <button
+          mat-icon-button
+          [attr.aria-label]="fullscreenStatus() ? 'Exit fullscreen' : 'Enter fullscreen'"
+          (click)="toggleFullScreen()"
+        >
+          <mat-icon>{{ fullscreenStatus() ? 'close_fullscreen' : 'fullscreen' }}</mat-icon>
+        </button>
+      }
+      @if (!autoNightMode()) {
+        <button
+          mat-icon-button
+          [attr.aria-label]="isNightMode() ? 'Day mode' : 'Night mode'"
+          (click)="toggleNightMode()"
+        >
+          <mat-icon>{{ isNightMode() ? 'light_mode' : 'mode_night' }}</mat-icon>
+        </button>
+      }
+    </div>
+
+    <div class="toolbar-group toolbar-center">
+      <page-nav-control />
+    </div>
+
+    <div class="toolbar-group toolbar-end">
+      <button mat-icon-button aria-label="Notifications" (click)="openNotifications()">
+        <mat-icon
+          [matBadge]="alarmCount()"
+          [matBadgeHidden]="!alarmCount()"
+          matBadgeSize="small"
+          matBadgeColor="warn"
+        >notifications</mat-icon>
+      </button>
+      <button mat-icon-button aria-label="Edit dashboard" (click)="enterEdit()">
+        <mat-icon>lock_open</mat-icon>
+      </button>
+    </div>
+  </div>
+</div>
