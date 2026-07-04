@@ -289,21 +289,21 @@ describe('DashboardService', () => {
   describe('dashboard cycling', () => {
     beforeEach(() => setup());
 
-    // Direction is pinned as implemented and is inverted relative to the method
-    // names and their JSDoc: previousDashboard advances, nextDashboard retreats.
-    it('previousDashboard advances the active index, wrapping to the first', () => {
+    // Correctly named: nextDashboard advances (wraps last -> first),
+    // previousDashboard retreats (wraps first -> last).
+    it('nextDashboard advances the active index, wrapping to the first', () => {
       service.setActiveDashboardIndex(1);
-      service.previousDashboard();
+      service.nextDashboard();
       expect(service.activeDashboard()).toBe(2);
-      service.previousDashboard();
+      service.nextDashboard();
       expect(service.activeDashboard()).toBe(0);
     });
 
-    it('nextDashboard retreats the active index, wrapping to the last', () => {
+    it('previousDashboard retreats the active index, wrapping to the last', () => {
       service.setActiveDashboardIndex(1);
-      service.nextDashboard();
+      service.previousDashboard();
       expect(service.activeDashboard()).toBe(0);
-      service.nextDashboard();
+      service.previousDashboard();
       expect(service.activeDashboard()).toBe(2);
     });
   });
@@ -325,19 +325,18 @@ describe('DashboardService', () => {
       expect(consoleError).toHaveBeenCalled();
     });
 
-    // Same pinned direction swap as previousDashboard/nextDashboard.
-    it('navigateToNextDashboard routes backward and navigateToPreviousDashboard forward, with wrap', () => {
+    it('navigateToNextDashboard routes forward and navigateToPreviousDashboard backward, with wrap', () => {
       service.setActiveDashboardIndex(0);
       service.navigateToNextDashboard();
-      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 2]);
-      service.navigateToPreviousDashboard();
       expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 1]);
+      service.navigateToPreviousDashboard();
+      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 2]);
       service.setActiveDashboardIndex(2);
       service.navigateToPreviousDashboard();
-      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 0]);
+      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 1]);
       service.setActiveDashboardIndex(1);
       service.navigateToNextDashboard();
-      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 0]);
+      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 2]);
     });
   });
 

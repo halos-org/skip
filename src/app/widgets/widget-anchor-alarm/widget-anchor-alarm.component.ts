@@ -78,10 +78,10 @@ export class WidgetAnchorAlarmComponent implements AfterViewInit, OnDestroy {
     if (event.data.gesture) {
       switch (event.data.gesture) {
         case 'swipeup':
-          this._dashboard.navigateToPreviousDashboard();
+          this._dashboard.navigateToNextDashboard();
           break;
         case 'swipedown':
-          this._dashboard.navigateToNextDashboard();
+          this._dashboard.navigateToPreviousDashboard();
           break;
         case 'swipeleft': {
           const leftSidebarEvent = new Event('openLeftSidenav', { bubbles: true, cancelable: true });

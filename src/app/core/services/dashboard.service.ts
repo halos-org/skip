@@ -272,10 +272,10 @@ export class DashboardService {
    * This only updates the internal state and does NOT trigger navigation or URL changes.
    */
   public previousDashboard(): void {
-    if ((this.activeDashboard() + 1) > (this.dashboards().length) - 1) {
-      this.activeDashboard.set(0);
+    if ((this.activeDashboard() - 1) < 0) {
+      this.activeDashboard.set(this.dashboards().length - 1);
     } else {
-      this.activeDashboard.set(this.activeDashboard() + 1);
+      this.activeDashboard.set(this.activeDashboard() - 1);
     }
   }
 
@@ -285,10 +285,10 @@ export class DashboardService {
    * This only updates the internal state and does NOT trigger navigation or URL changes.
    */
   public nextDashboard(): void {
-    if ((this.activeDashboard() - 1) < 0) {
-      this.activeDashboard.set(this.dashboards().length - 1);
+    if ((this.activeDashboard() + 1) > (this.dashboards().length) - 1) {
+      this.activeDashboard.set(0);
     } else {
-      this.activeDashboard.set(this.activeDashboard() - 1);
+      this.activeDashboard.set(this.activeDashboard() + 1);
     }
   }
 
@@ -315,30 +315,30 @@ export class DashboardService {
 
   /**
    * Navigates to the next dashboard in the list.
-   * If the current dashboard is the first one, wraps around to the last dashboard.
+   * If the current dashboard is the last one, wraps around to the first dashboard.
    * This updates the browser URL and triggers Angular routing.
    */
   public navigateToNextDashboard(): void {
     let nextDashboard: number = null;
-    if ((this.activeDashboard() - 1) < 0) {
-      nextDashboard = this.dashboards().length - 1;
+    if ((this.activeDashboard() + 1) >= this.dashboards().length) {
+      nextDashboard = 0;
     } else {
-      nextDashboard = this.activeDashboard() - 1;
+      nextDashboard = this.activeDashboard() + 1;
     }
     this._router.navigate(['/dashboard', nextDashboard]);
   }
 
   /**
    * Navigates to the previous dashboard in the list.
-   * If the current dashboard is the last one, wraps around to the first dashboard.
+   * If the current dashboard is the first one, wraps around to the last dashboard.
    * This updates the browser URL and triggers Angular routing.
    */
   public navigateToPreviousDashboard(): void {
     let nextDashboard: number = null;
-    if ((this.activeDashboard() + 1) >= this.dashboards().length) {
-      nextDashboard = 0;
+    if ((this.activeDashboard() - 1) < 0) {
+      nextDashboard = this.dashboards().length - 1;
     } else {
-      nextDashboard = this.activeDashboard() + 1;
+      nextDashboard = this.activeDashboard() - 1;
     }
     this._router.navigate(['/dashboard', nextDashboard]);
   }
