@@ -1,35 +1,34 @@
 ## Touch, Mouse, and Keyboard Navigation
-KIP supports multiple input modes for seamless navigation across devices.
+KIP supports touch, mouse, and keyboard input across devices.
 
-| Actions                    | Touch         | Mouse                        | Keyboard Shortcuts                                 |
-|----------------------------|--------------|------------------------------|----------------------------------------------------|
-| Open Actions sidenav          | Swipe left    | Click, drag left, and release| <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>←</kbd> (Left Arrow) |
-| Open Notification sidenav     | Swipe right   | Click, drag right, and release| <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>→</kbd> (Right Arrow)  |
-| Cycle through dashboards   | Swipe up/down | Click, drag up/down, and release| <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>↑</kbd>/<kbd>↓</kbd> (Up/Down Arrow) |
-| Toggle Fullscreen          | N/A           | N/A                          | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>F</kbd>  |
-| Toggle Night mode          | N/A           | N/A                          | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>N</kbd>  |
-| Toggle dashboard edit mode | N/A           | N/A                          | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>E</kbd>  |
+| Action               | Touch                        | Mouse / wheel                         | Keyboard                                          |
+|----------------------|------------------------------|---------------------------------------|---------------------------------------------------|
+| Show the toolbar     | Swipe down from the top      | Scroll up, or tap the top peek strip  | —                                                 |
+| Move between pages   | Swipe left or right          | Scroll horizontally                   | <kbd>Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd> (Left/Right Arrow) |
+| Jump to a page       | Tap its icon in the toolbar  | Click its icon in the toolbar         | —                                                 |
+| Enter page edit mode | Tap the edit button          | Click the edit button                 | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>E</kbd>  |
+| Toggle Fullscreen    | —                            | Click the fullscreen button           | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>F</kbd>  |
+| Toggle Night mode    | Tap the night-mode button    | Click the night-mode button           | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>N</kbd>  |
+| Open notifications   | Tap the notifications button (or alarm badge) | Click the notifications button (or alarm badge) | —                                |
 
 > Note that the words Touch and Tap are synonymous with mouse click.
 
-## General Layout
-<img src="assets/help-docs/img/general-layout.png" alt="Sidebar Menus" title="Sidebar Menus" width="100%">
+## The Toolbar
+KIP has no permanent navigation bar. A toolbar sits hidden at the top of the page and slides down when you need it — swipe down from the top, scroll up, or tap the thin strip that peeks at the top edge. It hides again when you scroll back, tap elsewhere, or leave it idle.
 
-1. Actions menu
-2. *Fullscreen toggle button
-3. **Night Mode toggle button
-4. Settings button
-5. Select dashboard buttons
-6. Unlock dashboard edit mode
-7. Notifications menu
-8. Notification message
-9. Silence notification
-10. Resolve notification
-11. Mute audio toggle button
+The toolbar holds:
+1. Settings
+2. *Fullscreen toggle
+3. **Night-mode toggle
+4. Page navigator — one icon per page; tap a page’s icon to jump to it
+5. Notifications
+6. Edit button — unlock the current page to change its layout
 
-*Only visible if mode is supported
+When an alarm is active, a notification badge also appears in the lower-left corner and stays there until the alarm clears. It is the one piece of always-on chrome, for safety. Tap it to see the alarms.
 
-**Only if visible if automatic day and night is not enabled. See <Home / Settings / Display>.
+*Only visible if the mode is supported.
+
+**Only visible if automatic day and night is not enabled. See <Home / Settings / Display>.
 
 ## Loading KIP on Phones, Tablets, Raspberry Pi, and Computers
 Simply navigate to `http://<Signal K Server URL>:<port>/@halos-org/skip/` to load KIP and enjoy its features remotely on any device.
@@ -50,21 +49,21 @@ KIP is now installed and available on your home screen.
 KIP is now installed and available on your home screen.
 
 ## Fullscreen
-You can toggle fullscreen mode on and off, and disable the screen saver and computer sleep mode (if supported by the device/browser), by clicking the small Expand/Reduce button in the upper left corner of the Actions menu or using the keyboard hotkey. This button is not available on mobile devices.
+You can toggle fullscreen mode on and off, and disable the screen saver and computer sleep mode (if supported by the device/browser), by tapping the Expand/Reduce button on the toolbar or using the keyboard hotkey. This button is not available on mobile devices.
 
 ## Night Mode
-Save your night vision by automatically switching KIP to day or night mode based on sunrise and sunset hours (the Signal K Derived Data plugin is required for automatic switching). This feature can be enabled in the **Settings > Display** page. You can also manually set the mode by clicking the small Moon/Sun button in the upper right corner of the Actions menu. Note that if automatic switching is enabled, brightness will reset to the Signal K mode value.
+Save your night vision by automatically switching KIP to day or night mode based on sunrise and sunset hours (the Signal K Derived Data plugin is required for automatic switching). This feature can be enabled in the **Settings > Display** page. You can also manually set the mode by tapping the Moon/Sun button on the toolbar. Note that if automatic switching is enabled, brightness will reset to the Signal K mode value.
 
 ## Multiple User Profiles and Configuration Sharing
 KIP supports multiple user profiles, allowing different roles on board—such as captain, skipper, tactician, navigator, or engineer—to tailor the interface to their needs. Profiles can also be used to tie specific configuration arrangements to use cases or device form factors. See the Login & Configurations help sections for mode details.
 
 ## Remote Control Other KIP Displays
-Control which dashboard is shown on another KIP instance (for example: a mast display, a TV or pilot‑house screen that is hard to reach, or a device with no local input hardware).
+Control which page is shown on another KIP instance (for example: a mast display, a TV or pilot‑house screen that is hard to reach, or a device with no local input hardware).
 
 ### Typical Use Cases
-- Mast display: change dashboards from the cockpit without going forward.
-- Salon / TV screen: rotate between navigation and status dashboards easily.
-- Headless / no input device: select dashboards when there is no keyboard/mouse or touch is disabled.
+- Mast display: change pages from the cockpit without going forward.
+- Salon / TV screen: rotate between navigation and status pages easily.
+- Headless / no input device: select pages when there is no keyboard/mouse or touch is disabled.
 
 ### Requirements
 - Both devices must be connected to the same Signal K server.
@@ -80,14 +79,14 @@ If multiple devices log in with the same Signal K user to share configuration, t
   - Enable: Allow this KIP dashboard to be managed remotely.
   - Set: Instance Name (this is what will appear in the controller list).
 2. On the controlling device
-  - Open: Actions menu → Settings → Remote Control.
+  - Open: reveal the toolbar → Settings → Remote Control.
   - Select the target device by its Instance Name.
-  - Click / tap a dashboard tile to activate it on the target device.
+  - Click / tap a page tile to activate it on the target device.
 
 ### Using Remote Control
-- The currently active dashboard on the target device is highlighted.
+- The currently active page on the target device is highlighted.
 - Switching is usually instantaneous; brief delays can indicate network latency.
-- You can leave the Remote Control panel open to “page” through dashboards live.
+- You can leave the Remote Control panel open to step through pages live.
 
 ### Troubleshooting
 | Problem | What to Check |
@@ -104,4 +103,4 @@ If multiple devices log in with the same Signal K user to share configuration, t
 >- Use different Signal K users if you want fully isolated configurations.
 
 ### Privacy / Safety Note
-Anyone with access to a logged‑in controlling KIP instance can switch dashboards on enabled targets. Only enable remote management on displays where that is acceptable.
+Anyone with access to a logged‑in controlling KIP instance can switch pages on enabled targets. Only enable remote management on displays where that is acceptable.

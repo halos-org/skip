@@ -1,7 +1,7 @@
 ## Video Recipes
 
 Short, step-by-step guides for the most common things people do with the Video widget. Each one
-starts from a dashboard in **edit mode** (tap the pencil/unlock to add or change widgets). For the
+starts from a page in **edit mode** (tap the pencil/unlock to add or change widgets). For the
 full reference, see **The Video Widget** help page.
 
 > Recipes that use a **camera** or **uploaded video** need the free **SK Video** add-on installed on
@@ -11,9 +11,9 @@ full reference, see **The Video Widget** help page.
 
 ### Watch the foredeck while sailing
 
-**You'll get:** the view from a bow or mast camera, right on a sailing dashboard.
+**You'll get:** the view from a bow or mast camera, right on a sailing page.
 
-1. Add a **Video** widget to your dashboard.
+1. Add a **Video** widget to your page.
 2. Open its settings and set **Source** to **Camera**.
 3. Tap **Scan network**. When your foredeck camera appears, tap it to fill in its details.
    (No camera found? Add it by hand under **Add a camera** — see the recipe below.)
@@ -21,9 +21,9 @@ full reference, see **The Video Widget** help page.
 5. Tap **Add camera**, then leave **Delivery** on **Standard (HLS)**.
 6. Set **Quality & Latency** to **Balanced** and save.
 
-<img src="assets/help-docs/img/video/widget-playing.png" alt="A foredeck camera on a sailing dashboard" title="The foredeck on your dashboard" width="100%">
+<img src="assets/help-docs/img/video/widget-playing.png" alt="A foredeck camera on a sailing page" title="The foredeck on your page" width="100%">
 
-**Tip:** Put this widget on its own "Underway" dashboard so it only runs when you're looking at it —
+**Tip:** Put this widget on its own "Underway" page so it only runs when you're looking at it —
 that saves battery and keeps your device cool.
 
 ---
@@ -84,7 +84,7 @@ saved "looking at the dock" position.
 
 ### Show a stream from a web address
 
-**You'll get:** any browser-playable video on your dashboard, with no add-on.
+**You'll get:** any browser-playable video on your page, with no add-on.
 
 1. Add a **Video** widget and set **Source** to **URL**.
 2. Paste the address of a video file (`.mp4`/`.webm`), an HLS stream (`.m3u8`), or an MJPEG feed.
@@ -110,12 +110,12 @@ play the same clip — no copying files around.
 
 ---
 
-### Use one camera on several dashboards
+### Use one camera on several pages
 
 **You'll get:** the same camera in more than one place, set up only once.
 
 1. Add the camera once using any recipe above. It's now a **saved camera**.
-2. On another dashboard, add a **Video** widget, set **Source** to **Camera**, and just **pick it from
+2. On another page, add a **Video** widget, set **Source** to **Camera**, and just **pick it from
    the list** — no need to re-enter the address or login.
 
 **Tip:** Saved cameras live on the Signal K server, so they're available to every device on the boat.
@@ -126,8 +126,8 @@ play the same clip — no copying files around.
 
 **You'll get:** a "camera wall" view.
 
-1. Add **one Video widget per camera** to the same dashboard.
+1. Add **one Video widget per camera** to the same page.
 2. Arrange and size them on the grid however you like.
 
 **Tip:** Each video uses power and warms up the device. On phones and tablets, keep it to a handful at
-a time, and let dashboards you're not looking at pause themselves.
+a time, and let pages you're not looking at pause themselves.

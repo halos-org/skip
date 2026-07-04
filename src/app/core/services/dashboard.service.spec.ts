@@ -29,7 +29,7 @@ const seed = (): Dashboard[] => [
 const widgetsOf = (dashboard: Dashboard): NgGridStackWidget[] => dashboard.configuration as NgGridStackWidget[];
 
 function makeRouterStub(idParam: string | null) {
-  // Mirrors the app's top-level `dashboard/:id` route: the id param lives on a
+  // Mirrors the app's top-level `page/:id` route: the id param lives on a
   // child snapshot, never on the root, so getRouteParam must walk firstChild.
   const snapshotRoot = (id: string | null): ActivatedRouteSnapshot =>
     ({
@@ -43,7 +43,7 @@ function makeRouterStub(idParam: string | null) {
     routerState: { snapshot: { root: snapshotRoot(idParam) } },
     navigate: vi.fn<(commands: unknown[]) => Promise<boolean>>(() => Promise.resolve(true)),
     setIdParam: (id: string | null): void => { stub.routerState.snapshot.root = snapshotRoot(id); },
-    emitNavigationEnd: (): void => { navId++; events.next(new NavigationEnd(navId, '/dashboard', '/dashboard')); }
+    emitNavigationEnd: (): void => { navId++; events.next(new NavigationEnd(navId, '/page', '/page')); }
   };
   return stub;
 }
@@ -89,7 +89,7 @@ describe('DashboardService', () => {
       setup([]);
       const dashboards = service.dashboards();
       expect(dashboards).toHaveLength(1);
-      expect(dashboards[0].name).toBe('Dashboard 1');
+      expect(dashboards[0].name).toBe('Page 1');
       expect(dashboards[0].id).toMatch(UUID_PATTERN);
       expect(widgetsOf(dashboards[0])[0].input.widgetProperties.type).toBe('widget-tutorial');
       // Pins today's aliasing: the blank dashboard shares its configuration array with the DefaultDashboard constant.
@@ -217,7 +217,7 @@ describe('DashboardService', () => {
       const dashboards = service.dashboards();
       expect(dashboards).toHaveLength(1);
       expect(dashboards[0].id).not.toBe('d-only');
-      expect(dashboards[0].name).toBe('Dashboard 1');
+      expect(dashboards[0].name).toBe('Page 1');
       expect(dashboards[0].configuration).toEqual([]);
       expect(service.activeDashboard()).toBe(0);
     });
@@ -314,12 +314,12 @@ describe('DashboardService', () => {
     it('navigateToActive routes to the active dashboard index', () => {
       service.setActiveDashboardIndex(1);
       service.navigateToActive();
-      expect(router.navigate).toHaveBeenCalledWith(['/dashboard', 1]);
+      expect(router.navigate).toHaveBeenCalledWith(['/page', 1]);
     });
 
     it('navigateTo routes to an in-bounds index and rejects others with an error', () => {
       service.navigateTo(2);
-      expect(router.navigate).toHaveBeenCalledWith(['/dashboard', 2]);
+      expect(router.navigate).toHaveBeenCalledWith(['/page', 2]);
       service.navigateTo(3);
       expect(router.navigate).toHaveBeenCalledTimes(1);
       expect(consoleError).toHaveBeenCalled();
@@ -328,15 +328,15 @@ describe('DashboardService', () => {
     it('navigateToNextDashboard routes forward and navigateToPreviousDashboard backward, with wrap', () => {
       service.setActiveDashboardIndex(0);
       service.navigateToNextDashboard();
-      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 1]);
+      expect(router.navigate).toHaveBeenLastCalledWith(['/page', 1]);
       service.navigateToPreviousDashboard();
-      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 2]);
+      expect(router.navigate).toHaveBeenLastCalledWith(['/page', 2]);
       service.setActiveDashboardIndex(2);
       service.navigateToPreviousDashboard();
-      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 1]);
+      expect(router.navigate).toHaveBeenLastCalledWith(['/page', 1]);
       service.setActiveDashboardIndex(1);
       service.navigateToNextDashboard();
-      expect(router.navigate).toHaveBeenLastCalledWith(['/dashboard', 2]);
+      expect(router.navigate).toHaveBeenLastCalledWith(['/page', 2]);
     });
   });
 

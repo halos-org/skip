@@ -183,7 +183,7 @@ export class DashboardService {
     this.dashboards.update(dashboards => dashboards.filter((_, i) => i !== itemIndex));
 
     if (this.dashboards().length === 0) {
-      this.add('Dashboard ' + (this.dashboards().length + 1), []);
+      this.add('Page ' + (this.dashboards().length + 1), []);
       this.activeDashboard.set(0);
     } else if (this.activeDashboard() > this.dashboards().length - 1) {
       this.activeDashboard.set(this.dashboards().length - 1);
@@ -297,7 +297,7 @@ export class DashboardService {
    * This updates the browser URL and triggers Angular routing.
    */
   public navigateToActive(): void {
-    this._router.navigate(['/dashboard', this.activeDashboard()]);
+    this._router.navigate(['/page', this.activeDashboard()]);
   }
 
   /**
@@ -307,7 +307,7 @@ export class DashboardService {
    */
   public navigateTo(itemIndex: number): void {
     if (itemIndex >= 0 && itemIndex < this.dashboards().length) {
-      this._router.navigate(['/dashboard', itemIndex]);
+      this._router.navigate(['/page', itemIndex]);
     } else {
       console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
     }
@@ -325,7 +325,7 @@ export class DashboardService {
     } else {
       nextDashboard = this.activeDashboard() + 1;
     }
-    this._router.navigate(['/dashboard', nextDashboard]);
+    this._router.navigate(['/page', nextDashboard]);
   }
 
   /**
@@ -340,7 +340,7 @@ export class DashboardService {
     } else {
       nextDashboard = this.activeDashboard() - 1;
     }
-    this._router.navigate(['/dashboard', nextDashboard]);
+    this._router.navigate(['/page', nextDashboard]);
   }
 
   /**

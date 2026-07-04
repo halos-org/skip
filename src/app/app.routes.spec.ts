@@ -17,12 +17,12 @@ class TestRouteTargetComponent {}
 })
 class TestRouterHostComponent {}
 
-describe('app.routes default-dashboard normalization', () => {
+describe('app.routes default-page normalization', () => {
   let router: Router;
 
   beforeEach(async () => {
     const testRoutes: Route[] = routes.map((route) => {
-      if (route.path === 'dashboard/:id') {
+      if (route.path === 'page/:id') {
         return { ...route, component: TestRouteTargetComponent };
       }
       return route;
@@ -38,23 +38,33 @@ describe('app.routes default-dashboard normalization', () => {
     fixture.detectChanges();
   });
 
-  it('redirects the root URL to /dashboard/0', async () => {
+  it('redirects the root URL to /page/0', async () => {
     await router.navigateByUrl('/');
-    expect(router.url).toBe('/dashboard/0');
+    expect(router.url).toBe('/page/0');
   });
 
-  it('redirects /dashboard without an id to /dashboard/0', async () => {
+  it('keeps /page/:id as-is', async () => {
+    await router.navigateByUrl('/page/7');
+    expect(router.url).toBe('/page/7');
+  });
+
+  it('redirects /page without an id to /page/0', async () => {
+    await router.navigateByUrl('/page');
+    expect(router.url).toBe('/page/0');
+  });
+
+  it('redirects the legacy /dashboard link to /page/0', async () => {
     await router.navigateByUrl('/dashboard');
-    expect(router.url).toBe('/dashboard/0');
+    expect(router.url).toBe('/page/0');
   });
 
-  it('keeps /dashboard/:id as-is', async () => {
+  it('redirects a legacy /dashboard/:id link to /page/:id, preserving the id', async () => {
     await router.navigateByUrl('/dashboard/7');
-    expect(router.url).toBe('/dashboard/7');
+    expect(router.url).toBe('/page/7');
   });
 
-  it('redirects an unknown URL (including a stale /chartplotter link) to /dashboard/0', async () => {
+  it('redirects an unknown URL (including a stale /chartplotter link) to /page/0', async () => {
     await router.navigateByUrl('/chartplotter/2');
-    expect(router.url).toBe('/dashboard/0');
+    expect(router.url).toBe('/page/0');
   });
 });

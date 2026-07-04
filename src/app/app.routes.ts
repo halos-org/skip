@@ -4,17 +4,27 @@ import { DashboardComponent } from './core/components/dashboard/dashboard.compon
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'dashboard/0',
+    redirectTo: 'page/0',
     pathMatch: 'full'
   },
   {
+    path: 'page',
+    redirectTo: 'page/0',
+    pathMatch: 'full'
+  },
+  {
+    path: 'page/:id',
+    component: DashboardComponent
+  },
+  // Backward-compat for the pre-rename /dashboard route (bookmarks, kiosk configs).
+  {
     path: 'dashboard',
-    redirectTo: 'dashboard/0',
+    redirectTo: 'page/0',
     pathMatch: 'full'
   },
   {
     path: 'dashboard/:id',
-    component: DashboardComponent
+    redirectTo: route => `/page/${route.params['id']}`
   },
   {
     path: 'settings',
@@ -53,6 +63,6 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'dashboard/0'
+    redirectTo: 'page/0'
   }
 ];

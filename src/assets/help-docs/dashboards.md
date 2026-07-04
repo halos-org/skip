@@ -1,59 +1,54 @@
-## Managing Dashboards
-Dashboards let you group widgets by task—navigation, engines, energy, weather, racing, night watch, and more. This guide covers creating, organizing, and editing dashboards, plus an overview of available widget types.
+## Managing Pages
+Pages let you group widgets by task—navigation, engines, energy, weather, racing, night watch, and more. This guide covers creating, organizing, and editing pages, plus an overview of available widget types.
 
 
-## Dashboard Pages Panel
-Open the Actions menu and select Settings.
+## Pages Panel
+Reveal the toolbar and select Settings.
 
 Here you can:
-- Add a new dashboard (+ button)
-- Reorder dashboards (drag with touch or mouse)
+- Add a new page (+ button)
+- Reorder pages (drag with touch or mouse)
 - Rename and pick an icon (double tap or double click)
-- Duplicate a dashboard (long press or long click → Duplicate)
-- Delete a dashboard (long press or long click → Delete)
+- Duplicate a page (long press or long click → Duplicate)
+- Delete a page (long press or long click → Delete)
 
-Choose icons that reflect each dashboard’s purpose (e.g. compass for navigation, droplet for tanks, bolt for power). Icons appear wherever dashboards are listed.
+Choose icons that reflect each page’s purpose (e.g. compass for navigation, droplet for tanks, bolt for power). Icons appear wherever pages are listed.
 
 ### Gesture / Action Summary
-| Action         | Touch / Mobile         | Mouse / Desktop         |
-|---------------|-----------------------|------------------------|
-| Add dashboard | Tap (+)               | Click (+)              |
-| Reorder       | Drag tile              | Drag tile              |
-| Rename/Icon   | Double tap             | Double click           |
-| Duplicate     | Long press → Duplicate | Long click → Duplicate |
-| Delete        | Long press → Delete    | Long click → Delete    |
+| Action        | Touch / Mobile         | Mouse / Desktop         |
+|---------------|------------------------|-------------------------|
+| Add page      | Tap (+)                | Click (+)               |
+| Reorder       | Drag tile              | Drag tile               |
+| Rename/Icon   | Double tap             | Double click            |
+| Duplicate     | Long press → Duplicate | Long click → Duplicate  |
+| Delete        | Long press → Delete    | Long click → Delete     |
 
 
-## Editing Dashboard Layouts
-1. Navigate to the dashboard you want to change (swipe or use dashboard selector).
-2. Open the Actions menu.
-3. Tap the Unlock/Lock button at the bottom to toggle edit mode.
+## Editing Page Layouts
+1. Go to the page you want to change (swipe sideways, scroll horizontally, or tap its icon in the toolbar’s page navigator).
+2. Reveal the toolbar (swipe down from the top, scroll up, or tap the top peek strip).
+3. Tap the edit button to unlock the page.
 
 In edit mode, widgets show dashed outlines.
 
 ### What You Can Do in Edit Mode
-- Add a widget (long press empty space → Add Widget)
+- Add a widget (tap empty space → Add Widget)
 - Move a widget (drag)
 - Resize a widget (drag edges/corners)
-- Configure a widget (double tap/double click)
-- Duplicate a widget (long press → Duplicate)
-- Delete a widget (long press → Delete, then confirm)
+- Configure, duplicate, or delete a widget (tap it → action menu; Delete asks to confirm)
 - Save changes (Check button) or discard (X button) in the lower right
 
 >**Tip:** If you can’t add a widget, free up space by resizing or moving existing ones first.
 
-## Viewing Widget History on Locked Dashboards
-When a dashboard is locked (normal viewing mode), you can open a history chart for a widget without entering edit mode:
+## Viewing Widget History on a Locked Page
+When a page is locked (normal viewing mode), you can open a history chart for a widget without entering edit mode: **press and hold (long-press)** the widget.
 
-- **Desktop / mouse:** right-click on the widget
-- **Touch device:** two-finger tap on the widget
-
-KIP opens a history chart dialog and loads historical series data for that widget using the History API.
+KIP opens a history chart dialog and loads historical series data for that widget using the History API. Only widgets bound to numeric data have a history — long-pressing anything else does nothing.
 
 
-## Workflow: From Idea to Dashboard
+## Workflow: From Idea to Page
 1. Define the purpose (e.g. “Night Nav” = heading, COG, SOG, depth, wind, batteries, minimal brightness)
-2. Create or duplicate a dashboard similar to what you want
+2. Create or duplicate a page similar to what you want
 3. Enter edit mode and add required widgets
 4. Configure each widget’s data paths (keep sample times reasonable to reduce churn)
 5. Arrange and size for readability at your viewing distance
@@ -91,7 +86,7 @@ KIP widgets turn Signal K data into readable visuals and controls. Available wid
 - **Embed Webpage Viewer** – Embeds external web apps (Grafana, Node-RED, etc.) into your dashboard.
 - **Racesteer** – Race steering display fusing polar performance data with live conditions for optimal tactics.
 - **Racer - Start Line Insight** – Set and adjust start line ends, see distance, favored end, and line bias; integrates with Freeboard SK.
-- **Racer - Start Timer** – Advanced racing countdown timer with OCS status and auto dashboard switching.
+- **Racer - Start Timer** – Advanced racing countdown timer with OCS status and auto page switching.
 - **Countdown Timer** – Simple race start countdown timer with start, pause, sync, and reset options.
 
 ### Need a Widget Not Listed Here?
@@ -103,11 +98,11 @@ KIP widgets turn Signal K data into readable visuals and controls. Available wid
 ## Performance & Layout Tips
 - Favor clarity over cramming: leave space around high‑priority values
 - Group related widgets (navigation, energy, engines, environment)
-- Use consistent units per dashboard (e.g. all speeds in knots, all temps in °C or °F—don’t mix)
-- For night dashboards, adjust brightness or use the all‑red theme in Settings → Options → Display
+- Use consistent units per page (e.g. all speeds in knots, all temps in °C or °F—don’t mix)
+- For night pages, adjust brightness or use the all‑red theme in Settings → Options → Display
 - Duplicate a working layout before making major changes (easy rollback)
 - Keep sampling intervals modest (1000 ms+) unless fast reaction is essential
-- Know your device’s hardware limits and adjust widget count per dashboard accordingly
+- Know your device’s hardware limits and adjust widget count per page accordingly
 - Avoid embedding too many external webpages—each adds load
 
 
@@ -116,15 +111,15 @@ KIP widgets turn Signal K data into readable visuals and controls. Available wid
 |------------------------|---------------------------------------|---------------------------------------------------------------------|
 | Data shows “—” or blank| Path missing/not configured/null value | Open widget config, verify Signal K path exists and updates. Use Data Inspector and Signal K Data Browser to view raw data from the server. |
 | Wrong units            | Default convert unit used              | Edit widget config paths and set the desired target unit.            |
-| Slow dashboard switching| Excessive data sampling/too many widgets| Increase sample times; remove unused widgets. Split widgets into separate dashboards. Optimize system resource usage. |
+| Slow page switching    | Excessive data sampling/too many widgets| Increase sample times; remove unused widgets. Split widgets into separate pages. Optimize system resource usage. |
 | Embedded page blank    | Cross‑origin blocked                   | See "Embed Page Viewer" help section.                               |
-| History dialog not opening on locked dashboard | Dashboard is still in edit mode, or interaction did not register as right-click / two-finger tap | Lock the dashboard first, then retry with a right-click (desktop) or two-finger tap (touch). |
+| History dialog not opening on a locked page | The page is still in edit mode, or the widget has no numeric data | Lock the page first, then press and hold the widget. Only numeric‑data widgets have a history. |
 
 
 ## Next Steps
 See also:
-- Remote Control (switch dashboards on unattended displays)
+- Remote Control (switch pages on unattended displays)
 - Night Mode (automatic theme + brightness)
 - Contact / Issues (report widget feature ideas)
 
-Refine incrementally—small improvements keep dashboards readable and reliable.
+Refine incrementally—small improvements keep pages readable and reliable.

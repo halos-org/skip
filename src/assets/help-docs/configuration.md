@@ -54,4 +54,4 @@ Use advanced operations with caution. All changes affect your active configurati
 
 KIP separates configuration into two parts:
 1. **Server Connection**: This configuration is always stored locally in your browser and is never shared. It is used in the **Connectivity** tab of the **Settings** page.
-2. **Application Settings**: This includes the configuration settings you can back up, delete, and restore with the **Configurations** page. It contains all dashboards, widgets and other configuration settings.
+2. **Application Settings**: This includes the configuration settings you can back up, delete, and restore with the **Configurations** page. It contains all pages, widgets and other configuration settings.

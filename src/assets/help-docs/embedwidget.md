@@ -60,7 +60,7 @@ CORS restrictions only apply when the protocol, hostname, or port of the embedde
    - Some websites may allow embedding only for specific trusted domains, which most probably, do not include your Signal K installation.
 
 3. **Consequences of Blocked Content in KIP**:
-   - When you enable the "Allow Input" Embed widget option, KIP needs to inject swipe gestures within the embedded application to trigger dashboard navigation, sidebar menu control, or use KIP's keyboard hotkeys while the focus is inside the iframe. To achieve this, KIP dynamically injects scripts into the iframe application. If CORS restrictions apply, this will be prohibited by the browser. This means that gestures and hotkeys will not work over the Embed widget. If you have a full-screen Embed widget, you could get stuck with no way to change dashboards or open menus.
+   - When you enable the "Allow Input" Embed widget option, KIP needs to inject gestures within the embedded application to trigger page navigation, reveal the auto-hiding toolbar, or use KIP's keyboard hotkeys while the focus is inside the iframe. To achieve this, KIP dynamically injects scripts into the iframe application. If CORS restrictions apply, this will be prohibited by the browser. This means that gestures and hotkeys will not work over the Embed widget. If you have a full-screen Embed widget, you could get stuck with no way to change pages or reveal the toolbar.
 
 4. **No Workaround for Restricted Websites**:
    - If the application does not allow iframe embedding, there is no way to bypass this restriction without the application owner's adding some kind of authorization for you. This is a browser-enforced security feature.

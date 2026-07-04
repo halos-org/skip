@@ -14,40 +14,31 @@
   </thead>
   <tbody>
     <tr>
-      <td>Open Actions menu</td>
-      <td>Swipe left</td>
-      <td>Click, drag left, and release</td>
-      <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd style="font-size: x-large;">&#8592;</kbd> (Left Arrow)</td>
+      <td>Show the toolbar</td>
+      <td>Swipe down from the top</td>
+      <td>Scroll up, or tap the top peek strip</td>
+      <td>N/A</td>
     </tr>
     <tr>
-      <td>Open Notification menu</td>
-      <td>Swipe right</td>
-      <td>Click, drag right, and release</td>
-      <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd style="font-size: x-large;">&#8594;</kbd> (Right Arrow)</td>
+      <td>Move between pages</td>
+      <td>Swipe left or right</td>
+      <td>Scroll horizontally</td>
+      <td><kbd>Ctrl</kbd> + <kbd style="font-size: x-large;">&#8592;</kbd>/<kbd style="font-size: x-large;">&#8594;</kbd> (Left/Right Arrow)</td>
     </tr>
     <tr>
-      <td>Cycle through dashboards</td>
-      <td>Swipe up/down</td>
-      <td>Click, drag up/down, and release</td>
-      <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd style="font-size: x-large;">&#8593;</kbd>/<kbd style="font-size: x-large;">&#8595;</kbd> (Up/Down Arrow)</td>
+      <td>Enter page edit mode</td>
+      <td colspan="2">Tap the edit button on the toolbar</td>
+      <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>E</kbd></td>
     </tr>
     <tr>
       <td>Toggle Fullscreen</td>
-      <td>N/A</td>
-      <td>N/A</td>
+      <td colspan="2">Tap the fullscreen button on the toolbar</td>
       <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>F</kbd></td>
     </tr>
     <tr>
       <td>Toggle Night mode</td>
-      <td>N/A</td>
-      <td>N/A</td>
+      <td colspan="2">Tap the night-mode button on the toolbar</td>
       <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>N</kbd></td>
-    </tr>
-    <tr>
-      <td>Toggle dashboard edit mode</td>
-      <td>N/A</td>
-      <td>N/A</td>
-      <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>E</kbd></td>
     </tr>
   </tbody>
 </table>
@@ -55,14 +46,14 @@
 
 <h2>Migration Limitations</h2>
 <p>
-  <span class="warning">Important:</span> The new widget layout engine is <strong>completely different</strong> from the previous version. When you upgrade, your configuration will be migrated, but <strong>the way dashboards and widgets are arranged will change significantly</strong>.
+  <span class="warning">Important:</span> The new widget layout engine is <strong>completely different</strong> from the previous version. When you upgrade, your configuration will be migrated, but <strong>the way pages and widgets are arranged will change significantly</strong>.
 </p>
 <ul>
   <li>All KIP configuration settings will be migrated.</li>
-  <li>Each v2 Page layout will become a v3 Dashboard.</li>
-  <li>All widgets and their settings will appear in their new dashboards.</li>
+  <li>Each v2 Page layout becomes its own v3 page.</li>
+  <li>All widgets and their settings will appear in their new pages.</li>
   <li>
-    <span class="warning"><strong>Note:</strong> Widget positions, order, and sizes <strong>WILL BE LOST</strong>. After upgrading, dashboards will contain small widgets that you must reposition and resize manually.</span>
+    <span class="warning"><strong>Note:</strong> Widget positions, order, and sizes <strong>WILL BE LOST</strong>. After upgrading, pages will contain small widgets that you must reposition and resize manually.</span>
   </li>
 </ul>
 
@@ -76,7 +67,7 @@
     </ul>
   </li>
   <li>Click the <strong>Upgrade</strong> button below.</li>
-  <li>Once the upgrade is complete, KIP will restart and display the migrated dashboards.</li>
+  <li>Once the upgrade is complete, KIP will restart and display the migrated pages.</li>
   <li>Reposition and resize your widgets as needed.</li>
   <li>Once satisfied, delete the <code>9.0.0.json</code> configuration files located in the previously mentioned folders. They are not needed any more.</li>
 </ol>

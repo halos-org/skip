@@ -130,7 +130,7 @@ export class AppHelpComponent {
   }
 
   protected closePage(): void {
-    this._router.navigate(['/dashboard']);
+    this._router.navigate(['/page']);
   }
 
   private resolveSelectedFile(page: string | null, files: HelpMenuEntry[]): string {

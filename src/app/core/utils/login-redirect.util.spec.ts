@@ -3,8 +3,8 @@ import { isSafeReturnTo, buildLoginRedirectUrl } from './login-redirect.util';
 
 describe('isSafeReturnTo', () => {
   it('accepts a site-relative path', () => {
-    expect(isSafeReturnTo('/dashboard')).toBe(true);
-    expect(isSafeReturnTo('/dashboard/2?foo=bar')).toBe(true);
+    expect(isSafeReturnTo('/page')).toBe(true);
+    expect(isSafeReturnTo('/page/2?foo=bar')).toBe(true);
   });
 
   it('rejects empty / non-string', () => {
@@ -46,18 +46,18 @@ describe('isSafeReturnTo', () => {
 
   it('rejects the hash-routed login self-route (hash routing puts /login in the fragment)', () => {
     expect(isSafeReturnTo('/#/login')).toBe(false);
-    expect(isSafeReturnTo('/#/login?returnTo=%2Fdashboard')).toBe(false);
+    expect(isSafeReturnTo('/#/login?returnTo=%2Fpage')).toBe(false);
   });
 
   it('accepts a non-login hash route', () => {
-    expect(isSafeReturnTo('/#/dashboard/0')).toBe(true);
+    expect(isSafeReturnTo('/#/page/0')).toBe(true);
   });
 });
 
 describe('buildLoginRedirectUrl', () => {
   it('appends a validated returnTo to a query-style (OIDC) login URL', () => {
-    const url = buildLoginRedirectUrl({ loginUrl: '/signalk/v1/auth/oidc/login', returnTo: '/dashboard' });
-    expect(url).toBe('/signalk/v1/auth/oidc/login?returnTo=%2Fdashboard');
+    const url = buildLoginRedirectUrl({ loginUrl: '/signalk/v1/auth/oidc/login', returnTo: '/page' });
+    expect(url).toBe('/signalk/v1/auth/oidc/login?returnTo=%2Fpage');
   });
 
   it('drops an unsafe returnTo but still returns the login URL', () => {

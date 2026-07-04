@@ -193,7 +193,7 @@ export class ConfigurationUpgradeService {
 
       const dashboards: Dashboard[] = rootSplits.map((rootSplitUUID: string, i: number) => {
         const configuration = this.extractWidgetsFromSplitSets(splitSets, widgets, rootSplitUUID);
-        return { id: rootSplitUUID, name: `Dashboard ${i + 1}`, configuration };
+        return { id: rootSplitUUID, name: `Page ${i + 1}`, configuration };
       });
 
       this.migrateUseNeedleToEnableNeedle(dashboards);
@@ -265,7 +265,7 @@ export class ConfigurationUpgradeService {
     const widgets = config.widget?.widgets || [];
     const dashboards: Dashboard[] = rootSplits.map((rootSplitUUID: string, i: number) => {
       const configuration = this.extractWidgetsFromSplitSets(splitSets, widgets, rootSplitUUID);
-      return { id: rootSplitUUID, name: `Dashboard ${i + 1}`, configuration };
+      return { id: rootSplitUUID, name: `Page ${i + 1}`, configuration };
     });
     this.migrateUseNeedleToEnableNeedle(dashboards);
     const oldConf: v10IConfig = cloneDeep(config);

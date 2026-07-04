@@ -8,15 +8,12 @@ See [History-API Provider](#/help/history-api.md) in the Integrations help menu 
 
 ## What KIP Does With History
 - Pre-seeds Data Chart and Wind Trends so they show recent trends immediately on open.
-- Provides a pop-up historical view for numeric-value widgets on your dashboards.
+- Provides a pop-up historical view for numeric-value widgets on your pages.
 
 The detail and time span available depend entirely on what your provider has recorded and how it is configured.
 
 ## Accessing the History Chart
-Open the pop-up history chart directly from a locked dashboard:
-
-- **Touch devices:** Two-finger tap a numeric value widget.
-- **Desktop / mouse:** Right-click a numeric value widget, or two-finger click on trackpads.
+On a **locked page** (normal viewing mode), **press and hold (long-press)** a numeric value widget to open its pop-up history chart directly — no edit mode, no menu. This is the only way to open it; interactive widgets keep single-tap for their own control, so long-press is the history gesture there too.
 
 The pop-up chart displays recorded data only (no live-stream overlay), across a fixed set of time windows: the last 15 minutes, 1 hour, 8 hours, or 24 hours. For more flexible analytics, use a purpose-built platform such as Grafana.
 
