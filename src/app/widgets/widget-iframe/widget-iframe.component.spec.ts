@@ -24,10 +24,10 @@ function gestureFrom(
   );
 }
 
-function mount(url: string | null = EMBED_URL) {
+function mount(url: string | null = EMBED_URL, isStatic = true) {
   const options = signal<IWidgetSvcConfig | undefined>({ widgetUrl: url, allowInput: true });
   const dashboard = {
-    isDashboardStatic: () => true,
+    isDashboardStatic: () => isStatic,
     navigateToNextDashboard: vi.fn(),
     navigateToPreviousDashboard: vi.fn()
   };
@@ -73,8 +73,29 @@ describe('WidgetIframeComponent', () => {
     expect(dashboard.navigateToNextDashboard).toHaveBeenCalledTimes(1);
   });
 
+  it('navigates to the previous page on a rightward gesture from its own iframe', () => {
+    const { fixture, dashboard } = mount();
+    gestureFrom('swiperight', iframeWindow(fixture), window.location.origin);
+    expect(dashboard.navigateToPreviousDashboard).toHaveBeenCalledTimes(1);
+  });
+
   it('reveals the chrome on an upward gesture from its own iframe', () => {
     const { fixture, chrome } = mount();
+    gestureFrom('swipeup', iframeWindow(fixture), window.location.origin);
+    expect(chrome.reveal).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the chrome on a downward gesture from its own iframe', () => {
+    const { fixture, chrome } = mount();
+    gestureFrom('swipedown', iframeWindow(fixture), window.location.origin);
+    expect(chrome.hide).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not page-navigate on a horizontal gesture while the dashboard is unlocked', () => {
+    const { fixture, dashboard, chrome } = mount(EMBED_URL, false);
+    gestureFrom('swipeleft', iframeWindow(fixture), window.location.origin);
+    expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+    // vertical chrome intent is not gated on lock state
     gestureFrom('swipeup', iframeWindow(fixture), window.location.origin);
     expect(chrome.reveal).toHaveBeenCalledTimes(1);
   });
