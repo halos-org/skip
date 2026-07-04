@@ -2,7 +2,6 @@ import { Component, inject, Type, ViewChild, ViewContainerRef, Input, effect, Co
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
 import { GestureDirective } from '../../directives/gesture.directive';
-import { TwoFingerTapDirective } from '../../directives/two-finger-tap.directive';
 import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { IWidget, IWidgetPath, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 import type { NgCompInputs, NgGridStackWidget } from 'gridstack/dist/angular';
@@ -32,7 +31,7 @@ type TOverlayGate = 'history' | 'options' | 'sheet';
 
 @Component({
   selector: 'widget-host2',
-  imports: [MatCardModule, MatBottomSheetModule, GestureDirective, TwoFingerTapDirective],
+  imports: [MatCardModule, MatBottomSheetModule, GestureDirective],
   templateUrl: './widget-host2.component.html',
   styleUrl: './widget-host2.component.scss',
   hostDirectives: [
@@ -376,32 +375,11 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   }
 
   /**
-   * Opens the locked-mode history chart dialog using the widget's resolved historical series.
-   *
-   * @param {MouseEvent} event Browser context menu event.
-   * @returns {void}
-   *
-   * @example
-   * this.openWidgetHistoryDialog(event);
+   * Long-press on a locked dashboard opens the widget's history chart directly.
+   * Gating (locked-only + history eligibility) lives in the internal opener, so
+   * a long-press on a non-eligible widget is a silent no-op.
    */
-  public openWidgetHistoryDialog(event: MouseEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    void this.openWidgetHistoryDialogInternal();
-  }
-
-  /**
-   * Handles a two-finger tap gesture and opens the locked-mode history dialog.
-   *
-   * @param event Pointer event emitted by TwoFingerTapDirective.
-   * @returns void
-   *
-   * @example
-   * this.onHistoryTwoFingerTap(event);
-   */
-  public onHistoryTwoFingerTap(event: PointerEvent): void {
-    event.preventDefault();
+  public onWidgetLongPress(event: Event | CustomEvent): void {
     event.stopPropagation();
 
     void this.openWidgetHistoryDialogInternal();

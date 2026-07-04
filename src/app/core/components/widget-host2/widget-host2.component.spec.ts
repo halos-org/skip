@@ -15,20 +15,6 @@ import { UnitsService } from '../../services/units.service';
 import { KipSeriesApiClientService } from '../../services/kip-series-api-client.service';
 import { IWidget } from '../../interfaces/widgets-interface';
 
-function createPointerUpTouchEvent(init: PointerEventInit): PointerEvent {
-    if (typeof PointerEvent !== 'undefined') {
-        return new PointerEvent('pointerup', { bubbles: true, cancelable: true, ...init });
-    }
-
-    const event = new Event('pointerup', { bubbles: true, cancelable: true }) as PointerEvent;
-    Object.defineProperty(event, 'pointerId', { value: init.pointerId ?? 1 });
-    Object.defineProperty(event, 'pointerType', { value: init.pointerType ?? 'touch' });
-    Object.defineProperty(event, 'clientX', { value: init.clientX ?? 0 });
-    Object.defineProperty(event, 'clientY', { value: init.clientY ?? 0 });
-    Object.defineProperty(event, 'isPrimary', { value: init.isPrimary ?? true });
-    return event;
-}
-
 class DashboardServiceStub {
     public readonly isDashboardStatic = signal<boolean>(true);
     public readonly layoutEditCanceled = signal<number>(0);
@@ -123,7 +109,11 @@ describe('WidgetHost2Component', () => {
                 { provide: DashboardHistorySeriesSyncService, useValue: historySyncMock },
                 { provide: KipSeriesApiClientService, useValue: kipSeriesMock }
             ]
-        }).compileComponents();
+        })
+            // MatBottomSheet is pulled in via the component's MatBottomSheetModule import,
+            // which shadows a plain provider; overrideProvider forces the mock to win.
+            .overrideProvider(MatBottomSheet, { useValue: bottomSheetMock })
+            .compileComponents();
 
         fixture = TestBed.createComponent(WidgetHost2Component);
         component = fixture.componentInstance;
@@ -151,11 +141,10 @@ describe('WidgetHost2Component', () => {
         }).widgetProperties = testWidget;
     });
 
-    it('opens history dialog from context menu when dashboard is locked', async () => {
+    it('opens history dialog on long-press when dashboard is locked', async () => {
         dashboard.isDashboardStatic.set(true);
-        const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
 
-        component.openWidgetHistoryDialog(event);
+        component.onWidgetLongPress(new CustomEvent('press'));
         await Promise.resolve();
 
         expect(historySyncMock.resolveSeriesForWidget).toHaveBeenCalledWith(testWidget);
@@ -166,11 +155,10 @@ describe('WidgetHost2Component', () => {
         }));
     });
 
-    it('does not open history dialog from context menu when dashboard is unlocked', async () => {
+    it('does not open history dialog on long-press when dashboard is unlocked', async () => {
         dashboard.isDashboardStatic.set(false);
-        const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
 
-        component.openWidgetHistoryDialog(event);
+        component.onWidgetLongPress(new CustomEvent('press'));
         await Promise.resolve();
 
         expect(historySyncMock.resolveSeriesForWidget).not.toHaveBeenCalled();
@@ -185,20 +173,20 @@ describe('WidgetHost2Component', () => {
         expect(dialogServiceMock.openWidgetOptions).not.toHaveBeenCalled();
     });
 
-    it('opens history dialog from explicit two-finger tap when dashboard is locked', async () => {
+    it('opens the action popup on single-tap when the dashboard is unlocked', () => {
+        dashboard.isDashboardStatic.set(false);
+
+        component.openBottomSheet(new CustomEvent('tap'));
+
+        expect(bottomSheetMock.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not open the action popup on single-tap when the dashboard is locked', () => {
         dashboard.isDashboardStatic.set(true);
 
-        component.onHistoryTwoFingerTap(createPointerUpTouchEvent({
-            pointerId: 10,
-            pointerType: 'touch',
-            clientX: 20,
-            clientY: 20,
-            isPrimary: true
-        }));
-        await Promise.resolve();
+        component.openBottomSheet(new CustomEvent('tap'));
 
-        expect(historySyncMock.resolveSeriesForWidget).toHaveBeenCalledWith(testWidget);
-        expect(dialogServiceMock.openWidgetHistoryDialog).toHaveBeenCalledTimes(1);
+        expect(bottomSheetMock.open).not.toHaveBeenCalled();
     });
 
     it('does not open history dialog when widget has no numeric paths', async () => {
@@ -214,7 +202,7 @@ describe('WidgetHost2Component', () => {
             }
         };
 
-        component.openWidgetHistoryDialog(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        component.onWidgetLongPress(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await Promise.resolve();
 
         expect(dialogServiceMock.openWidgetHistoryDialog).not.toHaveBeenCalled();
@@ -224,7 +212,7 @@ describe('WidgetHost2Component', () => {
         dashboard.isDashboardStatic.set(true);
         testWidget.config.supportAutomaticHistoricalSeries = false;
 
-        component.openWidgetHistoryDialog(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        component.onWidgetLongPress(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await Promise.resolve();
 
         expect(dialogServiceMock.openWidgetHistoryDialog).not.toHaveBeenCalled();
@@ -245,7 +233,7 @@ describe('WidgetHost2Component', () => {
             }
         ]);
 
-        component.openWidgetHistoryDialog(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        component.onWidgetLongPress(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await Promise.resolve();
 
         expect(dialogServiceMock.openWidgetHistoryDialog).not.toHaveBeenCalled();
@@ -281,7 +269,7 @@ describe('WidgetHost2Component', () => {
             }
         ]);
 
-        component.openWidgetHistoryDialog(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        component.onWidgetLongPress(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await Promise.resolve();
         await Promise.resolve();
 
@@ -322,7 +310,7 @@ describe('WidgetHost2Component', () => {
             }
         ]);
 
-        component.openWidgetHistoryDialog(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        component.onWidgetLongPress(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await Promise.resolve();
         await Promise.resolve();
 
