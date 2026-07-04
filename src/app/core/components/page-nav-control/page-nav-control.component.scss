@@ -1,0 +1,11 @@
+:host {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.page-tile {
+  flex: 0 0 auto;
+}
