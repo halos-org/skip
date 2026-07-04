@@ -13,7 +13,7 @@
  * - Diagnostics are gated by a runtime flag (default enabled) and can be toggled via console helper / localStorage.
  *
  * Supported gestures (emitted events):
- * - swipeleft, swiperight, swipeup, swipedown, press, doubletap
+ * - swipeleft, swiperight, swipeup, swipedown, press, doubletap, tap (opt-in via `enableTap`)
  */
 import { Directive, DestroyRef, ElementRef, inject, input, output } from '@angular/core';
 import { GESTURES_DEBUG_KEY } from '../constants/config-storage.const';
@@ -118,8 +118,8 @@ export class GestureDirective {
   enablePress = input(true);
   /** Enable/disable doubletap gesture (honored in modes that allow doubletap). */
   enableDoubleTap = input(true);
-  /** When true, also dispatch document-level UI events for horizontal swipes (openLeftSidenav/openRightSidenav). */
-  bridgeUiEvents = input(false);
+  /** Enable/disable single-tap gesture (opt-in; honored in modes that allow press). */
+  enableTap = input(false);
 
   // Dynamically adjusted gesture thresholds (set on pointerdown)
   private _swipeMinDistance = 30;
@@ -142,6 +142,8 @@ export class GestureDirective {
   press = output<CustomEvent<{ x: number; y: number; center?: { x: number; y: number } }>>();
   /** Emitted on a double-tap. Event.detail contains { x, y, dt }. */
   doubletap = output<CustomEvent<{ x: number; y: number; dt: number }>>();
+  /** Emitted on a single tap (opt-in via `enableTap`). Event.detail contains { x, y, center }. */
+  tap = output<CustomEvent<{ x: number; y: number; center: { x: number; y: number } }>>();
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject(ElementRef<HTMLElement>);
@@ -919,6 +921,11 @@ export class GestureDirective {
       this.lastTapUpTime = endTime;
       this.lastTapUpX = ev.clientX;
       this.lastTapUpY = ev.clientY;
+      // Emit the single-tap gesture (opt-in). Lane ownership arbitrates grid vs.
+      // widget so only the innermost host that owns the press/tap lane fires.
+      if (this.ownedLanes.p && this.modeAllowsTap()) {
+        this.emitTapEvent({ x: ev.clientX, y: ev.clientY, center: { x: ev.clientX, y: ev.clientY } });
+      }
     } else {
       // Reset potential double tap tracking if gesture was swipe or press
       this.potentialDoubleTap = false;
@@ -1105,13 +1112,6 @@ export class GestureDirective {
     const evt = new CustomEvent(name, { detail, bubbles: true, composed: true });
     try { this.host.nativeElement.dispatchEvent(evt); } catch { /* ignore */ }
     this.debug('emitSwipeEvent', { name, detail });
-    // Optional bridge to global UI events for app shell listeners
-    if (this.bridgeUiEvents() && (name === 'swipeleft' || name === 'swiperight')) {
-      try {
-        const bridge = name === 'swipeleft' ? 'openLeftSidenav' : 'openRightSidenav';
-        document.dispatchEvent(new CustomEvent(bridge, { detail }));
-      } catch { /* ignore */ }
-    }
     switch (name) {
       case 'swipeleft': this.swipeleft.emit(evt as CustomEvent<{ dx: number; dy: number; duration: number }>); break;
       case 'swiperight': this.swiperight.emit(evt as CustomEvent<{ dx: number; dy: number; duration: number }>); break;
@@ -1142,6 +1142,11 @@ export class GestureDirective {
     this.doubletap.emit(evt as CustomEvent<{ x: number; y: number; dt: number }>);
   }
 
+  private emitTapEvent(detail: { x: number; y: number; center: { x: number; y: number } }) {
+    (detail as unknown as { __gid?: number }).__gid = this._instanceId;
+    this.tap.emit(new CustomEvent('tap', { detail }));
+  }
+
   // Mode helpers
   private modeAllowsHorizontal(): boolean {
     const m = this.mode();
@@ -1165,6 +1170,12 @@ export class GestureDirective {
     // no doubletap in 'horizontal' mode to avoid global capture of taps
     const allows = m === 'all' || m === 'dashboard' || m === 'press' || m === 'editor';
     return allows && this.enableDoubleTap();
+  }
+  private modeAllowsTap(): boolean {
+    const m = this.mode();
+    if (this.disableGestures()) return false;
+    const allows = m === 'all' || m === 'dashboard' || m === 'press' || m === 'editor';
+    return allows && this.enableTap();
   }
 
   // ----------- Diagnostics helpers (debug only) -----------
