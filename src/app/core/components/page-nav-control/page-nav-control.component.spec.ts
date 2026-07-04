@@ -32,13 +32,19 @@ describe('PageNavControlComponent', () => {
     return Array.from(fixture.nativeElement.querySelectorAll('tile-large-icon'));
   }
 
+  // aria-current lives on the focusable inner control, not the tile host, so it
+  // is announced when a screen-reader user focuses the page.
+  function tileButton(index: number): HTMLElement {
+    return tiles()[index].querySelector('[role="button"]') as HTMLElement;
+  }
+
   it('renders one icon per page', () => {
     expect(tiles().length).toBe(3);
   });
 
   it('marks the active page with aria-current', () => {
     expect(fixture.nativeElement.querySelectorAll('[aria-current="page"]').length).toBe(1);
-    expect(tiles()[1].getAttribute('aria-current')).toBe('page');
+    expect(tileButton(1).getAttribute('aria-current')).toBe('page');
   });
 
   it('labels a page without a name using a Page N fallback', () => {
@@ -55,7 +61,7 @@ describe('PageNavControlComponent', () => {
   it('reflects the active index reactively', () => {
     activeDashboard.set(0);
     fixture.detectChanges();
-    expect(tiles()[0].getAttribute('aria-current')).toBe('page');
-    expect(tiles()[1].getAttribute('aria-current')).toBeNull();
+    expect(tileButton(0).getAttribute('aria-current')).toBe('page');
+    expect(tileButton(1).getAttribute('aria-current')).toBeNull();
   });
 });

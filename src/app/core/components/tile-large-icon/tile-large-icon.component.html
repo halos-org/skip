@@ -2,6 +2,7 @@
   tabindex="0"
   role="button"
   [attr.aria-pressed]="active()"
+  [attr.aria-current]="ariaCurrent() ? 'page' : null"
   [attr.aria-label]="iconOnly() ? label() : null"
   [class]="`${compact() ? 'icon-container-compact' : 'icon-container'}`"
   [class.active-container-accent]="active()"

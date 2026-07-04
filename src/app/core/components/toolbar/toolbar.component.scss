@@ -56,6 +56,13 @@
   pointer-events: auto;
 }
 
+.peek-strip:focus-visible {
+  opacity: 0.92;
+  transform: translateY(0);
+  outline: 2px solid var(--mat-sys-on-surface, #e6e6e6);
+  outline-offset: -2px;
+}
+
 // Night mode dims the app to a warm cast; a bright blue cue fights it, so
 // recolor the edge-peek to the amber accent already used in night mode.
 :host-context(.night-theme) .peek-strip {
