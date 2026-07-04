@@ -215,7 +215,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   /** Navigate pages, honoring locked mode and suppressing during a drag. */
   protected pageNav(direction: PageNavDirection): void {
-    if (!this._dashboard.isDashboardStatic() || this._uiEvent.isDragging()) return;
+    if (!this.dashboardVisible() || !this._dashboard.isDashboardStatic() || this._uiEvent.isDragging()) return;
     if (direction === 'next') this._dashboard.navigateToNextDashboard();
     else this._dashboard.navigateToPreviousDashboard();
   }

@@ -6,7 +6,7 @@
   [enableDoubleTap]="false"
   kipScrollNav
   [navEnabled]="dashboardStatic()"
-  [suspended]="isDragging()"
+  [suspended]="!dashboardVisible() || isDragging()"
   (swipeup)="onChromeIntent('reveal')"
   (swipedown)="onChromeIntent('hide')"
   (swipeleft)="pageNav('next')"
@@ -16,7 +16,9 @@
   (pointerdown)="chrome.pulsePeek()"
   (mousemove)="onMouseActivity()"
 >
-  <app-toolbar />
+  @if (dashboardVisible()) {
+    <app-toolbar />
+  }
   <router-outlet class="router-outlet-container" />
 </div>
 
