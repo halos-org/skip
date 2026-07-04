@@ -3,7 +3,6 @@ import { GestureDirective } from '../../directives/gesture.directive';
 import { GridstackComponent, NgGridStackWidget, NgGridStackOptions, } from 'gridstack/dist/angular';
 import { GridItemHTMLElement, GridStackOptions } from 'gridstack';
 import { DashboardService, widgetOperation } from '../../services/dashboard.service';
-import { DashboardScrollerComponent } from "../dashboard-scroller/dashboard-scroller.component";
 import { UUID } from '../../utils/uuid.util';
 import { ToastService } from '../../services/toast.service';
 import { MatIconModule } from '@angular/material/icon';
@@ -31,7 +30,7 @@ interface GridApi {
 @Component({
   selector: 'dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GridstackComponent, DashboardScrollerComponent, MatIconModule, MatButtonModule, GestureDirective, ActionMenuComponent],
+  imports: [GridstackComponent, MatIconModule, MatButtonModule, GestureDirective, ActionMenuComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   host: {
