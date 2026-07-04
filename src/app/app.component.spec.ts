@@ -24,7 +24,7 @@ describe('AppComponent', () => {
 
   let dashboard: {
     isDashboardStatic: ReturnType<typeof signal<boolean>>;
-    activeDashboard: ReturnType<typeof signal<number>>;
+    activeDashboard: ReturnType<typeof signal<number | null>>;
     dashboards: ReturnType<typeof signal<unknown[]>>;
     navigateToNextDashboard: ReturnType<typeof vi.fn>;
     navigateToPreviousDashboard: ReturnType<typeof vi.fn>;
@@ -48,7 +48,7 @@ describe('AppComponent', () => {
   beforeEach(async () => {
     dashboard = {
       isDashboardStatic: signal(true),
-      activeDashboard: signal(0),
+      activeDashboard: signal<number | null>(null),
       dashboards: signal([]),
       navigateToNextDashboard: vi.fn(),
       navigateToPreviousDashboard: vi.fn(),
@@ -132,6 +132,45 @@ describe('AppComponent', () => {
       expect(dashboard.setStaticDashboard).toHaveBeenCalledTimes(1);
       expect(uiEvent.toggleFullScreen).toHaveBeenCalledTimes(1);
       expect(appService.toggleNightMode).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('page-change toolbar reveal', () => {
+    it('reveals the toolbar when the active page changes', () => {
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      chrome.reveal.mockClear();
+
+      dashboard.activeDashboard.set(1);
+      fixture.detectChanges();
+
+      expect(chrome.reveal).toHaveBeenCalledTimes(1);
+    });
+
+    it('reveals again on each subsequent page change', () => {
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      dashboard.activeDashboard.set(1);
+      fixture.detectChanges();
+      chrome.reveal.mockClear();
+
+      dashboard.activeDashboard.set(2);
+      fixture.detectChanges();
+
+      expect(chrome.reveal).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reveal on a transition to no active page', () => {
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      dashboard.activeDashboard.set(1);
+      fixture.detectChanges();
+      chrome.reveal.mockClear();
+
+      dashboard.activeDashboard.set(null);
+      fixture.detectChanges();
+
+      expect(chrome.reveal).not.toHaveBeenCalled();
     });
   });
 
