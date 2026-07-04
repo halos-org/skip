@@ -1,44 +1,37 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, viewChild } from '@angular/core';
 import { GestureDirective } from '../../directives/gesture.directive';
 import { Dashboard, DashboardService } from '../../services/dashboard.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { DialogService } from '../../services/dialog.service';
-import { CdkDropList, CdkDrag, CdkDragDrop, CdkDragMove, moveItemInArray } from '@angular/cdk/drag-drop';
-import { DashboardsBottomSheetComponent } from '../dashboards-bottom-sheet/dashboards-bottom-sheet.component';
-import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
+import { CdkDropList, CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { uiEventService } from '../../services/uiEvent.service';
 import { MatRippleModule } from '@angular/material/core';
-import { DomSanitizer } from '@angular/platform-browser';
+import { ActionMenuComponent } from '../action-menu/action-menu.component';
+import { ActionMenuItem } from '../action-menu/action-menu-item';
 
 
 @Component({
   selector: 'dashboards-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatBottomSheetModule, MatButtonModule, MatIconModule, CdkDropList, CdkDrag, MatRippleModule, GestureDirective],
+  imports: [MatButtonModule, MatIconModule, CdkDropList, CdkDrag, MatRippleModule, GestureDirective, ActionMenuComponent],
   templateUrl: './dashboards-editor.component.html',
-  styleUrl: './dashboards-editor.component.scss',
-  host: {
-    '(document:mouseup)': 'onPointerRelease()',
-    '(document:touchend)': 'onPointerRelease()'
-  }
+  styleUrl: './dashboards-editor.component.scss'
 })
 export class DashboardsEditorComponent {
-  protected readonly pageTitle = 'Dashboards';
-  private _bottomSheet = inject(MatBottomSheet);
   protected _dashboard = inject(DashboardService);
   private _uiEvent = inject(uiEventService);
   private _dialog = inject(DialogService);
-  private _sanitizer = inject(DomSanitizer);
-  /** True while bottom sheet open */
-  protected _sheetOpen = false;
-  /** Suppress starting a drag after a press consumed the pointer */
-  protected suppressDrag = false;
 
-  // Drag / press coordination flags
-  private _dragActive = false;       // true between dragStart and dragEnd
-  private _dragMoved = false;        // becomes true once movement surpasses threshold
-  private readonly _dragSuppressThresholdPx = 4; // movement to treat as a real drag
+  private readonly _actionMenu = viewChild.required(ActionMenuComponent);
+  /** The tile whose action menu is currently open. */
+  private _menuIndex = -1;
+
+  protected readonly pageActions: ActionMenuItem[] = [
+    { id: 'edit', label: 'Edit', icon: 'edit' },
+    { id: 'duplicate', label: 'Duplicate', icon: 'content_copy' },
+    { id: 'delete', label: 'Delete', icon: 'delete_forever' }
+  ];
 
   protected addDashboard(): void {
     this._dialog.openDashboardPageEditorDialog({
@@ -53,34 +46,49 @@ export class DashboardsEditorComponent {
     });
   }
 
-  protected openBottomSheet(index: number): void {
-    if (this._sheetOpen) {
-      return; // guard against re-entrancy / duplicate opens
-    }
-    this._sheetOpen = true;
-    // Detect Linux Firefox for workaround
-    const isLinuxFirefox = typeof navigator !== 'undefined' &&
-      /Linux/.test(navigator.platform) &&
-      /Firefox/.test(navigator.userAgent);
-    const sheetRef = this._bottomSheet.open(DashboardsBottomSheetComponent, isLinuxFirefox ? { disableClose: true, data: { showCancel: true } } : {});
-    sheetRef.afterDismissed().subscribe((action) => {
-      this._sheetOpen = false;
-      switch (action) {
-        case 'delete':
-          this.deleteDashboard(index);
-          break;
-
-        case 'duplicate':
-          this.duplicateDashboard(index, `${this._dashboard.dashboards()[index].name}`);
-          break;
-
-        default:
-          break;
-      }
-    });
+  /**
+   * A single tap on a page tile opens its action menu at the tap point. Tap vs.
+   * drag is arbitrated by the gesture directive's movement threshold — a reorder
+   * moves past the tap slop and emits no tap, so it never reaches here. (Gating
+   * on the shared isDragging signal instead would swallow a legitimate tap whose
+   * minor travel already tripped cdkDrag's lower start threshold.)
+   */
+  protected onTileTap(index: number, e: Event | CustomEvent): void {
+    const center = (e as CustomEvent).detail?.center as { x: number; y: number } | undefined;
+    this.openMenu(index, center?.x ?? 0, center?.y ?? 0);
   }
 
-  protected editDashboard(itemIndex: number): void {
+  /** Keyboard equivalent: open the action menu centered on the focused tile. */
+  protected onTileKey(index: number, e: Event): void {
+    e.preventDefault();
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    this.openMenu(index, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  private openMenu(index: number, x: number, y: number): void {
+    this._menuIndex = index;
+    this._actionMenu().open(x, y);
+  }
+
+  protected onPageAction(id: string): void {
+    const index = this._menuIndex;
+    if (index < 0 || index >= this._dashboard.dashboards().length) return;
+    switch (id) {
+      case 'edit':
+        this.editDashboard(index);
+        break;
+      case 'duplicate':
+        this.duplicateDashboard(index, this._dashboard.dashboards()[index].name);
+        break;
+      case 'delete':
+        this.confirmDelete(index);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private editDashboard(itemIndex: number): void {
     const dashboard = this._dashboard.dashboards()[itemIndex];
     this._dialog.openDashboardPageEditorDialog({
       title: 'Page Options',
@@ -94,11 +102,7 @@ export class DashboardsEditorComponent {
     });
   }
 
-  protected deleteDashboard(index: number): void {
-    this._dashboard.delete(index);
-  }
-
-  protected duplicateDashboard(itemIndex: number, currentName: string): void {
+  private duplicateDashboard(itemIndex: number, currentName: string): void {
     const originalDashboard = this._dashboard.dashboards()[itemIndex];
     this._dialog.openDashboardPageEditorDialog({
       title: 'Duplicate Page',
@@ -109,6 +113,18 @@ export class DashboardsEditorComponent {
     }).afterClosed().subscribe(data => {
       if (!data) { return } //clicked cancel
       this._dashboard.duplicate(itemIndex, data.name, data.icon);
+    });
+  }
+
+  private confirmDelete(itemIndex: number): void {
+    const name = this._dashboard.dashboards()[itemIndex].name;
+    this._dialog.openConfirmationDialog({
+      title: 'Delete Page',
+      message: `Delete the "${name}" page and all its widgets?`,
+      confirmBtnText: 'Delete',
+      cancelBtnText: 'Cancel'
+    }).subscribe(confirmed => {
+      if (confirmed) this._dashboard.delete(itemIndex);
     });
   }
 
@@ -134,52 +150,10 @@ export class DashboardsEditorComponent {
   }
 
   protected dragStart(): void {
-    if (this._sheetOpen || this.suppressDrag) return; // block drag while sheet open or suppressed
     this._uiEvent.isDragging.set(true);
-    this._dragActive = true;
-    this._dragMoved = false; // reset for new gesture
   }
 
   protected dragEnd(): void {
     this._uiEvent.isDragging.set(false);
-    this._dragActive = false;
-    // Reset movement flag shortly after drag end so future presses work.
-    // Timeout lets finish any internal gesture state before we allow a new press.
-    setTimeout(() => { this._dragMoved = false; }, 60);
-  }
-
-  protected onDragMoved(ev: CdkDragMove<unknown>): void {
-    if (!this._dragActive || this._dragMoved) return;
-    const dist = Math.hypot(ev.distance.x, ev.distance.y);
-    if (dist > this._dragSuppressThresholdPx) {
-      this._dragMoved = true;
-    }
-  }
-
-  protected onPress(index: number): void {
-    // Avoid passive listener warnings and duplicate opens; no need to preventDefault/stopPropagation here
-    if (this._sheetOpen) return;
-    // Suppress press if an actual drag movement occurred
-    if (this._dragMoved) return;
-    // Cancel pointer sequence so moving while holding does not initiate drag
-    this.cancelPointerSequence();
-    this.openBottomSheet(index);
-  }
-
-  private cancelPointerSequence(): void {
-    this.suppressDrag = true;
-    this._dragActive = false;
-    this._dragMoved = false;
-    // Dispatch synthetic pointer end events to end any potential drag tracking
-    ['pointerup', 'mouseup', 'touchend'].forEach(type => {
-      document.dispatchEvent(new Event(type, { bubbles: true }));
-    });
-  }
-
-  protected onPointerRelease(): void {
-    // Allow future drags after actual release, but only if sheet not open
-    if (!this._sheetOpen) {
-      this.suppressDrag = false;
-    }
   }
 }

@@ -3,18 +3,18 @@
     <div class="dashboard-card dashboard-item"
       kipGestures
       [mode]="'editor'"
-      [disableGestures]="_sheetOpen || suppressDrag"
+      [enableTap]="true"
+      [enablePress]="false"
+      [enableDoubleTap]="false"
       matRipple
       cdkDrag
-      [cdkDragDisabled]="_sheetOpen || suppressDrag"
       cdkDragBoundary=".dashboard-manage"
-      (cdkDragStarted)="dragStart()" (cdkDragMoved)="onDragMoved($event)" (cdkDragEnded)="dragEnd()"
-      (press)="onPress(index)"
-      (doubletap)="editDashboard(index)"
+      (cdkDragStarted)="dragStart()" (cdkDragEnded)="dragEnd()"
+      (tap)="onTileTap(index, $event)"
       tabindex="0"
       [attr.aria-label]="dashboard.name"
-      (keydown.enter)="editDashboard(index)"
-      (keydown.space)="onPress(index)">
+      (keydown.enter)="onTileKey(index, $event)"
+      (keydown.space)="onTileKey(index, $event)">
       <div class="item-index">{{index + 1}}</div>
       <div >
         <mat-icon class="dashboard-icon"
@@ -34,3 +34,5 @@
     <p style="margin-top: 10px;"><i>Add Page</i></p>
   </div>
 </div>
+
+<action-menu #actionMenu [items]="pageActions" (selected)="onPageAction($event)" />
