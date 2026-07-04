@@ -45,7 +45,7 @@
   box-shadow: 0 1px 8px 0 var(--mat-sys-primary, #6ea8fe);
   opacity: 0;
   transform: translateY(-100%);
-  transition: transform 160ms ease, opacity 160ms ease;
+  transition: transform 300ms ease, opacity 300ms ease;
   pointer-events: none;
   cursor: pointer;
 }

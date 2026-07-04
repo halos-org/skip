@@ -6,7 +6,7 @@ import { Injectable, signal } from '@angular/core';
  */
 export const CHROME_BOOT_DWELL_MS = 4000;
 export const CHROME_IDLE_HIDE_MS = 4000;
-export const CHROME_PEEK_MS = 900;
+export const CHROME_PEEK_MS = 1300;
 
 /**
  * Owns the ephemeral visibility state of the top navigation toolbar.
