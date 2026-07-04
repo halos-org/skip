@@ -1,9 +1,7 @@
-import { Component, inject, Type, ViewChild, ViewContainerRef, Input, effect, ComponentRef, OnDestroy, OnInit, untracked, ChangeDetectionStrategy, inputBinding, computed, signal } from '@angular/core';
+import { Component, inject, Type, ViewChild, ViewContainerRef, Input, effect, ComponentRef, OnDestroy, OnInit, untracked, ChangeDetectionStrategy, inputBinding, computed, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
 import { GestureDirective } from '../../directives/gesture.directive';
-import { TwoFingerTapDirective } from '../../directives/two-finger-tap.directive';
-import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { IWidget, IWidgetPath, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 import type { NgCompInputs, NgGridStackWidget } from 'gridstack/dist/angular';
 import { BaseWidget } from 'gridstack/dist/angular';
@@ -13,7 +11,8 @@ import { WidgetMetadataDirective } from '../../directives/widget-metadata.direct
 import { WidgetRuntimeDirective } from '../../directives/widget-runtime.directive';
 import { DialogService } from '../../services/dialog.service';
 import { DashboardService } from '../../services/dashboard.service';
-import { WidgetHostBottomSheetComponent } from '../widget-host-bottom-sheet/widget-host-bottom-sheet.component';
+import { ActionMenuComponent } from '../action-menu/action-menu.component';
+import { WIDGET_ACTIONS } from '../action-menu/widget-actions';
 import { WidgetService } from '../../services/widget.service';
 import { AppService } from '../../services/app-service';
 import { DashboardHistorySeriesSyncService } from '../../services/dashboard-history-series-sync.service';
@@ -28,11 +27,11 @@ import { uiEventService } from '../../services/uiEvent.service';
 // If absent, Host2 will create & immediately destroy a temp instance to read instance.defaultConfig.
 interface WidgetViewComponentBase { defaultConfig?: IWidgetSvcConfig }
 
-type TOverlayGate = 'history' | 'options' | 'sheet';
+type TOverlayGate = 'history' | 'options';
 
 @Component({
   selector: 'widget-host2',
-  imports: [MatCardModule, MatBottomSheetModule, GestureDirective, TwoFingerTapDirective],
+  imports: [MatCardModule, GestureDirective, ActionMenuComponent],
   templateUrl: './widget-host2.component.html',
   styleUrl: './widget-host2.component.scss',
   hostDirectives: [
@@ -63,7 +62,8 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   @ViewChild('childOutlet', { read: ViewContainerRef, static: true }) private outlet!: ViewContainerRef;
   private readonly dialog = inject(DialogService);
   protected readonly dashboard = inject(DashboardService);
-  private readonly bottomSheet = inject(MatBottomSheet);
+  private readonly _actionMenu = viewChild.required(ActionMenuComponent);
+  protected readonly widgetActions = WIDGET_ACTIONS;
   private readonly streams = inject(WidgetStreamsDirective, { optional: true });
   private readonly meta = inject(WidgetMetadataDirective, { optional: true });
   private readonly runtime = inject(WidgetRuntimeDirective, { optional: true });
@@ -322,86 +322,48 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   }
 
   /**
-   * Open the bottom sheet for widget management (delete / duplicate actions).
-   * @param e Event used to stop propagation.
-   * @returns void
-   * @example
-   * this.openBottomSheet(event);
+   * Single tap in edit mode opens the widget action menu at the tap point
+   * (a bottom drawer on phones). Suppressed while a gridstack drag is in flight.
    */
-  public openBottomSheet(e: Event | CustomEvent): void {
+  public onSingleTap(e: Event | CustomEvent): void {
     (e as Event).stopPropagation();
-    this.debug('openBottomSheet invoked', { widgetId: this.widgetProperties?.uuid, static: this.dashboard.isDashboardStatic() });
-    if (!this.dashboard.isDashboardStatic()) {
-      if (this._uiEvent.isDragging()) {
-        this.debug('bottom sheet suppressed during drag', { widgetId: this.widgetProperties?.uuid });
-        return;
-      }
-      if (!this.acquireOverlay('sheet')) {
-        return;
-      }
-      const isLinuxFirefox = typeof navigator !== 'undefined' &&
-        /Linux/.test(navigator.platform) &&
-        /Firefox/.test(navigator.userAgent);
+    if (this.dashboard.isDashboardStatic() || this._uiEvent.isDragging()) return;
+    const detail = (e as CustomEvent).detail as { center?: { x: number; y: number } } | undefined;
+    this.openActionMenu(detail?.center?.x ?? 0, detail?.center?.y ?? 0);
+  }
 
-      try {
-        const sheetRef = this.bottomSheet.open(WidgetHostBottomSheetComponent, isLinuxFirefox ? { disableClose: true, data: { showCancel: true } } : {});
-        sheetRef.afterDismissed().subscribe((action) => {
-          this.releaseOverlay('sheet');
-          this.debug('bottom sheet dismissed', { widgetId: this.widgetProperties?.uuid, action });
-          switch (action) {
-            case 'delete':
-              this.dashboard.deleteWidget(this.widgetProperties.uuid);
-              break;
-            case 'duplicate':
-              this.dashboard.duplicateWidget(this.widgetProperties.uuid);
-              break;
-            case 'copy':
-              this.dashboard.copyWidget(this.widgetProperties.uuid);
-              break;
-            case 'cut':
-              this.dashboard.cutWidget(this.widgetProperties.uuid);
-              break;
-            default:
-              break;
-          }
-        });
-      } catch (error) {
-        this.releaseOverlay('sheet');
-        console.error('[Host2] failed to open bottom sheet', {
-          widgetId: this.widgetProperties?.uuid,
-          error
-        });
-      }
+  protected openActionMenu(x: number, y: number): void {
+    this._actionMenu().open(x, y);
+  }
+
+  protected onWidgetAction(action: string): void {
+    switch (action) {
+      case 'settings':
+        this.openWidgetOptions(new Event('widget-settings'));
+        break;
+      case 'delete':
+        this.dashboard.deleteWidget(this.widgetProperties.uuid);
+        break;
+      case 'duplicate':
+        this.dashboard.duplicateWidget(this.widgetProperties.uuid);
+        break;
+      case 'copy':
+        this.dashboard.copyWidget(this.widgetProperties.uuid);
+        break;
+      case 'cut':
+        this.dashboard.cutWidget(this.widgetProperties.uuid);
+        break;
+      default:
+        break;
     }
   }
 
   /**
-   * Opens the locked-mode history chart dialog using the widget's resolved historical series.
-   *
-   * @param {MouseEvent} event Browser context menu event.
-   * @returns {void}
-   *
-   * @example
-   * this.openWidgetHistoryDialog(event);
+   * Long-press on a locked dashboard opens the widget's history chart directly.
+   * Gating (locked-only + history eligibility) lives in the internal opener, so
+   * a long-press on a non-eligible widget is a silent no-op.
    */
-  public openWidgetHistoryDialog(event: MouseEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    void this.openWidgetHistoryDialogInternal();
-  }
-
-  /**
-   * Handles a two-finger tap gesture and opens the locked-mode history dialog.
-   *
-   * @param event Pointer event emitted by TwoFingerTapDirective.
-   * @returns void
-   *
-   * @example
-   * this.onHistoryTwoFingerTap(event);
-   */
-  public onHistoryTwoFingerTap(event: PointerEvent): void {
-    event.preventDefault();
+  public onWidgetLongPress(event: Event | CustomEvent): void {
     event.stopPropagation();
 
     void this.openWidgetHistoryDialogInternal();

@@ -1,24 +1,12 @@
 <mat-action-list>
-  <button mat-list-item (click)="clickAction('duplicate')">
-    <mat-icon matListItemIcon>add_to_photos</mat-icon>
-    <span>Duplicate</span>
-  </button>
-  <button mat-list-item (click)="clickAction('copy')">
-    <mat-icon matListItemIcon>content_copy</mat-icon>
-    <span>Copy</span>
-  </button>
-  <button mat-list-item (click)="clickAction('cut')">
-    <mat-icon matListItemIcon>content_cut</mat-icon>
-    <span>Cut</span>
-  </button>
-  <button mat-list-item (click)="clickAction('delete')">
-    <mat-icon matListItemIcon>delete_forever</mat-icon>
-    <span>Delete</span>
-  </button>
-  @if (showCancel) {
-    <button mat-list-item (click)="clickAction('cancel')">
-      <mat-icon matListItemIcon>close</mat-icon>
-      <span>Close</span>
+  @for (item of items; track item.id) {
+    <button mat-list-item (click)="clickAction(item.id)">
+      <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+      <span>{{ item.label }}</span>
     </button>
   }
 </mat-action-list>
+
+<button type="button" class="widget-action-cancel" (click)="clickAction('cancel')">
+  Cancel
+</button>

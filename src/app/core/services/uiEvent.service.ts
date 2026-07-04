@@ -26,11 +26,7 @@ export class uiEventService implements OnDestroy {
   public noSleepStatus = signal<boolean>(false);
   public noSleepSupported = signal<boolean>(true);
   private noSleep: { enable: () => void; disable: () => void } | null = null;
-  private initialTouchX: number | null = null;
-  private initialTouchY: number | null = null;
   private hotkeyListeners = new Map<(key: string, event: KeyboardEvent) => void, EventListener>();
-  // Stored bound gesture handler so remove works (otherwise bind() creates new fn)
-  private boundPreventGestures: EventListener | null = null;
   private readonly fullscreenChangeHandler = () => {
     this.fullscreenStatus.set(screenfull.isFullscreen);
     if (!screenfull.isFullscreen) {
@@ -130,60 +126,6 @@ export class uiEventService implements OnDestroy {
     }
   }
 
-  public addGestureListeners(onSwipeLeft: (e: Event | CustomEvent) => void, onSwipeRight: (e: Event | CustomEvent) => void): void {
-    if (!this.boundPreventGestures) {
-      this.boundPreventGestures = this.preventBrowserHistorySwipeGestures.bind(this);
-    }
-    document.addEventListener('openLeftSidenav', onSwipeLeft);
-    document.addEventListener('openRightSidenav', onSwipeRight);
-    document.addEventListener('touchstart', this.boundPreventGestures, { passive: false });
-    document.addEventListener('touchmove', this.boundPreventGestures, { passive: false });
-    document.addEventListener('touchend', this.boundPreventGestures);
-    document.addEventListener('touchcancel', this.boundPreventGestures);
-  }
-
-  public removeGestureListeners(onSwipeLeft: (e: Event | CustomEvent) => void, onSwipeRight: (e: Event | CustomEvent) => void): void {
-    document.removeEventListener('openLeftSidenav', onSwipeLeft);
-    document.removeEventListener('openRightSidenav', onSwipeRight);
-    if (this.boundPreventGestures) {
-      document.removeEventListener('touchstart', this.boundPreventGestures);
-      document.removeEventListener('touchmove', this.boundPreventGestures);
-      document.removeEventListener('touchend', this.boundPreventGestures);
-      document.removeEventListener('touchcancel', this.boundPreventGestures);
-    }
-  }
-
-  public preventBrowserHistorySwipeGestures(e: TouchEvent): void {
-    if (!(e instanceof TouchEvent)) return;
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const edgeThreshold = 30; // More reliable threshold
-
-      if (e.type === 'touchstart') {
-        this.initialTouchX = touch.clientX;
-        this.initialTouchY = touch.clientY;
-      } else if (e.type === 'touchmove' && this.initialTouchX !== null && this.initialTouchY !== null) {
-        const deltaX = Math.abs(touch.clientX - this.initialTouchX);
-        const deltaY = Math.abs(touch.clientY - this.initialTouchY);
-
-        // Prevent only strong horizontal swipes from the screen edges
-        if (
-          deltaX > 10 && deltaX > deltaY && (this.initialTouchX < edgeThreshold || this.initialTouchX > window.innerWidth - edgeThreshold)
-        ) {
-          e.preventDefault();
-        }
-
-        // Prevent downward swipe (pull-to-refresh)
-        if (deltaY > 10 && this.initialTouchY < 50) {
-          e.preventDefault();
-        }
-      } else if (e.type === 'touchend' || e.type === 'touchcancel') {
-        this.initialTouchX = null;
-        this.initialTouchY = null;
-      }
-    }
-  }
-
   public addHotkeyListener(
     callback: (key: string, event: KeyboardEvent) => void,
     options?: { keys?: string[]; ctrlKey?: boolean; shiftKey?: boolean }
@@ -232,14 +174,6 @@ export class uiEventService implements OnDestroy {
       try { this.noSleep.disable(); } catch { /* ignore */ }
     }
     this.noSleep = null;
-    // Remove any globally added gesture listeners if still present
-    if (this.boundPreventGestures) {
-      document.removeEventListener('touchstart', this.boundPreventGestures);
-      document.removeEventListener('touchmove', this.boundPreventGestures);
-      document.removeEventListener('touchend', this.boundPreventGestures);
-      document.removeEventListener('touchcancel', this.boundPreventGestures);
-      this.boundPreventGestures = null;
-    }
     // Hotkeys
     for (const [, listener] of this.hotkeyListeners.entries()) {
       document.removeEventListener('keydown', listener);

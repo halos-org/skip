@@ -13,7 +13,7 @@
  * - Diagnostics are gated by a runtime flag (default enabled) and can be toggled via console helper / localStorage.
  *
  * Supported gestures (emitted events):
- * - swipeleft, swiperight, swipeup, swipedown, press, doubletap
+ * - swipeleft, swiperight, swipeup, swipedown, press, doubletap, tap (opt-in via `enableTap`)
  */
 import { Directive, DestroyRef, ElementRef, inject, input, output } from '@angular/core';
 import { GESTURES_DEBUG_KEY } from '../constants/config-storage.const';
@@ -118,8 +118,8 @@ export class GestureDirective {
   enablePress = input(true);
   /** Enable/disable doubletap gesture (honored in modes that allow doubletap). */
   enableDoubleTap = input(true);
-  /** When true, also dispatch document-level UI events for horizontal swipes (openLeftSidenav/openRightSidenav). */
-  bridgeUiEvents = input(false);
+  /** Enable/disable single-tap gesture (opt-in; honored in modes that allow press). */
+  enableTap = input(false);
 
   // Dynamically adjusted gesture thresholds (set on pointerdown)
   private _swipeMinDistance = 30;
@@ -142,6 +142,8 @@ export class GestureDirective {
   press = output<CustomEvent<{ x: number; y: number; center?: { x: number; y: number } }>>();
   /** Emitted on a double-tap. Event.detail contains { x, y, dt }. */
   doubletap = output<CustomEvent<{ x: number; y: number; dt: number }>>();
+  /** Emitted on a single tap (opt-in via `enableTap`). Event.detail contains { x, y, center }. */
+  tap = output<CustomEvent<{ x: number; y: number; center: { x: number; y: number } }>>();
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject(ElementRef<HTMLElement>);
@@ -445,8 +447,9 @@ export class GestureDirective {
     const allowV = this.modeAllowsVertical();
     let allowPress = this.modeAllowsPress();
     let allowDT = this.modeAllowsDoubleTap();
-    // Prefer child widgets for press/doubletap when the target is inside a widget container and
-    // this host is not that widget container. Applies across modes so widget long-press wins.
+    let allowTap = this.modeAllowsTap();
+    // Prefer child widgets for press/tap/doubletap when the target is inside a widget container and
+    // this host is not that widget container. Applies across modes so widget long-press/tap wins.
     {
       const targetEl = ev.target as Element | null;
       const hostEl = this.host.nativeElement as Element;
@@ -456,9 +459,10 @@ export class GestureDirective {
       if (widgetEl && widgetEl !== hostEl) {
         allowPress = false;
         allowDT = false;
+        allowTap = false;
       }
-      // Additionally: if host is the grid root and the press originates inside a grid item,
-      // let the item's overlay/child own press/doubletap instead of the grid.
+      // Additionally: if host is the grid root and the gesture originates inside a grid item,
+      // let the item's overlay/child own press/tap/doubletap instead of the grid.
       const hostIsGridRoot = (hostEl as HTMLElement).classList?.contains('grid-stack') ||
         (hostEl as HTMLElement).tagName?.toLowerCase() === 'gridstack';
       const inGridItem = targetEl && typeof (targetEl as Element).closest === 'function'
@@ -467,19 +471,20 @@ export class GestureDirective {
       if (hostIsGridRoot && inGridItem) {
         allowPress = false;
         allowDT = false;
-        this.debug('suppress grid-root press/doubletap for event inside grid-stack-item', {
+        allowTap = false;
+        this.debug('suppress grid-root press/tap/doubletap for event inside grid-stack-item', {
           host: this.elDesc(hostEl as HTMLElement),
           target: this.elDesc(targetEl ?? undefined),
           inGridItem: this.elDesc(inGridItem as HTMLElement)
         });
       }
     }
-    if (!allowH && !allowV && !allowPress && !allowDT) {
+    if (!allowH && !allowV && !allowPress && !allowDT && !allowTap) {
       this.debug('ignoring pointerdown: no gestures enabled for current mode');
       return;
     }
     // Try to acquire lanes for this pointer
-    const wantP = allowPress || allowDT;
+    const wantP = allowPress || allowDT || allowTap;
     const ownersMap = (this.constructor as typeof GestureDirective)._laneOwners;
     // If this is the first handler seeing this pointerId for this sequence, clear any stale owners
     if (!hadPointer && ownersMap.has(ev.pointerId)) {
@@ -919,6 +924,11 @@ export class GestureDirective {
       this.lastTapUpTime = endTime;
       this.lastTapUpX = ev.clientX;
       this.lastTapUpY = ev.clientY;
+      // Emit the single-tap gesture (opt-in). Lane ownership arbitrates grid vs.
+      // widget so only the innermost host that owns the press/tap lane fires.
+      if (this.ownedLanes.p && this.modeAllowsTap()) {
+        this.emitTapEvent({ x: ev.clientX, y: ev.clientY, center: { x: ev.clientX, y: ev.clientY } });
+      }
     } else {
       // Reset potential double tap tracking if gesture was swipe or press
       this.potentialDoubleTap = false;
@@ -1105,13 +1115,6 @@ export class GestureDirective {
     const evt = new CustomEvent(name, { detail, bubbles: true, composed: true });
     try { this.host.nativeElement.dispatchEvent(evt); } catch { /* ignore */ }
     this.debug('emitSwipeEvent', { name, detail });
-    // Optional bridge to global UI events for app shell listeners
-    if (this.bridgeUiEvents() && (name === 'swipeleft' || name === 'swiperight')) {
-      try {
-        const bridge = name === 'swipeleft' ? 'openLeftSidenav' : 'openRightSidenav';
-        document.dispatchEvent(new CustomEvent(bridge, { detail }));
-      } catch { /* ignore */ }
-    }
     switch (name) {
       case 'swipeleft': this.swipeleft.emit(evt as CustomEvent<{ dx: number; dy: number; duration: number }>); break;
       case 'swiperight': this.swiperight.emit(evt as CustomEvent<{ dx: number; dy: number; duration: number }>); break;
@@ -1142,6 +1145,10 @@ export class GestureDirective {
     this.doubletap.emit(evt as CustomEvent<{ x: number; y: number; dt: number }>);
   }
 
+  private emitTapEvent(detail: { x: number; y: number; center: { x: number; y: number } }) {
+    this.tap.emit(new CustomEvent('tap', { detail }));
+  }
+
   // Mode helpers
   private modeAllowsHorizontal(): boolean {
     const m = this.mode();
@@ -1165,6 +1172,12 @@ export class GestureDirective {
     // no doubletap in 'horizontal' mode to avoid global capture of taps
     const allows = m === 'all' || m === 'dashboard' || m === 'press' || m === 'editor';
     return allows && this.enableDoubleTap();
+  }
+  private modeAllowsTap(): boolean {
+    const m = this.mode();
+    if (this.disableGestures()) return false;
+    const allows = m === 'all' || m === 'dashboard' || m === 'press' || m === 'editor';
+    return allows && this.enableTap();
   }
 
   // ----------- Diagnostics helpers (debug only) -----------

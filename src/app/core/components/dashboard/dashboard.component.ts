@@ -9,7 +9,6 @@ import { ToastService } from '../../services/toast.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { DialogService } from '../../services/dialog.service';
-import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 import { uiEventService } from '../../services/uiEvent.service';
@@ -18,7 +17,8 @@ import cloneDeep from 'lodash-es/cloneDeep';
 import { Router } from '@angular/router';
 import { WidgetHost2Component } from '../widget-host2/widget-host2.component';
 import { GroupWidgetComponent } from '../group-widget/group-widget.component';
-import { DashboardClipboardBottomSheetComponent } from '../dashboard-clipboard-bottom-sheet/dashboard-clipboard-bottom-sheet.component';
+import { ActionMenuComponent } from '../action-menu/action-menu.component';
+import { ActionMenuItem } from '../action-menu/action-menu-item';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
 
 interface PressGestureDetail { x?: number; y?: number; center?: { x: number; y: number }; }
@@ -31,7 +31,7 @@ interface GridApi {
 @Component({
   selector: 'dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GridstackComponent, DashboardScrollerComponent, MatIconModule, MatButtonModule, GestureDirective],
+  imports: [GridstackComponent, DashboardScrollerComponent, MatIconModule, MatButtonModule, GestureDirective, ActionMenuComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   host: {
@@ -42,7 +42,16 @@ interface GridApi {
 export class DashboardComponent implements AfterViewInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly _dialog = inject(DialogService);
-  private readonly _bottomSheet = inject(MatBottomSheet);
+  private readonly _actionMenu = viewChild.required(ActionMenuComponent);
+  private _pendingAddCell: { x: number; y: number } | null = null;
+  protected readonly emptyAreaActions = computed<ActionMenuItem[]>(() => {
+    const actions: ActionMenuItem[] = [{ id: 'add', label: 'Add Widget', icon: 'add' }];
+    if (this.dashboard.widgetClipboard()) {
+      actions.push({ id: 'paste', label: 'Paste', icon: 'content_paste' });
+      actions.push({ id: 'clear', label: 'Clear clipboard', icon: 'delete_sweep' });
+    }
+    return actions;
+  });
   protected readonly dashboard = inject(DashboardService);
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _uiEvent = inject(uiEventService);
@@ -82,7 +91,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   private _lastContainerHeight = 0;
   private _lastCellHeight = 0;
   private _addDialogOpen = false;
-  private _clipboardSheetOpen = false;
 
   constructor() {
     GridstackComponent.addComponentToSelectorType([
@@ -270,49 +278,42 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.dashboard.notifyLayoutEditCanceled();
   }
 
-  protected addNewWidget(e: Event | CustomEvent): void {
-    if (!this.dashboard.isDashboardStatic() && (e as CustomEvent).detail !== undefined) {
-      if (this._addDialogOpen || this._clipboardSheetOpen) {
-        return; // prevent double-open from duplicate press or bubbling
-      }
-      const detail = ((e as CustomEvent).detail || {}) as PressGestureDetail;
-      const inputX = detail.center?.x ?? detail.x ?? 0;
-      const inputY = detail.center?.y ?? detail.y ?? 0;
-      const gridCell = this._gridstack().grid.getCellFromPixel({ left: inputX, top: inputY });
-      const isMinCellSpaceEmpty = this._gridstack().grid.isAreaEmpty(gridCell.x, gridCell.y, 1, 2);
-
-      if (isMinCellSpaceEmpty) {
-        if (this.dashboard.widgetClipboard()) {
-          this.openClipboardBottomSheet(gridCell.x, gridCell.y);
-          return;
-        }
-        this.openAddWidgetDialog(gridCell.x, gridCell.y);
-      } else {
-        this.toast.show('Not enough free space at the selected location to add a widget. Please reorganize the dashboard to free up space or try a larger empty area.', 0, false, 'error');
-      }
+  protected onEmptyAreaTap(e: Event | CustomEvent): void {
+    if (this.dashboard.isDashboardStatic() || (e as CustomEvent).detail === undefined) return;
+    if (this._addDialogOpen) return; // an add dialog is already up
+    const detail = ((e as CustomEvent).detail || {}) as PressGestureDetail;
+    const inputX = detail.center?.x ?? detail.x ?? 0;
+    const inputY = detail.center?.y ?? detail.y ?? 0;
+    const gridCell = this._gridstack().grid.getCellFromPixel({ left: inputX, top: inputY });
+    if (!this._gridstack().grid.isAreaEmpty(gridCell.x, gridCell.y, 1, 2)) {
+      this.toast.show('Not enough free space at the selected location to add a widget. Please reorganize the dashboard to free up space or try a larger empty area.', 0, false, 'error');
+      return;
     }
+    this._pendingAddCell = { x: gridCell.x, y: gridCell.y };
+    this.openActionMenu(inputX, inputY);
   }
 
-  private openClipboardBottomSheet(x: number, y: number): void {
-    if (this._clipboardSheetOpen) return;
-    this._clipboardSheetOpen = true;
-    const sheetRef = this._bottomSheet.open(DashboardClipboardBottomSheetComponent);
-    sheetRef.afterDismissed().subscribe(action => {
-      this._clipboardSheetOpen = false;
-      switch (action) {
-        case 'paste':
-          this.pasteCopiedWidget(x, y);
-          break;
-        case 'clear':
-          this.dashboard.clearWidgetClipboard();
-          break;
-        case 'add':
-          this.openAddWidgetDialog(x, y);
-          break;
-        default:
-          break;
-      }
-    });
+  protected openActionMenu(x: number, y: number): void {
+    this._actionMenu().open(x, y);
+  }
+
+  protected onEmptyAreaAction(action: string): void {
+    const cell = this._pendingAddCell;
+    this._pendingAddCell = null;
+    if (!cell) return;
+    switch (action) {
+      case 'add':
+        this.openAddWidgetDialog(cell.x, cell.y);
+        break;
+      case 'paste':
+        this.pasteCopiedWidget(cell.x, cell.y);
+        break;
+      case 'clear':
+        this.dashboard.clearWidgetClipboard();
+        break;
+      default:
+        break;
+    }
   }
 
   private openAddWidgetDialog(x: number, y: number): void {

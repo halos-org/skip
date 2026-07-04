@@ -4,8 +4,8 @@
 </widget-title>
 @if (!dashboard.isDashboardStatic()) {
   <div class="widgetOverlay"
-    kipGestures mode="press"
-    (doubletap)="openWidgetOptions($event)"
-    (press)="openBottomSheet($event)">
+    kipGestures mode="press" [enablePress]="false" [enableTap]="true" [enableDoubleTap]="false"
+    (tap)="onSingleTap($event)">
   </div>
 }
+<action-menu #actionMenu [items]="widgetActions" (selected)="onWidgetAction($event)" />

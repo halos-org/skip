@@ -15,11 +15,17 @@ import { GestureDirective } from './gesture.directive';
       [pressMoveSlop]="pressMoveSlop"
       [swipeMinDistance]="swipeMinDistance"
       [swipeMaxDuration]="swipeMaxDuration"
-      [enableDoubleTap]="enableDoubleTap">
+      [enableDoubleTap]="enableDoubleTap"
+      [enableTap]="enableTap"
+      (tap)="tapCount = tapCount + 1">
     </div>
   `
 })
 class TestHostComponent {
+  /** Opt-in single-tap recognition. */
+  public enableTap = false;
+  /** Number of `tap` outputs observed. */
+  public tapCount = 0;
     /**
      * Active gesture mode for the directive under test.
      * @returns Current gesture mode value.
@@ -254,6 +260,50 @@ describe('GestureDirective', () => {
         vi.useRealTimers();
 
         expect(pressCount).toBe(0);
+    });
+
+    it('emits tap on a quick low-movement release when enableTap is set', () => {
+        component.mode = 'press';
+        component.enableTap = true;
+        component.enableDoubleTap = false;
+        component.longPressMs = 400;
+        syncFixture();
+        now = 7000;
+
+        dispatchPointerEvent(hostEl, 'pointerdown', { clientX: 20, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+        now = 7050;
+        dispatchPointerEvent(hostEl, 'pointerup', { clientX: 21, clientY: 21, pointerId: POINTER_ID, pointerType: 'touch' });
+
+        expect(component.tapCount).toBe(1);
+    });
+
+    it('does not emit tap when enableTap is off', () => {
+        component.mode = 'press';
+        component.enableTap = false;
+        component.longPressMs = 400;
+        syncFixture();
+        now = 8000;
+
+        dispatchPointerEvent(hostEl, 'pointerdown', { clientX: 20, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+        now = 8050;
+        dispatchPointerEvent(hostEl, 'pointerup', { clientX: 20, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+
+        expect(component.tapCount).toBe(0);
+    });
+
+    it('does not emit tap when the release comes after the long-press threshold', () => {
+        component.mode = 'press';
+        component.enableTap = true;
+        component.enableDoubleTap = false;
+        component.longPressMs = 80;
+        syncFixture();
+        now = 9000;
+
+        dispatchPointerEvent(hostEl, 'pointerdown', { clientX: 20, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+        now = 9200; // 200ms > 80ms long-press threshold
+        dispatchPointerEvent(hostEl, 'pointerup', { clientX: 20, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+
+        expect(component.tapCount).toBe(0);
     });
 
     it('suppresses gestures when multi-pointer is active', async () => {
