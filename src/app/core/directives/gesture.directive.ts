@@ -1146,7 +1146,6 @@ export class GestureDirective {
   }
 
   private emitTapEvent(detail: { x: number; y: number; center: { x: number; y: number } }) {
-    (detail as unknown as { __gid?: number }).__gid = this._instanceId;
     this.tap.emit(new CustomEvent('tap', { detail }));
   }
 
