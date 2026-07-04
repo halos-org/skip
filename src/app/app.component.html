@@ -7,8 +7,8 @@
   kipScrollNav
   [navEnabled]="dashboardStatic()"
   [suspended]="!dashboardVisible() || isDragging()"
-  (swipeup)="onChromeIntent('reveal')"
-  (swipedown)="onChromeIntent('hide')"
+  (swipeup)="onChromeIntent('hide')"
+  (swipedown)="onChromeIntent('reveal')"
   (swipeleft)="pageNav('next')"
   (swiperight)="pageNav('prev')"
   (pageNav)="pageNav($event)"

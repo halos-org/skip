@@ -92,10 +92,10 @@ export class WidgetAnchorAlarmComponent implements AfterViewInit, OnDestroy {
     if (event.data.gesture) {
       switch (event.data.gesture) {
         case 'swipeup':
-          this._chrome.reveal();
+          this._chrome.hide();
           break;
         case 'swipedown':
-          this._chrome.hide();
+          this._chrome.reveal();
           break;
         case 'swipeleft':
           if (this._dashboard.isDashboardStatic()) this._dashboard.navigateToNextDashboard();

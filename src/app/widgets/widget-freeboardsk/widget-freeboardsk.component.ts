@@ -125,10 +125,10 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
     if (event.data.gesture && event.data.eventData?.instanceId === instanceId) {
       switch (event.data.gesture) {
         case 'swipeup':
-          this._chrome.reveal();
+          this._chrome.hide();
           break;
         case 'swipedown':
-          this._chrome.hide();
+          this._chrome.reveal();
           break;
         case 'swipeleft':
           if (this.dashboard.isDashboardStatic()) this.dashboard.navigateToNextDashboard();
