@@ -27,7 +27,9 @@ describe('ConfigurationUpgradeService', () => {
         mockStorage.listConfigs.mockClear();
         mockStorage.getConfig.mockClear();
         mockStorage.setConfig.mockClear();
+        mockStorage.initConfig = null;
         mockAppSettings.reloadApp.mockClear();
+        mockAppSettings.resetSettings.mockClear();
 
         TestBed.configureTestingModule({
             providers: [
@@ -203,5 +205,45 @@ describe('ConfigurationUpgradeService', () => {
             'global', 'gconf', expect.objectContaining({ app: expect.objectContaining({ configVersion: 0 }) }), 9);
         expect(mockStorage.setConfig).toHaveBeenCalledWith(
             'user', 'uconf', expect.objectContaining({ app: expect.objectContaining({ configVersion: 0 }) }), 9);
+    });
+
+    it('legacy upgrade clears the blocking overlay when slot listing fails, without wedging', async () => {
+        mockStorage.listConfigs.mockRejectedValueOnce(new Error('offline'));
+
+        await service.runUpgrade(); // legacy (version-less) path
+
+        // The catch must reset upgrading(), matching the v11/v12 paths; leaving it set
+        // wedges the app behind the upgrade overlay with no dismiss.
+        expect(service.upgrading()).toBe(false);
+    });
+
+    it('legacy upgrade skips a slot whose config has no app section, without crashing', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({ theme: { themeName: '' } }); // no app section
+
+        await service.runUpgrade();
+
+        // transformConfig returns null for the app-less slot, so nothing is persisted and
+        // the prior config.app.configVersion TypeError no longer fires.
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('startFresh skips a legacy slot missing its app section and still retires the rest', async () => {
+        mockStorage.initConfig = null; // remote (Signal K) path
+        mockStorage.listConfigs.mockResolvedValueOnce([
+            { scope: 'global', name: 'gconf' },
+            { scope: 'user', name: 'uconf' }
+        ]);
+        mockStorage.getConfig.mockImplementation((scope: string, name: string) =>
+            Promise.resolve(name === 'uconf' ? { app: { configVersion: 10 } } : { theme: {} }));
+
+        service.startFresh();
+        await vi.waitFor(() => expect(mockAppSettings.resetSettings).toHaveBeenCalled());
+
+        // The valid user slot is retired; the app-less global slot is skipped, not retired.
+        expect(mockStorage.setConfig).toHaveBeenCalledWith(
+            'user', 'uconf', expect.objectContaining({ app: expect.objectContaining({ configVersion: 0 }) }), 9);
+        expect(mockStorage.setConfig).not.toHaveBeenCalledWith(
+            'global', 'gconf', expect.anything(), 9);
     });
 });
