@@ -24,8 +24,8 @@ const handledStatusCodes = new Set([200, 202, 400, 401, 403, 405, 500, 502, 504]
 const serverErrorStatusCodes = new Set([500, 502, 504]);
 export interface skRequest {
   requestId: string;
-  state: string;
-  statusCode: number;
+  state: string | null;
+  statusCode: number | null;
   statusCodeDescription?: string;
   widgetUUID?: string;
   message?: string;
@@ -107,43 +107,43 @@ export class SignalkRequestsService {
   private updateRequest(delta: ISignalKDeltaMessage) {
     const index = this.requests.findIndex(r => r.requestId == delta.requestId);
     if (index > -1) {  // exists in local array
-      this.requests[index].state = delta.state;
-      this.requests[index].statusCode = delta.statusCode;
+      const statusCode = delta.statusCode;
+      this.requests[index].state = delta.state ?? null;
+      this.requests[index].statusCode = statusCode ?? null;
       this.requests[index].message = delta.message;
 
-      const currentStatusCode = deltaStatusCodes[delta.statusCode];
+      const currentStatusCode = statusCode !== undefined ? deltaStatusCodes[statusCode] : undefined;
 
-      if ((typeof currentStatusCode != 'undefined') && handledStatusCodes.has(this.requests[index].statusCode)) {
+      if (statusCode !== undefined && (typeof currentStatusCode != 'undefined') && handledStatusCodes.has(statusCode)) {
         this.requests[index].statusCodeDescription = currentStatusCode;
 
-        if (this.requests[index].statusCode == 202) {
+        if (statusCode == 202) {
           console.log("[Request Service] Async 202 response received");
           return;
         }
 
-        if (this.requests[index].statusCode == 400) {
-          this.toast.show(this.requests[index].message, 0, false, 'error');
+        if (statusCode == 400) {
+          this.toast.show(this.requests[index].message ?? '', 0, false, 'error');
           console.log("[Request Service] " + this.requests[index].message );
         }
 
-        if (this.requests[index].statusCode == 403) {
-          console.warn("[Request Service] Status Code: " + this.requests[index].statusCode + " - " + this.requests[index].statusCodeDescription);
+        if (statusCode == 403) {
+          console.warn("[Request Service] Status Code: " + statusCode + " - " + currentStatusCode);
         }
 
-        if (this.requests[index].statusCode == 405) {
-          console.error("[Request Service] Status Code: " + this.requests[index].statusCode + " - " + this.requests[index].message);
+        if (statusCode == 405) {
+          console.error("[Request Service] Status Code: " + statusCode + " - " + this.requests[index].message);
         }
 
-        if (serverErrorStatusCodes.has(this.requests[index].statusCode)) {
-          const description = this.requests[index].statusCodeDescription;
-          const detail = this.requests[index].message ? description + " - " + this.requests[index].message : description;
+        if (serverErrorStatusCodes.has(statusCode)) {
+          const detail = this.requests[index].message ? currentStatusCode + " - " + this.requests[index].message : currentStatusCode;
           this.toast.show(detail, 0, false, 'error');
-          console.error("[Request Service] Status Code: " + this.requests[index].statusCode + " - " + description);
+          console.error("[Request Service] Status Code: " + statusCode + " - " + currentStatusCode);
         }
 
       } else {
-        this.toast.show("Unknown Request Status Code received: " + this.requests[index].statusCode + " - " + deltaStatusCodes[this.requests[index].statusCode] + " - " + this.requests[index].message, 0, false, 'error');
-        console.error("[Request Service] Unknown Request Status Code received: " + this.requests[index].statusCode + " - " + deltaStatusCodes[this.requests[index].statusCode] + " - " + this.requests[index].message);
+        this.toast.show("Unknown Request Status Code received: " + statusCode + " - " + currentStatusCode + " - " + this.requests[index].message, 0, false, 'error');
+        console.error("[Request Service] Unknown Request Status Code received: " + statusCode + " - " + currentStatusCode + " - " + this.requests[index].message);
       }
       try {
         this.requestStatus$.next(this.requests[index]);    // dispatched results

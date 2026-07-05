@@ -59,7 +59,7 @@ export class SignalKDeltaService implements OnDestroy {
   // Self URN message stream Observer
   private _vesselSelfUrn$ = new Subject<string>();
   // local self URN to filter data based on root node (self or others)
-  private _selfUrn: string = undefined;
+  private _selfUrn: string | undefined = undefined;
 
   // Delta Service Endpoint status publishing
   public streamEndpoint: IStreamStatus = {
@@ -73,7 +73,7 @@ export class SignalKDeltaService implements OnDestroy {
   // full delta firehose; path selection happens in DataService and per-widget rate limiting in
   // WidgetStreamsDirective (sampleTime). We intentionally do not emit per-path SK subscribe/unsubscribe deltas or use
   // SK subscription policies (policy/format/minPeriod), so no such controls exist in widget config.
-  private endpointWS: string = null;
+  private endpointWS: string | null = null;
   private SubscriptionType = "self";
   private readonly WS_CONNECTION_SUBSCRIBE = "?subscribe=";
   private readonly WS_CONNECTION_META = "&sendMeta=all"; // default but we could use none + specific paths in the future
@@ -280,6 +280,9 @@ export class SignalKDeltaService implements OnDestroy {
    * authenticates the WS upgrade, so no auth token is ever appended.
    */
   private buildWebSocketUrl(): string {
+    if (!this.endpointWS) {
+      throw new Error('[Delta Service] No WebSocket endpoint available to build URL from');
+    }
     const args = this.WS_CONNECTION_SUBSCRIBE + this.SubscriptionType + this.WS_CONNECTION_META;
     return this.endpointWS + args;
   }
@@ -332,6 +335,10 @@ export class SignalKDeltaService implements OnDestroy {
 
   private processWebsocketMessage(message: ISignalKDeltaMessage) {
     if (message.updates) {
+      if (typeof message.context !== 'string') {
+        console.warn("[Delta Service] Dropping updates without a string context:", message);
+        return;
+      }
       this.parseUpdates(message.updates, message.context);
       return;
     }

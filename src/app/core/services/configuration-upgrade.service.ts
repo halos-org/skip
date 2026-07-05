@@ -179,11 +179,12 @@ export class ConfigurationUpgradeService {
 
     } else {
       // LocalStorage upgrade path for config version 10
-      const localStorageConfig: v10IConfig = { app: null, widget: null, layout: null, theme: null };
-      localStorageConfig.app = this._settings.loadConfigFromLocalStorage('appConfig');
-      localStorageConfig.widget = this._settings.loadConfigFromLocalStorage('widgetConfig');
-      localStorageConfig.layout = this._settings.loadConfigFromLocalStorage('layoutConfig');
-      localStorageConfig.theme = this._settings.loadConfigFromLocalStorage('themeConfig');
+      const localStorageConfig: v10IConfig = {
+        app: this._settings.loadConfigFromLocalStorage('appConfig'),
+        widget: this._settings.loadConfigFromLocalStorage('widgetConfig'),
+        layout: this._settings.loadConfigFromLocalStorage('layoutConfig'),
+        theme: this._settings.loadConfigFromLocalStorage('themeConfig')
+      };
 
       const transformedApp = this.transformApp(localStorageConfig.app as IAppConfig);
       const transformedTheme = this.transformTheme(localStorageConfig.theme);
@@ -216,6 +217,10 @@ export class ConfigurationUpgradeService {
         .then(async (rootConfigs: Config[]) => {
           for (const rootConfig of rootConfigs) {
             const oldConfiguration = await this._storage.getConfig(rootConfig.scope, rootConfig.name, this.legacyFileVersion) as unknown as IConfig;
+            if (!oldConfiguration.app) {
+              this.pushError(`[Upgrade] Configuration ${rootConfig.scope}/${rootConfig.name} has no app section; skipping retire.`);
+              continue;
+            }
             oldConfiguration.app.configVersion = 0; // retire
             try {
               // Await the retire write for BOTH scopes so it completes before the
@@ -237,9 +242,14 @@ export class ConfigurationUpgradeService {
           // close handled by component dialog; service only reloads on upgrade path
         });
     } else {
-      const localStorageConfig: IConfig = { app: null, dashboards: null, theme: null };
+      const localStorageConfig: IConfig = { app: null, dashboards: [], theme: null };
       localStorageConfig.app = this._settings.loadConfigFromLocalStorage('appConfig');
       localStorageConfig.theme = this._settings.loadConfigFromLocalStorage('themeConfig');
+      if (!localStorageConfig.app || !localStorageConfig.theme) {
+        this.pushError('[Upgrade Service] Cannot start fresh: local appConfig/themeConfig failed to load.');
+        this.upgrading.set(false);
+        return;
+      }
       localStorageConfig.app.configVersion = MIGRATION_OUTPUT_VERSION; // baseline fresh
       localStorageConfig.app.nightModeBrightness = 0.27;
       localStorageConfig.theme.themeName = '';
@@ -301,7 +311,7 @@ export class ConfigurationUpgradeService {
     return config;
   }
 
-  private transformApp(app: IAppConfig): IAppConfig {
+  private transformApp(app: IAppConfig | null): IAppConfig | null {
     if (!app) return null;
     const clone = cloneDeep(app);
     clone.configVersion = MIGRATION_OUTPUT_VERSION;
@@ -310,7 +320,7 @@ export class ConfigurationUpgradeService {
     return clone;
   }
 
-  private transformTheme(theme: v10IThemeConfig): IThemeConfig {
+  private transformTheme(theme: v10IThemeConfig): IThemeConfig | null {
     if (!theme) return null;
     const themeConfig: IThemeConfig = { themeName: '' };
     return themeConfig;
@@ -318,11 +328,12 @@ export class ConfigurationUpgradeService {
 
   private upgradeConfig(config: IConfig): IConfig | null {
     try {
-      if (config.app.configVersion !== 11) {
-        this.pushError(`[Upgrade Service] Config version ${config.app.configVersion} upgrade is not supported. Skipping...`);
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 11) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} upgrade is not supported. Skipping...`);
         return null;
       }
-      this.removeSplitShellConfigKeys(config.app);
+      this.removeSplitShellConfigKeys(appConfig);
       this.migrateUseNeedleToEnableNeedle(config.dashboards);
       // Iterate dashboards and force widget selector to 'widget-host2'
       let updatedWidgetCount = 0;
@@ -375,14 +386,14 @@ export class ConfigurationUpgradeService {
         this.pushMsg(`[Upgrade] Doubled widget grid metrics for ${dimensionUpdatedCount} non-zero (w/h/x/y) entries.`);
       }
 
-      config.app.configVersion = MIGRATION_OUTPUT_VERSION;
+      appConfig.configVersion = MIGRATION_OUTPUT_VERSION;
 
       return {
-        app: config.app, theme: config.theme, dashboards: config.dashboards
+        app: appConfig, theme: config.theme, dashboards: config.dashboards
       };
 
     } catch (error) {
-      this.pushError(`[Upgrade Service] Error upgrading ${config.app.configVersion}: ${(error as Error).message}`);
+      this.pushError(`[Upgrade Service] Error upgrading ${config.app?.configVersion}: ${(error as Error).message}`);
       return null;
     }
   }
@@ -394,12 +405,13 @@ export class ConfigurationUpgradeService {
    */
   private upgradeConfigV12toV13(config: IConfig): IConfig | null {
     try {
-      if (config.app.configVersion !== 12) {
-        this.pushError(`[Upgrade Service] Config version ${config.app.configVersion} is not an upgradable v12 config. Skipping...`);
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 12) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v12 config. Skipping...`);
         return null;
       }
 
-      delete (config.app as unknown as Record<string, unknown>).dataSets;
+      delete (appConfig as unknown as Record<string, unknown>).dataSets;
 
       if (Array.isArray(config.dashboards)) {
         for (const dash of config.dashboards) {
@@ -415,8 +427,8 @@ export class ConfigurationUpgradeService {
         }
       }
 
-      config.app.configVersion = V13_MIGRATION_OUTPUT_VERSION;
-      return { app: config.app, theme: config.theme, dashboards: config.dashboards };
+      appConfig.configVersion = V13_MIGRATION_OUTPUT_VERSION;
+      return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading v12->v13: ${(error as Error).message}`);
       return null;

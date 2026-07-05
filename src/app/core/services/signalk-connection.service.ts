@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { BehaviorSubject, catchError, lastValueFrom, throwError, timeout } from 'rxjs';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpResponse } from '@angular/common/http';
 import { ISignalKUrl } from '../interfaces/app-settings.interfaces';
 import { ConnectionStateMachine } from './connection-state-machine.service';
 
@@ -38,10 +38,10 @@ interface ISignalKEndpointResponse {
 export interface IEndpointStatus {
   operation: number;
   message: string;
-  serverDescription: string;
-  httpServiceUrl: string;     // v1 API endpoint
+  serverDescription: string | null;
+  httpServiceUrl: string | null;     // v1 API endpoint
   httpServiceUrlV2?: string;  // v2 API endpoint (if available)
-  WsServiceUrl: string;
+  WsServiceUrl: string | null;
   WsServiceUrlV2?: string;    // v2 WebSocket endpoint (if available)
   subscribeAll?: boolean;
 }
@@ -71,8 +71,8 @@ export class SignalKConnectionService {
 
   // Server information
   public signalKURL: ISignalKUrl;
-  private serverName: string;
-  public serverVersion$ = new BehaviorSubject<string>(null);
+  private serverName: string | undefined;
+  public serverVersion$ = new BehaviorSubject<string | null>(null);
   private serverRoles: string[] = [];
   private http = inject(HttpClient);
 
@@ -298,10 +298,13 @@ export class SignalKConnectionService {
    * @returns Configured endpoint status object
    */
   private processEndpointResponse(
-    endpointResponse: { body: ISignalKEndpointResponse; status: number },
+    endpointResponse: HttpResponse<ISignalKEndpointResponse>,
     proxyEnabled?: boolean,
     subscribeAll?: boolean
   ): IEndpointStatus {
+    if (!endpointResponse.body) {
+      throw new Error("Signal K server response did not include a body");
+    }
     console.debug("[Connection Service] Signal K HTTP Endpoints retrieved");
     this.serverVersion$.next(endpointResponse.body.server.version);
 
@@ -309,6 +312,10 @@ export class SignalKConnectionService {
     const wsUrl = endpointResponse.body.endpoints.v1["signalk-ws"];
     const httpUrlV2 = endpointResponse.body.endpoints.v2?.["signalk-http"];
     const wsUrlV2 = endpointResponse.body.endpoints.v2?.["signalk-ws"];
+
+    if (!httpUrl || !wsUrl) {
+      throw new Error("Signal K server response is missing required v1 endpoint URLs");
+    }
 
     const serverServiceEndpoints: IEndpointStatus = {
       operation: 2,
@@ -368,17 +375,17 @@ export class SignalKConnectionService {
     return this.serverServiceEndpoint$.asObservable();
   }
 
-  public setServerInfo(name: string, version: string, roles: string[]): void {
+  public setServerInfo(name: string | undefined, version: string | undefined, roles: string[] | undefined): void {
     this.serverName = name;
-    this.serverRoles = roles;
+    this.serverRoles = roles ?? [];
     console.log(`[Connection Service] Server Name: ${name}, Version: ${version}, Roles: ${JSON.stringify(roles)}`);
   }
 
-  public get skServerName() : string {
+  public get skServerName() : string | undefined {
     return this.serverName;
   }
 
-  public get skServerVersion() : string {
+  public get skServerVersion() : string | null {
     return this.serverVersion$.getValue();
   }
 

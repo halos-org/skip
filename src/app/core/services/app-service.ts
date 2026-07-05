@@ -65,7 +65,7 @@ export class AppService {
     {label: "Grey", value: "grey"}
   ];
   public readonly cssThemeColorRoles$ = new BehaviorSubject<ITheme|null>(null);
-  private _cssThemeColorRoles: ITheme = null;
+  private _cssThemeColorRoles: ITheme;
   private readonly _settings = inject(SettingsService);
   private readonly _data = inject(DataService);
   private readonly _iconRegistry = inject(MatIconRegistry);
@@ -98,9 +98,11 @@ export class AppService {
     });
 
     effect(() => {
-      const mode = this._environmentMode().data.value;
+      const environmentMode = this._environmentMode();
 
       untracked(() => {
+        if (!environmentMode) return;
+        const mode = environmentMode.data.value;
         if (this.previousEnvironmentMode === mode) return; // No change in mode
 
         this.previousEnvironmentMode = mode;
@@ -124,8 +126,7 @@ export class AppService {
       });
     });
 
-    this.readThemeCssRoleVariables();
-    this._cssThemeColorRoles = this.cssThemeColorRoles$.getValue();
+    this._cssThemeColorRoles = this.readThemeCssRoleVariables();
 
     this.browserVersion.set(this.getBrowserVersion());
     this.osVersion.set(this.getOSVersion());
@@ -137,7 +138,7 @@ export class AppService {
     console.log("***********************************************");
   }
 
-  private readThemeCssRoleVariables(): void {
+  private readThemeCssRoleVariables(): ITheme {
     const root = document.body;
     const computedStyle = getComputedStyle(root);
     const cssThemeRolesColor: ITheme = {
@@ -176,6 +177,7 @@ export class AppService {
       zoneEmergency: computedStyle.getPropertyValue('--kip-zone-emergency-color').trim(),
     };
     this.cssThemeColorRoles$.next(cssThemeRolesColor);
+    return cssThemeRolesColor;
   }
 
   public get cssThemeColors() : ITheme {
@@ -220,8 +222,7 @@ export class AppService {
       }
       this.setBrightness(1, false);
     }
-    this.readThemeCssRoleVariables();
-    this._cssThemeColorRoles = this.cssThemeColorRoles$.getValue();
+    this._cssThemeColorRoles = this.readThemeCssRoleVariables();
   }
 
   /**

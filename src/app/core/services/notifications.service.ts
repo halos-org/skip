@@ -63,10 +63,10 @@ export class NotificationsService implements OnDestroy {
     emergency: { sound: 4, visual: 2 },
   };
 
-  private _notificationSettingsSubscription: Subscription = null;
-  private _notificationDataStreamSubscription: Subscription = null;
-  private _notificationMetaStreamSubscription: Subscription = null;
-  private _resetServiceSubscription: Subscription = null;
+  private _notificationSettingsSubscription: Subscription;
+  private _notificationDataStreamSubscription: Subscription | null = null;
+  private _notificationMetaStreamSubscription: Subscription | null = null;
+  private _resetServiceSubscription: Subscription;
 
   private _notificationConfig: INotificationConfig;
   private _notificationConfig$ = new BehaviorSubject<INotificationConfig>(DefaultNotificationConfig);
@@ -78,10 +78,10 @@ export class NotificationsService implements OnDestroy {
   // --- HTMLAudioElement (audio) state ----------------------------------------
   // Cache one player per track id and reuse across switches.
   private _players = new Map<number, HTMLAudioElement>();
-  private _activeAlarmSoundtrack: number = null;
+  private _activeAlarmSoundtrack: number | null = null;
   private _isMuted = false;
 
-  private _lastEmittedValue: IAlarmInfo = null;
+  private _lastEmittedValue: IAlarmInfo | null = null;
 
   constructor() {
     this._notificationSettingsSubscription = this.settings.getNotificationServiceConfigAsO()
@@ -250,6 +250,10 @@ export class NotificationsService implements OnDestroy {
   }
 
   private getNotificationSeverity(message: INotification): { aSev: number; vSev: number } {
+    if (!message.value) {
+      return { aSev: 0, vSev: 0 };
+    }
+
     const state = message.value['state'];
     const severity = NotificationsService.ALARM_SEVERITIES[state];
     if (!severity) {
