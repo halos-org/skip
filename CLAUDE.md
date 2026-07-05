@@ -18,6 +18,16 @@ Skip — an Angular 21 (zoneless, signals, new control flow) Signal K marine mul
 
 Node: the app builds on Node 20+. CI runs the matrix 20/22/24.
 
+## strictNullChecks ratchet (betterer)
+
+`strictNullChecks` is not yet enabled in the app build — the codebase still has hundreds of latent null-safety issues, migrated file-by-file (issue #6). A [betterer](https://phenomnomnominal.github.io/betterer/) ratchet holds the line: the count can only go down.
+
+- `npm run snc` — `tsc -p tsconfig.strict.json`, lists your remaining `strictNullChecks` errors. `tsconfig.strict.json` is the single source of the strict compiler options and the checked file scope (all `src/**/*.ts`, no specs, no `test.ts`).
+- `npm run betterer` — **regenerates** `.betterer.results` (the committed baseline). Run and commit this whenever you fix a file **or merge/rebase main into your branch**.
+- `npm run betterer:ci` — the check the `strict-null-checks` CI job runs; fails on any new issue.
+
+The baseline is keyed by file **content hash**, so any content change to a tracked file — a real fix, or just merging main — invalidates its key and makes `betterer:ci` fail with "unexpected changes" until you regenerate. If CI reports the same count but "unexpected changes", that's the tell: run `npm run betterer` and commit the result. The check runs on Node 24; the baseline is Node-portable (Node 20/22/24 produce identical results). `tsconfig.betterer.json` is only the ts-node loader config for `.betterer.ts`, not a check config.
+
 ## Performance and freeze measurement (perf-harness/)
 
 Self-contained freeze/jank harness (own `package.json`, never touches app deps): builds the **real production bundle**, drives it in headless Chromium at **10× CPU throttle** (Pi-class HaLOS target) against a **mock Signal K server** on one origin. Use it for perf-sensitive changes to widgets, rendering, or the data pipeline, and for before/after numbers when replicating upstream perf work. Full operator docs: `perf-harness/README.md`.

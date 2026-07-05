@@ -966,9 +966,6 @@ exports[`strictNullChecks`] = {
     ],
     "src/default-config/config.blank.dashboard.ts:3810089117": [
       [4, 6, 2, "Type \'null\' is not assignable to type \'string\'.", "5861160"]
-    ],
-    "src/test.ts:2801733261": [
-      [246, 54, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"]
     ]
   }`
 };
