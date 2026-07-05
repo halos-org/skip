@@ -82,7 +82,7 @@
             required>
             @for (source of availableSources; track $index) {
               <mat-option [value]="source">
-                {{source}}
+                {{source === 'default' ? 'Any' : source}}
               </mat-option>
             }
           </mat-select>

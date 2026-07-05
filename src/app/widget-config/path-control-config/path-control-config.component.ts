@@ -216,23 +216,16 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
         pathFormGroup.controls['convertUnitTo'].enable({onlySelf: false});
       }
 
-      if (Object.keys(pathObject.sources).length == 1) {
-        this.availableSources = ['default'];
-        if (setValues) {
-          if (pathFormGroup.controls['source'].value != 'default') {
-            pathFormGroup.controls['source'].setValue('default', {onlySelf: true});
-          }
-        }
-        else if (pathFormGroup.controls['source'].value != 'default') {
-          pathFormGroup.controls['source'].setValue('', {onlySelf: true});
-        }
-      } else if (Object.keys(pathObject.sources).length > 1) {
-        this.availableSources = Object.keys(pathObject.sources);
-        if (pathFormGroup.controls['source'].value == 'default') {
-          pathFormGroup.controls['source'].reset();
-        }
+      // 'default' (shown as "Any") always leads the list: it reads the server's
+      // merged, priority-selected value and follows source failover. Concrete
+      // sources follow, letting the user pin to one. A fresh path defaults to
+      // "Any"; an existing selection is preserved.
+      this.availableSources = ['default', ...Object.keys(pathObject.sources).sort()];
+      const sourceControl = pathFormGroup.controls['source'];
+      if (setValues || !sourceControl.value) {
+        sourceControl.setValue('default', {onlySelf: true});
       }
-      pathFormGroup.controls['source'].enable({onlySelf: false});
+      sourceControl.enable({onlySelf: false});
     } else {
       // we don't know this path. Maybe and old saved path...
       this.disablePathFields();
