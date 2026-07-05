@@ -109,6 +109,8 @@ export class ConfigurationUpgradeService {
         setTimeout(() => this._settings.reloadApp(), 1500);
       } catch (error) {
         this.pushError('Error fetching configuration data: ' + (error as Error).message);
+        // Clear the blocking overlay so the error is visible, matching the v11/v12 paths.
+        this.upgrading.set(false);
       }
 
     } else if (version === 11) {
@@ -264,7 +266,7 @@ export class ConfigurationUpgradeService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async transformConfig(rootConfig: Config): Promise<any> {
     const config = await this._storage.getConfig(rootConfig.scope, rootConfig.name, this.legacyFileVersion) as unknown as v10IConfig;
-    if (config.app.configVersion !== this.legacyConfigVersion) {
+    if (!config.app || config.app.configVersion !== this.legacyConfigVersion) {
       this.pushError(`[Upgrade Service] ${rootConfig.scope}/${rootConfig.name} is not an upgradable version ${this.legacyConfigVersion} config. Skipping.`);
       return null;
     }
