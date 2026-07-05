@@ -115,6 +115,14 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       }
     });
 
+    // Reveal the auto-hiding toolbar on every page change: its page-icon strip
+    // is the transient page-position indicator. Fires for swipe, hotkey, tap and
+    // remote navigation alike, since all route through the activeDashboard signal.
+    effect(() => {
+      if (this._dashboard.activeDashboard() === null) return;
+      this.chrome.reveal();
+    });
+
     // initialize dashboardVisible from current URL
     try {
       this.dashboardVisible.set(this.isUrlDashboard(this._router.url));

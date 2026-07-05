@@ -315,6 +315,34 @@ describe('DataService', () => {
     expect(latest!.state).toBe(States.Normal);
   });
 
+  it('resets every source registration for a path on timeout, not just the first', () => {
+    let latestDefault: IPathUpdate | undefined;
+    let latestSource: IPathUpdate | undefined;
+    service
+      .subscribePath('self.electrical.batteries.10.voltage', 'default')
+      .subscribe(update => (latestDefault = update));
+    service
+      .subscribePath('self.electrical.batteries.10.voltage', 'test-source')
+      .subscribe(update => (latestSource = update));
+
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'electrical.batteries.10.voltage',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: 12.5,
+    });
+    expect(latestDefault!.data.value).toBe(12.5);
+    expect(latestSource!.data.value).toBe(12.5);
+
+    service.timeoutPathObservable('self.electrical.batteries.10.voltage', 'number');
+
+    // Both the default bucket and the per-source registration must clear on timeout.
+    expect(latestDefault!.data.value).toBeNull();
+    expect(latestSource!.data.value).toBeNull();
+    expect(latestSource!.state).toBe(States.Normal);
+  });
+
   it('does not emit on timeout for an unrecognised pathType', () => {
     const updates: IPathUpdate[] = [];
     service

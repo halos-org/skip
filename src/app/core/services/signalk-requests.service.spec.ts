@@ -87,7 +87,7 @@ describe('SignalkRequestsService', () => {
   });
 
   it.each<[number, string]>([
-    [200, 'The request was successfully.'],
+    [200, 'The request was successful.'],
     [401, 'Login failed. Your User ID or Password is incorrect.'],
     [403, 'DENIED: Authorization with R/W or Admin permission level is required to send commands. Configure Sign In credential.'],
     [405, 'The server does not support the request.'],
@@ -131,16 +131,45 @@ describe('SignalkRequestsService', () => {
     expect(received[0].statusCode).toBe(200);
   });
 
-  it('reports a described but unhandled status code (500) as unknown yet still dispatches it', () => {
+  it.each<[number, string]>([
+    [500, 'The request failed.'],
+    [502, 'Something went wrong carrying out the request on the server.'],
+    [504, 'Timeout on the server side trying to carry out the request.'],
+  ])('surfaces a %i server error as an error toast with its description and dispatches it', (statusCode, description) => {
     const received: skRequest[] = [];
     service.subscribeRequest().subscribe(r => received.push(r));
 
     const requestId = service.putRequest('navigation.lights', true, 'widget-1')!;
-    requestUpdates$.next({ requestId, state: 'COMPLETED', statusCode: 500 });
+    requestUpdates$.next({ requestId, state: 'COMPLETED', statusCode, message: 'disk full' });
+
+    expect(toastShow).toHaveBeenCalledWith(`${description} - disk full`, 0, false, 'error');
+    expect(received).toHaveLength(1);
+    expect(received[0].statusCode).toBe(statusCode);
+    expect(received[0].statusCodeDescription).toBe(description);
+  });
+
+  it('shows the bare description for a server error that carries no message', () => {
+    const received: skRequest[] = [];
+    service.subscribeRequest().subscribe(r => received.push(r));
+
+    const requestId = service.putRequest('navigation.lights', true, 'widget-1')!;
+    requestUpdates$.next({ requestId, state: 'COMPLETED', statusCode: 502 });
+
+    expect(toastShow).toHaveBeenCalledWith('Something went wrong carrying out the request on the server.', 0, false, 'error');
+    expect(received).toHaveLength(1);
+    expect(received[0].statusCodeDescription).toBe('Something went wrong carrying out the request on the server.');
+  });
+
+  it('reports a truly unknown status code as unknown yet still dispatches it', () => {
+    const received: skRequest[] = [];
+    service.subscribeRequest().subscribe(r => received.push(r));
+
+    const requestId = service.putRequest('navigation.lights', true, 'widget-1')!;
+    requestUpdates$.next({ requestId, state: 'COMPLETED', statusCode: 418 });
 
     expect(toastShow).toHaveBeenCalledWith(expect.stringContaining('Unknown Request Status Code'), 0, false, 'error');
     expect(received).toHaveLength(1);
-    expect(received[0].statusCode).toBe(500);
+    expect(received[0].statusCode).toBe(418);
     expect(received[0].statusCodeDescription).toBeUndefined();
   });
 

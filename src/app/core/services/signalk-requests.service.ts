@@ -8,7 +8,7 @@ import { UUID } from '../utils/uuid.util'
 import { ToastService } from './toast.service';
 
 const deltaStatusCodes: Record<number, string> = {
-  200: "The request was successfully.",
+  200: "The request was successful.",
   202: "Request accepted and pending completion.",
   400: "Something is wrong with the client's request.",
   401: "Login failed. Your User ID or Password is incorrect.",
@@ -19,7 +19,9 @@ const deltaStatusCodes: Record<number, string> = {
   504: "Timeout on the server side trying to carry out the request."
 }
 // Codes dispatched as recognized responses; anything else raises the unknown-status error toast.
-const handledStatusCodes = new Set([200, 202, 400, 401, 403, 405]);
+const handledStatusCodes = new Set([200, 202, 400, 401, 403, 405, 500, 502, 504]);
+// Server-side failures surfaced to the user as an error toast carrying their description.
+const serverErrorStatusCodes = new Set([500, 502, 504]);
 export interface skRequest {
   requestId: string;
   state: string;
@@ -130,6 +132,13 @@ export class SignalkRequestsService {
 
         if (this.requests[index].statusCode == 405) {
           console.error("[Request Service] Status Code: " + this.requests[index].statusCode + " - " + this.requests[index].message);
+        }
+
+        if (serverErrorStatusCodes.has(this.requests[index].statusCode)) {
+          const description = this.requests[index].statusCodeDescription;
+          const detail = this.requests[index].message ? description + " - " + this.requests[index].message : description;
+          this.toast.show(detail, 0, false, 'error');
+          console.error("[Request Service] Status Code: " + this.requests[index].statusCode + " - " + description);
         }
 
       } else {
