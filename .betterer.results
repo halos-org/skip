@@ -143,7 +143,7 @@ exports[`strictNullChecks`] = {
       [37, 10, 26, "Type \'null\' is not assignable to type \'Subscription\'.", "273497119"],
       [79, 8, 13, "Type \'null\' is not assignable to type \'string | undefined\'.", "2466344431"]
     ],
-    "src/app/widget-config/dataset-chart-options/dataset-chart-options.component.ts:4252167719": [
+    "src/app/widget-config/dataset-chart-options/dataset-chart-options.component.ts:2604195000": [
       [82, 26, 10, "Argument of type \'ISkPathData | null\' is not assignable to parameter of type \'ISkPathData\'.\\n  Type \'null\' is not assignable to type \'ISkPathData\'.", "384538813"]
     ],
     "src/app/widget-config/display-chart-options/display-chart-options.component.ts:333710162": [
