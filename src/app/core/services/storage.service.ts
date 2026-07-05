@@ -52,15 +52,15 @@ export class StorageService {
   private http = inject(HttpClient);
   private readonly _auth = inject(AuthenticationService);
 
-  private serverEndpoint: string = null;
+  private serverEndpoint: string | null = null;
   public isAppDataSupported = false;
-  private configFileVersion: number = null;
+  private configFileVersion: number | null = null;
   public sharedConfigName: string;
-  private InitConfig: IConfig = null;
+  private InitConfig: IConfig | null = null;
   private _isRemoteContextBootstrapped = false;
   public storageServiceReady$ = new BehaviorSubject<boolean>(false);
   private _isLoggedIn = false;
-  private _networkStatus: IEndpointStatus = undefined;
+  private _networkStatus: IEndpointStatus | undefined = undefined;
   // Instrumentation toggle
   private _logIO = false; // set to false to silence logging
 
@@ -279,8 +279,11 @@ export class StorageService {
     this.ensureReady();
     const serverConfigs: Config[] = [];
     if (!this.serverEndpoint) {
+      // Unreachable in practice: ensureReady() only passes once isStorageServiceReady() has
+      // observed a truthy serverEndpoint, and nothing ever clears it afterward. Kept as a
+      // defensive fallback that degrades to "no configs" rather than a crash.
       console.warn("[Storage Service] No server endpoint set. Cannot retrieve config list");
-      return null;
+      return serverConfigs;
     }
 
     const base = this.serverEndpoint;
@@ -344,8 +347,7 @@ export class StorageService {
       if (isInitLoad) this.InitConfig = remoteConfig;
       return cloneDeep(remoteConfig);
     } catch (error) {
-      this.handleError(error as HttpErrorResponse); // throws
-      return null; // unreachable
+      this.handleError(error as HttpErrorResponse); // never returns
     }
   }
 
@@ -590,13 +592,13 @@ export class StorageService {
     }
   }
 
-  private handleError(error: HttpErrorResponse) {
+  private handleError(error: HttpErrorResponse): never {
     this.logError(error);
     // Rethrow so awaiting callers (get/set/list) observe the failure.
     throw error;
   }
 
-  public get initConfig(): IConfig {
+  public get initConfig(): IConfig | null {
     return this.InitConfig;
   }
 }

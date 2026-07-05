@@ -42,7 +42,7 @@ const isRfc3339StringDate = (date: Date | string): boolean => {
 };
 
 // Translate units from sk metadata to appropriate type category
-const typeFromUnits = (units: string): string | undefined => {
+const typeFromUnits = (units: string | undefined): string | undefined => {
   if (!units) {
     return undefined;
   }
@@ -239,8 +239,8 @@ export class DataService implements OnDestroy {
       return matchingPaths.pathDataUpdate$;
     }
 
-    let currentValue: string = null;
-    let currentTimestamp: string = null;
+    let currentValue: string | null = null;
+    let currentTimestamp: string | null | undefined = null;
     let currentDateTimestamp: Date | null = null;
     let state: TState = States.Normal;
     let pathUpdate: IPathUpdate = {
@@ -250,7 +250,7 @@ export class DataService implements OnDestroy {
       },
       state: state
     };
-    let metaUpdate: ISkMetadata = null;
+    let metaUpdate: ISkMetadata | null = null;
 
     const dataPath = this._skData.get(path);
 
@@ -480,7 +480,7 @@ export class DataService implements OnDestroy {
           state: pendingState ?? States.Normal,
           defaultSource: undefined,
           sources: {},
-          meta: meta.meta ? cloneDeep(meta.meta) : null,
+          meta: meta.meta ? cloneDeep(meta.meta) : undefined,
         };
         this._skData.set(metaPath, pathObject);
         if (pendingState !== undefined) {
@@ -611,7 +611,7 @@ export class DataService implements OnDestroy {
     }
   }
 
-  private setPathContext(context: string, path: string): string {
+  private setPathContext(context: string | undefined, path: string): string {
     const finalPath = context !== this._selfUrn ? `${context}.${path}` : `${SELFROOTDEF}.${path}`;
     return finalPath;
   }

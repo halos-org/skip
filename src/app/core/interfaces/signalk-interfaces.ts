@@ -181,7 +181,7 @@ export interface ISkMetadata {
   /** Optional list of possible values for multi-state control metadata */
   possibleValues?: ISkPossibleValue[];
   supportsPut?: boolean; // true if the path supports PUT (write) requests
-  units: string;        // required if value is present. Describe the SK type of data
+  units?: string;        // required if value is present. Describe the SK type of data
   timeout?: number;     // tells the consumer how long it should consider the value valid
   properties: object; // Not defined by Kip. Used by GPS and Ship details and other complex data types
   method?: TMethod[];

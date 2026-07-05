@@ -38,8 +38,8 @@ export interface IBootstrapIssue {
 @Injectable()
 export class AppNetworkInitService implements OnDestroy {
   private config: IConnectionConfig;
-  private isLoggedIn: boolean = null;
-  private loggedInSubscription: Subscription = null;
+  private isLoggedIn = false;
+  private loggedInSubscription: Subscription;
 
   private readonly connection = inject(SignalKConnectionService);
   private readonly auth = inject(AuthenticationService);
@@ -338,17 +338,21 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   private loadLocalStorageConfig(): void {
-    this.config = JSON.parse(localStorage.getItem(CONNECTION_CONFIG_KEY));
+    const stored = localStorage.getItem(CONNECTION_CONFIG_KEY);
+    const parsedConfig: IConnectionConfig | null = stored ? JSON.parse(stored) : null;
 
-    if (!this.config) {
+    if (!parsedConfig) {
       this.config = cloneDeep(DefaultConnectionConfig);
       this.config.signalKUrl = window.location.origin;
       console.log(`[AppInit Network Service] Connection Configuration not found. Creating configuration using Auto-Discovery URL: ${this.config.signalKUrl}`);
       this.setLocalStorageConfig();
-    } else if (!this.config.signalKUrl) {
-      this.config.signalKUrl = window.location.origin;
-      this.setLocalStorageConfig();
-      console.log(`[AppInit Network Service] Config found with no server URL. Setting Auto-Discovery URL: ${this.config.signalKUrl}`);
+    } else {
+      this.config = parsedConfig;
+      if (!this.config.signalKUrl) {
+        this.config.signalKUrl = window.location.origin;
+        this.setLocalStorageConfig();
+        console.log(`[AppInit Network Service] Config found with no server URL. Setting Auto-Discovery URL: ${this.config.signalKUrl}`);
+      }
     }
 
     if (this.config.configVersion == 9) {

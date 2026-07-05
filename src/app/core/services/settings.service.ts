@@ -107,14 +107,15 @@ export class SettingsService {
   private async startup(): Promise<void> {
     // A missing server config comes back as {} (not a 404), so guard on the presence of app config —
     // an empty/appless object must not fall through to pushSettings() and dereference activeConfig.app.
-    if (!this.storage.isRemoteContextBootstrapped() || !this.storage.initConfig?.app) {
+    const initConfig = this.storage.initConfig;
+    if (!this.storage.isRemoteContextBootstrapped() || !initConfig?.app) {
       console.warn('[AppSettings Service] Shared configuration enabled but remote bootstrap handoff is missing or empty. Waiting for explicit recovery action.');
       return;
     }
 
-    this.configVersion = this.storage.initConfig?.app?.configVersion;
-    this.checkConfigUpgradeRequired(false, this.storage.initConfig?.app?.configVersion);
-    this.activeConfig = this.storage.initConfig;
+    this.configVersion = initConfig.app.configVersion;
+    this.checkConfigUpgradeRequired(false, initConfig.app.configVersion);
+    this.activeConfig = initConfig;
     this.pushSettings();
   }
 
@@ -222,28 +223,35 @@ export class SettingsService {
   }
 
   private pushSettings(): void {
+    const app = this.activeConfig.app;
+    // Guaranteed non-null by startup()'s pre-check before pushSettings() is invoked; guarded again
+    // here defensively rather than asserted, since activeConfig is a mutable field.
+    if (!app) {
+      return;
+    }
+
     if (this.activeConfig.theme) {
       this._themeName.set(this.activeConfig.theme.themeName);
     }
-    this.applyUnitDefaults(this.activeConfig.app.unitDefaults);
-    this.applyNotificationConfig(this.activeConfig.app.notificationConfig);
+    this.applyUnitDefaults(app.unitDefaults);
+    this.applyNotificationConfig(app.notificationConfig);
 
-    if (this.activeConfig.app.autoNightMode === undefined) {
+    if (app.autoNightMode === undefined) {
       this.setAutoNightMode(false);
     } else {
-      this._autoNightMode.set(this.activeConfig.app.autoNightMode);
+      this._autoNightMode.set(app.autoNightMode);
     }
 
-    if (this.activeConfig.app.redNightMode === undefined) {
+    if (app.redNightMode === undefined) {
       this.setRedNightMode(false);
     } else {
-      this._redNightMode.set(this.activeConfig.app.redNightMode);
+      this._redNightMode.set(app.redNightMode);
     }
 
-    if (this.activeConfig.app.nightModeBrightness === undefined) {
+    if (app.nightModeBrightness === undefined) {
       this.setNightModeBrightness(0.2);
     } else {
-      this._nightModeBrightness.set(this.activeConfig.app.nightModeBrightness);
+      this._nightModeBrightness.set(app.nightModeBrightness);
     }
 
     if (this.activeConfig.dashboards === undefined) {
@@ -252,10 +260,10 @@ export class SettingsService {
       this._dashboards = this.activeConfig.dashboards;
     }
 
-    if (this.activeConfig.app.browserTabTitle === undefined) {
+    if (app.browserTabTitle === undefined) {
       this._browserTabTitle.set('SKip');
     } else {
-      this._browserTabTitle.set(this.activeConfig.app.browserTabTitle);
+      this._browserTabTitle.set(app.browserTabTitle);
     }
   }
 

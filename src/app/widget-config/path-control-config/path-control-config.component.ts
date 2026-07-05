@@ -174,7 +174,7 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
       if (isMultiCTRLTypeLight) {
         supportsPUT = false;
       } else {
-        supportsPUT = compare(this._connection.skServerVersion, '2.12.0', ">=") ? pathFormGroup.value.supportsPut : false;
+        supportsPUT = this._connection.skServerVersion != null && compare(this._connection.skServerVersion, '2.12.0', ">=") ? pathFormGroup.value.supportsPut : false;
       }
     }
 

@@ -338,6 +338,9 @@ describe('SignalKDeltaService', () => {
       service.subscribeRequestUpdates().subscribe(v => reqs.push(v));
       parse(service, { requestId: 'req-1', updates: [update([{ path: 'navigation.speedOverGround', value: 1 }])] });
       expect(out).toHaveLength(1);
+      // A message with no context field emits context: undefined (DataService folds it to self).
+      // Pin it so a refactor coercing undefined -> '' or a literal URN is caught.
+      expect(out[0].context).toBeUndefined();
       expect(reqs).toEqual([]);
     });
 
