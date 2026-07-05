@@ -58,7 +58,7 @@ export class WidgetSimpleLinearComponent {
   // Signals (presentation state)
   protected readonly unitsLabel = signal<string>('');
   protected readonly dataLabelValue = signal<string>('0');
-  protected readonly dataValue = signal<number>(null);
+  protected readonly dataValue = signal<number | null>(null);
   protected readonly barColor = signal<string>('');
   protected readonly barColorGradient = signal<string>('');
   protected readonly barColorBackground = signal<string>('');
@@ -72,9 +72,9 @@ export class WidgetSimpleLinearComponent {
     const zones = this.metadata.zones();
     if (!zones?.length) return [];
 
-    const unit = cfg.paths['gaugePath'].convertUnitTo;
-    const min = cfg.displayScale.lower;
-    const max = cfg.displayScale.upper;
+    const unit = cfg.paths?.['gaugePath'].convertUnitTo;
+    const min = cfg.displayScale?.lower ?? 0;
+    const max = cfg.displayScale?.upper ?? 15;
     return getHighlights(zones, theme, unit, this.unitsService, min, max);
   });
   private lastState: States | null = null; // simple cache to avoid redundant color sets
@@ -92,10 +92,12 @@ export class WidgetSimpleLinearComponent {
           const raw = pkt?.data?.value as number | null;
             // Clamp & label formatting
           if (raw == null) {
-            this.dataValue.set(cfg.displayScale.lower);
+            this.dataValue.set(cfg.displayScale?.lower ?? 0);
             this.dataLabelValue.set('--');
           } else {
-            const clamped = Math.min(Math.max(raw, cfg.displayScale.lower), cfg.displayScale.upper);
+            const lower = cfg.displayScale?.lower ?? 0;
+            const upper = cfg.displayScale?.upper ?? 15;
+            const clamped = Math.min(Math.max(raw, lower), upper);
             this.dataValue.set(clamped);
             this.dataLabelValue.set(clamped.toFixed(cfg.numDecimal));
           }
@@ -109,15 +111,15 @@ export class WidgetSimpleLinearComponent {
                 case States.Warn: this.barColor.set(theme.zoneWarn); break;
                 case States.Alert: this.barColor.set(theme.zoneAlert); break;
                 case States.Nominal: this.barColor.set(theme.zoneNominal); break;
-                default: this.barColor.set(getColors(cfg.color, theme).color); break;
+                default: this.barColor.set(getColors(cfg.color ?? 'contrast', theme).color); break;
               }
             }
           }
         });
 
         // Unit label (abr|full)
-        const unit = cfg.paths['gaugePath'].convertUnitTo;
-        this.unitsLabel.set(cfg.gauge.unitLabelFormat === 'abr' ? unit?.substring(0,1) : unit);
+        const unit = cfg.paths?.['gaugePath'].convertUnitTo;
+        this.unitsLabel.set(cfg.gauge?.unitLabelFormat === 'abr' ? unit?.substring(0,1) : unit);
       });
     });
 
@@ -128,7 +130,7 @@ export class WidgetSimpleLinearComponent {
       if (!cfg || !theme) return;
       untracked(() => {
         this.barColorBackground.set(theme.background);
-        const palette = getColors(cfg.color, theme);
+        const palette = getColors(cfg.color ?? 'contrast', theme);
         // Set baseline colors (and recompute any zone-derived color on theme changes)
         if (cfg.ignoreZones) {
           this.barColor.set(palette.color);
@@ -152,8 +154,9 @@ export class WidgetSimpleLinearComponent {
     // Zones metadata observation (only when needed)
     effect(() => {
       const cfg = this.runtime.options();
-      if (!cfg || cfg.ignoreZones || !this.metadata) return;
-      untracked(() => this.metadata.observe('gaugePath'));
+      const metadata = this.metadata;
+      if (!cfg || cfg.ignoreZones || !metadata) return;
+      untracked(() => metadata.observe('gaugePath'));
     });
   }
 }

@@ -612,8 +612,12 @@ export class DataService implements OnDestroy {
   }
 
   private setPathContext(context: string | undefined, path: string): string {
-    const finalPath = context !== this._selfUrn ? `${context}.${path}` : `${SELFROOTDEF}.${path}`;
-    return finalPath;
+    // An empty/absent context means "self" (per the ISkPathData/IMeta contract), same as a
+    // context that already equals the learned self URN. Anything else is a foreign root node.
+    if (!context || context === this._selfUrn) {
+      return `${SELFROOTDEF}.${path}`;
+    }
+    return `${context}.${path}`;
   }
 
   /**
