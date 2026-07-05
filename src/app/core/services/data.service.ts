@@ -611,7 +611,7 @@ export class DataService implements OnDestroy {
     }
   }
 
-  private setPathContext(context: string, path: string): string {
+  private setPathContext(context: string | undefined, path: string): string {
     const finalPath = context !== this._selfUrn ? `${context}.${path}` : `${SELFROOTDEF}.${path}`;
     return finalPath;
   }

@@ -335,10 +335,6 @@ export class SignalKDeltaService implements OnDestroy {
 
   private processWebsocketMessage(message: ISignalKDeltaMessage) {
     if (message.updates) {
-      if (typeof message.context !== 'string') {
-        console.warn("[Delta Service] Dropping updates without a string context:", message);
-        return;
-      }
       this.parseUpdates(message.updates, message.context);
       return;
     }
@@ -363,7 +359,7 @@ export class SignalKDeltaService implements OnDestroy {
     console.warn("[Delta Service] Unknown message type. Message content:" + message);
   }
 
-  private parseUpdates(updates: ISignalKUpdateMessage[], context: string): void {
+  private parseUpdates(updates: ISignalKUpdateMessage[], context: string | undefined): void {
     // if (context != this._selfUrn) {    // remove non self root nodes
     //   return;
     // }
@@ -487,7 +483,7 @@ export class SignalKDeltaService implements OnDestroy {
     return results;
   }
 
-  private parseSkMeta(metadata: ISignalKMeta, context: string) {
+  private parseSkMeta(metadata: ISignalKMeta, context: string | undefined) {
     if (metadata?.value == null) {
       console.warn("[Delta Service] Dropping metadata update without a value:", metadata);
       return;

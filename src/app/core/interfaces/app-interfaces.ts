@@ -17,7 +17,7 @@ import { ISkMetadata, TState } from "./signalk-interfaces";
  * @memberof app-interfaces
  */
  export interface IPathValueData {
-  context: string;
+  context: string | undefined;
   path: string;
   source: string;
   timestamp: string;
@@ -91,7 +91,7 @@ export interface IMeta {
    * Empty context should assume the message is from Self. Other contexts
    * can be from AIS, DCS and other types of remote emitting sources
    * configured */
-  context: string,
+  context: string | undefined,
   path: string;
   meta: ISkMetadata;
 }
