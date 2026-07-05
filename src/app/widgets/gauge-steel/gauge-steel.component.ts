@@ -131,6 +131,8 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
         let lower: number | null | undefined = null;
         let upper: number | null | undefined = null;
 
+        // Zones still draw before the theme loads (transparent fill), so the gauge
+        // shows its zone geometry rather than skipping the render as the other widgets do.
         let color: string;
         switch (zone.state) {
           case States.Emergency:

@@ -2,6 +2,7 @@ import { Component, OnDestroy, AfterViewInit, ElementRef, inject, signal, viewCh
 import { ChangeDetectionStrategy } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { MinichartComponent } from '../minichart/minichart.component';
+import { reduceMinMax } from './numeric-minmax.util';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
@@ -100,13 +101,9 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private onNumericValue = (newValue: IPathUpdate) => {
     const dataValue = newValue.data.value as number | null;
     this.dataValue = dataValue;
-    if (dataValue !== null) {
-      if (this.minValue === null || dataValue < this.minValue) {
-        this.minValue = dataValue;
-      } else if (this.maxValue === null || dataValue > this.maxValue) {
-        this.maxValue = dataValue;
-      }
-    }
+    const minMax = reduceMinMax(this.minValue, this.maxValue, dataValue);
+    this.minValue = minMax.min;
+    this.maxValue = minMax.max;
 
     if (!this.runtime?.options()?.ignoreZones) {
       if (this.pathDataState !== newValue.state) {
