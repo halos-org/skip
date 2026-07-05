@@ -134,24 +134,24 @@ export class DatasetChartOptionsComponent implements OnInit {
       this.setPathUnits();
       return;
     }
+    // A freshly chosen path must not carry over the previous path's concrete
+    // source, which may not exist here. Clear it so setPathSources falls back
+    // to "Any"; the ngOnInit load path calls setPathSources directly and keeps
+    // the saved selection.
+    this.datachartSource().reset();
     this.setPathSources(pathObject);
     this.setPathUnits(pathObject.path);
   }
 
   private setPathSources(pathObject: ISkPathData): void {
-    if (Object.keys(pathObject.sources).length == 1) {
-      this.pathSources.set(['default']);
+    // 'default' (shown as "Any") always leads the list: it reads the server's
+    // merged, priority-selected value and follows source failover. Concrete
+    // sources follow. An existing selection is preserved; otherwise default to "Any".
+    this.pathSources.set(['default', ...Object.keys(pathObject.sources).sort()]);
+    if (!this.datachartSource().value) {
       this.datachartSource().setValue('default');
-      this.datachartSource().enable();
-    } else if (Object.keys(pathObject.sources).length > 1) {
-      this.pathSources.set(Object.keys(pathObject.sources).sort());
-      if(this.datachartSource().value) {
-        this.datachartSource().setValue(this.datachartSource().value);
-      } else {
-        this.datachartSource().reset();
-      }
-      this.datachartSource().enable();
     }
+    this.datachartSource().enable();
   }
 
   private setPathUnits(path?: string): void {

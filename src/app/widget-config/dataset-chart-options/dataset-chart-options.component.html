@@ -56,7 +56,7 @@
           >
           @for (source of pathSources(); track source) {
             <mat-option [value]="source">
-              {{source}}
+              {{source === 'default' ? 'Any' : source}}
             </mat-option>
           }
         </mat-select>
