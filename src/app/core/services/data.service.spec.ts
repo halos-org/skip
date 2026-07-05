@@ -389,4 +389,41 @@ describe('DataService', () => {
 
     expect(service.getPathObject('self.navigation.anchor.position')!.type).toBeUndefined();
   });
+
+  it('files a context-less delta value under self (empty context assumes self)', () => {
+    const values: unknown[] = [];
+    service
+      .subscribePath('self.navigation.speedOverGround', 'default')
+      .subscribe(update => values.push(update.data.value));
+
+    // A delta with no context must land on the self root, not an "undefined.<path>" key (#209).
+    dataPathUpdates$.next({
+      context: undefined,
+      path: 'navigation.speedOverGround',
+      source: 'default',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: 3.2,
+    });
+
+    expect(values.at(-1)).toBe(3.2);
+  });
+
+  it('keeps a foreign-context value under its own root, not self', () => {
+    const selfValues: unknown[] = [];
+    const foreignValues: unknown[] = [];
+    service.subscribePath('self.navigation.speedOverGround', 'default').subscribe(u => selfValues.push(u.data.value));
+    service.subscribePath('vessels.abc.navigation.speedOverGround', 'default').subscribe(u => foreignValues.push(u.data.value));
+
+    dataPathUpdates$.next({
+      context: 'vessels.abc',
+      path: 'navigation.speedOverGround',
+      source: 'default',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: 7,
+    });
+
+    expect(foreignValues.at(-1)).toBe(7);
+    // Self stays at its initial null emission; the foreign value never leaks onto it.
+    expect(selfValues).not.toContain(7);
+  });
 });
