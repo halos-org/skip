@@ -49,7 +49,7 @@ export class MinichartComponent implements OnDestroy {
   public yScaleMin: number = null;
   public yScaleMax: number = null;
   public inverseYAxis = false;
-  public verticalChart = null;
+  public verticalChart: boolean | null = null;
   protected unitsService = inject(UnitsService);
   private readonly historyStream = inject(HistoryChartStreamService);
   private readonly ngZone = inject(NgZone);

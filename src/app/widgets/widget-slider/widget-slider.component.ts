@@ -36,7 +36,6 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null,
         showConvertUnitTo: false,
-        convertUnitTo: null,
         supportsPut: true,
         sampleTime: 500
       }
@@ -57,8 +56,8 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
   private readonly signalkRequestsService = inject(SignalkRequestsService);
   private readonly toast = inject(ToastService);
 
-  protected labelColor = signal<string>(undefined)
-  protected barColor = signal<string>(undefined);
+  protected labelColor = signal<string>('')
+  protected barColor = signal<string>('');
 
   private lineStartPx: number;
   private lineWidthPx: number;
@@ -86,7 +85,7 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
       if (!cfg || !theme) return;
       untracked(() => {
         this.ensureColorMap();
-        this.getColors(cfg.color);
+        this.getColors(cfg.color ?? 'contrast');
       });
     });
 
@@ -100,7 +99,8 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
 
         this.streams.observe('gaugePath', (newValue) => {
           if (!newValue || !newValue.data) {
-            queueMicrotask(() => this.updateHandlePosition(this.mapValueToPosition(cfg.displayScale.lower)));
+            const lower = this.getScaleBounds(cfg).lower;
+            queueMicrotask(() => this.updateHandlePosition(this.mapValueToPosition(lower)));
             return;
           }
           queueMicrotask(() => this.updateHandlePosition(this.mapValueToPosition(newValue.data.value as number)));
@@ -113,7 +113,7 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
     const cfg = this.runtime.options();
 
     if (cfg) {
-      this.getColors(cfg.color);
+      this.getColors(cfg.color ?? 'contrast');
     }
 
     this.valueChange$
@@ -121,11 +121,12 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
         map((value) => {
           const cfg = this.runtime.options();
           if (!cfg) return value;
+          const { lower, upper } = this.getScaleBounds(cfg);
           // Check if the value is within 1% of the lower or upper bounds
-          if (this.isWithinMargin(value, cfg.displayScale.lower, cfg)) {
-            return cfg.displayScale.lower; // Exact lower bound
-          } else if (this.isWithinMargin(value, cfg.displayScale.upper, cfg)) {
-            return cfg.displayScale.upper; // Exact upper bound
+          if (this.isWithinMargin(value, lower, cfg)) {
+            return lower; // Exact lower bound
+          } else if (this.isWithinMargin(value, upper, cfg)) {
+            return upper; // Exact upper bound
           }
           return parseFloat(value.toFixed(2)); // Round to 2 decimal places
         }),
@@ -137,31 +138,42 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
       });
   }
 
+  /** Real fallback matches DEFAULT_CONFIG.displayScale (lower: 0, upper: 1). */
+  private getScaleBounds(cfg: IWidgetSvcConfig): { lower: number; upper: number } {
+    return {
+      lower: cfg.displayScale?.lower ?? 0,
+      upper: cfg.displayScale?.upper ?? 1
+    };
+  }
+
   private mapValueToPosition(value: number): number {
     const cfg = this.runtime.options();
     if (!cfg) return value;
-    const scaleRange = cfg.displayScale.upper - cfg.displayScale.lower;
+    const { lower, upper } = this.getScaleBounds(cfg);
+    const scaleRange = upper - lower;
     const lineRange = this.LINE_WIDTH;
-    return ((value - cfg.displayScale.lower) / scaleRange) * lineRange + this.LINE_START;
+    return ((value - lower) / scaleRange) * lineRange + this.LINE_START;
   }
 
   private mapPositionToValue(position: number): number {
     const cfg = this.runtime.options();
     if (!cfg) return position;
-    const scaleRange = cfg.displayScale.upper - cfg.displayScale.lower;
+    const { lower, upper } = this.getScaleBounds(cfg);
+    const scaleRange = upper - lower;
     const lineRange = this.LINE_WIDTH;
-    return ((position - this.LINE_START) / lineRange) * scaleRange + cfg.displayScale.lower;
+    return ((position - this.LINE_START) / lineRange) * scaleRange + lower;
   }
 
   private isWithinMargin(value: number, target: number, cfg: IWidgetSvcConfig): boolean {
-    const margin = (cfg.displayScale.upper - cfg.displayScale.lower) * 0.01; // 1% margin
+    const { lower, upper } = this.getScaleBounds(cfg);
+    const margin = (upper - lower) * 0.01; // 1% margin
     return Math.abs(value - target) <= margin;
   }
 
   public sendValue(value: unknown): void {
     const path = this.runtime.options()?.paths?.['gaugePath']?.path;
     this.signalkRequestsService.putRequest(
-      path,
+      path ?? '',
       value,
       this.id()
     );
@@ -216,9 +228,9 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
 
         const cfg = this.runtime.options();
         if (cfg && handlePosition <= this.LINE_START) {
-          this.pathValue = cfg.displayScale.lower; // Exact lower bound
+          this.pathValue = this.getScaleBounds(cfg).lower; // Exact lower bound
         } else if (cfg && handlePosition >= this.LINE_START + this.LINE_WIDTH) {
-          this.pathValue = cfg.displayScale.upper; // Exact upper bound
+          this.pathValue = this.getScaleBounds(cfg).upper; // Exact upper bound
         } else {
           this.pathValue = this.mapPositionToValue(handlePosition);
         }
@@ -249,6 +261,7 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
     this.ensureColorMap();
     if (!this.colorMap) return;
     const colors = this.colorMap.get(color) || this.colorMap.get("contrast");
+    if (!colors) return;
     this.labelColor.set(colors.label);
     this.barColor.set(colors.bar);
   }

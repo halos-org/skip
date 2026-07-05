@@ -60,19 +60,19 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private canvasMainRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
 
   protected showMiniChart = signal<boolean>(false);
-  protected labelColor = signal<string>(undefined);
+  protected labelColor = signal<string>('');
   private canvasElement: HTMLCanvasElement;
-  private canvasCtx: CanvasRenderingContext2D;
+  private canvasCtx: CanvasRenderingContext2D | null;
   private cssWidth = 0;
   private cssHeight = 0;
   private backgroundBitmap: HTMLCanvasElement | null = null;
   private backgroundBitmapText: string | null = null;
 
-  private dataValue: number = null;
-  private maxValue: number = null;
-  private minValue: number = null;
-  private valueColor: string = undefined;
-  private valueStateColor: string = undefined;
+  private dataValue: number | null = null;
+  private maxValue: number | null = null;
+  private minValue: number | null = null;
+  private valueColor: string | undefined = undefined;
+  private valueStateColor: string | undefined = undefined;
   private maxValueTextWidth = 0;
   private maxValueTextHeight = 0;
   private maxMinMaxTextWidth = 0;
@@ -98,25 +98,29 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   });
 
   private onNumericValue = (newValue: IPathUpdate) => {
-    this.dataValue = newValue.data.value as number;
-    if (this.minValue === null || this.dataValue < this.minValue) {
-      this.minValue = this.dataValue;
-    } else if (this.maxValue === null || this.dataValue > this.maxValue) {
-      this.maxValue = this.dataValue;
+    const dataValue = newValue.data.value as number | null;
+    this.dataValue = dataValue;
+    if (dataValue !== null) {
+      if (this.minValue === null || dataValue < this.minValue) {
+        this.minValue = dataValue;
+      } else if (this.maxValue === null || dataValue > this.maxValue) {
+        this.maxValue = dataValue;
+      }
     }
 
-    if (!this.runtime?.options().ignoreZones) {
+    if (!this.runtime?.options()?.ignoreZones) {
       if (this.pathDataState !== newValue.state) {
         this.pathDataState = newValue.state as States;
+        const theme = this.theme();
         switch (newValue.state) {
           case States.Alarm:
-            this.valueStateColor = this.theme().zoneAlarm;
+            this.valueStateColor = theme?.zoneAlarm ?? this.valueColor;
             break;
           case States.Warn:
-            this.valueStateColor = this.theme().zoneWarn;
+            this.valueStateColor = theme?.zoneWarn ?? this.valueColor;
             break;
           case States.Alert:
-            this.valueStateColor = this.theme().zoneAlert;
+            this.valueStateColor = theme?.zoneAlert ?? this.valueColor;
             break;
           default:
             this.valueStateColor = this.valueColor;
@@ -128,7 +132,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   };
 
   constructor() {
-    this.showMiniChart.set(this.runtime.options().showMiniChart);
+    this.showMiniChart.set(this.runtime.options()?.showMiniChart ?? false);
     effect(() => {
       const theme = this.theme();
       const color = this.runtime?.options()?.color;
@@ -186,8 +190,8 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
       if (!miniChartSignature) return;
       if (!show) return;
       if (!chart) return; // will re-run when present
-      this.setMiniChart();
-      this.miniChart().startChart();
+      this.setMiniChart(chart);
+      chart.startChart();
     });
   }
 
@@ -226,62 +230,66 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private updateMiniChartVisibility(): void {
-    this.showMiniChart.set(!!this.runtime.options().showMiniChart);
+    this.showMiniChart.set(!!this.runtime.options()?.showMiniChart);
   }
 
-  private setMiniChart(): void {
+  private setMiniChart(chart: MinichartComponent): void {
     const cfg = this.runtime.options();
-    const pathInfo = cfg.paths['numericPath'];
-    this.miniChart().dataPath = pathInfo?.path ?? null;
-    this.miniChart().dataSource = pathInfo?.source ?? 'default';
-    this.miniChart().color = cfg.color;
-    this.miniChart().convertUnitTo = pathInfo?.convertUnitTo;
-    this.miniChart().numDecimal = cfg.numDecimal;
-    this.miniChart().yScaleMin = cfg.yScaleMin;
-    this.miniChart().yScaleMax = cfg.yScaleMax;
-    this.miniChart().inverseYAxis = cfg.inverseYAxis;
-    this.miniChart().verticalChart = cfg.verticalChart;
+    if (!cfg) return;
+    const pathInfo = cfg.paths?.['numericPath'];
+    chart.dataPath = pathInfo?.path ?? null;
+    chart.dataSource = pathInfo?.source ?? 'default';
+    chart.color = cfg.color ?? 'contrast';
+    chart.convertUnitTo = pathInfo?.convertUnitTo;
+    chart.numDecimal = cfg.numDecimal ?? 1;
+    chart.yScaleMin = cfg.yScaleMin ?? 0;
+    chart.yScaleMax = cfg.yScaleMax ?? 10;
+    chart.inverseYAxis = cfg.inverseYAxis ?? false;
+    chart.verticalChart = cfg.verticalChart ?? false;
   }
 
   private setColors(): void {
     const cfg = this.runtime.options();
-    if (!cfg) return;
-    this.labelColor.set(getColors(cfg.color, this.theme()).dim);
-    this.valueStateColor = this.valueColor = getColors(cfg.color, this.theme()).color;
+    const theme = this.theme();
+    if (!cfg || !theme) return;
+    this.labelColor.set(getColors(cfg.color ?? 'contrast', theme).dim);
+    this.valueStateColor = this.valueColor = getColors(cfg.color ?? 'contrast', theme).color;
     this.backgroundBitmap = null;
     this.backgroundBitmapText = null;
   }
 
   private drawWidget(): void {
-    if (!this.canvasCtx) return;
+    const ctx = this.canvasCtx;
+    if (!ctx) return;
     const cfg = this.runtime.options();
     if (!cfg) return;
-    const unit = cfg.paths['numericPath'].convertUnitTo;
+    const unit = cfg.paths?.['numericPath']?.convertUnitTo;
     const marginX = 10 * this.canvas.scaleFactor;
     const marginY = 5 * this.canvas.scaleFactor;
-    const bgText = cfg.displayName + '|' + unit;
+    const displayName = cfg.displayName ?? 'Gauge Label';
+    const bgText = displayName + '|' + (unit ?? '');
 
     if (!this.backgroundBitmap ||
         this.backgroundBitmap.width !== this.canvasElement.width ||
         this.backgroundBitmap.height !== this.canvasElement.height ||
         this.backgroundBitmapText !== bgText) {
       this.backgroundBitmap = this.canvas.renderStaticToBitmap(
-        this.canvasCtx,
+        ctx,
         this.cssWidth,
         this.cssHeight,
-        (ctx) => {
+        (bitmapCtx) => {
           this.canvas['drawTitleInternal'](
-            ctx,
-            cfg.displayName,
+            bitmapCtx,
+            displayName,
             this.labelColor(),
             'normal',
             this.cssWidth,
             this.cssHeight,
             0.1
           );
-          if (!['unitless', 'percent', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
+          if (unit !== undefined && !['unitless', 'percent', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
             this.canvas.drawText(
-              ctx,
+              bitmapCtx,
               unit,
               this.cssWidth - marginX,
               this.cssHeight - marginY,
@@ -298,21 +306,21 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
       this.backgroundBitmapText = bgText;
     }
 
-    this.canvas.clearCanvas(this.canvasCtx, this.cssWidth, this.cssHeight);
+    this.canvas.clearCanvas(ctx, this.cssWidth, this.cssHeight);
     if (this.backgroundBitmap && this.backgroundBitmap.width > 0 && this.backgroundBitmap.height > 0) {
-      this.canvasCtx.drawImage(this.backgroundBitmap, 0, 0, this.cssWidth, this.cssHeight);
+      ctx.drawImage(this.backgroundBitmap, 0, 0, this.cssWidth, this.cssHeight);
     }
 
-    this.drawValue();
+    this.drawValue(ctx);
     if (cfg.showMax || cfg.showMin) {
-      this.drawMinMax();
+      this.drawMinMax(ctx);
     }
   }
 
-  private drawValue(): void {
+  private drawValue(ctx: CanvasRenderingContext2D): void {
     const valueText = this.getValueText();
     this.canvas.drawText(
-      this.canvasCtx,
+      ctx,
       valueText,
       Math.floor(this.cssWidth / 2),
       Math.floor((this.cssHeight / 2) * 1.15),
@@ -324,16 +332,19 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private getValueText(): string {
-    if (this.dataValue === null) return "--";
-    const cUnit = this.runtime.options().paths['numericPath'].convertUnitTo;
-    if (['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'].includes(cUnit)) {
-      return this.dataValue.toString();
+    const dataValue = this.dataValue;
+    if (dataValue === null) return "--";
+    const cfg = this.runtime.options();
+    const cUnit = cfg?.paths?.['numericPath']?.convertUnitTo;
+    if (cUnit !== undefined && ['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'].includes(cUnit)) {
+      return dataValue.toString();
     }
-    return this.applyDecorations(this.dataValue.toFixed(this.runtime.options().numDecimal));
+    return this.applyDecorations(dataValue.toFixed(cfg?.numDecimal));
   }
 
-  private drawMinMax(): void {
+  private drawMinMax(ctx: CanvasRenderingContext2D): void {
     const cfg = this.runtime.options();
+    if (!cfg) return;
     if (!cfg.showMin && !cfg.showMax) return;
     let valueText = '';
     if (cfg.showMin) {
@@ -346,7 +357,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     const marginX = 10 * this.canvas.scaleFactor;
     const marginY = 5 * this.canvas.scaleFactor;
     this.canvas.drawText(
-      this.canvasCtx,
+      ctx,
       valueText,
       marginX,
       Math.floor(this.cssHeight - marginY),
@@ -360,7 +371,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private applyDecorations(txtValue: string): string {
-    switch (this.runtime.options().paths['numericPath'].convertUnitTo) {
+    switch (this.runtime.options()?.paths?.['numericPath']?.convertUnitTo) {
       case 'percent':
       case 'percentraw':
         txtValue += '%';

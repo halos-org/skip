@@ -174,7 +174,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
             this.ngGauge()?.update({ highlights: [] });
           } else {
             const serialized = JSON.stringify(hl) as unknown as string; // gauge lib tolerates stringified form
-            this.ngGauge()?.update({ highlights: serialized, highlightsWidth: this.runtime.options().gauge?.highlightsWidth });
+            this.ngGauge()?.update({ highlights: serialized, highlightsWidth: this.runtime.options()?.gauge?.highlightsWidth });
           }
         } catch { /* ignore */ }
       });
@@ -187,7 +187,9 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       const scale = this.adjustedScale(); // reading for dependency
 
       untracked(() => {
-        this.buildGaugeOptions(this.runtime.options(), theme, scale);
+        const cfg = this.runtime.options();
+        if (!cfg || !theme) return;
+        this.buildGaugeOptions(cfg, theme, scale);
         if (this.viewReady()) {
           try {
             this.ngGauge()?.update(this.gaugeOptions);
@@ -217,7 +219,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       untracked(() => {
         const cfg = this.runtime.options();
         const theme = this.theme();
-        if (cfg.ignoreZones) return;
+        if (!cfg || !theme || cfg.ignoreZones) return;
 
         const option: RadialGaugeOptions = {};
         switch (state) {
@@ -238,8 +240,8 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
             break;
           default:
             option.colorBorderMiddle = theme.cardColor;
-            option.colorBarProgress = cfg.gauge?.subType === 'measuring' ? getColors(cfg.color, theme).color : getColors(cfg.color, theme).dim;
-            option.colorValueText = getColors(cfg.color, theme).color;
+            option.colorBarProgress = cfg.gauge?.subType === 'measuring' ? getColors(cfg.color ?? 'contrast', theme).color : getColors(cfg.color ?? 'contrast', theme).dim;
+            option.colorValueText = getColors(cfg.color ?? 'contrast', theme).color;
         }
         try {
           this.ngGauge()?.update(option);
@@ -306,12 +308,12 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     g.colorBorderShadow = false; g.colorBorderOuter = theme.cardColor; g.colorBorderOuterEnd = ''; g.colorBorderMiddle = theme.cardColor; g.colorBorderMiddleEnd = '';
     g.colorPlate = g.colorPlateEnd = theme.cardColor; g.colorBar = theme.background;
 
-    g.barProgress = cfg.gauge?.enableProgressbar; g.colorBarProgress = getColors(cfg.color, theme).color;
-    g.colorNeedle = getColors(cfg.color, theme).color; g.colorNeedleEnd = getColors(cfg.color, theme).color;
+    g.barProgress = cfg.gauge?.enableProgressbar; g.colorBarProgress = getColors(cfg.color ?? 'contrast', theme).color;
+    g.colorNeedle = getColors(cfg.color ?? 'contrast', theme).color; g.colorNeedleEnd = getColors(cfg.color ?? 'contrast', theme).color;
     g.needleShadow = true; g.colorNeedleShadowUp = "black"; g.colorNeedleShadowDown = "black";
     g.colorNeedleCircleInner = g.colorPlate; g.colorNeedleCircleInnerEnd = g.colorPlate; g.colorNeedleCircleOuter = g.colorPlate; g.colorNeedleCircleOuterEnd = g.colorPlate;
 
-    g.colorTitle = theme.contrastDim; g.colorUnits = theme.contrastDim; g.colorValueText = getColors(cfg.color, theme).color;
+    g.colorTitle = theme.contrastDim; g.colorUnits = theme.contrastDim; g.colorValueText = getColors(cfg.color ?? 'contrast', theme).color;
     this.colorStrokeTicks.set(theme.contrastDim); g.colorMinorTicks = theme.contrastDim;
     g.animationTarget = this.ANIMATION_TARGET_NEEDLE; g.useMinPath = false;
 
@@ -321,7 +323,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       g.valueBox = true; g.fontValueSize = 60; g.valueBoxWidth = 10; g.valueBoxBorderRadius = 5; g.valueBoxStroke = 0; g.colorValueBoxBackground = '';
       g.colorMajorTicks = g.colorPlate; g.colorNumbers = g.colorMinorTicks = '' as unknown as string;
 
-      g.barWidth = 20; g.colorBarProgress = getColors(cfg.color, theme).dim;
+      g.barWidth = 20; g.colorBarProgress = getColors(cfg.color ?? 'contrast', theme).dim;
       g.needle = cfg.gauge.enableNeedle; g.needleType = this.LINE; g.needleWidth = 2; g.needleStart = 75; g.needleEnd = 95; g.needleCircleSize = 1; g.needleCircleInner = false; g.needleCircleOuter = false;
       g.ticksAngle = 360; g.startAngle = (cfg.gauge?.scaleStart as number) || 180; g.majorTicks = 0 as unknown as string[]; g.exactTicks = true; g.strokeTicks = false; g.minorTicks = 0; g.numbersMargin = 0; g.fontNumbersSize = 0;
       g.borders = true; g.borderOuterWidth = 2; g.borderMiddleWidth = 1; g.borderInnerWidth = 0; g.borderShadowWidth = 0;
@@ -329,9 +331,9 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     } else { // measuring
       g.fontTitleSize = 24;
       g.barWidth = 15; g.valueBox = true; g.fontValueSize = 60; g.valueBoxWidth = 100; g.valueBoxBorderRadius = 0; g.valueBoxStroke = 0; g.colorValueBoxBackground = '';
-      g.needle = cfg.gauge.enableNeedle; g.needleType = this.LINE; g.needleWidth = 2; g.needleStart = 0; g.needleEnd = 95; g.needleCircleSize = 10; g.needleCircleInner = false; g.needleCircleOuter = false;
+      g.needle = cfg.gauge?.enableNeedle; g.needleType = this.LINE; g.needleWidth = 2; g.needleStart = 0; g.needleEnd = 95; g.needleCircleSize = 10; g.needleCircleInner = false; g.needleCircleOuter = false;
       g.ticksAngle = 270; g.startAngle = 45; g.barStartPosition = cfg.gauge?.barStartPosition || 'left';
-      if (cfg.gauge.enableTicks) {
+      if (cfg.gauge?.enableTicks) {
         g.strokeTicks = true; g.majorTicks = scale.majorTicks as unknown as string[]; g.minorTicks = 2; g.exactTicks = false; g.numbersMargin = 3; g.fontNumbersSize = 15;
         g.colorMajorTicks = theme.contrastDim; g.colorNumbers = theme.contrastDim;
       } else {
