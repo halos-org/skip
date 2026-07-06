@@ -25,10 +25,10 @@ const loginStatusTimeoutMs = 5000; // bounded so a hung endpoint cannot block th
 const noHttpResponseStatus = 0; // HttpErrorResponse.status is 0 when no response ever reached the client
 
 /**
- * Session authentication for the Signal K server. SKip is served same-origin by the SK server (behind
+ * Session authentication for the Signal K server. Skip is served same-origin by the SK server (behind
  * the reverse proxy / SSO), so the httpOnly session cookie is the only credential: the interceptor
  * carries it on same-origin requests and this service derives session state from
- * `GET /skServer/loginStatus`. SKip never collects, stores, or transmits raw credentials or tokens.
+ * `GET /skServer/loginStatus`. Skip never collects, stores, or transmits raw credentials or tokens.
  */
 @Injectable({
   providedIn: 'root'

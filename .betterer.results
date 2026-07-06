@@ -73,7 +73,7 @@ exports[`strictNullChecks`] = {
       [54, 6, 17, "Object is possibly \'undefined\'.", "2944426029"],
       [55, 6, 17, "Object is possibly \'undefined\'.", "27783321"]
     ],
-    "src/app/core/components/options/signalk/signalk.component.ts:3522798646": [
+    "src/app/core/components/options/signalk/signalk.component.ts:3082783318": [
       [101, 10, 6, "Type \'null\' is not assignable to type \'Chart<keyof ChartTypeRegistry, (number | [number, number] | Point | BubbleDataPoint | null)[], unknown>\'.", "3491622934"],
       [110, 45, 20, "Object is possibly \'undefined\'.", "235433357"],
       [171, 28, 20, "Object is possibly \'undefined\'.", "235433357"],
@@ -675,7 +675,7 @@ exports[`strictNullChecks`] = {
     "src/app/widgets/widget-zones-state-panel/widget-zones-state-panel.component.ts:2501103102": [
       [78, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
     ],
-    "src/default-config/config.blank.const.ts:475420683": [
+    "src/default-config/config.blank.const.ts:2019243563": [
       [31, 2, 12, "Type \'null\' is not assignable to type \'string\'.", "3195809883"]
     ],
     "src/default-config/config.blank.dashboard.ts:3810089117": [

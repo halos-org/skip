@@ -173,7 +173,7 @@ describe('SettingsService — legacy credential purge', () => {
 describe('SettingsService — storage routing (server applicationData only)', () => {
   beforeEach(() => ensureLocalStorage());
 
-  // SKip runs same-origin with the SK server (SSO session), so config always persists to the
+  // Skip runs same-origin with the SK server (SSO session), so config always persists to the
   // server's applicationData.
   function setup() {
     seedConnectionConfig();
@@ -490,9 +490,9 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
     expect(patchSpy.mock.calls.map((c) => c[0])).toEqual(['IAppConfig', 'IAppConfig', 'IAppConfig']);
   });
 
-  it('a missing browserTabTitle defaults to "SKip" in memory WITHOUT a bootstrap write', () => {
+  it('a missing browserTabTitle defaults to "Skip" in memory WITHOUT a bootstrap write', () => {
     const { service, patchSpy } = setupHydrated({ app: loadedAppConfig(['browserTabTitle']), theme: null, dashboards: [] });
-    expect(service.getBrowserTabTitle()).toBe('SKip');
+    expect(service.getBrowserTabTitle()).toBe('Skip');
     expect(patchSpy).not.toHaveBeenCalled();
   });
 
