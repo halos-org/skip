@@ -44,7 +44,7 @@
   ],
   "signalk": {
     "appIcon": "assets/icon-72x72.png",
-    "displayName": "Skip Instrument MFD"
+    "displayName": "Skip"
   },
   "files": [
     "public/**",
