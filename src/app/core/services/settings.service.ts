@@ -37,7 +37,7 @@ export class SettingsService {
   private readonly _nightModeBrightness = signal<number>(1);
   private readonly _isRemoteControl = signal<boolean>(false);
   private readonly _instanceName = signal<string>('');
-  private readonly _browserTabTitle = signal<string>('SKip');
+  private readonly _browserTabTitle = signal<string>('Skip');
 
   public readonly unitDefaults = this._unitDefaults.asReadonly();
   public readonly themeName = this._themeName.asReadonly();
@@ -261,7 +261,7 @@ export class SettingsService {
     }
 
     if (app.browserTabTitle === undefined) {
-      this._browserTabTitle.set('SKip');
+      this._browserTabTitle.set('Skip');
     } else {
       this._browserTabTitle.set(app.browserTabTitle);
     }

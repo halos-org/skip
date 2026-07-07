@@ -45,7 +45,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected isLightTheme = model<boolean>(false);
   protected isRemoteControl = model<boolean>(false);
   protected instanceName = model<string>('');
-  protected browserTabTitle = model<string>('SKip');
+  protected browserTabTitle = model<string>('Skip');
   protected isPathValidationDisabled = model<boolean>(this.settings.getDisablePathValidation());
   // Guards concurrent plugin enable checks to avoid stale promise handlers mutating state
   private _pluginCheckSeq = 0;
