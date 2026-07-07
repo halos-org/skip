@@ -74,10 +74,10 @@ The mock serves Skip's full session/config surface (`loginStatus`, `applicationD
 
 ## Fork-specific gotchas
 
-- **The package name is the serving path.** `angular.json` `baseHref`, the `dev` serve-path, and `src/manifest.json` `id`/`scope`/`start_url` must all stay `/@halos-org/skip/`. Branding lives in `brand/` (vector master, repo-only), `src/assets/` (favicon/icon set), `src/manifest.json`, and `signalk.displayName` in `package.json`.
+- **The package name is the serving path.** `angular.json` `baseHref`, the `dev` serve-path, `src/manifest.json` `id`/`scope`/`start_url`, and `SKIP_URL` in `plugin/index.js` must all stay `/@halos-org/skip/`. Branding lives in `brand/` (vector master, repo-only), `src/assets/` (favicon/icon set), `src/manifest.json`, and `signalk.displayName` in `package.json`.
 - **`gh` defaults PRs to the `upstream` remote.** Always pass `--repo halos-org/skip` to `gh pr create` / `gh pr merge`. (The clone is set up with `gh repo set-default halos-org/skip` and a disabled upstream push URL, but pass it explicitly anyway.)
 - **Upstream's own vitest CI is red**; a rebase onto `mxtommy/kip` can re-introduce test failures. The fork's fixes are small and live in `src/test.ts` stubs plus a few specs — re-apply them rather than disabling tests.
-- Not published to npm (publishing would list it in the Signal K app store). Deploy by placing the built `public/` output where the SK server serves the webapp.
+- Not published to npm (publishing would list it in the Signal K app store). Deploy by placing the package where the SK server serves it: the built `public/` output (the webapp) **and** `plugin/` (the bundled Freeboard-SK panel plugin, referenced by `main`) alongside `package.json`. A `public/`-only copy leaves `main` dangling and the plugin fails to load.
 
 ## Inherited upstream docs — treat skeptically
 
