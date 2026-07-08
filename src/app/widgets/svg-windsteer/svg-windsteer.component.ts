@@ -29,6 +29,7 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly courseOverGroundAngle = input<number>(undefined);
   protected readonly courseOverGroundEnabled = input.required<boolean>();
   protected readonly trueWindAngle = input.required<number>();
+  protected readonly trueWindActive = input<boolean>(false);
   protected readonly twsEnabled = input.required<boolean>();
   protected readonly twaEnabled = input.required<boolean>();
   protected readonly trueWindSpeed = input.required<number>();
@@ -218,8 +219,6 @@ export class SvgWindsteerComponent implements OnDestroy {
             animateRotation(this.awaIndicator().nativeElement, this.awa.oldValue, this.awa.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
           }
         }
-        // Laylines align to apparent wind; recompute on AWA
-        this.updateCloseHauledLines(!isFirstAwa);
       });
     });
 
@@ -230,10 +229,11 @@ export class SvgWindsteerComponent implements OnDestroy {
       if (trueWindAngle == null) return;
 
       untracked(() => {
+        const isFirstTwa = !this.twaInitialized;
         this.trueWindHeading = trueWindAngle;
         const headingOffset = modeEnabled ? (this.compass.newValue * -1) : 0;
         const nextTwa = this.addHeading(this.trueWindHeading, headingOffset);
-        if (!this.twaInitialized) {
+        if (isFirstTwa) {
           this.twa.oldValue = nextTwa;
           this.twa.newValue = nextTwa;
           this.twaInitialized = true;
@@ -242,12 +242,14 @@ export class SvgWindsteerComponent implements OnDestroy {
           this.twa.newValue = nextTwa;
         }
         if (this.twaIndicator()?.nativeElement) {
-          if (!this.twaInitialized || this.twa.oldValue === this.twa.newValue) {
+          if (isFirstTwa || this.twa.oldValue === this.twa.newValue) {
             this.setRotationImmediate(this.twaIndicator().nativeElement, this.twa.newValue);
           } else {
             animateRotation(this.twaIndicator().nativeElement, this.twa.oldValue, this.twa.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
           }
         }
+        // Laylines are centered on the true wind; recompute whenever TWA changes
+        this.updateCloseHauledLines(!isFirstTwa);
       });
     });
 
@@ -258,8 +260,6 @@ export class SvgWindsteerComponent implements OnDestroy {
       if (!this.closeHauledLineEnabled()) return;
       untracked(() => this.updateCloseHauledLines());
     });
-
-  // Recompute laylines when AWA changes (already handled in AWA effect) and when laylineAngle changes (below)
 
     effect(() => {
       const raw = this.driftSet();
@@ -310,24 +310,25 @@ export class SvgWindsteerComponent implements OnDestroy {
     });
   }
 
+  // Dial-local placement: convert a boat-relative angle into the rotating dial's local frame
+  // so the dial's -heading rotation (compass mode) yields the correct boat-relative result.
+  private toDialLocal(boatRelative: number): number {
+    const heading = this.compassModeEnabled() ? (Number(this.compass.newValue) || 0) : 0;
+    return this.addHeading(heading, boatRelative);
+  }
+
   private updateCloseHauledLines(animate = true): void {
     if (!this.closeHauledLineEnabled()) return;
 
-    // Dial-local angle must include heading so that dial rotation (-heading) yields boat-relative result
-    const modeEnabled = this.compassModeEnabled();
-    const heading = modeEnabled ? (Number(this.compass.newValue) || 0) : 0;
-    const boatBase = modeEnabled ? (Number(this.awa.newValue) || 0) : 0;
+    // Close-hauled lines straddle the true wind: boat-relative TWA ± laylineAngle.
+    const base = Number(this.twa.newValue) || 0;
     const lay = Number(this.laylineAngle()) || 0;
-    const portLaylineRotate = modeEnabled
-      ? this.addHeading(heading, this.addHeading(boatBase, lay * -1))
-      : this.addHeading(boatBase, lay * -1);
+
+    const portLaylineRotate = this.toDialLocal(this.addHeading(base, lay * -1));
     this.animateLayline(this.portLaylinePrev, portLaylineRotate, true, animate);
     this.portLaylinePrev = portLaylineRotate;
 
-    // Animate Starboard Layline
-    const stbdLaylineRotate = modeEnabled
-      ? this.addHeading(heading, this.addHeading(boatBase, lay))
-      : this.addHeading(boatBase, lay);
+    const stbdLaylineRotate = this.toDialLocal(this.addHeading(base, lay));
     this.animateLayline(this.stbdLaylinePrev, stbdLaylineRotate, false, animate);
     this.stbdLaylinePrev = stbdLaylineRotate;
   }
@@ -381,6 +382,16 @@ export class SvgWindsteerComponent implements OnDestroy {
       this.trueWindMidHistoric() == null ||
       this.trueWindMaxHistoric() == null
     ) {
+      // No sector data (e.g. true wind absent): cancel any in-flight sector animation and clear
+      // the paths, mirroring the disable branch, so a running frame can't overwrite the cleared
+      // path and leave a stale sector on screen.
+      if (this.portSectorAnimId) cancelAnimationFrame(this.portSectorAnimId);
+      if (this.stbdSectorAnimId) cancelAnimationFrame(this.stbdSectorAnimId);
+      this.portSectorAnimId = null;
+      this.stbdSectorAnimId = null;
+      this.windSectorsInitialized = false;
+      this.portWindSectorPath.set('');
+      this.stbdWindSectorPath.set('');
       return;
     }
 
@@ -511,20 +522,13 @@ export class SvgWindsteerComponent implements OnDestroy {
   private computeSectorPath(state: { min: number, mid: number, max: number }, isPort: boolean): string {
     const lay = Number(this.laylineAngle()) || 0;
     const offset = lay * (isPort ? -1 : 1);
-    const modeEnabled = this.compassModeEnabled();
-    const heading = modeEnabled ? (Number(this.compass.newValue) || 0) : 0;
-    const awaBase = Number(this.awa.newValue) || 0;
-    // Dial-local = heading + boat-relative (AWA min/mid/max + lay offset)
-    // When compass mode is off, position sectors relative to laylines (remove AWA base)
-    const minAngle = modeEnabled
-      ? this.addHeading(heading, this.addHeading(state.min, offset))
-      : this.addHeading(offset, this.addHeading(state.min, awaBase * -1));
-    const midAngle = modeEnabled
-      ? this.addHeading(heading, this.addHeading(state.mid, offset))
-      : this.addHeading(offset, this.addHeading(state.mid, awaBase * -1));
-    const maxAngle = modeEnabled
-      ? this.addHeading(heading, this.addHeading(state.max, offset))
-      : this.addHeading(offset, this.addHeading(state.max, awaBase * -1));
+    // Sector min/mid/max are the true wind DIRECTION (absolute compass). Convert to boat-relative
+    // using the actual boat heading -- not compass.newValue, which the dial forces to 0 in simple
+    // mode -- then place in the dial's local frame via toDialLocal.
+    const heading = Number(this.compassHeading()) || 0;
+    const minAngle = this.toDialLocal(this.addHeading(this.addHeading(state.min, -heading), offset));
+    const midAngle = this.toDialLocal(this.addHeading(this.addHeading(state.mid, -heading), offset));
+    const maxAngle = this.toDialLocal(this.addHeading(this.addHeading(state.max, -heading), offset));
 
     const minX = this.RADIUS * Math.sin((minAngle * Math.PI) / 180) + this.CENTER;
     const minY = (this.RADIUS * Math.cos((minAngle * Math.PI) / 180) * -1) + this.CENTER;
