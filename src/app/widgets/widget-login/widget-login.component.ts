@@ -22,7 +22,7 @@ export class WidgetLoginComponent implements OnInit {
     if (this.auth.loginStatusValue?.status === 'loggedIn') {
       return;
     }
-    // Same-origin only: SKip has no credential form. Redirect to the SK/SSO login (explicit sign-in:
+    // Same-origin only: Skip has no credential form. Redirect to the SK/SSO login (explicit sign-in:
     // resets the redirect budget and disables auto-login so this is not immediately auto-bounced).
     this.redirecting = true;
     this.ssoRedirect.manualSignIn();

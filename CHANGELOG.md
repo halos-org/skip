@@ -1,5 +1,6 @@
 # Unreleased
 ## New Features
+* Freeboard-SK panel: Skip registers itself as a Freeboard-SK plotter extension, so a supporting Freeboard-SK (3.0.0-beta or later) shows a toolbar button that opens Skip in a side panel. Ships as a Signal K server plugin bundled in the Skip package, enabled by default.
 * Same-origin Signal K sign-in (SSO): when KIP is served by a Signal K server on the same origin, it authenticates with the server's session cookie instead of its own username/password form. With an OIDC/SSO server, KIP joins the existing session and redirects to the server login when needed — no second sign-in, and OIDC-provisioned users (who have no server-local password) can use KIP. Cross-origin standalone use (a PWA pointed at a remote server) keeps the existing token sign-in.
 ## Improvements
 * The Connectivity settings show your Signal K session identity in same-origin mode (including a read-only-session indicator) instead of a credential form.

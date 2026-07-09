@@ -220,7 +220,7 @@ class AppNetworkInitServiceStub {
   public bootstrapIssue$ = this._bootstrapIssueSubject.asObservable();
 }
 class AuthenticationServiceStub {
-  // Minimal stub surface for tests that inject AuthenticationService. SKip authenticates only through
+  // Minimal stub surface for tests that inject AuthenticationService. Skip authenticates only through
   // the same-origin server session, so the surface is loginStatus-derived (no tokens, no auth mode).
   private _isLoggedIn$ = new BehaviorSubject<boolean>(false);
   public isLoggedIn$ = this._isLoggedIn$.asObservable();
@@ -356,7 +356,7 @@ class SettingsServiceStub {
   public readonly nightModeBrightness = signal(0.2);
   public readonly isRemoteControl = signal(false);
   public readonly instanceName = signal('');
-  public readonly browserTabTitle = signal('SKip');
+  public readonly browserTabTitle = signal('Skip');
 
   // Synchronous getters for places not using observables
   getThemeName(): string { return this.themeNameSubject.value; }

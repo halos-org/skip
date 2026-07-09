@@ -13,7 +13,7 @@ export const DefaultAppConfig: Readonly<IAppConfig> = {
   "nightModeBrightness": 0.27,
   "unitDefaults": DefaultUnitsConfig,
   "notificationConfig": DefaultNotificationConfig,
-  "browserTabTitle": "SKip"
+  "browserTabTitle": "Skip"
 }
 
 export const DefaultThemeConfig: IThemeConfig = {

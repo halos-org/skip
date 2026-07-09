@@ -25,7 +25,7 @@ import { InternetReachabilityService } from '../../../services/internet-reachabi
 /**
  * Signal K settings component for managing server connection configuration.
  * Handles URL validation, connection establishment, and real-time monitoring
- * of connection status and data stream statistics. SKip authenticates only through
+ * of connection status and data stream statistics. Skip authenticates only through
  * the server's same-origin session (SSO); it has no credential entry of its own.
  */
 @Component({

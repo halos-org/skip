@@ -33,7 +33,7 @@ export function appConfig(extra = {}) {
   return {
     configVersion: 12, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
     widgetHistoryDisabled: false, dataSets: [], unitDefaults: DEFAULT_UNITS,
-    notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'SKip', ...extra,
+    notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'Skip', ...extra,
   };
 }
 

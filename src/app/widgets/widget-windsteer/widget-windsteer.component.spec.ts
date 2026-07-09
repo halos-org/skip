@@ -95,3 +95,55 @@ describe('WidgetWindComponent live compass-mode toggle (#73)', () => {
     expect(twa()).toBe(135); // compass mode: heading (90) added to the cached angle (45)
   });
 });
+
+/**
+ * Wind sectors and layline gating are driven by TRUE wind, not apparent wind.
+ * The sector history must be fed only from the true-wind stream, and trueWindActive
+ * must track whether the configured true-wind path is currently delivering a value.
+ */
+describe('WidgetWindComponent true-wind sector source', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const makeConfig = (): IWidgetSvcConfig => ({
+    ...WidgetWindComponent.DEFAULT_CONFIG,
+    compassModeEnabled: true,
+    windSectorEnable: true
+  });
+  const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
+  const sampleCount = (): number => (component as unknown as { windSamples: unknown[] }).windSamples.length;
+  const active = (): boolean => (component as unknown as { trueWindActive: () => boolean }).trueWindActive();
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>(makeConfig());
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock }
+      ]
+    });
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick();
+  });
+
+  it('feeds the sector history from true wind and not from apparent wind', () => {
+    callbacks.get('appWindAngle')!(update(30));
+    expect(sampleCount()).toBe(0); // apparent wind no longer feeds the sector history
+
+    callbacks.get('trueWindAngle')!(update(40));
+    expect(sampleCount()).toBe(1); // true wind does
+  });
+
+  it('tracks true-wind availability in trueWindActive', () => {
+    expect(active()).toBe(false); // nothing received yet
+    callbacks.get('trueWindAngle')!(update(40));
+    expect(active()).toBe(true);
+    callbacks.get('trueWindAngle')!(update(null));
+    expect(active()).toBe(false); // explicit null -> laylines hide
+  });
+});

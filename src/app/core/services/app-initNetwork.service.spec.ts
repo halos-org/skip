@@ -161,7 +161,7 @@ describe('AppNetworkInitService', () => {
             localStorage.removeItem('skip.connectionConfig');
             localStorage.setItem('skip.appConfig', JSON.stringify({
                 configVersion: 12, autoNightMode: true, redNightMode: false, nightModeBrightness: 0.27,
-                dataSets: [], unitDefaults: {}, notificationConfig: {}, browserTabTitle: 'SKip'
+                dataSets: [], unitDefaults: {}, notificationConfig: {}, browserTabTitle: 'Skip'
             }));
             setConnConfig({ ...baseV12, isRemoteControl: true, instanceName: 'stale' });
             migrate(null);

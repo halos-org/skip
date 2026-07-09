@@ -1,6 +1,7 @@
 {
   "name": "@halos-org/skip",
   "version": "4.8.0",
+  "main": "plugin/index.js",
   "publishConfig": {
     "access": "public"
   },
@@ -32,6 +33,7 @@
   },
   "keywords": [
     "signalk-webapp",
+    "signalk-node-server-plugin",
     "signalk-category-instruments",
     "signalk-category-notifications",
     "signalk-category-ais",
@@ -44,10 +46,12 @@
   ],
   "signalk": {
     "appIcon": "assets/icon-72x72.png",
-    "displayName": "Skip Instrument MFD"
+    "displayName": "Skip"
   },
+  "signalk-plugin-enabled-by-default": true,
   "files": [
     "public/**",
+    "plugin/**",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",

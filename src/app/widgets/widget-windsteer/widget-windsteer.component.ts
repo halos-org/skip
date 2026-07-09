@@ -175,6 +175,7 @@ export class WidgetWindComponent implements OnDestroy {
   protected appWindSpeed = signal(0);
   protected appWindSpeedUnit = signal('');
   protected trueWindAngle = signal(0);
+  protected trueWindActive = signal(false);
   protected trueWindSpeed = signal(0);
   protected trueWindSpeedUnit = signal('');
   protected driftFlow = signal(0);
@@ -259,8 +260,6 @@ export class WidgetWindComponent implements OnDestroy {
     const next = this.normalizeAngle(raw);
     if (!this.hasAWA || this.angleDelta(this.appWindAngle(), next) >= this.DEG_EPSILON) {
       this.appWindAngle.set(next); this.hasAWA = true;
-      const cfg = this.runtime.options();
-      if (cfg?.windSectorEnable) this.addHistoricalWindDirection(this.normalizeAngle(raw));
     }
   };
   private onAppWindSpeed = (u: IPathUpdate) => {
@@ -278,18 +277,33 @@ export class WidgetWindComponent implements OnDestroy {
     }
   };
   private onTrueWindAngle = (u: IPathUpdate) => {
+    const present = u.data.value != null;
     if (u.data.value == null) u.data.value = 0;
     this.lastRawTrueWindAngle = u.data.value;
+    this.trueWindActive.set(present);
     const next = this.normalizeAngle(this.computeTrueWindBase(u.data.value));
     if (!this.hasTWA || this.angleDelta(this.trueWindAngle(), next) >= this.DEG_EPSILON) {
       this.trueWindAngle.set(next); this.hasTWA = true;
     }
+    const cfg = this.runtime.options();
+    if (present && cfg?.windSectorEnable) {
+      this.addHistoricalWindDirection(this.normalizeAngle(this.computeTrueWindDirection(u.data.value)));
+    }
   };
 
+  private trueWindPath(): string {
+    return this.runtime.options()?.paths?.['trueWindAngle']?.path || '';
+  }
+
   private computeTrueWindBase(rawAngle: number): number {
-    const cfg = this.runtime.options();
-    const path = cfg?.paths['trueWindAngle'].path || '';
-    return computeTrueWindBaseAngle(path, rawAngle, this.currentHeading(), !!cfg?.compassModeEnabled);
+    const compassMode = !!this.runtime.options()?.compassModeEnabled;
+    return computeTrueWindBaseAngle(this.trueWindPath(), rawAngle, this.currentHeading(), compassMode);
+  }
+
+  // Wind sectors track the true wind DIRECTION (compass frame) so heading and boat-speed
+  // changes don't smear the oscillation range; only real wind shifts move it.
+  private computeTrueWindDirection(rawAngle: number): number {
+    return computeTrueWindBaseAngle(this.trueWindPath(), rawAngle, this.currentHeading(), true);
   }
 
   private applyTrueWindBase() {
