@@ -21,7 +21,11 @@ export interface widgetOperation {
   operation: 'delete' | 'duplicate' | 'copy' | 'cut';
 }
 
-/** Travel direction of a page navigation, used to drive the transition slide. */
+/**
+ * Travel direction of a page navigation, used to drive the transition slide.
+ * Intentionally mirrors `PageNavDirection` (scroll-nav.directive.ts) rather than
+ * importing it, to avoid a service→UI-directive dependency for a two-value union.
+ */
 export type PageTransitionDirection = 'next' | 'prev';
 
 @Injectable({
