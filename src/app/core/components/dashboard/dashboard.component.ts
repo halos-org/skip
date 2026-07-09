@@ -20,6 +20,12 @@ import { ActionMenuComponent } from '../action-menu/action-menu.component';
 import { ActionMenuItem } from '../action-menu/action-menu-item';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
 
+/** Per-phase duration (ms) of the page-transition slide; two phases run back to back. */
+const PAGE_SLIDE_PHASE_MS = 180;
+/** Exit accelerates out, enter decelerates in, so the two phases read as one motion. */
+const PAGE_SLIDE_EXIT_EASING = 'ease-in';
+const PAGE_SLIDE_ENTER_EASING = 'ease-out';
+
 interface PressGestureDetail { x?: number; y?: number; center?: { x: number; y: number }; }
 interface GridApi {
   getRow?: () => number;
@@ -61,6 +67,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   protected readonly dashboardStaticView = computed(() => this.dashboard.isDashboardStatic());
   protected readonly gridIsEmpty = signal<boolean>(true);
   private readonly _gridstack = viewChild.required<GridstackComponent>('grid');
+  private readonly _pageSlide = viewChild<ElementRef<HTMLElement>>('pageSlide');
   private _previousIsStaticState = true;
   /** Suppress starting a drag sequence right after a long-press add (until pointer released) */
   private _suppressDrag = false;
@@ -114,7 +121,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       const activeIdx = this.dashboard.activeDashboard();
 
       untracked(() => {
-        this.loadDashboard(activeIdx);
+        void this.runPageChange(activeIdx);
       });
     });
   }
@@ -243,6 +250,59 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     _gridstack.grid.load(dashboard.configuration);
     _gridstack.grid.batchUpdate(false);
     this.syncGridEmptyState();
+  }
+
+  /**
+   * Applies an active-dashboard change: a horizontal slide when the change was
+   * initiated by a navigate* call (a travel direction is pending) and motion is
+   * allowed, otherwise an instant swap. The incoming page loads while the wrapper
+   * is off-screen, so no partially-loaded page is ever visible mid-slide. The
+   * service transition flag makes the slide non-interruptible.
+   */
+  private async runPageChange(dashboardId: number): Promise<void> {
+    const direction = this.dashboard.consumePendingPageDirection();
+    const slide = this._pageSlide()?.nativeElement;
+    if (!direction || !slide || this.prefersReducedMotion()) {
+      this.loadDashboard(dashboardId);
+      return;
+    }
+
+    const exitTo = direction === 'next' ? -100 : 100;
+    const enterFrom = -exitTo;
+    this.dashboard.beginPageTransition();
+    try {
+      await this.animatePhase(slide, 0, exitTo, PAGE_SLIDE_EXIT_EASING);
+      this.loadDashboard(dashboardId);
+      this.setSlideOffset(slide, enterFrom); // jump to the opposite edge, still off-screen
+      await this.animatePhase(slide, enterFrom, 0, PAGE_SLIDE_ENTER_EASING);
+    } finally {
+      this.setSlideOffset(slide, 0);
+      this.dashboard.endPageTransition();
+    }
+  }
+
+  /** Runs one transform-only slide phase. Overridable so specs can drive the sequence without real Web Animations. */
+  protected animatePhase(el: HTMLElement, fromPct: number, toPct: number, easing: string): Promise<void> {
+    const animation = el.animate(
+      [{ transform: `translateX(${fromPct}%)` }, { transform: `translateX(${toPct}%)` }],
+      { duration: PAGE_SLIDE_PHASE_MS, easing, fill: 'forwards' }
+    );
+    return animation.finished
+      .catch(() => undefined)
+      .then(() => {
+        this.setSlideOffset(el, toPct); // persist the end position as the inline base
+        animation.cancel(); // drop the forwards fill so the inline style wins
+      });
+  }
+
+  private setSlideOffset(el: HTMLElement, pct: number): void {
+    el.style.transform = pct === 0 ? '' : `translateX(${pct}%)`;
+  }
+
+  private prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
   protected onGridItemsChanged(): void {
