@@ -1,4 +1,5 @@
 @let dashboardStatic = dashboardStaticView() ?? true;
+<div class="page-slide" #pageSlide>
 <gridstack kipGestures [mode]="dashboardStatic === true ? 'press' : 'editor'" [enablePress]="false" [enableTap]="dashboardStatic === false" [enableDoubleTap]="false" #grid
   [isEmpty]="false"
   [options]="gridOptions()"
@@ -7,7 +8,6 @@
   (tap)="onEmptyAreaTap($event)"
 >
 </gridstack>
-<action-menu #actionMenu [items]="emptyAreaActions()" (selected)="onEmptyAreaAction($event)" />
 @if (gridIsEmpty()) {
   <div
     class="dashboard-empty-state-container"
@@ -41,6 +41,8 @@
     </div>
   </div>
 }
+</div>
+<action-menu #actionMenu [items]="emptyAreaActions()" (selected)="onEmptyAreaAction($event)" />
 @if (!dashboardStatic) {
   <div class="edit-layout-close-icon">
     <button
