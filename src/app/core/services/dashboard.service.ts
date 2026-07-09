@@ -21,6 +21,9 @@ export interface widgetOperation {
   operation: 'delete' | 'duplicate' | 'copy' | 'cut';
 }
 
+/** Travel direction of a page navigation, used to drive the transition slide. */
+export type PageTransitionDirection = 'next' | 'prev';
+
 @Injectable({
   providedIn: 'root'
 })
@@ -37,6 +40,12 @@ export class DashboardService {
 
   public readonly layoutEditSaved = signal<number>(0);
   public readonly layoutEditCanceled = signal<number>(0);
+
+  /** True while a page-transition animation is in flight; blocks re-entrant navigation (#194). */
+  public readonly isPageTransitioning = signal<boolean>(false);
+  /** Travel direction of the pending navigation, set (wrap-aware) by the navigate* methods
+   *  and consumed once by the dashboard host to drive the slide. */
+  private _pendingPageDirection: PageTransitionDirection | null = null;
 
   constructor() {
     const dashboardsConfig = this._settings.getDashboardConfig();
@@ -320,7 +329,12 @@ export class DashboardService {
    * @param itemIndex The index of the dashboard to navigate to.
    */
   public navigateTo(itemIndex: number): void {
+    if (this.isPageTransitioning()) return;
     if (itemIndex >= 0 && itemIndex < this.dashboards().length) {
+      const active = this.activeDashboard() ?? 0;
+      if (itemIndex !== active) {
+        this._pendingPageDirection = itemIndex > active ? 'next' : 'prev';
+      }
       this._router.navigate(['/page', itemIndex]);
     } else {
       console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
@@ -333,6 +347,7 @@ export class DashboardService {
    * This updates the browser URL and triggers Angular routing.
    */
   public navigateToNextDashboard(): void {
+    if (this.isPageTransitioning()) return;
     const active = this.activeDashboard() ?? 0;
     let nextDashboard: number;
     if ((active + 1) >= this.dashboards().length) {
@@ -340,6 +355,8 @@ export class DashboardService {
     } else {
       nextDashboard = active + 1;
     }
+    if (nextDashboard === active) return;
+    this._pendingPageDirection = 'next';
     this._router.navigate(['/page', nextDashboard]);
   }
 
@@ -349,6 +366,7 @@ export class DashboardService {
    * This updates the browser URL and triggers Angular routing.
    */
   public navigateToPreviousDashboard(): void {
+    if (this.isPageTransitioning()) return;
     const active = this.activeDashboard() ?? 0;
     let nextDashboard: number;
     if ((active - 1) < 0) {
@@ -356,7 +374,30 @@ export class DashboardService {
     } else {
       nextDashboard = active - 1;
     }
+    if (nextDashboard === active) return;
+    this._pendingPageDirection = 'prev';
     this._router.navigate(['/page', nextDashboard]);
+  }
+
+  /** Marks a page transition as in flight so re-entrant navigation is ignored. */
+  public beginPageTransition(): void {
+    this.isPageTransitioning.set(true);
+  }
+
+  /** Clears the in-flight page-transition state. */
+  public endPageTransition(): void {
+    this.isPageTransitioning.set(false);
+  }
+
+  /**
+   * Returns the pending travel direction once, clearing it. Null when the last
+   * active-dashboard change was not initiated by a navigate* call (initial load,
+   * deep link, browser history, delete) — the caller should then swap without animating.
+   */
+  public consumePendingPageDirection(): PageTransitionDirection | null {
+    const direction = this._pendingPageDirection;
+    this._pendingPageDirection = null;
+    return direction;
   }
 
   /**
