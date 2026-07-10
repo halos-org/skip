@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, NgZone, OnDestroy, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, NgZone, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import type { DialogComponentData } from '../../../core/interfaces/dialog-data';
 import type { AisAton, AisBasestation, AisSar, AisTrack, AisVessel } from '../../../core/services/ais-processing.service';
+import { AisProcessingService } from '../../../core/services/ais-processing.service';
 import { UnitsService } from '../../../core/services/units.service';
 
 interface AisDialogPayload {
@@ -17,15 +18,16 @@ interface AisDialogPayload {
   styleUrls: ['./dialog-ais-target.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DialogAisTargetComponent implements OnDestroy {
+export class DialogAisTargetComponent implements OnInit, OnDestroy {
   private static readonly CLOCK_INTERVAL_MS = 1000;
   private readonly data = inject<DialogComponentData>(MAT_DIALOG_DATA);
   private readonly units = inject(UnitsService);
+  private readonly ais = inject(AisProcessingService);
   private readonly ngZone = inject(NgZone);
   private readonly now = signal(Date.now());
   private nowTimer: number | null = null;
 
-  constructor() {
+  ngOnInit(): void {
     this.startClock();
   }
 
@@ -34,7 +36,13 @@ export class DialogAisTargetComponent implements OnDestroy {
   }
 
   protected get target(): AisTrack | null {
-    return this.payload?.target ?? null;
+    // Re-read the live track by id so the dialog reflects fresh position, CPA,
+    // TCPA and age while it's open (the 1s clock re-renders the OnPush view).
+    // The payload target is a detached snapshot used only as a fallback once the
+    // target has been evicted from the live set.
+    const initial = this.payload?.target ?? null;
+    if (!initial) return null;
+    return this.ais.targets().find(t => t.id === initial.id) ?? initial;
   }
 
   protected formatDirection(value: number | null | undefined): string {
