@@ -1,7 +1,7 @@
-import { AfterViewInit, Component, effect, ElementRef, inject, OnDestroy, signal, viewChild, input, untracked } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, effect, ElementRef, inject, OnDestroy, signal, viewChild, input, untracked } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { DashboardService } from '../../core/services/dashboard.service';
-import { SettingsService } from '../../core/services/settings.service';
+import { ChromeVisibilityService } from '../../core/services/chrome-visibility.service';
 import { generateSwipeScript } from '../../core/utils/iframe-inputs-inject.utils';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
@@ -9,6 +9,7 @@ import { ITheme } from '../../core/services/app-service';
 
 @Component({
   selector: 'widget-hoekens-anchor-alarm',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './widget-hoekens-anchor-alarm.component.html',
   styleUrls: ['./widget-hoekens-anchor-alarm.component.scss']
 })
@@ -16,15 +17,14 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
   // Functional Host2 inputs
   public id = input.required<string>();
   public type = input.required<string>();
-  public theme = input.required<ITheme>();
+  public theme = input.required<ITheme | null>();
 
   // Runtime directive (config merge done by container)
   protected readonly runtime = inject(WidgetRuntimeDirective);
   protected readonly _dashboard = inject(DashboardService);
+  private readonly _chrome = inject(ChromeVisibilityService);
   private readonly _sanitizer = inject(DomSanitizer);
-  private readonly settings = inject(SettingsService);
 
-  // Static default config (legacy parity)
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
   };
 
@@ -36,7 +36,7 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
     const pluginUrl = new URL('/hoekens-anchor-alarm/', window.location.origin);
     this.widgetUrl = this.toSafeResourceUrl(pluginUrl);
 
-    // Effect to derive overlay state from dashboard edit/static + config.allowInput
+    // Overlay passes pointer input to the iframe only while the dashboard is static.
     effect(() => {
       const cfg = this.runtime.options();
       const dashIsStatic = this._dashboard.isDashboardStatic();
@@ -54,7 +54,7 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
   private toSafeResourceUrl(url: URL): SafeResourceUrl | null {
     // Only allow same-origin URLs for iframe content.
     if (url.origin !== window.location.origin) return null;
-    // Anchor alarm plugin is expected to live under this fixed path.
+    // The Hoeken's anchor alarm plugin is expected to live under this fixed path.
     if (!url.pathname.startsWith('/hoekens-anchor-alarm/')) return null;
     return this._sanitizer.bypassSecurityTrustResourceUrl(url.toString());
   }
@@ -72,6 +72,18 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
   private handleIframeGesture = (event: MessageEvent) => {
     if (!event.data) return;
 
+    // Only accept messages from this widget's own iframe; a foreign window that
+    // guessed the widget UUID must not drive navigation, toggle chrome, or
+    // inject synthetic key events. The plugin iframe is always same-origin.
+    let iframeWindow: Window | null = null;
+    try {
+      iframeWindow = this.iframe()?.nativeElement?.contentWindow ?? null;
+    } catch {
+      iframeWindow = null;
+    }
+    if (!iframeWindow || event.source !== iframeWindow) return;
+    if (event.origin !== window.location.origin) return;
+
     const instanceId = event.data?.eventData?.instanceId || event.data?.keyEventData?.instanceId;
     if (!instanceId || instanceId !== this.id()) return;
 
@@ -79,21 +91,17 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
     if (event.data.gesture) {
       switch (event.data.gesture) {
         case 'swipeup':
-          this._dashboard.navigateToPreviousDashboard();
+          this._chrome.hide();
           break;
         case 'swipedown':
-          this._dashboard.navigateToNextDashboard();
+          this._chrome.reveal();
           break;
-        case 'swipeleft': {
-          const leftSidebarEvent = new Event('openLeftSidenav', { bubbles: true, cancelable: true });
-          window.document.dispatchEvent(leftSidebarEvent);
+        case 'swipeleft':
+          if (this._dashboard.isDashboardStatic()) this._dashboard.navigateToNextDashboard();
           break;
-        }
-        case 'swiperight': {
-          const rightSidebarEvent = new Event('openRightSidenav', { bubbles: true, cancelable: true });
-          window.document.dispatchEvent(rightSidebarEvent);
+        case 'swiperight':
+          if (this._dashboard.isDashboardStatic()) this._dashboard.navigateToPreviousDashboard();
           break;
-        }
         default:
           break;
       }
@@ -110,7 +118,7 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
     const iframeWindow = this.iframe().nativeElement.contentWindow;
     const iframeDocument = this.iframe().nativeElement.contentDocument;
     if (!iframeDocument || !iframeWindow) {
-      console.error('[WidgetIframe] Iframe contentDocument or contentWindow is undefined. Possible cross-origin issue or iframe not fully loaded.');
+      console.error('[WidgetHoekensAnchorAlarm] Iframe contentDocument or contentWindow is undefined. Possible cross-origin issue or iframe not fully loaded.');
       return;
     }
     try {
@@ -123,7 +131,7 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
       script.textContent = scriptText;
       iframeDocument.body.appendChild(script);
     } catch (e) {
-      console.warn('[WidgetIframe] Failed to inject swipe script into iframe:', e);
+      console.warn('[WidgetHoekensAnchorAlarm] Failed to inject swipe script into iframe:', e);
     }
   }
 
