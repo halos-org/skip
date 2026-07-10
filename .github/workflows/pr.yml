@@ -1,0 +1,11 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  checks:
+    uses: halos-org/shared-workflows/.github/workflows/pr-checks.yml@main
+    with:
+      skip-lintian: true

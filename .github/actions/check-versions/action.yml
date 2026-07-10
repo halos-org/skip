@@ -1,0 +1,22 @@
+name: 'Check Versions'
+description: 'Verify VERSION file matches package.json version'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check version consistency
+      shell: bash
+      run: |
+        VERSION_FILE=$(cat VERSION | tr -d '[:space:]')
+        PKG_VERSION=$(node -p "require('./package.json').version")
+
+        echo "VERSION file: ${VERSION_FILE}"
+        echo "package.json: ${PKG_VERSION}"
+
+        if [ "$VERSION_FILE" != "$PKG_VERSION" ]; then
+          echo "::error::VERSION file (${VERSION_FILE}) does not match package.json version (${PKG_VERSION})"
+          echo "Run './run bumpversion patch' (or minor/major) to keep them in sync."
+          exit 1
+        fi
+
+        echo "Versions match"

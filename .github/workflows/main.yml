@@ -1,0 +1,21 @@
+name: Main Branch CI/CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.repository }}-main-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    uses: halos-org/shared-workflows/.github/workflows/build-release.yml@main
+    with:
+      package-name: skip
+      package-description: 'An advanced and versatile marine instrumentation package to display Signal K data.'
+      build-deb: false
