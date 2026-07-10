@@ -322,7 +322,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   // Keypad buttons & layout
   protected apGrid = computed(() => this.apMode() ? 'grid' : 'none');
   protected readonly standbyButtonLabel = computed(() => {
-    const apiVersion = this.runtime.options().autopilot.apiVersion;
+    const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
 
     if (apiVersion === "v2" && !this.apEngaged()) {
       return "Engage";
@@ -334,12 +334,12 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     const state = this.apState();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const engaged = this.apEngaged();
-    const apiVersion = this.runtime.options().autopilot.apiVersion;
+    const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
 
     if (!apiVersion) return true;
 
     if (apiVersion === "v1") {
-      return (['standby', 'off-line'].includes(state)) ? true : false;
+      return (state !== null && ['standby', 'off-line'].includes(state)) ? true : false;
     }
 
     if (apiVersion === "v2") {
@@ -349,7 +349,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   });
   protected readonly apBtnDisabled = computed(() => {
     const engaged = this.apEngaged();
-    const apiVersion = this.runtime.options().autopilot.apiVersion;
+    const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
 
     if (apiVersion === "v1") {
       return this.apMode() === 'standby' ? true : false;
@@ -361,14 +361,14 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   });
   protected readonly adjustHdgBtnVisibility = computed(() => {
     const mode = this.apMode();
-    if ( ['auto', 'compass', 'gps', 'wind', 'true wind', 'standby'].includes(mode)) {
+    if ( mode !== null && ['auto', 'compass', 'gps', 'wind', 'true wind', 'standby'].includes(mode)) {
       return true;
     }
     return false;
   });
   protected readonly tackBtnVisibility = computed(() => {
     const mode = this.apMode();
-    if ( ['auto', 'compass', 'gps', 'wind', 'true wind', 'standby'].includes(mode)) {
+    if ( mode !== null && ['auto', 'compass', 'gps', 'wind', 'true wind', 'standby'].includes(mode)) {
       return true;
     }
     return false;
@@ -399,7 +399,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   // Mode Menu
   protected menuItems = computed<MenuItem[]>(() => {
     const mode = this.apMode();
-    const apiVersion = this.runtime.options().autopilot.apiVersion;
+    const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
     let menuItems: MenuItem[] = [];
 
     untracked(() => {
@@ -610,9 +610,9 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       state: ''
     };
 
-    const apiVersion = this.runtime.options().autopilot.apiVersion;
-    const instanceId = this.runtime.options().autopilot.instanceId;
-    const pluginId = this.runtime.options().autopilot.pluginId;
+    const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
+    const instanceId = this.runtime.options()?.autopilot?.instanceId;
+    const pluginId = this.runtime.options()?.autopilot?.pluginId;
 
     // Helper for persistent error state
     const setPersistentError = (message: string) => {
@@ -672,7 +672,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   }
 
   private autopilotModes(): string[] {
-    const modes = this.runtime.options().autopilot.modes;
+    const modes = this.runtime.options()?.autopilot?.modes;
 
     if (Array.isArray(modes)) {
       return modes;
@@ -686,6 +686,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   }
 
   private startV2Subscriptions(): void {
+    if (!this.streams) return;
     this.streams.observe('autopilotState', newValue => {
       if (newValue.data?.value) {
         this.apState.set(newValue.data.value);
@@ -723,8 +724,15 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   }
 
   private startV1Subscriptions(): void {
+    if (!this.streams) return;
     // For V1, we use this single legacy path
-    this.runtime.options().paths['autopilotMode'].path = API_PATHS.V1_MODE_PATH;
+    const cfg = this.runtime.options();
+    const autopilotModePathCfg = cfg && !Array.isArray(cfg.paths) ? cfg.paths?.['autopilotMode'] : undefined;
+    if (autopilotModePathCfg) {
+      autopilotModePathCfg.path = API_PATHS.V1_MODE_PATH;
+    } else {
+      console.warn('[Autopilot Widget] Missing autopilotMode path config; V1 mode subscription will use its configured path as-is');
+    }
     this.streams.observe('autopilotMode', newValue => {
       if (newValue.data?.value) {
         this.apMode.set(newValue.data.value);
@@ -745,17 +753,19 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   }
 
   private startDataSubscription(): void {
+    if (!this.streams) return;
     this.streams.observe('courseXte', newValue => this.crossTrackError.set(newValue.data.value != null ? newValue.data.value : 0));
     this.streams.observe('rudderAngle', newValue => {
         if (newValue.data.value === null) {
           this.rudder.set(null);
         } else {
-          this.rudder.set(this.runtime.options().autopilot.invertRudder ? -newValue.data.value : newValue.data.value);
+          const invertRudder = this.runtime.options()?.autopilot?.invertRudder ?? true;
+          this.rudder.set(invertRudder ? -newValue.data.value : newValue.data.value);
         }
       }
     );
 
-    if (this.runtime.options().autopilot.headingDirectionTrue) {
+    if (this.runtime.options()?.autopilot?.headingDirectionTrue ?? false) {
       this.streams.observe('headingTrue', newValue => this.heading.set(newValue.data.value != null ? newValue.data.value : 0));
     } else {
       this.streams.observe('headingMag', newValue => this.heading.set(newValue.data.value != null ? newValue.data.value : 0));
@@ -799,7 +809,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     if (typeof cmdAction === 'undefined') {
       // V2 autopilot modes are provider-defined free-form strings, so a reported mode outside the
       // built-in COMMANDS table is still commandable via its raw mode string.
-      if (this.runtime.options().autopilot.apiVersion === 'v2' && this.autopilotModes().includes(cmd)) {
+      if (this.runtime.options()?.autopilot?.apiVersion === 'v2' && this.autopilotModes().includes(cmd)) {
         this.sendV2Command(cmd);
         return;
       }
@@ -832,7 +842,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   }
 
   private routeCommand(cmd: string, cmdAction: IV1CommandDefinition): void {
-    const apiVersion = this.runtime.options().autopilot.apiVersion;
+    const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
     if (apiVersion === 'v2') {
       if (cmd === 'route' && this.apMode() === 'nav') {
         cmd = 'advanceWaypoint';
@@ -1012,6 +1022,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
           break;
         default:
           console.error('[Autopilot Widget] Unsupported REST method:', method);
+          return { statusCode: 0, message: 'Unsupported REST method', state: null };
       }
 
       if (response && response.statusCode === 200) {
@@ -1057,7 +1068,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   }
 
   private performTackOrGybe(operation: 'tack' | 'gybe', direction: 'port' | 'starboard'): void {
-    if (this.runtime.options().autopilot.apiVersion === 'v2') {
+    if (this.runtime.options()?.autopilot?.apiVersion === 'v2') {
       this.sendV2Command(operation, {value: direction});
     } else {
       // Fall back to V1
@@ -1070,7 +1081,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
 
   // V2 Absolute Target Method (class only - no UI yet)
   protected setAbsoluteTarget(heading: number): void {
-    if (this.runtime.options().autopilot.apiVersion === 'v2') {
+    if (this.runtime.options()?.autopilot?.apiVersion === 'v2') {
       this.sendV2Command('target_heading', {"value": heading, "units": "deg"});
     } else {
       console.error('[Autopilot Widget] Absolute target only available in V2 API');
@@ -1079,7 +1090,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
 
   // V2 Dodge Method (class only - no UI yet)
   protected toggleDodge(): void {
-    if (this.runtime.options().autopilot.apiVersion === 'v2') {
+    if (this.runtime.options()?.autopilot?.apiVersion === 'v2') {
       this.sendV2Command('dodge');
     } else {
       console.warn('[Autopilot Widget] Dodge mode only available in V2 API');
@@ -1131,7 +1142,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
 
     this.updateCountDownCounter(message);
 
-    clearTimeout(this.handleConfirmActionTimeout);
+    clearTimeout(this.handleConfirmActionTimeout ?? undefined);
 
     this.handleConfirmActionTimeout = setTimeout(() => {
       this.countdownOverlayVisibility.set("hidden");
@@ -1141,8 +1152,8 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   }
 
   private clearConfirmCmd(): void {
-    clearTimeout(this.handleConfirmActionTimeout);
-    clearTimeout(this.handleCountDownCounterTimeout);
+    clearTimeout(this.handleConfirmActionTimeout ?? undefined);
+    clearTimeout(this.handleCountDownCounterTimeout ?? undefined);
     this.countDownValue = -1;
     this.countdownOverlayVisibility.set("hidden");
     this.countdownOverlayText.set("");
@@ -1151,7 +1162,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
 
   private updateCountDownCounter(message: string): void {
     if (this.countDownValue > 0) {
-      clearTimeout(this.handleCountDownCounterTimeout);
+      clearTimeout(this.handleCountDownCounterTimeout ?? undefined);
       this.countdownOverlayText.set(message);
       this.countDownValue -= 1;
       this.handleCountDownCounterTimeout = setTimeout(() => {
@@ -1159,7 +1170,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       }, 1000);
     } else {
       this.countDownValue = -1;
-        clearTimeout(this.handleCountDownCounterTimeout);
+        clearTimeout(this.handleCountDownCounterTimeout ?? undefined);
     }
   }
 
@@ -1177,7 +1188,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     this.errorOverlayText.set(errMsg);
     this.errorOverlayVisibility.set("visible");
 
-    clearTimeout(this.handleDisplayErrorTimeout);
+    clearTimeout(this.handleDisplayErrorTimeout ?? undefined);
     this.handleDisplayErrorTimeout = setTimeout(() => {
       // Only hide if it's not a persistent error
       if (!this.isPersistentError) {
@@ -1200,9 +1211,9 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     this.menuOpen.set(false);
   }
 
-  private parseMenuItems(menuItems: MenuItem[], mode: string): MenuItem[] {
+  private parseMenuItems(menuItems: MenuItem[], mode: string | null): MenuItem[] {
     // Set enabled/disabled state for each mode menu item based
-    const apiVersion = this.runtime.options().autopilot.apiVersion;
+    const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
     const parsedMenuItems = menuItems.map(item => {
       if (item.isCancel) return { ...item, current: false, disabled: false };
 
@@ -1242,9 +1253,9 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     this.cancelAllHttpRequests();
 
     // Clear any pending timeouts
-    clearTimeout(this.handleCountDownCounterTimeout);
-    clearTimeout(this.handleConfirmActionTimeout);
-    clearTimeout(this.handleDisplayErrorTimeout);
-    clearTimeout(this.handleMessageTimeout);
+    clearTimeout(this.handleCountDownCounterTimeout ?? undefined);
+    clearTimeout(this.handleConfirmActionTimeout ?? undefined);
+    clearTimeout(this.handleDisplayErrorTimeout ?? undefined);
+    clearTimeout(this.handleMessageTimeout ?? undefined);
   }
 }

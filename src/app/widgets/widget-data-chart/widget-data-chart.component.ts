@@ -19,7 +19,7 @@ Chart.register(annotationPlugin, ChartStreaming, Filler, Title, SubTitle, TimeSc
 
 interface AnnPlugin {
   annotation?: {
-    annotations?: Record<string, { value?: number; label?: { content?: string } }>
+    annotations?: Record<string, { value?: number; label: { content?: string } }>
   }
 }
 interface IChartColors {
@@ -31,7 +31,7 @@ interface IChartColors {
   chartLabel: string,
   chartValue: string
 }
-interface IDataSetRow { x: number, y: number }
+interface IDataSetRow { x: number | null, y: number | null }
 
 @Component({
   selector: 'widget-data-chart',
@@ -78,14 +78,14 @@ export class WidgetDataChartComponent implements OnDestroy {
     startScaleAtZero: false,
     verticalChart: false,
     showYScale: false,
-    yScaleSuggestedMin: null,
-    yScaleSuggestedMax: null,
+    yScaleSuggestedMin: undefined,
+    yScaleSuggestedMax: undefined,
     enableMinMaxScaleLimit: false,
-    yScaleMin: null,
-    yScaleMax: null,
+    yScaleMin: undefined,
+    yScaleMax: undefined,
   };
   public lineChartData: ChartData<'line', { x: number, y: number }[]> = { datasets: [] };
-  public lineChartOptions: ChartConfiguration['options'] = {
+  public lineChartOptions: NonNullable<ChartConfiguration['options']> = {
     parsing: false,
     datasets: { line: { pointRadius: 0, pointHoverRadius: 0, tension: 0.4 } },
     animations: { tension: { easing: 'easeInOutCubic' } }
@@ -95,7 +95,7 @@ export class WidgetDataChartComponent implements OnDestroy {
   private streamSub: Subscription | null = null;
   private datasetConfig: IDatasetServiceDatasetConfig | null = null;
   private dataSourceInfo: IDatasetServiceDataSourceInfo | null = null;
-  private lastVerticalChart: boolean | null = null;
+  private lastVerticalChart: boolean | null | undefined = null;
   protected hasPath = computed<boolean>(() => {
     const cfg = this.runtime.options();
     return !!cfg?.datachartPath;
@@ -105,7 +105,7 @@ export class WidgetDataChartComponent implements OnDestroy {
   protected historyUnavailable = signal<boolean>(false);
   private pathSignature = computed<string | undefined>(() => {
     const cfg = this.runtime.options();
-    if (!cfg.datachartPath) {
+    if (!cfg?.datachartPath) {
       return undefined;
     }
     return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
@@ -119,9 +119,11 @@ export class WidgetDataChartComponent implements OnDestroy {
 
       untracked(() => {
         if (sig !== this.previousPathSignature) {
+          const cfg = this.runtime.options();
+          if (!cfg) return;
           untracked(() => {
           this.previousPathSignature = sig;
-          this.rebuildForDataset(this.runtime.options());
+          this.rebuildForDataset(cfg);
           });
         }
       });
@@ -161,7 +163,8 @@ export class WidgetDataChartComponent implements OnDestroy {
 
   private rebuildForDataset(cfg: IWidgetSvcConfig): void {
     if (!cfg.datachartPath) return; // Widget not yet configured
-    if (!this.widgetDataChart()) return; // View not ready yet
+    const canvasRef = this.widgetDataChart();
+    if (!canvasRef) return; // View not ready yet
 
     this.streamSub?.unsubscribe(); // Cleanup old subscription & chart data
     this.lineChartData.datasets = [];
@@ -169,7 +172,8 @@ export class WidgetDataChartComponent implements OnDestroy {
 
     // Synthesize the config + cadence the axis/streaming options expect, derived from the widget's
     // display window.
-    const windowMs = resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period);
+    const period = cfg.period ?? 10;
+    const windowMs = resolveWindowMs(cfg.timeScale as TimeScaleFormat, period);
     this.dataSourceInfo = deriveDataSourceInfo(windowMs);
     this.datasetConfig = {
       uuid: this.id(),
@@ -177,7 +181,7 @@ export class WidgetDataChartComponent implements OnDestroy {
       pathSource: cfg.datachartSource ?? 'default',
       baseUnit: '',
       timeScaleFormat: cfg.timeScale as TimeScaleFormat,
-      period: cfg.period,
+      period: period,
       label: '',
       angleDomainOverride: cfg.datachartAngleRange ?? undefined
     };
@@ -185,7 +189,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     this.setChartOptions(cfg);
     // Always recreate chart instance on rebuild to ensure orientation/scale axis changes apply
     this.chart?.destroy();
-    this.chart = new Chart(this.widgetDataChart().nativeElement.getContext('2d'), {
+    this.chart = new Chart(canvasRef.nativeElement.getContext('2d'), {
       type: this.lineChartType,
       data: this.lineChartData,
       options: this.lineChartOptions
@@ -195,6 +199,14 @@ export class WidgetDataChartComponent implements OnDestroy {
   }
 
   private setChartOptions(cfg: IWidgetSvcConfig): void {
+    // Both fields are always populated by rebuildForDataset() before a chart exists, and
+    // setChartOptions() is only ever called once a chart does; theme() can only be transiently
+    // null during the app's very first render tick, before AppService publishes the real palette.
+    const theme = this.theme();
+    const datasetConfig = this.datasetConfig;
+    const dataSourceInfo = this.dataSourceInfo;
+    if (!theme || !datasetConfig || !dataSourceInfo) return;
+
     this.lineChartOptions.maintainAspectRatio = false;
     this.lineChartOptions.animation = false;
     this.lineChartOptions.indexAxis = cfg.verticalChart ? 'y' : 'x';
@@ -209,12 +221,12 @@ export class WidgetDataChartComponent implements OnDestroy {
           suggestedMax: "",
           title: {
             display: true,
-            text: `Last ${this.datasetConfig.period} ${this.datasetConfig.timeScaleFormat}`,
+            text: `Last ${datasetConfig.period} ${datasetConfig.timeScaleFormat}`,
             align: "center",
             color: this.getThemeColors().averageChartLine
           },
           time: {
-            unit: this.datasetConfig.timeScaleFormat as TimeUnit,
+            unit: datasetConfig.timeScaleFormat as TimeUnit,
             minUnit: "second",
             round: "second",
             displayFormats: {
@@ -235,17 +247,17 @@ export class WidgetDataChartComponent implements OnDestroy {
           },
           grid: {
             display: true,
-            color: this.theme().contrastDimmer
+            color: theme.contrastDimmer
           }
         },
         x: {
           type: "linear",
           display: cfg.showYScale,
           position: cfg.verticalChart ? "top" : "bottom",
-          suggestedMin: cfg.enableMinMaxScaleLimit ? null : cfg.yScaleSuggestedMin,
-          suggestedMax: cfg.enableMinMaxScaleLimit ? null : cfg.yScaleSuggestedMax,
-          min: cfg.enableMinMaxScaleLimit ? cfg.yScaleMin : null,
-          max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : null,
+          suggestedMin: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMin,
+          suggestedMax: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMax,
+          min: cfg.enableMinMaxScaleLimit ? cfg.yScaleMin : undefined,
+          max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : undefined,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
           title: {
@@ -264,7 +276,7 @@ export class WidgetDataChartComponent implements OnDestroy {
           },
           grid: {
             display: true,
-            color: this.theme().contrastDimmer,
+            color: theme.contrastDimmer,
           }
         }
       }
@@ -275,12 +287,12 @@ export class WidgetDataChartComponent implements OnDestroy {
           display: cfg.showTimeScale,
           title: {
             display: true,
-            text: `Last ${this.datasetConfig.period} ${this.datasetConfig.timeScaleFormat}`,
+            text: `Last ${datasetConfig.period} ${datasetConfig.timeScaleFormat}`,
             align: "center",
             color: this.getThemeColors().averageChartLine
           },
           time: {
-            unit: this.datasetConfig.timeScaleFormat as TimeUnit,
+            unit: datasetConfig.timeScaleFormat as TimeUnit,
             minUnit: "second",
             round: "second",
             displayFormats: {
@@ -301,16 +313,16 @@ export class WidgetDataChartComponent implements OnDestroy {
           },
           grid: {
             display: true,
-            color: this.theme().contrastDimmer
+            color: theme.contrastDimmer
           }
         },
         y: {
           display: cfg.showYScale,
           position: "right",
-          suggestedMin: cfg.enableMinMaxScaleLimit ? null : cfg.yScaleSuggestedMin,
-          suggestedMax: cfg.enableMinMaxScaleLimit ? null : cfg.yScaleSuggestedMax,
-          min: cfg.enableMinMaxScaleLimit ? cfg.yScaleMin : null,
-          max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : null,
+          suggestedMin: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMin,
+          suggestedMax: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMax,
+          min: cfg.enableMinMaxScaleLimit ? cfg.yScaleMin : undefined,
+          max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : undefined,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
           title: {
@@ -329,7 +341,7 @@ export class WidgetDataChartComponent implements OnDestroy {
           },
           grid: {
             display: true,
-            color: this.theme().contrastDimmer,
+            color: theme.contrastDimmer,
           }
         }
       }
@@ -368,7 +380,7 @@ export class WidgetDataChartComponent implements OnDestroy {
             type: 'line',
             scaleID: cfg.verticalChart ? 'x' : 'y',
             display: cfg.showDatasetMinimumValueLine,
-            value: null,
+            value: undefined,
             drawTime: 'afterDatasetsDraw',
             label: {
               display: true,
@@ -383,7 +395,7 @@ export class WidgetDataChartComponent implements OnDestroy {
             type: 'line',
             scaleID: cfg.verticalChart ? 'x' : 'y',
             display: cfg.showDatasetMaximumValueLine,
-            value: null,
+            value: undefined,
             drawTime: 'afterDatasetsDraw',
             label: {
               display: true,
@@ -398,7 +410,7 @@ export class WidgetDataChartComponent implements OnDestroy {
             type: 'line',
             scaleID: cfg.verticalChart ? 'x' : 'y',
             display: cfg.showDatasetAverageValueLine,
-            value: null,
+            value: undefined,
             borderDash: [6, 6],
             borderColor: this.getThemeColors().averageChartLine,
             drawTime: 'afterDatasetsDraw',
@@ -416,9 +428,9 @@ export class WidgetDataChartComponent implements OnDestroy {
         display: false
       },
        streaming: {
-        duration: this.dataSourceInfo.maxDataPoints * this.dataSourceInfo.sampleTime,
-        delay: this.dataSourceInfo.sampleTime,
-        frameRate: this.datasetConfig.timeScaleFormat === "day" ? 5 : this.datasetConfig.timeScaleFormat === "hour" ? 8 : this.datasetConfig.timeScaleFormat === "minute" ? 15 : 30,
+        duration: dataSourceInfo.maxDataPoints * dataSourceInfo.sampleTime,
+        delay: dataSourceInfo.sampleTime,
+        frameRate: datasetConfig.timeScaleFormat === "day" ? 5 : datasetConfig.timeScaleFormat === "hour" ? 8 : datasetConfig.timeScaleFormat === "minute" ? 15 : 30,
        }
     }
   }
@@ -554,167 +566,174 @@ export class WidgetDataChartComponent implements OnDestroy {
   }
 
   private getThemeColors(): IChartColors {
+    // Fallback (transparent) sentinel: theme() is only transiently null during the app's very
+    // first render tick, and widgetColor only escapes the switch below for a corrupted/legacy
+    // config value outside the fixed palette offered by the widget's color picker.
+    const NO_COLOR = 'rgba(0,0,0,0)';
     const widgetColor = this.runtime.options()?.color;
     const colors: IChartColors = {
-      valueLine: null,
-      valueFill: null,
-      averageLine: null,
-      averageFill: null,
-      averageChartLine: null,
-      chartLabel: null,
-      chartValue: null
+      valueLine: NO_COLOR,
+      valueFill: NO_COLOR,
+      averageLine: NO_COLOR,
+      averageFill: NO_COLOR,
+      averageChartLine: NO_COLOR,
+      chartLabel: NO_COLOR,
+      chartValue: NO_COLOR
     };
+
+    const theme = this.theme();
+    if (!theme) return colors;
 
     switch (widgetColor) {
       case "contrast":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().contrastDimmer;
-          colors.valueFill = this.theme().contrastDimmer;
-          colors.averageLine = this.theme().contrast;
-          colors.averageFill = this.theme().contrast;
+          colors.valueLine = theme.contrastDimmer;
+          colors.valueFill = theme.contrastDimmer;
+          colors.averageLine = theme.contrast;
+          colors.averageFill = theme.contrast;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().contrast;
-          colors.valueFill = this.theme().contrast;
-          colors.averageLine = this.theme().contrastDimmer;
-          colors.averageFill = this.theme().contrastDimmer;
-          colors.chartValue = this.theme().contrast;
+          colors.valueLine = theme.contrast;
+          colors.valueFill = theme.contrast;
+          colors.averageLine = theme.contrastDimmer;
+          colors.averageFill = theme.contrastDimmer;
+          colors.chartValue = theme.contrast;
         }
-        colors.averageChartLine = this.theme().contrastDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.contrastDim;
+        colors.chartLabel = theme.contrastDim;
         break;
 
       case "blue":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().blueDimmer;
-          colors.valueFill = this.theme().blueDimmer;
-          colors.averageLine = this.theme().blue;
-          colors.averageFill = this.theme().blue;
+          colors.valueLine = theme.blueDimmer;
+          colors.valueFill = theme.blueDimmer;
+          colors.averageLine = theme.blue;
+          colors.averageFill = theme.blue;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().blue;
-          colors.valueFill = this.theme().blue;
-          colors.averageLine = this.theme().blueDimmer;
-          colors.averageFill = this.theme().blueDimmer;
+          colors.valueLine = theme.blue;
+          colors.valueFill = theme.blue;
+          colors.averageLine = theme.blueDimmer;
+          colors.averageFill = theme.blueDimmer;
           colors.chartValue = colors.valueFill;
         }
-        colors.averageChartLine = this.theme().blueDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.blueDim;
+        colors.chartLabel = theme.contrastDim;
         break;
 
       case "green":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().greenDimmer;
-          colors.valueFill = this.theme().greenDimmer;
-          colors.averageLine = this.theme().green;
-          colors.averageFill = this.theme().green;
+          colors.valueLine = theme.greenDimmer;
+          colors.valueFill = theme.greenDimmer;
+          colors.averageLine = theme.green;
+          colors.averageFill = theme.green;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().green;
-          colors.valueFill = this.theme().green;
-          colors.averageLine = this.theme().greenDimmer;
-          colors.averageFill = this.theme().greenDimmer;
+          colors.valueLine = theme.green;
+          colors.valueFill = theme.green;
+          colors.averageLine = theme.greenDimmer;
+          colors.averageFill = theme.greenDimmer;
           colors.chartValue = colors.valueFill;
         }
-        colors.averageChartLine = this.theme().greenDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.greenDim;
+        colors.chartLabel = theme.contrastDim;
         break;
 
       case "pink":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().pinkDimmer;
-          colors.valueFill = this.theme().pinkDimmer;
-          colors.averageLine = this.theme().pink;
-          colors.averageFill = this.theme().pink;
+          colors.valueLine = theme.pinkDimmer;
+          colors.valueFill = theme.pinkDimmer;
+          colors.averageLine = theme.pink;
+          colors.averageFill = theme.pink;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().pink;
-          colors.valueFill = this.theme().pink;
-          colors.averageLine = this.theme().pinkDimmer;
-          colors.averageFill = this.theme().pinkDimmer;
+          colors.valueLine = theme.pink;
+          colors.valueFill = theme.pink;
+          colors.averageLine = theme.pinkDimmer;
+          colors.averageFill = theme.pinkDimmer;
           colors.chartValue = colors.valueFill;
         }
-        colors.averageChartLine = this.theme().pinkDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.pinkDim;
+        colors.chartLabel = theme.contrastDim;
         break;
 
       case "orange":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().orangeDimmer;
-          colors.valueFill = this.theme().orangeDimmer;
-          colors.averageLine = this.theme().orange;
-          colors.averageFill = this.theme().orange;
+          colors.valueLine = theme.orangeDimmer;
+          colors.valueFill = theme.orangeDimmer;
+          colors.averageLine = theme.orange;
+          colors.averageFill = theme.orange;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().orange;
-          colors.valueFill = this.theme().orange;
-          colors.averageLine = this.theme().orangeDimmer;
-          colors.averageFill = this.theme().orangeDimmer;
+          colors.valueLine = theme.orange;
+          colors.valueFill = theme.orange;
+          colors.averageLine = theme.orangeDimmer;
+          colors.averageFill = theme.orangeDimmer;
           colors.chartValue = colors.valueFill;
         }
-        colors.averageChartLine = this.theme().orangeDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.orangeDim;
+        colors.chartLabel = theme.contrastDim;
         break;
 
       case "purple":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().purpleDimmer;
-          colors.valueFill = this.theme().purpleDimmer;
-          colors.averageLine = this.theme().purple;
-          colors.averageFill = this.theme().purple;
+          colors.valueLine = theme.purpleDimmer;
+          colors.valueFill = theme.purpleDimmer;
+          colors.averageLine = theme.purple;
+          colors.averageFill = theme.purple;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().purple;
-          colors.valueFill = this.theme().purple;
-          colors.averageLine = this.theme().purpleDimmer;
-          colors.averageFill = this.theme().purpleDimmer;
+          colors.valueLine = theme.purple;
+          colors.valueFill = theme.purple;
+          colors.averageLine = theme.purpleDimmer;
+          colors.averageFill = theme.purpleDimmer;
           colors.chartValue = colors.valueFill;
         }
-        colors.averageChartLine = this.theme().purpleDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.purpleDim;
+        colors.chartLabel = theme.contrastDim;
         break;
 
       case "grey":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().greyDimmer;
-          colors.valueFill = this.theme().greyDimmer;
-          colors.averageLine = this.theme().grey;
-          colors.averageFill = this.theme().grey;
+          colors.valueLine = theme.greyDimmer;
+          colors.valueFill = theme.greyDimmer;
+          colors.averageLine = theme.grey;
+          colors.averageFill = theme.grey;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().grey;
-          colors.valueFill = this.theme().grey;
-          colors.averageLine = this.theme().greyDimmer;
-          colors.averageFill = this.theme().greyDimmer;
+          colors.valueLine = theme.grey;
+          colors.valueFill = theme.grey;
+          colors.averageLine = theme.greyDimmer;
+          colors.averageFill = theme.greyDimmer;
           colors.chartValue = colors.valueFill;
         }
-        colors.averageChartLine = this.theme().greyDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.greyDim;
+        colors.chartLabel = theme.contrastDim;
         break;
 
       case "yellow":
         if (this.runtime.options()?.trackAgainstAverage) {
-          colors.valueLine = this.theme().yellowDimmer;
-          colors.valueFill = this.theme().yellowDimmer;
-          colors.averageLine = this.theme().yellow;
-          colors.averageFill = this.theme().yellow;
+          colors.valueLine = theme.yellowDimmer;
+          colors.valueFill = theme.yellowDimmer;
+          colors.averageLine = theme.yellow;
+          colors.averageFill = theme.yellow;
           colors.chartValue = colors.averageLine;
         } else {
-          colors.valueLine = this.theme().yellow;
-          colors.valueFill = this.theme().yellow;
-          colors.averageLine = this.theme().yellowDimmer;
-          colors.averageFill = this.theme().yellowDimmer;
+          colors.valueLine = theme.yellow;
+          colors.valueFill = theme.yellow;
+          colors.averageLine = theme.yellowDimmer;
+          colors.averageFill = theme.yellowDimmer;
           colors.chartValue = colors.valueFill;
         }
-        colors.averageChartLine = this.theme().yellowDim;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.averageChartLine = theme.yellowDim;
+        colors.chartLabel = theme.contrastDim;
         break;
     }
     return colors;
   }
 
-  private getUnitsLabel(): string {
-    let label: string = null;
+  private getUnitsLabel(): string | null | undefined {
+    let label: string | null | undefined = null;
     const unit = this.runtime.options()?.convertUnitTo;
     switch (unit) {
 
@@ -752,14 +771,16 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (!cfg?.datachartPath) return;
     this.streamSub?.unsubscribe();
 
+    // Always set by rebuildForDataset() just before startStreaming() is called (its only caller).
     const info = this.dataSourceInfo;
+    if (!info) return;
     const params: IHistoryChartStreamParams = {
       path: cfg.datachartPath,
       source: cfg.datachartSource ?? 'default',
       angleDomainOverride: cfg.datachartAngleRange === 'signed' || cfg.datachartAngleRange === 'direction'
         ? cfg.datachartAngleRange
         : undefined,
-      windowMs: resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period),
+      windowMs: resolveWindowMs(cfg.timeScale as TimeScaleFormat, cfg.period ?? 10),
       sampleTime: info.sampleTime,
       maxDataPoints: info.maxDataPoints,
       smoothingPeriod: info.smoothingPeriod
@@ -801,31 +822,37 @@ export class WidgetDataChartComponent implements OnDestroy {
   }
 
   private applyTitleAndAnnotationValues(point: IDatasetServiceDatapoint, cfg: IWidgetSvcConfig): void {
+    const unit = cfg.convertUnitTo ?? '';
     const trackValue: number = cfg.trackAgainstAverage ? (point.data.sma ?? point.data.value) : point.data.value;
-    const convertedTrack = this.unitsService.convertToUnit(cfg.convertUnitTo, trackValue);
-    if (Number.isFinite(convertedTrack)) {
-      this.chart.options.plugins.title.text = `${convertedTrack.toFixed(cfg.numDecimal)} ${this.getUnitsLabel()} `;
+    const convertedTrack = this.unitsService.convertToUnit(unit, trackValue);
+    if (convertedTrack !== null && Number.isFinite(convertedTrack)) {
+      const titlePlugin = this.chart.options.plugins?.title;
+      if (titlePlugin) {
+        titlePlugin.text = `${convertedTrack.toFixed(cfg.numDecimal)} ${this.getUnitsLabel()} `;
+      }
     }
 
-    const lastAverage = this.unitsService.convertToUnit(cfg.convertUnitTo, point.data.lastAverage);
-    const lastMinimum = this.unitsService.convertToUnit(cfg.convertUnitTo, point.data.lastMinimum);
-    const lastMaximum = this.unitsService.convertToUnit(cfg.convertUnitTo, point.data.lastMaximum);
+    // A missing rolling stat (insufficient history yet) converts like the pre-existing code's
+    // implicit `+undefined` did: NaN in, NaN out, so the finite-checks below skip it exactly as before.
+    const lastAverage = this.unitsService.convertToUnit(unit, point.data.lastAverage ?? NaN);
+    const lastMinimum = this.unitsService.convertToUnit(unit, point.data.lastMinimum ?? NaN);
+    const lastMaximum = this.unitsService.convertToUnit(unit, point.data.lastMaximum ?? NaN);
 
     const plugins = this.chart.options.plugins as unknown as AnnPlugin;
     const ann = plugins.annotation?.annotations;
     if (!ann) return;
 
-    if (Number.isFinite(lastAverage) && ann.averageLine?.value !== lastAverage) {
+    if (lastAverage !== null && Number.isFinite(lastAverage) && ann.averageLine?.value !== lastAverage) {
       ann.averageLine.value = lastAverage;
       ann.averageLine.label.content = `${lastAverage.toFixed(cfg.numDecimal)}`;
     }
 
-    if (Number.isFinite(lastMinimum) && ann.minimumLine?.value !== lastMinimum) {
+    if (lastMinimum !== null && Number.isFinite(lastMinimum) && ann.minimumLine?.value !== lastMinimum) {
       ann.minimumLine.value = lastMinimum;
       ann.minimumLine.label.content = `${lastMinimum.toFixed(cfg.numDecimal)}`;
     }
 
-    if (Number.isFinite(lastMaximum) && ann.maximumLine?.value !== lastMaximum) {
+    if (lastMaximum !== null && Number.isFinite(lastMaximum) && ann.maximumLine?.value !== lastMaximum) {
       ann.maximumLine.value = lastMaximum;
       ann.maximumLine.label.content = `${lastMaximum.toFixed(cfg.numDecimal)}`;
     }
@@ -833,9 +860,10 @@ export class WidgetDataChartComponent implements OnDestroy {
 
   private transformDatasetRows(rows: IDatasetServiceDatapoint[], datasetType): IDataSetRow[] {
     const cfg = this.runtime.options();
-    const convert = (v: number) => this.unitsService.convertToUnit(cfg.convertUnitTo, v);
+    if (!cfg) return [];
+    const convert = (v: number) => this.unitsService.convertToUnit(cfg.convertUnitTo ?? '', v);
     const verticalChart = cfg.verticalChart;
-    const avgKey = cfg.datasetAverageArray;
+    const avgKey = cfg.datasetAverageArray ?? 'sma';
 
     return rows.map(row => {
       if (verticalChart) {
