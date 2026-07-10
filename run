@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+#
+# usage: ./run command [argument ...]
+#
+# Commands for Skip development.
+#
+
+set -o nounset
+set -o pipefail
+set -o errexit
+
+# Change the current directory to the project root.
+PROJECT_ROOT=${0%/*}
+if [[ $0 != $PROJECT_ROOT && $PROJECT_ROOT != "" ]]; then
+  cd "$PROJECT_ROOT"
+fi
+readonly PROJECT_ROOT=$(pwd)
+
+################################################################################
+# Development Commands
+
+function dev {
+  #@ Run the dev server (serve-path /@halos-org/skip/)
+  #@ Category: Development
+  npm run dev
+}
+
+################################################################################
+# Build Commands
+
+function build {
+  #@ Build the production webapp bundle (output -> public/)
+  #@ Category: Build
+  npm run build:prod
+}
+
+function build-dev {
+  #@ Build the development webapp bundle (output -> public/)
+  #@ Category: Build
+  npm run build:dev
+}
+
+################################################################################
+# Test Commands
+
+function test {
+  #@ Run the unit suite headless (CI mode)
+  #@ Category: Test
+  npm run test:headless
+}
+
+function test-watch {
+  #@ Run the unit suite in interactive watch mode
+  #@ Category: Test
+  npm run test:interactive
+}
+
+################################################################################
+# Quality Commands
+
+function lint {
+  #@ Run ESLint
+  #@ Category: Quality
+  npm run lint
+}
+
+function snc {
+  #@ List remaining strictNullChecks errors
+  #@ Category: Quality
+  npm run snc
+}
+
+function betterer {
+  #@ Regenerate the strictNullChecks ratchet baseline (.betterer.results)
+  #@ Category: Quality
+  npm run betterer
+}
+
+function betterer-ci {
+  #@ Enforce the strictNullChecks ratchet (fails on new issues)
+  #@ Category: Quality
+  npm run betterer:ci
+}
+
+function ci {
+  #@ Run all CI checks (lint, betterer:ci, tests)
+  #@ Category: Quality
+  npm run ci
+}
+
+################################################################################
+# Version Management Commands
+
+function bumpversion {
+  #@ Bump version using bumpversion tool (patch|minor|major)
+  #@ Category: Version
+  local BUMP_TYPE="${1:-}"
+
+  if [[ -z "$BUMP_TYPE" ]]; then
+    echo "Error: version bump type required"
+    echo "Usage: ./run bumpversion [patch|minor|major]"
+    exit 1
+  fi
+
+  if [[ ! "$BUMP_TYPE" =~ ^(patch|minor|major)$ ]]; then
+    echo "Error: invalid bump type '$BUMP_TYPE'"
+    echo "Usage: ./run bumpversion [patch|minor|major]"
+    exit 1
+  fi
+
+  if ! command -v bumpversion &> /dev/null; then
+    echo "Error: bumpversion not installed"
+    echo "Install with: uv tool install bump2version"
+    exit 1
+  fi
+
+  echo "Bumping $BUMP_TYPE version..."
+  command bumpversion "$BUMP_TYPE"
+  echo "Version bumped and committed successfully"
+  echo "New version: $(cat VERSION)"
+  echo "Push with: git push"
+}
+
+################################################################################
+# Help System
+
+function help {
+  #@ Show this help message
+  #@ Category: Core
+  echo "Skip - Development Commands"
+  echo "==========================="
+  echo ""
+  echo "Available commands:"
+  echo ""
+
+  # Extract function definitions and their help comments
+  awk '/^function / {
+    fname = $2
+    sub(/[({].*/, "", fname)
+    getline
+    if ($0 ~ /#@/) {
+      desc = $0
+      sub(/.*#@ /, "", desc)
+      sub(/ *$/, "", desc)
+      getline
+      if ($0 ~ /#@ Category:/) {
+        cat = $0
+        sub(/.*Category: /, "", cat)
+        sub(/ *$/, "", cat)
+        if (!seen[cat]++) categories[++cat_count] = cat
+        commands[cat, ++cmd_count[cat]] = fname
+        descriptions[cat, cmd_count[cat]] = desc
+      }
+    }
+  }
+  END {
+    for (i = 1; i <= cat_count; i++) {
+      cat = categories[i]
+      print "\n" cat ":"
+      for (j = 1; j <= cmd_count[cat]; j++) {
+        printf "  %-25s %s\n", commands[cat, j], descriptions[cat, j]
+      }
+    }
+  }' "$0"
+
+  echo ""
+  echo "Usage: ./run <command> [arguments...]"
+  echo ""
+}
+
+################################################################################
+# Commands end.
+
+TIMEFORMAT=$'\nTask completed in %3lR'
+time "${@:-help}"
