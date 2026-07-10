@@ -56,6 +56,10 @@ describe('DashboardComponent', () => {
             notifyLayoutEditCanceled: vi.fn().mockName("DashboardService.notifyLayoutEditCanceled"),
             navigateToNextDashboard: vi.fn().mockName("DashboardService.navigateToNextDashboard"),
             navigateToPreviousDashboard: vi.fn().mockName("DashboardService.navigateToPreviousDashboard"),
+            consumePendingPageDirection: vi.fn().mockName("DashboardService.consumePendingPageDirection").mockReturnValue(null),
+            beginPageTransition: vi.fn().mockName("DashboardService.beginPageTransition"),
+            endPageTransition: vi.fn().mockName("DashboardService.endPageTransition"),
+            isPageTransitioning: signal(false),
             setWidgetClipboardFromNode: vi.fn().mockName("DashboardService.setWidgetClipboardFromNode"),
             clearWidgetClipboard: vi.fn().mockName("DashboardService.clearWidgetClipboard"),
             isDashboardStatic: signal(true),
@@ -314,5 +318,161 @@ describe('DashboardComponent', () => {
         api.onEmptyAreaAction('add');
 
         expect(openAddWidgetDialogSpy).toHaveBeenCalledWith(1, 1);
+    });
+
+    describe('runPageChange (page transition)', () => {
+        interface RunPageChangeApi {
+            runPageChange: () => Promise<void>;
+            animatePhase: (el: HTMLElement, from: number, to: number, easing: string) => Promise<void>;
+            loadDashboard: (dashboardId: number) => void;
+            prefersReducedMotion: () => boolean;
+        }
+
+        // Drive the sequence without real Web Animations: record phase/load ordering
+        // (load carries the index) and stub loadDashboard so it does not touch the grid.
+        function instrument(): { api: RunPageChangeApi; order: string[]; animate: Mock } {
+            const api = component as unknown as RunPageChangeApi;
+            const order: string[] = [];
+            const slide = document.createElement('div');
+            vi.spyOn(component as unknown as { _pageSlide: () => unknown }, '_pageSlide')
+                .mockReturnValue({ nativeElement: slide });
+            const animate = vi.spyOn(api, 'animatePhase').mockImplementation((_el, from, to) => {
+                order.push(`animate:${from}->${to}`);
+                return Promise.resolve();
+            }) as unknown as Mock;
+            vi.spyOn(api, 'loadDashboard').mockImplementation((id) => { order.push(`load:${id}`); });
+            return { api, order, animate };
+        }
+
+        function deferred(): { promise: Promise<void>; resolve: () => void } {
+            let resolve!: () => void;
+            const promise = new Promise<void>((r) => { resolve = r; });
+            return { promise, resolve };
+        }
+
+        it('slides out then in, loading the current page off-screen at the midpoint, for next', async () => {
+            mockDashboardService.activeDashboard.set(1);
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api, order } = instrument();
+
+            await api.runPageChange();
+
+            expect(order).toEqual(['animate:0->-100', 'load:1', 'animate:100->0']);
+            expect(mockDashboardService.beginPageTransition).toHaveBeenCalledTimes(1);
+            expect(mockDashboardService.endPageTransition).toHaveBeenCalledTimes(1);
+        });
+
+        it('mirrors the slide direction for a previous navigation', async () => {
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('prev');
+            const { api, order } = instrument();
+
+            await api.runPageChange();
+
+            expect(order).toEqual(['animate:0->100', 'load:0', 'animate:-100->0']);
+        });
+
+        it('swaps instantly without animating when no travel direction is pending', async () => {
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue(null);
+            const { api, order } = instrument();
+
+            await api.runPageChange();
+
+            expect(order).toEqual(['load:0']);
+            expect(api.animatePhase).not.toHaveBeenCalled();
+            expect(mockDashboardService.beginPageTransition).not.toHaveBeenCalled();
+        });
+
+        it('swaps instantly under prefers-reduced-motion', async () => {
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api, order } = instrument();
+            vi.spyOn(api, 'prefersReducedMotion').mockReturnValue(true);
+
+            await api.runPageChange();
+
+            expect(order).toEqual(['load:0']);
+            expect(api.animatePhase).not.toHaveBeenCalled();
+            expect(mockDashboardService.beginPageTransition).not.toHaveBeenCalled();
+        });
+
+        it('swaps instantly, consuming the direction once, when the slide wrapper is not ready', async () => {
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const api = component as unknown as RunPageChangeApi;
+            vi.spyOn(component as unknown as { _pageSlide: () => unknown }, '_pageSlide').mockReturnValue(undefined);
+            const animateSpy = vi.spyOn(api, 'animatePhase');
+            const loadSpy = vi.spyOn(api, 'loadDashboard').mockImplementation(() => undefined);
+
+            await api.runPageChange();
+
+            expect(loadSpy).toHaveBeenCalledTimes(1);
+            expect(animateSpy).not.toHaveBeenCalled();
+            expect(mockDashboardService.beginPageTransition).not.toHaveBeenCalled();
+            expect(mockDashboardService.consumePendingPageDirection).toHaveBeenCalledTimes(1);
+        });
+
+        it('holds the transition flag for the whole slide so re-entrant navigation stays blocked', async () => {
+            const flag = signal(false);
+            (mockDashboardService.beginPageTransition as Mock).mockImplementation(() => flag.set(true));
+            (mockDashboardService.endPageTransition as Mock).mockImplementation(() => flag.set(false));
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api, animate } = instrument();
+            const gate = deferred();
+            animate.mockImplementationOnce(() => gate.promise);
+
+            const run = api.runPageChange();
+            expect(flag()).toBe(true); // armed and held while the exit phase is in flight
+
+            gate.resolve();
+            await run;
+            expect(flag()).toBe(false); // cleared once the slide finishes
+        });
+
+        it('ignores a re-entrant runPageChange while a slide is in flight', async () => {
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api, animate } = instrument();
+            const gate = deferred();
+            animate.mockImplementationOnce(() => gate.promise);
+
+            const run = api.runPageChange();  // starts; suspended on the exit phase
+            await api.runPageChange();         // re-entrant call must no-op
+
+            expect(animate).toHaveBeenCalledTimes(1);
+            expect(mockDashboardService.consumePendingPageDirection).toHaveBeenCalledTimes(1);
+
+            gate.resolve();
+            await run;
+        });
+
+        it('settles on the latest activeDashboard when it changes during the slide', async () => {
+            mockDashboardService.activeDashboard.set(1);
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api, order, animate } = instrument();
+            const gate = deferred();
+            animate.mockImplementationOnce(() => gate.promise); // gate the exit phase
+
+            const run = api.runPageChange();
+            mockDashboardService.activeDashboard.set(4); // router-driven change mid-slide
+            gate.resolve();
+            await run;
+
+            expect(order).toContain('load:4');   // midpoint loads the current index, not the start index
+            expect(order).not.toContain('load:1');
+        });
+
+        it('clears the transition flag if loadDashboard throws between phases', async () => {
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api } = instrument();
+            vi.spyOn(api, 'loadDashboard').mockImplementation(() => { throw new Error('boom'); });
+
+            await expect(api.runPageChange()).rejects.toThrow('boom');
+            expect(mockDashboardService.endPageTransition).toHaveBeenCalledTimes(1);
+        });
+
+        it('clears the transition flag on destroy so a torn-down slide cannot wedge navigation', () => {
+            (vi.mocked(component.ngOnDestroy) as unknown as { mockRestore: () => void }).mockRestore();
+
+            component.ngOnDestroy();
+
+            expect(mockDashboardService.endPageTransition).toHaveBeenCalledTimes(1);
+        });
     });
 });

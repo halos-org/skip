@@ -9,6 +9,12 @@
   overflow: hidden;
 }
 
+.page-slide {
+  position: relative; /* containing block for the absolute empty-state overlay */
+  width: 100%;
+  height: 100%;
+}
+
 .grid-stack {
   width: 100%;
   height: 100%;

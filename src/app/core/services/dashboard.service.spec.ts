@@ -377,6 +377,73 @@ describe('DashboardService', () => {
     });
   });
 
+  describe('page transition direction and guard', () => {
+    beforeEach(() => setup());
+
+    it('records "next" going forward and "prev" going back', () => {
+      service.setActiveDashboardIndex(1);
+      service.navigateToNextDashboard();
+      expect(service.consumePendingPageDirection()).toBe('next');
+      service.setActiveDashboardIndex(1);
+      service.navigateToPreviousDashboard();
+      expect(service.consumePendingPageDirection()).toBe('prev');
+    });
+
+    it('records the travel direction across wrap-around at both ends', () => {
+      service.setActiveDashboardIndex(2); // last of three
+      service.navigateToNextDashboard(); // wraps to first
+      expect(router.navigate).toHaveBeenLastCalledWith(['/page', 0]);
+      expect(service.consumePendingPageDirection()).toBe('next');
+      service.setActiveDashboardIndex(0); // first
+      service.navigateToPreviousDashboard(); // wraps to last
+      expect(router.navigate).toHaveBeenLastCalledWith(['/page', 2]);
+      expect(service.consumePendingPageDirection()).toBe('prev');
+    });
+
+    it('derives direction from the target index on a direct jump', () => {
+      service.setActiveDashboardIndex(0);
+      service.navigateTo(2);
+      expect(service.consumePendingPageDirection()).toBe('next');
+      service.setActiveDashboardIndex(2);
+      service.navigateTo(0);
+      expect(service.consumePendingPageDirection()).toBe('prev');
+    });
+
+    it('records no direction when the target equals the current page', () => {
+      service.setActiveDashboardIndex(1);
+      service.navigateTo(1);
+      expect(service.consumePendingPageDirection()).toBeNull();
+    });
+
+    it('is a no-op for next/previous with a single dashboard', () => {
+      setup([makeDashboard('d-0', 'Only')]);
+      service.navigateToNextDashboard();
+      service.navigateToPreviousDashboard();
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(service.consumePendingPageDirection()).toBeNull();
+    });
+
+    it('consumes the pending direction once', () => {
+      service.setActiveDashboardIndex(0);
+      service.navigateToNextDashboard();
+      expect(service.consumePendingPageDirection()).toBe('next');
+      expect(service.consumePendingPageDirection()).toBeNull();
+    });
+
+    it('ignores navigation while a transition is in flight', () => {
+      service.setActiveDashboardIndex(1);
+      service.beginPageTransition();
+      service.navigateToNextDashboard();
+      service.navigateToPreviousDashboard();
+      service.navigateTo(2);
+      expect(router.navigate).not.toHaveBeenCalled();
+      service.endPageTransition();
+      expect(service.isPageTransitioning()).toBe(false);
+      service.navigateToNextDashboard();
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('widget actions', () => {
     beforeEach(() => setup());
 
