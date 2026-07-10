@@ -86,7 +86,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
       return;
     }
 
-    const syncCourseOverGroundDisabledState = (isCompassModeEnabled: unknown): void => {
+    const syncWindsteerControlsEnabledState = (isCompassModeEnabled: unknown): void => {
       if (isCompassModeEnabled === true) {
         courseOverGroundControl.enable({ emitEvent: false });
         waypointEnableControl.enable({ emitEvent: false });
@@ -98,10 +98,10 @@ export class RootModalWidgetConfigComponent implements OnInit {
       driftEnableControl.disable({ emitEvent: false });
     };
 
-    syncCourseOverGroundDisabledState(compassModeControl.value);
+    syncWindsteerControlsEnabledState(compassModeControl.value);
     compassModeControl.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(value => syncCourseOverGroundDisabledState(value));
+      .subscribe(value => syncWindsteerControlsEnabledState(value));
   }
 
   // Helper to ensure we only treat plain object literals as nested groups and not arrays, dates, etc.

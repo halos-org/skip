@@ -167,7 +167,7 @@ exports[`strictNullChecks`] = {
       [66, 26, 49, "Object is possibly \'null\'.", "3725617003"],
       [70, 26, 49, "Object is possibly \'null\'.", "3725617003"]
     ],
-    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:1301836307": [
+    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:513393189": [
       [75, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
       [210, 8, 4, "Type \'null\' is not assignable to type \'UntypedFormControl\'.", "2087777580"],
       [231, 4, 9, "\'ctrlLabel\' is possibly \'null\'.", "2892925034"]
@@ -561,9 +561,9 @@ exports[`strictNullChecks`] = {
       [148, 8, 15, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4102914388"],
       [154, 29, 3, "\'cfg\' is possibly \'undefined\'.", "193415815"]
     ],
-    "src/app/widgets/widget-windsteer/widget-windsteer.component.ts:1986353320": [
-      [207, 34, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
-      [208, 35, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"]
+    "src/app/widgets/widget-windsteer/widget-windsteer.component.ts:965751974": [
+      [210, 34, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
+      [211, 35, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"]
     ],
     "src/app/widgets/widget-windtrends-chart/widget-windtrends-chart.component.ts:3621756652": [
       [86, 10, 15, "Type \'null\' is not assignable to type \'Subscription\'.", "2233656204"],

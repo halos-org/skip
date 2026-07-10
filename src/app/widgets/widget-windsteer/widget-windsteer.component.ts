@@ -7,6 +7,10 @@ import { WidgetStreamsDirective } from '../../core/directives/widget-streams.dir
 import { IPathUpdate } from '../../core/services/data.service';
 import { ITheme } from '../../core/services/app-service';
 
+// Default rolling window (seconds) for the wind-sector history; the single
+// source of truth for both the default config and the missing-value fallback.
+const DEFAULT_WIND_SECTOR_WINDOW_SECONDS = 5;
+
 @Component({
   selector: 'widget-wind-steer',
   templateUrl: './widget-windsteer.component.html',
@@ -139,7 +143,7 @@ export class WidgetWindComponent implements OnDestroy {
     },
     compassModeEnabled: true,
     windSectorEnable: true,
-    windSectorWindowSeconds: 5,
+    windSectorWindowSeconds: DEFAULT_WIND_SECTOR_WINDOW_SECONDS,
     laylineEnable: true,
     laylineAngle: 40,
     waypointEnable: true,
@@ -204,7 +208,6 @@ export class WidgetWindComponent implements OnDestroy {
       const cfg = this.runtime.options();
       if (!cfg) return;
       untracked(() => {
-
         this.appWindSpeedUnit.set(cfg.paths['appWindSpeed'].convertUnitTo);
         this.trueWindSpeedUnit.set(cfg.paths['trueWindSpeed'].convertUnitTo);
         this.registerStreams();
@@ -368,7 +371,7 @@ export class WidgetWindComponent implements OnDestroy {
 
   private historicalCleanup() {
     if (!this.runtime.options()?.windSectorEnable) return;
-    const cutoff = Date.now() - (this.runtime.options()?.windSectorWindowSeconds ?? 5) * 1000;
+    const cutoff = Date.now() - (this.runtime.options()?.windSectorWindowSeconds ?? DEFAULT_WIND_SECTOR_WINDOW_SECONDS) * 1000;
     while (this.windSamples.length && this.windSamples[0].t < cutoff) {
       const removed = this.windSamples.shift();
       if (!removed) break;
