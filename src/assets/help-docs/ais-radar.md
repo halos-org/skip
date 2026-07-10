@@ -256,5 +256,5 @@ The center own-ship icon uses its own dedicated asset and is not part of remote 
 
 ## See Also
 
-- [Managing Dashboards](#/help/dashboards.md)
+- [Pages and Layout](#/help/dashboards.md)
 - [Data Inspector](#/help/datainspector.md)
