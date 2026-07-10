@@ -50,4 +50,26 @@ describe('GaugeSteelComponent', () => {
     // NaN section that does not draw; the upper is converted (identity mock -> 11.5).
     expect(sectionSpy).toHaveBeenCalledWith(10, 11.5, 'red');
   });
+
+  it('clears the pending resize timer on destroy so the debounced rebuild cannot fire afterwards', () => {
+    vi.useFakeTimers();
+    try {
+      fixture.componentRef.setInput('subType', 'radial');
+      fixture.detectChanges();
+      const internals = component as unknown as { onResized: (e: ResizeObserverEntry) => void; startGauge: (f?: boolean) => void; resizeTimer: number | null };
+      const rebuild = vi.spyOn(internals, 'startGauge').mockImplementation(() => { /* no-op */ });
+
+      // A real resize arms the 120ms debounce.
+      internals.onResized({ contentRect: { width: 120, height: 120 } } as ResizeObserverEntry);
+      expect(internals.resizeTimer).not.toBeNull();
+
+      component.ngOnDestroy();
+      expect(internals.resizeTimer).toBeNull();
+
+      vi.advanceTimersByTime(200);
+      expect(rebuild).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
