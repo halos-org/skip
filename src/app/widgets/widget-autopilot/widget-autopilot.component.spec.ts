@@ -109,4 +109,35 @@ describe('WidgetAutopilotComponent', () => {
 
     expect(label).toBe('Disengage');
   });
+
+  const startV1 = () => (component as unknown as { startV1Subscriptions: () => void }).startV1Subscriptions();
+
+  it('does not throw starting V1 subscriptions when the config has no paths object', () => {
+    const spy = vi.spyOn(runtimeMock, 'options').mockReturnValue({ autopilot: runtimeOptions.autopilot } as unknown as typeof runtimeOptions);
+    try {
+      expect(() => startV1()).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not throw starting V1 subscriptions when paths exist but autopilotMode is absent', () => {
+    const spy = vi.spyOn(runtimeMock, 'options').mockReturnValue({ autopilot: runtimeOptions.autopilot, paths: {} } as unknown as typeof runtimeOptions);
+    try {
+      expect(() => startV1()).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('rewrites the autopilotMode path to the V1 legacy path when present', () => {
+    const cfg = { autopilot: runtimeOptions.autopilot, paths: { autopilotMode: { path: 'placeholder' } } };
+    const spy = vi.spyOn(runtimeMock, 'options').mockReturnValue(cfg as unknown as typeof runtimeOptions);
+    try {
+      startV1();
+      expect(cfg.paths.autopilotMode.path).toBe('self.steering.autopilot.state');
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
