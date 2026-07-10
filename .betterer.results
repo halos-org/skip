@@ -142,10 +142,10 @@ exports[`strictNullChecks`] = {
       [66, 26, 49, "Object is possibly \'null\'.", "3725617003"],
       [70, 26, 49, "Object is possibly \'null\'.", "3725617003"]
     ],
-    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:2942117481": [
-      [74, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
-      [181, 8, 4, "Type \'null\' is not assignable to type \'UntypedFormControl\'.", "2087777580"],
-      [202, 4, 9, "\'ctrlLabel\' is possibly \'null\'.", "2892925034"]
+    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:513393189": [
+      [75, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
+      [210, 8, 4, "Type \'null\' is not assignable to type \'UntypedFormControl\'.", "2087777580"],
+      [231, 4, 9, "\'ctrlLabel\' is possibly \'null\'.", "2892925034"]
     ],
     "src/app/widget-config/solar-charger-setup/solar-charger-setup.component.ts:3993417046": [
       [47, 48, 28, "Object is possibly \'undefined\'.", "758680035"],
@@ -268,11 +268,9 @@ exports[`strictNullChecks`] = {
       [148, 8, 15, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4102914388"],
       [154, 29, 3, "\'cfg\' is possibly \'undefined\'.", "193415815"]
     ],
-    "src/app/widgets/widget-windsteer/widget-windsteer.component.ts:293317480": [
-      [206, 34, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
-      [207, 35, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
-      [369, 33, 22, "Object is possibly \'undefined\'.", "576852750"],
-      [369, 33, 46, "Object is possibly \'undefined\'.", "1732614759"]
+    "src/app/widgets/widget-windsteer/widget-windsteer.component.ts:965751974": [
+      [210, 34, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
+      [211, 35, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"]
     ],
     "src/app/widgets/widget-zones-state-panel/widget-zones-state-panel.component.ts:2501103102": [
       [78, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]

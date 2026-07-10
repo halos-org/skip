@@ -99,4 +99,30 @@ describe('ModalWidgetComponent', () => {
       { id: 'grid', source: 'venus.1', key: 'grid||venus.1' }
     ]);
   });
+
+  function windsteerForm(compassMode: boolean) {
+    const compassModeEnabled = new UntypedFormControl(compassMode);
+    const courseOverGroundEnable = new UntypedFormControl(true);
+    const waypointEnable = new UntypedFormControl(true);
+    const driftEnable = new UntypedFormControl(true);
+    component.formMaster = new UntypedFormGroup({ compassModeEnabled, courseOverGroundEnable, waypointEnable, driftEnable });
+    (component as unknown as { setupWindsteerControlState: () => void }).setupWindsteerControlState();
+    return { compassModeEnabled, courseOverGroundEnable, waypointEnable, driftEnable };
+  }
+
+  it('enables the COG/waypoint/drift controls when compass mode is on and re-syncs on toggle', () => {
+    const f = windsteerForm(true);
+    expect([f.courseOverGroundEnable.disabled, f.waypointEnable.disabled, f.driftEnable.disabled]).toEqual([false, false, false]);
+
+    f.compassModeEnabled.setValue(false);
+    expect([f.courseOverGroundEnable.disabled, f.waypointEnable.disabled, f.driftEnable.disabled]).toEqual([true, true, true]);
+
+    f.compassModeEnabled.setValue(true);
+    expect([f.courseOverGroundEnable.disabled, f.waypointEnable.disabled, f.driftEnable.disabled]).toEqual([false, false, false]);
+  });
+
+  it('starts with the COG/waypoint/drift controls disabled when compass mode is initially off', () => {
+    const f = windsteerForm(false);
+    expect([f.courseOverGroundEnable.disabled, f.waypointEnable.disabled, f.driftEnable.disabled]).toEqual([true, true, true]);
+  });
 });

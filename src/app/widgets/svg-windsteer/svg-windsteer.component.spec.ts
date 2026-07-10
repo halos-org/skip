@@ -211,4 +211,37 @@ describe('SvgWindsteerComponent', () => {
         expect((component as unknown as { portWindSectorPath: () => string }).portWindSectorPath()).toBe('');
         expect((component as unknown as { stbdWindSectorPath: () => string }).stbdWindSectorPath()).toBe('');
     });
+
+    it('hides the COG, waypoint, drift and current indicators when compass mode is off', () => {
+        setRequiredInputs({
+            compassModeEnabled: false,
+            courseOverGroundEnabled: true,
+            driftEnabled: true,
+            waypointEnabled: true,
+            waypointAngle: 30
+        });
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('none');
+        expect(component['wptIndicator']().nativeElement.getAttribute('display')).toBe('none');
+        expect(component['setIndicator']().nativeElement.style.display).toBe('none');
+        expect((el.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('none');
+    });
+
+    it('shows the COG, drift and current indicators when compass mode is on', () => {
+        setRequiredInputs({
+            compassModeEnabled: true,
+            courseOverGroundEnabled: true,
+            driftEnabled: true,
+            waypointEnabled: true,
+            waypointAngle: 30
+        });
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
+        expect(component['setIndicator']().nativeElement.style.display).toBe('inline');
+        expect((el.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('inline');
+    });
 });
