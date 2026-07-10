@@ -24,13 +24,13 @@ const WINDTRENDS_TWD_PATH = 'self.environment.wind.directionTrue';
 const WINDTRENDS_TWS_PATH = 'self.environment.wind.speedTrue';
 
 interface IChartColors {
-  valueLine: string,
-  valueFill: string,
-  averageLine: string,
-  averageFill: string,
-  averageChartLine: string,
-  chartLabel: string,
-  chartValue: string
+  valueLine: string | null,
+  valueFill: string | null,
+  averageLine: string | null,
+  averageFill: string | null,
+  averageChartLine: string | null,
+  chartLabel: string | null,
+  chartValue: string | null
 }
 interface IDataSetRow {
   x: number,
@@ -67,7 +67,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   public lineChartData: ChartData<'line', { x: number, y: number }[]> = {
     datasets: []
   };
-  public lineChartOptions: ChartConfiguration['options'] = {
+  public lineChartOptions: NonNullable<ChartConfiguration['options']> = {
     parsing: false,
     datasets: {
       line: {
@@ -84,12 +84,12 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   }
   public lineChartType: ChartType = 'line';
   private chart: Chart<keyof ChartTypeRegistry, { x: number; y: number; }[], unknown>;
-  private _dsDirectionSub: Subscription = null;
-  private _dsSpeedSub: Subscription = null;
+  private _dsDirectionSub: Subscription | null = null;
+  private _dsSpeedSub: Subscription | null = null;
   /** Pending coalesced chart recompute+repaint frame id (one per animation frame across both streams). */
   private _chartUpdateRafId: number | null = null;
-  private timeScale: TimeScaleFormat = null;
-  private dataSourceInfo: IChartDataSourceInfo = null;
+  private timeScale: TimeScaleFormat | null = null;
+  private dataSourceInfo: IChartDataSourceInfo | null = null;
   private xCenter: number | null = null;
   private xStep: number | null = null;
   private xCenterSpeed: number | null = null;
@@ -123,6 +123,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       if (!area) return;
       const ctx = chart.ctx as CanvasRenderingContext2D;
       const theme = this.theme();
+      if (!theme) return;
       ctx.save();
       ctx.globalCompositeOperation = 'destination-over';
       ctx.fillStyle = theme.background;
@@ -137,6 +138,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       const ctx = chart.ctx as CanvasRenderingContext2D;
       const area = chart.chartArea as ChartArea;
       const theme = this.theme();
+      if (!theme) return;
       const chartColors = this.getThemeColors();
       const def = Chart.defaults.font;
       const scaleMap = chart.scales as Record<string, Scale | undefined>;
@@ -242,7 +244,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
 
       if (typeof lastSpeed === 'number' && isFinite(lastSpeed)) {
         ctx.save();
-        ctx.fillStyle = chartColors.chartValue;
+        ctx.fillStyle = chartColors.chartValue ?? ctx.fillStyle;
         // Draw speed value centered
         ctx.font = this.isPhonePortrait().matches ? `bold ${this.SPEED_VALUE_PHONE_PORTRAIT_FONT_SIZE}px ${def.family}` : `bold ${this.SPEED_VALUE_FONT_SIZE}px ${def.family}`;
         ctx.textAlign = 'center';
@@ -268,7 +270,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       if (typeof lastDir === 'number' && isFinite(lastDir)) {
         const dir = this.normalizeAngle(lastDir);
         ctx.save();
-        ctx.fillStyle = chartColors.chartValue;
+        ctx.fillStyle = chartColors.chartValue ?? ctx.fillStyle;
         ctx.font = this.isPhonePortrait().matches ? `bold ${this.SPEED_VALUE_PHONE_PORTRAIT_FONT_SIZE}px ${def.family}` : `bold ${this.SPEED_VALUE_FONT_SIZE}px ${def.family}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -296,7 +298,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         ctx.restore();
         // Text over everything
         ctx.save();
-        ctx.fillStyle = this.getThemeColors().chartLabel;
+        ctx.fillStyle = this.getThemeColors().chartLabel ?? ctx.fillStyle;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = `bold 18px ${def.family}`;
@@ -307,7 +309,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   };
 
   constructor() {
-    this.isPhonePortrait = toSignal(this.responsive.observe(Breakpoints.HandsetPortrait));
+    this.isPhonePortrait = toSignal(this.responsive.observe(Breakpoints.HandsetPortrait), { initialValue: { matches: false, breakpoints: {} } });
     // Theme or config color changes -> restyle chart
     effect(() => {
       const theme = this.theme();
@@ -338,15 +340,17 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
 
   private startWidget(): void {
     // Guard until canvas view is ready
-    if (!this.widgetDataChart()) return;
+    const widgetDataChartRef = this.widgetDataChart();
+    if (!widgetDataChartRef) return;
     const cfg = this.runtime?.options();
     if (!cfg || !cfg.timeScale) return;
-    this.timeScale = cfg.timeScale as TimeScaleFormat;
-    this.dataSourceInfo = deriveDataSourceInfo(resolveWindowMs(this.timeScale, WINDTRENDS_PERIOD));
+    const timeScale = cfg.timeScale as TimeScaleFormat;
+    this.timeScale = timeScale;
+    this.dataSourceInfo = deriveDataSourceInfo(resolveWindowMs(timeScale, WINDTRENDS_PERIOD));
     this.createDatasets();
     this.setChartOptions();
     if (!this.chart) {
-      this.chart = new Chart(this.widgetDataChart().nativeElement.getContext('2d'), {
+      this.chart = new Chart(widgetDataChartRef.nativeElement.getContext('2d'), {
         type: this.lineChartType,
         data: this.lineChartData,
         options: this.lineChartOptions,
@@ -360,6 +364,10 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   }
 
   private setChartOptions() {
+    const theme = this.theme();
+    const dataSourceInfo = this.dataSourceInfo;
+    if (!theme || !dataSourceInfo) return;
+
     this.lineChartOptions.maintainAspectRatio = false;
     this.lineChartOptions.animation = false;
 
@@ -412,7 +420,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         },
         grid: {
           display: true,
-          color: this.theme().contrastDimmer
+          color: theme.contrastDimmer
         }
       },
       x: {
@@ -455,7 +463,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
             const tickVal = (ctx as unknown as { tick?: { value: number } }).tick?.value ?? Number.NaN;
             const center = this.xCenter ?? Number.NaN;
             const isCenter = this.nearlyEqual(tickVal, center);
-            return isCenter ? this.theme().contrast : undefined;
+            return isCenter ? this.theme()?.contrast : undefined;
           },
         },
         grid: {
@@ -467,7 +475,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
             const sAny = scale as unknown as { min?: number };
             const min = (scales?.x?.min as number | undefined) ?? sAny.min;
             const isMin = this.nearlyEqual(tickVal, min as number);
-            return isMin ? 'rgba(0,0,0,0)' : this.theme().contrastDimmer;
+            return isMin ? 'rgba(0,0,0,0)' : this.theme()?.contrastDimmer;
           },
           lineWidth: 1
         }
@@ -512,7 +520,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
             const tickVal = (ctx as unknown as { tick?: { value: number } }).tick?.value ?? Number.NaN;
             const center = this.xCenterSpeed ?? Number.NaN;
             const isCenter = this.nearlyEqual(tickVal, center);
-            return isCenter ? this.theme().contrast : undefined;
+            return isCenter ? this.theme()?.contrast : undefined;
           },
         },
         grid: {
@@ -524,7 +532,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
             const sAny = scale as unknown as { max?: number };
             const max = (scales?.xSpeed?.max as number | undefined) ?? sAny.max;
             const isMax = this.nearlyEqual(tickVal, max as number);
-            return isMax ? 'rgba(0,0,0,0)' : this.theme().contrastDimmer;
+            return isMax ? 'rgba(0,0,0,0)' : this.theme()?.contrastDimmer;
           },
           lineWidth: 1
         }
@@ -536,7 +544,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         display: true,
         align: "end",
         text: `TWD `,
-        color: this.getThemeColors().chartLabel,
+        color: this.getThemeColors().chartLabel ?? undefined,
         padding: this.isPhonePortrait().matches ? { top: 3, bottom: 0 } : { top: 3, bottom: 0 },
         font: this.isPhonePortrait().matches ? { size: 16, weight: 'normal' } : { size: 35, weight: 'normal' }
       },
@@ -544,15 +552,15 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         display: true,
         align: "start",
          text: ` TWS`,
-        color: this.getThemeColors().chartLabel,
+        color: this.getThemeColors().chartLabel ?? undefined,
         padding: this.isPhonePortrait().matches ? { top: -18, bottom: 12 } : { top: -41, bottom: 12 },
         font: this.isPhonePortrait().matches ? { size: 16 } : { size: 35 }
       },
       legend: { display: false
       },
       streaming: {
-        duration: this.dataSourceInfo.maxDataPoints * this.dataSourceInfo.sampleTime,
-        delay: this.dataSourceInfo.sampleTime,
+        duration: dataSourceInfo.maxDataPoints * dataSourceInfo.sampleTime,
+        delay: dataSourceInfo.sampleTime,
         frameRate: this.timeScale === "day" ? 5 : this.timeScale === "hour" ? 8 : this.timeScale === "minute" ? 15 : 30,
       }
     }
@@ -596,7 +604,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         borderColor: (context) => {
           const chart = context.chart as Chart;
           const { ctx } = chart;
-          return this.lineGradientForAxis(ctx, chart, 'x');
+          return this.lineGradientForAxis(ctx, chart, 'x') ?? undefined;
         },
         backgroundColor: 'red',
         xAxisID: 'x'
@@ -665,7 +673,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         borderColor: (context) => {
           const chart = context.chart as Chart;
           const { ctx } = chart;
-          return this.lineGradientForAxis(ctx, chart, 'xSpeed');
+          return this.lineGradientForAxis(ctx, chart, 'xSpeed') ?? undefined;
         },
         xAxisID: 'xSpeed'
       },
@@ -712,10 +720,12 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     this._dsDirectionSub?.unsubscribe();
     this._dsSpeedSub?.unsubscribe();
 
+    const timeScale = this.timeScale;
     const info = this.dataSourceInfo;
+    if (!timeScale || !info) return;
     const baseParams = {
       source: 'default',
-      windowMs: resolveWindowMs(this.timeScale, WINDTRENDS_PERIOD),
+      windowMs: resolveWindowMs(timeScale, WINDTRENDS_PERIOD),
       sampleTime: info.sampleTime,
       maxDataPoints: info.maxDataPoints,
       smoothingPeriod: info.smoothingPeriod
@@ -730,7 +740,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         this.pushRowsToDatasets(emission);
       } else {
         this.pushRowsToDatasets([emission]);
-        if (this.chart.data.datasets[0].data.length > this.dataSourceInfo.maxDataPoints) {
+        if (this.chart.data.datasets[0].data.length > info.maxDataPoints) {
           for (let i = 0; i <= 4; i++) this.chart.data.datasets[i].data.shift();
         }
       }
@@ -743,7 +753,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         this.pushRowsToSpeedDatasets(emission);
       } else {
         this.pushRowsToSpeedDatasets([emission]);
-        if (this.chart.data.datasets[5].data.length > this.dataSourceInfo.maxDataPoints) {
+        if (this.chart.data.datasets[5].data.length > info.maxDataPoints) {
           for (let i = 5; i <= 9; i++) this.chart.data.datasets[i].data.shift();
         }
       }
@@ -754,21 +764,25 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   private unwrapAngles(degrees: (number | null)[]): (number | null)[] {
     if (degrees.length === 0) return [];
     const unwrapped: (number | null)[] = [];
-    let prev = null;
+    let prev: number | null = null;
+    let lastUnwrapped: number | null = null;
     for (const val of degrees) {
       if (val == null) {
         unwrapped.push(null);
         continue;
       }
-      if (prev == null) {
+      if (prev == null || lastUnwrapped == null) {
         unwrapped.push(val);
         prev = val;
+        lastUnwrapped = val;
         continue;
       }
       let delta = val - prev;
       if (delta > 180) delta -= 360;
       if (delta < -180) delta += 360;
-      unwrapped.push(unwrapped[unwrapped.length - 1]! + delta);
+      const next = lastUnwrapped + delta;
+      unwrapped.push(next);
+      lastUnwrapped = next;
       prev = val;
     }
     return unwrapped;
@@ -859,16 +873,13 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     const dirAvgArr = this.chart.data.datasets[2]?.data as IDataSetRow[] | undefined;
     const dirSmaArr = this.chart.data.datasets[1]?.data as IDataSetRow[] | undefined;
     const dirValArr = this.chart.data.datasets[0]?.data as IDataSetRow[] | undefined;
-    const hasAvg = !!dirAvgArr?.length;
-    const hasSma = !!dirSmaArr?.length;
-    const hasVal = !!dirValArr?.length;
     // Center MUST be the latest lastAverage value when available, else fall back to SMA, else Value
-    const centerVal = hasAvg
-      ? dirAvgArr![dirAvgArr!.length - 1].x
-      : hasSma
-        ? dirSmaArr![dirSmaArr!.length - 1].x
-        : hasVal
-          ? dirValArr![dirValArr!.length - 1].x
+    const centerVal = dirAvgArr?.length
+      ? dirAvgArr[dirAvgArr.length - 1].x
+      : dirSmaArr?.length
+        ? dirSmaArr[dirSmaArr.length - 1].x
+        : dirValArr?.length
+          ? dirValArr[dirValArr.length - 1].x
           : undefined;
     if (typeof centerVal === 'number' && isFinite(centerVal)) {
       // Try to use lastMinimum/Maximum if available; else derive half-range from recent window using angular distance
@@ -882,10 +893,10 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         ? Math.max(Number.isFinite(minDiff) ? minDiff : 0, Number.isFinite(maxDiff) ? maxDiff : 0)
         : Number.NaN;
       if (!Number.isFinite(halfRange)) {
-        const src = hasAvg ? dirAvgArr! : hasSma ? dirSmaArr! : dirValArr!;
-        const take = Math.min(30, src?.length ?? 0);
-        if (take > 1) {
-          const slice = src!.slice(src!.length - take);
+        const src = dirAvgArr?.length ? dirAvgArr : dirSmaArr?.length ? dirSmaArr : dirValArr;
+        if (src && src.length > 1) {
+          const take = Math.min(30, src.length);
+          const slice = src.slice(src.length - take);
           const xs = slice.map(p => p.x).filter(v => typeof v === 'number' && isFinite(v)) as number[];
           if (xs.length) {
             halfRange = xs.reduce((m, v) => Math.max(m, this.angularDiff(centerVal, v)), 0);
@@ -902,9 +913,9 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       // Place center exactly at lastAverage
       const xMin = centerVal - 2 * dStep;
       const xMax = centerVal + 2 * dStep;
-      this.chart.options.scales.x.min = xMin;
-      this.chart.options.scales.x.max = xMax;
-      const xScale = this.chart.options.scales as unknown as { x: { ticks?: { stepSize?: number } } };
+      const xScale = this.chart.options.scales as unknown as { x: { min?: number; max?: number; ticks?: { stepSize?: number } } };
+      xScale.x.min = xMin;
+      xScale.x.max = xMax;
       xScale.x.ticks = { ...(xScale.x.ticks ?? {}), stepSize: dStep };
 
       // Cache for tick styling
@@ -954,9 +965,6 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
           p.y = Math.max(0, Math.min(windowMs, nowTs - ts));
         });
       });
-      // Lock y scale to [0, window]
-      this.chart.options.scales.y.min = 0;
-      this.chart.options.scales.y.max = windowMs;
       // Explicit step per selected window
       let step: number;
       const fmt = this.timeScale;
@@ -975,7 +983,10 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
           step = windowMs / 5;
           break;
       }
-      const yScale = this.chart.options.scales as unknown as { y: { ticks?: { stepSize?: number; count?: number } } };
+      const yScale = this.chart.options.scales as unknown as { y: { min?: number; max?: number; ticks?: { stepSize?: number; count?: number } } };
+      // Lock y scale to [0, window]
+      yScale.y.min = 0;
+      yScale.y.max = windowMs;
       const ticksCopy = { ...(yScale.y.ticks ?? {}) } as { stepSize?: number; count?: number };
       delete ticksCopy.count;
       ticksCopy.stepSize = step;
@@ -983,7 +994,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     }
   }
 
-  private getWindowMs(fmt: TimeScaleFormat | undefined): number {
+  private getWindowMs(fmt: TimeScaleFormat | null | undefined): number {
     switch (fmt) {
       case 'Last 30 Minutes':
         return 30 * 60_000;
@@ -1001,6 +1012,8 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     if (!chartArea) return null;
     const scale = chart.scales?.[axisKey] as (Scale | undefined);
     if (!scale) return null;
+    const theme = this.theme();
+    if (!theme) return null;
     const scales = chart.options?.scales as Record<string, { min?: number; max?: number }> | undefined;
     const sAny = scale as unknown as { min?: number; max?: number };
     const min = (scales?.[axisKey]?.min as number | undefined) ?? sAny.min;
@@ -1010,28 +1023,28 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     const centerPx = scale.getPixelForValue(center);
     const offset = Math.max(0, Math.min(1, (centerPx - chartArea.left) / chartArea.width));
     const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
-    gradient.addColorStop(0, this.theme().port);
-    gradient.addColorStop(offset, this.theme().port);
-    gradient.addColorStop(offset, this.theme().starboard);
-    gradient.addColorStop(1, this.theme().starboard);
+    gradient.addColorStop(0, theme.port);
+    gradient.addColorStop(offset, theme.port);
+    gradient.addColorStop(offset, theme.starboard);
+    gradient.addColorStop(1, theme.starboard);
     return gradient;
   }
 
   private setDatasetsColors(): void {
     this.lineChartData.datasets.forEach((dataset) => {
       if (dataset.label === 'Value') {
-        dataset.borderColor = this.getThemeColors().valueLine;
-        dataset.backgroundColor = this.getThemeColors().valueFill;
+        dataset.borderColor = this.getThemeColors().valueLine ?? undefined;
+        dataset.backgroundColor = this.getThemeColors().valueFill ?? undefined;
       }
       if (dataset.label === 'Value Speed') {
-        dataset.borderColor = this.getThemeColors().valueLine;
-        dataset.backgroundColor = this.getThemeColors().valueFill;
+        dataset.borderColor = this.getThemeColors().valueLine ?? undefined;
+        dataset.backgroundColor = this.getThemeColors().valueFill ?? undefined;
       }
     });
   }
 
   private getThemeColors(): IChartColors {
-  const widgetColor = this.runtime?.options()?.color;
+    const widgetColor = this.runtime?.options()?.color;
     const colors: IChartColors = {
       valueLine: null,
       valueFill: null,
@@ -1042,78 +1055,81 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       chartValue: null
     };
 
+    const theme = this.theme();
+    if (!theme) return colors;
+
     switch (widgetColor) {
       case "contrast":
-        colors.valueLine = this.theme().contrastDim;
-        colors.valueFill = this.theme().contrastDimmer;
-        colors.averageLine = this.theme().contrast;
-        colors.averageFill = this.theme().contrast;
-        colors.chartValue = this.theme().contrast;
-        colors.averageChartLine = this.theme().contrast;
-        colors.chartLabel = this.theme().contrastDim;
+        colors.valueLine = theme.contrastDim;
+        colors.valueFill = theme.contrastDimmer;
+        colors.averageLine = theme.contrast;
+        colors.averageFill = theme.contrast;
+        colors.chartValue = theme.contrast;
+        colors.averageChartLine = theme.contrast;
+        colors.chartLabel = theme.contrastDim;
         break;
       case "blue":
-        colors.valueLine = this.theme().blueDim;
-        colors.valueFill = this.theme().blueDimmer;
-        colors.averageLine = this.theme().blue;
-        colors.averageFill = this.theme().blue;
-        colors.chartValue = this.theme().blue;
-        colors.averageChartLine = this.theme().blueDim;
-        colors.chartLabel = this.theme().blueDim;
+        colors.valueLine = theme.blueDim;
+        colors.valueFill = theme.blueDimmer;
+        colors.averageLine = theme.blue;
+        colors.averageFill = theme.blue;
+        colors.chartValue = theme.blue;
+        colors.averageChartLine = theme.blueDim;
+        colors.chartLabel = theme.blueDim;
         break;
       case "green":
-        colors.valueLine = this.theme().greenDim;
-        colors.valueFill = this.theme().greenDimmer;
-        colors.averageLine = this.theme().green;
-        colors.averageFill = this.theme().green;
-        colors.chartValue = this.theme().green;
-        colors.averageChartLine = this.theme().greenDim;
-        colors.chartLabel = this.theme().greenDim;
+        colors.valueLine = theme.greenDim;
+        colors.valueFill = theme.greenDimmer;
+        colors.averageLine = theme.green;
+        colors.averageFill = theme.green;
+        colors.chartValue = theme.green;
+        colors.averageChartLine = theme.greenDim;
+        colors.chartLabel = theme.greenDim;
         break;
       case "pink":
-        colors.valueLine = this.theme().pinkDim;
-        colors.valueFill = this.theme().pinkDimmer;
-        colors.averageLine = this.theme().pink;
-        colors.averageFill = this.theme().pink;
-        colors.chartValue = this.theme().pink;
-        colors.averageChartLine = this.theme().pinkDim;
-        colors.chartLabel = this.theme().pinkDim;
+        colors.valueLine = theme.pinkDim;
+        colors.valueFill = theme.pinkDimmer;
+        colors.averageLine = theme.pink;
+        colors.averageFill = theme.pink;
+        colors.chartValue = theme.pink;
+        colors.averageChartLine = theme.pinkDim;
+        colors.chartLabel = theme.pinkDim;
         break;
       case "orange":
-        colors.valueLine = this.theme().orangeDim;
-        colors.valueFill = this.theme().orangeDimmer;
-        colors.averageLine = this.theme().orange;
-        colors.averageFill = this.theme().orange;
-        colors.chartValue = this.theme().orange;
-        colors.averageChartLine = this.theme().orangeDim;
-        colors.chartLabel = this.theme().orangeDim;
+        colors.valueLine = theme.orangeDim;
+        colors.valueFill = theme.orangeDimmer;
+        colors.averageLine = theme.orange;
+        colors.averageFill = theme.orange;
+        colors.chartValue = theme.orange;
+        colors.averageChartLine = theme.orangeDim;
+        colors.chartLabel = theme.orangeDim;
         break;
       case "purple":
-        colors.valueLine = this.theme().purpleDim;
-        colors.valueFill = this.theme().purpleDimmer;
-        colors.averageLine = this.theme().purple;
-        colors.averageFill = this.theme().purple;
-        colors.chartValue = this.theme().purple;
-        colors.averageChartLine = this.theme().purpleDim;
-        colors.chartLabel = this.theme().purpleDim;
+        colors.valueLine = theme.purpleDim;
+        colors.valueFill = theme.purpleDimmer;
+        colors.averageLine = theme.purple;
+        colors.averageFill = theme.purple;
+        colors.chartValue = theme.purple;
+        colors.averageChartLine = theme.purpleDim;
+        colors.chartLabel = theme.purpleDim;
         break;
       case "grey":
-        colors.valueLine = this.theme().greyDim;
-        colors.valueFill = this.theme().greyDimmer;
-        colors.averageLine = this.theme().grey;
-        colors.averageFill = this.theme().grey;
-        colors.chartValue = this.theme().grey;
-        colors.averageChartLine = this.theme().greyDim;
-        colors.chartLabel = this.theme().greyDim;
+        colors.valueLine = theme.greyDim;
+        colors.valueFill = theme.greyDimmer;
+        colors.averageLine = theme.grey;
+        colors.averageFill = theme.grey;
+        colors.chartValue = theme.grey;
+        colors.averageChartLine = theme.greyDim;
+        colors.chartLabel = theme.greyDim;
         break;
       case "yellow":
-        colors.valueLine = this.theme().yellowDim;
-        colors.valueFill = this.theme().yellowDimmer;
-        colors.averageLine = this.theme().yellow;
-        colors.averageFill = this.theme().yellow;
-        colors.chartValue = this.theme().yellow;
-        colors.averageChartLine = this.theme().yellowDim;
-        colors.chartLabel = this.theme().yellowDim;
+        colors.valueLine = theme.yellowDim;
+        colors.valueFill = theme.yellowDimmer;
+        colors.averageLine = theme.yellow;
+        colors.averageFill = theme.yellow;
+        colors.chartValue = theme.yellow;
+        colors.averageChartLine = theme.yellowDim;
+        colors.chartLabel = theme.yellowDim;
         break;
     }
     return colors;
