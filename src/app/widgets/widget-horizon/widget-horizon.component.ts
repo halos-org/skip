@@ -114,7 +114,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
   // Gauge internals
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected gaugeOptions: any = {};
-  protected readonly frameVisibleView = computed(() => !(this.runtime.options()?.gauge?.noFrameVisible ?? false));
+  protected readonly frameVisibleView = computed(() => (this.runtime.options()?.gauge?.noFrameVisible ?? false));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private gauge: any = null;
   // Structural options cache key removed – always rebuild on size / config change for simplicity
