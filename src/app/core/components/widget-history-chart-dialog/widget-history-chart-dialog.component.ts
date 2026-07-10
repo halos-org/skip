@@ -6,7 +6,7 @@ import { Chart, ChartConfiguration, ChartDataset, Color, LegendItem, LineControl
 import 'chartjs-adapter-date-fns';
 import { IWidget } from '../../interfaces/widgets-interface';
 import { IKipSeriesDefinition } from '../../services/kip-series-api-client.service';
-import { isKipTemplateSeriesDefinition, type IKipTemplateSeriesDefinition } from '../../contracts/kip-series-contract';
+import { isKipTemplateSeriesDefinition, type IKipConcreteSeriesDefinition, type IKipTemplateSeriesDefinition } from '../../contracts/kip-series-contract';
 import {
   describeElectricalDualAxisSeries,
   getAxisConfigsForWidget,
@@ -19,7 +19,7 @@ import {
   transformDualAxisMetricValue
 } from '../../contracts/electrical-history-chart.contract';
 import { HistoryToChartMapperService } from '../../services/history-to-chart-mapper.service';
-import { AppService } from '../../services/app-service';
+import { AppService, ITheme } from '../../services/app-service';
 import { UnitsService } from '../../services/units.service';
 import { HistoryApiClientService } from '../../services/history-api-client.service';
 import { MatIconModule } from '@angular/material/icon';
@@ -30,7 +30,8 @@ Chart.register(LineController, LineElement, LinearScale, PointElement, TimeScale
 
 interface ChartPoint {
   x: number;
-  y: number;
+  /** A gap in the source history (no value at this timestamp) is a normal, chart.js-renderable state. */
+  y: number | null;
 }
 type HistoryChartDataset = ChartDataset<'line', ChartPoint[]>;
 
@@ -214,7 +215,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
 
       // Apply conversion based on dual-axis metric metadata first, then optional widget-level override.
       chartPoints = datapoints.map(point => {
-        let y = point.data.value as number;
+        let y: number | null = point.data.value;
         if (typeof y === 'number' && Number.isFinite(y)) {
           if (dualAxisSeries) {
             y = transformDualAxisMetricValue(dualAxisSeries, y);
@@ -279,17 +280,20 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
   }
 
   private getSeriesPalette(): string[] {
+    const theme = this.theme();
+    if (!theme) return [];
+
     const configColorKey = this.data.widget?.config?.color || 'blue';
     const preferredColor = this.resolveThemeColor(configColorKey);
     let palette = [
-      this.theme().green,
-      this.theme().orange,
-      this.theme().pink,
-      this.theme().purple,
-      this.theme().yellow,
-      this.theme().grey,
-      this.theme().blue,
-      this.theme().contrast
+      theme.green,
+      theme.orange,
+      theme.pink,
+      theme.purple,
+      theme.yellow,
+      theme.grey,
+      theme.blue,
+      theme.contrast
     ];
 
     const existingIndex = palette.findIndex(color => color?.toLowerCase() === preferredColor.toLowerCase());
@@ -303,7 +307,9 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
   }
 
   private resolveThemeColor(colorKey: string): string {
-    const themeColor = this.theme()[colorKey as keyof ReturnType<typeof this.theme>];
+    const theme = this.theme();
+    if (!theme) return colorKey;
+    const themeColor = theme[colorKey as keyof ITheme];
     return typeof themeColor === 'string' && themeColor.length > 0 ? themeColor : colorKey;
   }
 
@@ -416,14 +422,16 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       return [series];
     }
 
-    return matchedPaths.map((path, index) => ({
+    return matchedPaths.map((path, index): IKipConcreteSeriesDefinition => ({
       ...series,
       seriesId: `${series.seriesId}:resolved:${index}`,
       datasetUuid: `${series.datasetUuid}:resolved:${index}`,
       path,
+      // A resolved concrete path is no longer a template: clear all template-only bookkeeping fields.
       expansionMode: null,
       familyKey: null,
-      allowedIds: null
+      allowedIds: null,
+      trackedDevices: null
     }));
   }
 
@@ -521,6 +529,11 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       return;
     }
 
+    const theme = this.theme();
+    if (!theme) {
+      return;
+    }
+
     this.chart?.destroy();
 
     const unitLabel = this.getPrimaryAxisUnitLabel();
@@ -558,10 +571,10 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
 
             },
             ticks: {
-              color: this.theme().contrastDim,
+              color: theme.contrastDim,
             },
             grid: {
-              color: this.theme().contrastDimmer
+              color: theme.contrastDimmer
             }
           },
           ...this.buildYScales(unitLabel)
@@ -569,7 +582,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
         plugins: {
           legend: {
             labels: {
-              color: this.theme().contrastDim,
+              color: theme.contrastDim,
               generateLabels: chart => this.buildLegendLabels(chart)
             }
           },
@@ -588,7 +601,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
                   : undefined;
 
                 return {
-                  borderColor: (legendItem?.strokeStyle ?? this.theme().contrast) as string,
+                  borderColor: (legendItem?.strokeStyle ?? theme.contrast) as string,
                   backgroundColor: 'rgba(0, 0, 0, 0)',
                   borderWidth: 2,
                   borderRadius: 0,
@@ -636,20 +649,23 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
   }
 
   private buildYScales(unitLabel: string): NonNullable<NonNullable<ChartConfiguration<'line'>['options']>['scales']> {
+    const theme = this.theme();
+    if (!theme) return {};
+
     const dualAxisWidgetType = this.resolveDualAxisWidgetType();
     if (!dualAxisWidgetType) {
       return {
         y: {
           ticks: {
-            color: this.theme().contrastDim
+            color: theme.contrastDim
           },
           grid: {
-            color: this.theme().contrastDimmer
+            color: theme.contrastDimmer
           },
           title: {
             display: !!unitLabel,
             text: unitLabel ? `${unitLabel}` : '',
-            color: this.theme().contrastDim
+            color: theme.contrastDim
           }
         }
       };
@@ -662,7 +678,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       const axisMetric = this.resolvePrimaryMetricForAxis(dualAxisWidgetType, axisConfig.axisId);
       const axisColor = axisMetric
         ? this.getDualAxisMetricColor(dualAxisWidgetType, axisMetric)
-        : this.theme().contrastDim;
+        : theme.contrastDim;
 
       scales[axisConfig.axisId] = {
         type: 'linear',
@@ -670,11 +686,11 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
         ...(axisConfig.min != null ? { min: axisConfig.min } : {}),
         ...(axisConfig.max != null ? { max: axisConfig.max } : {}),
         ticks: {
-          color: this.theme().contrastDim,
+          color: theme.contrastDim,
           callback: (value: unknown) => this.formatAxisTick(value, axisConfig.tickSuffix)
         },
         grid: {
-          color: this.theme().contrastDimmer,
+          color: theme.contrastDimmer,
           ...(axisConfig.drawOnChartArea === false ? { drawOnChartArea: false } : {})
         },
         title: {
@@ -707,7 +723,9 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       const dataset = label.datasetIndex != null
         ? chart.data.datasets[label.datasetIndex] as HistoryChartDataset
         : null;
-      const borderDash = Array.isArray(dataset?.borderDash) ? dataset.borderDash : [];
+      const borderDash: number[] = Array.isArray(dataset?.borderDash)
+        ? dataset.borderDash.filter((v): v is number => typeof v === 'number')
+        : [];
       return {
         ...label,
         fillStyle: 'transparent' as Color,
