@@ -1,0 +1,60 @@
+name: Publish Stable Release
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.repository }}-npm-publish
+  cancel-in-progress: false
+
+jobs:
+  npm-publish:
+    runs-on: ubuntu-latest
+    # Only publish stable releases, not pre-releases
+    if: ${{ github.event.release.prerelease == false }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Install pinned npm with trusted publishing support
+        # Pin via corepack rather than `npm install -g npm@latest` so a broken
+        # bundled npm in the Node toolcache cannot fail the install step.
+        run: |
+          corepack enable
+          corepack prepare npm@11.14.1 --activate
+          npm --version
+
+      - name: Check if version exists on npm
+        id: check
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          if npm view @halos-org/skip@"$VERSION" version 2>/dev/null; then
+            # In npm-only mode a +N-only merge (no VERSION change) cuts a new
+            # GitHub release that publishes nothing here. Surface it loudly so a
+            # "published" release that ships nothing to npm is not mistaken for
+            # a real release — bump VERSION to publish a new version.
+            echo "::warning::@halos-org/skip@$VERSION is already on npm; nothing to publish. Bump VERSION to release a new version."
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION not found on npm, will publish"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and publish to npm
+        if: steps.check.outputs.exists == 'false'
+        # npm publish runs prepublishOnly (build:prod), so it is the single
+        # build gate — do not add --ignore-scripts here or the webapp won't build.
+        run: |
+          npm ci --ignore-scripts
+          npm publish

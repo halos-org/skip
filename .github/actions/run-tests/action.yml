@@ -1,0 +1,35 @@
+name: 'Run Tests'
+description: 'Run all CI checks (lint, strictNullChecks ratchet, unit tests) and build the webapp'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+      shell: bash
+
+    - name: Run CI checks
+      run: npm run ci
+      shell: bash
+
+    - name: Build webapp
+      run: npm run build:prod
+      shell: bash
+
+    - name: Verify npm package contents
+      shell: bash
+      # Assert the publish tarball (package.json `files`) contains the built
+      # webapp and the plugin entry `main` points at — catches a broken files
+      # glob, missing build output, or a dangling main before a real publish.
+      run: |
+        files=$(npm pack --dry-run --json \
+          | node -e 'const p=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(p[0].files.map(x=>x.path).join("\n"))')
+        echo "$files" | grep -qx 'plugin/index.js' || { echo "::error::npm package missing plugin/index.js (main entry)"; exit 1; }
+        echo "$files" | grep -q '^public/' || { echo "::error::npm package missing public/ (webapp build output)"; exit 1; }
+        echo "npm package contents verified"
