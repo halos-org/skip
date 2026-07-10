@@ -15,8 +15,11 @@ Skip — an Angular 21 (zoneless, signals, new control flow) Signal K marine mul
 - `npm test` — full unit suite, headless (vitest via `@angular/build:unit-test`). `npm run test:interactive` for watch mode.
 - `npm run lint` — ESLint (flat config). `@typescript-eslint/no-explicit-any` is an **error**, and `no-unused-vars` does **not** ignore `_`-prefixed params — drop unused params, don't underscore them.
 - `npm run generate:widget` — schematic that scaffolds a Host2 widget (preferred over hand-writing one).
+- `./run` — standard HaLOS dispatcher (`./run help` for commands): `build`, `test`, `lint`, `ci` (lint + betterer:ci + tests, the CI gate), `bumpversion patch|minor|major`.
 
-Node: the app builds on Node 20+. CI runs the matrix 20/22/24.
+Node: the app builds on Node 20+, but only **Node 24 is CI-verified** (`run-tests` and the npm-publish job run Node 24 — the 20/22/24 matrix was dropped when the bespoke `ci.yml` was replaced).
+
+CI is the standard HaLOS triad: `pr.yml` → shared `pr-checks` (with `skip-lintian`), `main.yml` → shared `build-release` in npm-only mode (`build-deb: false`; cuts a draft stable release), `release.yml` → `npm publish` when that release is published. `VERSION` is the source of truth, synced to `package.json` by `./run bumpversion`. In npm-only mode a `+N`-only merge (no `VERSION` change) cuts a GitHub release that publishes nothing to npm — bump `VERSION` to ship a new version.
 
 ## strictNullChecks ratchet (betterer)
 
@@ -24,7 +27,7 @@ Node: the app builds on Node 20+. CI runs the matrix 20/22/24.
 
 - `npm run snc` — `tsc -p tsconfig.strict.json`, lists your remaining `strictNullChecks` errors. `tsconfig.strict.json` is the single source of the strict compiler options and the checked file scope (all `src/**/*.ts`, no specs, no `test.ts`).
 - `npm run betterer` — **regenerates** `.betterer.results` (the committed baseline). Run and commit this whenever you fix a file **or merge/rebase main into your branch**.
-- `npm run betterer:ci` — the check the `strict-null-checks` CI job runs; fails on any new issue.
+- `npm run betterer:ci` — the ratchet check CI runs (inside `npm run ci` in the `run-tests` action); fails on any new issue.
 
 The baseline is keyed by file **content hash**, so any content change to a tracked file — a real fix, or just merging main — invalidates its key and makes `betterer:ci` fail with "unexpected changes" until you regenerate. If CI reports the same count but "unexpected changes", that's the tell: run `npm run betterer` and commit the result. The check runs on Node 24; the baseline is Node-portable (Node 20/22/24 produce identical results). `tsconfig.betterer.json` is only the ts-node loader config for `.betterer.ts`, not a check config.
 
@@ -57,7 +60,7 @@ The mock serves Skip's full session/config surface (`loginStatus`, `applicationD
 - The runner is **vitest** (`vitest.config.ts`, `environment: jsdom`) driven by `@angular/build:unit-test`. `src/test.ts` is the setup file and **monkey-patches `TestBed.configureTestingModule`** to inject a large set of global stubs/providers (SettingsService, AuthenticationService, SignalKConnectionService, ConnectionStateMachine, MatDialog refs, the widget host directives, etc.). Specs override these by listing their own local providers (local wins; globals are prepended).
 - **CI is the source of truth for tests, not local runs.** The local jsdom environment often lacks a usable `localStorage`, so services that read it at construction (Settings/Auth/Storage) crash locally in ways that do not occur in CI. `npm run lint` is reliable locally.
 - Run a **single spec** with `ng test --include='<path/to/file.spec.ts>'` — it goes through the `@angular/build:unit-test` builder (Angular linker + JIT). Plain `npx vitest run <file>` fails with `@angular/compiler is not available` / JIT errors because it bypasses that builder. Specs that don't touch `localStorage` at construction (e.g. the delta/requests parsers) run cleanly this way locally; Settings/Auth/Storage still need CI.
-- Use **`npm install`**, not `npm ci` — the committed lockfile is out of sync (npm ci errors on missing optional platform deps). CI also uses `npm install`.
+- CI uses **`npm ci`** (the `run-tests` action and `release.yml`) against a lockfile that is now in sync. If `npm ci` ever fails again on missing optional platform deps, regenerate the lockfile (`rm package-lock.json && npm install`) and commit it — don't switch CI back to `npm install`.
 - The most common spec failure is **stub drift**: a real service gained a method/observable that the global stub in `src/test.ts` (or a spec's own local mock) doesn't expose, yielding "X is not a function" or `.subscribe`/`.pipe` of undefined at construction. Fix the stub/mock, not app code. Services subscribe to `conn.serverServiceEndpoint$` and `conn.serverVersion$` at construction, so partial `SignalKConnectionService` mocks must provide them.
 
 ## Architecture (the parts that need several files to grasp)
@@ -77,7 +80,7 @@ The mock serves Skip's full session/config surface (`loginStatus`, `applicationD
 - **The package name is the serving path.** `angular.json` `baseHref`, the `dev` serve-path, `src/manifest.json` `id`/`scope`/`start_url`, and `SKIP_URL` in `plugin/index.js` must all stay `/@halos-org/skip/`. Branding lives in `brand/` (vector master, repo-only), `src/assets/` (favicon/icon set), `src/manifest.json`, and `signalk.displayName` in `package.json`.
 - **`gh` defaults PRs to the `upstream` remote.** Always pass `--repo halos-org/skip` to `gh pr create` / `gh pr merge`. (The clone is set up with `gh repo set-default halos-org/skip` and a disabled upstream push URL, but pass it explicitly anyway.)
 - **Upstream's own vitest CI is red**; a rebase onto `mxtommy/kip` can re-introduce test failures. The fork's fixes are small and live in `src/test.ts` stubs plus a few specs — re-apply them rather than disabling tests.
-- Not published to npm (publishing would list it in the Signal K app store). Deploy by placing the package where the SK server serves it: the built `public/` output (the webapp) **and** `plugin/` (the bundled Freeboard-SK panel plugin, referenced by `main`) alongside `package.json`. A `public/`-only copy leaves `main` dangling and the plugin fails to load.
+- Published to npm as `@halos-org/skip` via the standard CI triad — publishing a GitHub release triggers `release.yml` to `npm publish` (OIDC trusted publishing, no token). This also lists Skip in the Signal K app store, which is intended. The published package is the built `public/` output (the webapp) **and** `plugin/` (the bundled Freeboard-SK panel plugin, referenced by `main`) alongside `package.json`; a `public/`-only copy leaves `main` dangling and the plugin fails to load. For development you can still deploy an unreleased build by rsyncing `public/` + `plugin/` + `package.json` into the SK server's `node_modules` (see workspace `CLAUDE.local.md`).
 
 ## Inherited upstream docs — treat skeptically
 
