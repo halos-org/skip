@@ -7,6 +7,12 @@
   { "title": "Digital Switching and PUT", "file": "putcontrols.md" },
   { "title": "Historical Widget Data", "file": "time-series.md" },
   {
+    "title": "Widgets",
+    "items": [
+      { "title": "AIS Radar", "file": "ais-radar.md" }
+    ]
+  },
+  {
     "title": "Integrations",
     "items": [
       {
