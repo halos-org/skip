@@ -200,10 +200,6 @@ export class SettingsConfigComponent {
     input.value = '';
   }
 
-  public loadDemoConfig(): void {
-    this.settings.loadDemoConfig();
-  }
-
   public resetConfigToDefault(): void {
     this.settings.resetSettings();
   }

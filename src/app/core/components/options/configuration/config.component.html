@@ -79,14 +79,6 @@
           <button mat-flat-button class="adv-btn" [disabled]="!canWriteUserData()" (click)="fileInput.click()">Import</button>
         </div>
 
-        <div class="demo-txt">
-          Load the demonstration configuration and connect to the Signal K demo server.
-          <br /><strong>WARNING: This replaces the active profile's configuration.</strong>
-        </div>
-        <div class="demo-btn btn-div">
-          <button mat-flat-button type="button" class="adv-btn" (click)="loadDemoConfig()">Demo</button>
-        </div>
-
         <div class="reset-txt">
           Reset the active profile to defaults (a single Getting Started widget). Your Signal K
           connection settings remain.

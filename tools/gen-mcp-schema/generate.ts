@@ -47,7 +47,7 @@ const M3_DARK = 'src/themes/_m3dark.scss';
 const THEME_NAMES: readonly string[] = ['', 'light-theme', 'night-theme'];
 
 const SCHEMA_VERSION = 1;
-// Two distinct KIP version numbers (see storage.service.ts / config.demo.const.ts):
+// Two distinct KIP version numbers (see storage.service.ts):
 // the applicationData file version in the URL, and app.configVersion in the body.
 const CONFIG_FILE_VERSION = 11;
 const CONFIG_VERSION = 12;
