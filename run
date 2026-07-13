@@ -41,6 +41,125 @@ function build-dev {
 }
 
 ################################################################################
+# Deploy Commands
+
+function deploy-halos {
+  #@ Build locally and install onto a HaLOS device's Signal K as a durable dependency
+  #@ Category: Deploy
+  local target="${1:-}"
+  if [[ -z "$target" ]]; then
+    echo "Usage: ./run deploy-halos <target_host>"
+    echo ""
+    echo "Builds the production bundle locally, then installs it into the target"
+    echo "device's Signal K data volume as a declared file: dependency. Because the"
+    echo "dependency is declared, a later 'npm install' (e.g. adding another plugin)"
+    echo "no longer prunes it -- unlike a bare copy into node_modules, which it does."
+    echo ""
+    echo "Pass 'local' when running on the device itself; a hostname deploys over"
+    echo "ssh (needs ssh access + passwordless sudo on the target). The build runs"
+    echo "on the machine you invoke this from -- keep that a dev/build host."
+    echo ""
+    echo "Examples:"
+    echo "  ./run deploy-halos local         # on the device itself"
+    echo "  ./run deploy-halos halpi.hurma   # from a dev machine, over ssh"
+    return 1
+  fi
+
+  local pkg slug data sysdir dest
+  pkg=$(node -p "require('./package.json').name")   # e.g. @halos-org/skip
+  slug="${pkg##*/}"                                  # e.g. skip
+  data="/var/lib/container-apps/marine-signalk-server-container/data/data"
+  sysdir="${data}/system-plugins/${slug}"
+
+  # 'local'/'localhost' runs every step on this box; any other target goes over
+  # ssh. `runner` executes a bash script (fed via stdin heredoc) in either place.
+  local -a runner
+  if [[ "$target" == local || "$target" == localhost ]]; then
+    dest=""; runner=(bash -s --)
+  else
+    dest="${target}:"; runner=(ssh "$target" bash -s --)
+  fi
+
+  echo "==> Building production bundle (locally)..."
+  build
+
+  echo "==> Preparing ${dest}${sysdir} (backing up any existing install)..."
+  "${runner[@]}" "$sysdir" <<'PREP'
+set -o errexit -o nounset -o pipefail
+sysdir="$1"
+mkdir -p "$sysdir"
+if [ -n "$(ls -A "$sysdir" 2>/dev/null)" ]; then
+  tar -czf "$HOME/$(basename "$sysdir")-predeploy-$(date +%F-%H%M%S).tar.gz" \
+    -C "$(dirname "$sysdir")" "$(basename "$sysdir")"
+fi
+PREP
+
+  # Ship only the package's runtime payload: the webapp (public/), the bundled
+  # plugin referenced by "main" (plugin/), and its manifest (package.json).
+  echo "==> Syncing build to ${target}..."
+  rsync -rlpt --delete public/ "${dest}${sysdir}/public/"
+  rsync -rlpt --delete plugin/ "${dest}${sysdir}/plugin/"
+  rsync -lpt package.json "${dest}${sysdir}/package.json"
+
+  echo "==> Linking, registering the dependency, and restarting Signal K..."
+  "${runner[@]}" "$pkg" "$slug" "$data" <<'REMOTE'
+set -o errexit -o nounset -o pipefail
+pkg="$1"; slug="$2"; data="$3"
+
+# Link into node_modules exactly as npm does for a file: dependency (scope-aware).
+scope="${pkg%/*}"
+if [ "$scope" != "$pkg" ]; then
+  mkdir -p "${data}/node_modules/${scope}"
+  ln -sfn "../../system-plugins/${slug}" "${data}/node_modules/${pkg}"
+else
+  ln -sfn "../system-plugins/${slug}" "${data}/node_modules/${pkg}"
+fi
+
+# Declare it in package.json so npm treats it as owned and never prunes it.
+python3 - "$data" "$pkg" "$slug" <<'PY'
+import json, sys
+data, pkg, slug = sys.argv[1:4]
+path = data + "/package.json"
+cfg = json.load(open(path))
+deps = cfg.setdefault("dependencies", {})
+want = "file:system-plugins/" + slug
+if deps.get(pkg) != want:
+    deps[pkg] = want
+    with open(path, "w") as f:
+        json.dump(cfg, f, indent=2)
+        f.write("\n")
+    print("  registered", pkg, "->", want)
+else:
+    print(" ", pkg, "already registered")
+PY
+
+sudo docker restart signalk-server
+
+# Verify through Traefik (HTTPS, device CA). Never the container's :3000 port --
+# host networking only exposes that incidentally; all access goes via Traefik.
+ca=/usr/local/share/ca-certificates/halos-ca.crt
+domain=$(hostname -d 2>/dev/null || true)
+[ -z "$domain" ] && domain=$(awk '/^search/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
+base="https://$(hostname)${domain:+.$domain}:4430"
+echo "  waiting for Signal K at ${base} ..."
+for _ in $(seq 1 25); do
+  if curl -sf --max-time 10 --cacert "$ca" "${base}/skServer/webapps" >/dev/null 2>&1; then break; fi
+  sleep 3
+done
+if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "$pkg"; then
+  echo "  OK: ${pkg} is served by Signal K (listed in /skServer/webapps)"
+else
+  echo "  WARN: ${pkg} not listed at ${base}/skServer/webapps"
+fi
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --cacert "$ca" "${base}/${pkg}/" || true)
+echo "  ${base}/${pkg}/ -> HTTP ${code}"
+REMOTE
+
+  echo ""
+  echo "Deployed ${pkg} to ${target}; see the Traefik verify result above."
+}
+
+################################################################################
 # Test Commands
 
 function test {
