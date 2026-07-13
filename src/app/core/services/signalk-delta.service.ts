@@ -360,16 +360,14 @@ export class SignalKDeltaService implements OnDestroy {
   }
 
   private parseUpdates(updates: ISignalKUpdateMessage[], context: string | undefined): void {
-    // if (context != this._selfUrn) {    // remove non self root nodes
-    //   return;
-    // }
-
     updates.forEach(update => {
       if (Array.isArray(update?.meta)) {
         update.meta.forEach(meta => this.parseSkMeta(meta, context));
       }
 
       if (Array.isArray(update?.values)) {
+        const hasValidSource = typeof update.$source === 'string' && typeof update.timestamp === 'string';
+        let sourceWarned = false;
         update.values.forEach(item => {
           if (typeof item?.path !== 'string') {
             console.warn("[Delta Service] Dropping value update without a string path:", item);
@@ -379,6 +377,13 @@ export class SignalKDeltaService implements OnDestroy {
             this._skNotificationsMsg$.next(item);
           } else {
             // It's a path value source update.
+            if (!hasValidSource) {
+              if (!sourceWarned) {
+                console.warn("[Delta Service] Dropping value update without a valid $source or timestamp:", update);
+                sourceWarned = true;
+              }
+              return;
+            }
             if ((typeof(item.value) == 'object') && (item.value !== null)) {
               if (this.DO_NOT_FLATTEN_PATHS.some(sub_string => item.path.includes(sub_string))) {
                 // Skip flattening, treat as a single value
@@ -486,6 +491,10 @@ export class SignalKDeltaService implements OnDestroy {
   private parseSkMeta(metadata: ISignalKMeta, context: string | undefined) {
     if (metadata?.value == null) {
       console.warn("[Delta Service] Dropping metadata update without a value:", metadata);
+      return;
+    }
+    if (typeof metadata.path !== 'string') {
+      console.warn("[Delta Service] Dropping metadata update without a path:", metadata);
       return;
     }
     if (metadata.value.properties != null) {
