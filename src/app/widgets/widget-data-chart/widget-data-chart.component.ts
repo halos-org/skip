@@ -10,16 +10,20 @@ import { ITheme } from '../../core/services/app-service';
 import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
 import { resolveWindowMs, deriveDataSourceInfo } from '../../core/utils/chart-window.util';
 
-import { Chart, ChartConfiguration, ChartData, ChartType, TimeUnit, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle } from 'chart.js';
-import annotationPlugin from 'chartjs-plugin-annotation';
+import { Chart, ChartConfiguration, ChartData, ChartType, TimeUnit } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import ChartStreaming from '@aziham/chartjs-plugin-streaming';
+import { registerChartComponents } from '../../core/utils/chart-registration.util';
 
-Chart.register(annotationPlugin, ChartStreaming, Filler, Title, SubTitle, TimeScale, LinearScale, LineController, PointElement, LineElement,);
+registerChartComponents();
 
+interface AnnLine {
+  display?: boolean;
+  value?: number;
+  label: { display?: boolean; content?: string };
+}
 interface AnnPlugin {
   annotation?: {
-    annotations?: Record<string, { value?: number; label: { content?: string } }>
+    annotations?: Record<string, AnnLine>
   }
 }
 interface IChartColors {
@@ -96,6 +100,11 @@ export class WidgetDataChartComponent implements OnDestroy {
   private datasetConfig: IDatasetServiceDatasetConfig | null = null;
   private dataSourceInfo: IDatasetServiceDataSourceInfo | null = null;
   private lastVerticalChart: boolean | null | undefined = null;
+  // Latest finite annotation values; NaN until real data arrives, which keeps the
+  // min/max/average lines and their labels hidden instead of drawing at a placeholder 0.
+  private lastAverageValue = NaN;
+  private lastMinimumValue = NaN;
+  private lastMaximumValue = NaN;
   protected hasPath = computed<boolean>(() => {
     const cfg = this.runtime.options();
     return !!cfg?.datachartPath;
@@ -140,11 +149,13 @@ export class WidgetDataChartComponent implements OnDestroy {
           this.lastVerticalChart = cfg.verticalChart;
           this.rebuildForDataset(cfg);
         } else if (this.chart) {
-          // Styling / axis / annotation toggles / showAverageData
+          // Styling / axis / annotation toggles / showAverageData. setChartOptions rebuilds the
+          // annotation plugin wholesale, so annotation visibility is re-applied after it — otherwise
+          // an already-enabled avg/min/max line is reset to hidden until the next stream emission.
           this.ensureAverageDatasetPresence();
-          this.updateAnnotationVisibility();
           this.applyDynamicTrackAverageStyling();
           this.setChartOptions(cfg);
+          this.updateAnnotationVisibility();
           this.setDatasetsColors();
           this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
         }
@@ -168,6 +179,9 @@ export class WidgetDataChartComponent implements OnDestroy {
 
     this.streamSub?.unsubscribe(); // Cleanup old subscription & chart data
     this.lineChartData.datasets = [];
+    this.lastAverageValue = NaN;
+    this.lastMinimumValue = NaN;
+    this.lastMaximumValue = NaN;
     this.historyUnavailable.set(false);
 
     // Synthesize the config + cadence the axis/streaming options expect, derived from the widget's
@@ -379,11 +393,11 @@ export class WidgetDataChartComponent implements OnDestroy {
           minimumLine: {
             type: 'line',
             scaleID: cfg.verticalChart ? 'x' : 'y',
-            display: cfg.showDatasetMinimumValueLine,
+            display: false,
             value: undefined,
             drawTime: 'afterDatasetsDraw',
             label: {
-              display: true,
+              display: false,
               position: "start",
               yAdjust: 12,
               padding: 4,
@@ -394,11 +408,11 @@ export class WidgetDataChartComponent implements OnDestroy {
           maximumLine: {
             type: 'line',
             scaleID: cfg.verticalChart ? 'x' : 'y',
-            display: cfg.showDatasetMaximumValueLine,
+            display: false,
             value: undefined,
             drawTime: 'afterDatasetsDraw',
             label: {
-              display: true,
+              display: false,
               position: "start",
               yAdjust: -12,
               padding: 4,
@@ -409,13 +423,13 @@ export class WidgetDataChartComponent implements OnDestroy {
           averageLine: {
             type: 'line',
             scaleID: cfg.verticalChart ? 'x' : 'y',
-            display: cfg.showDatasetAverageValueLine,
+            display: false,
             value: undefined,
             borderDash: [6, 6],
             borderColor: this.getThemeColors().averageChartLine,
             drawTime: 'afterDatasetsDraw',
             label: {
-              display: true,
+              display: false,
               position: "start",
               padding: 4,
               color: this.getThemeColors().chartValue,
@@ -558,11 +572,24 @@ export class WidgetDataChartComponent implements OnDestroy {
   private updateAnnotationVisibility(): void {
     const cfg = this.runtime.options();
     if (!cfg || !this.chart) return;
-    const annCfg = (this.chart.options.plugins as unknown as { annotation?: { annotations?: Record<string, { display?: boolean }> } }).annotation?.annotations;
+    const annCfg = (this.chart.options.plugins as unknown as AnnPlugin).annotation?.annotations;
     if (!annCfg) return;
-    if (annCfg.minimumLine) annCfg.minimumLine.display = cfg.showDatasetMinimumValueLine;
-    if (annCfg.maximumLine) annCfg.maximumLine.display = cfg.showDatasetMaximumValueLine;
-    if (annCfg.averageLine) annCfg.averageLine.display = cfg.showDatasetAverageValueLine;
+    this.applyAnnotationLine(annCfg.minimumLine, cfg.showDatasetMinimumValueLine, this.lastMinimumValue, cfg.numDecimal);
+    this.applyAnnotationLine(annCfg.maximumLine, cfg.showDatasetMaximumValueLine, this.lastMaximumValue, cfg.numDecimal);
+    this.applyAnnotationLine(annCfg.averageLine, cfg.showDatasetAverageValueLine, this.lastAverageValue, cfg.numDecimal);
+  }
+
+  // The line and its label stay hidden until the tracked value is finite, so an enabled line never
+  // renders at a placeholder 0 with an empty label before real data arrives.
+  private applyAnnotationLine(line: AnnLine | undefined, enabled: boolean | undefined, value: number, numDecimal: number | undefined): void {
+    if (!line) return;
+    const visible = Boolean(enabled) && Number.isFinite(value);
+    line.display = visible;
+    line.label.display = visible;
+    if (visible) {
+      line.value = value;
+      line.label.content = value.toFixed(numDecimal);
+    }
   }
 
   private getThemeColors(): IChartColors {
@@ -838,24 +865,11 @@ export class WidgetDataChartComponent implements OnDestroy {
     const lastMinimum = this.unitsService.convertToUnit(unit, point.data.lastMinimum ?? NaN);
     const lastMaximum = this.unitsService.convertToUnit(unit, point.data.lastMaximum ?? NaN);
 
-    const plugins = this.chart.options.plugins as unknown as AnnPlugin;
-    const ann = plugins.annotation?.annotations;
-    if (!ann) return;
+    if (lastAverage !== null && Number.isFinite(lastAverage)) this.lastAverageValue = lastAverage;
+    if (lastMinimum !== null && Number.isFinite(lastMinimum)) this.lastMinimumValue = lastMinimum;
+    if (lastMaximum !== null && Number.isFinite(lastMaximum)) this.lastMaximumValue = lastMaximum;
 
-    if (lastAverage !== null && Number.isFinite(lastAverage) && ann.averageLine?.value !== lastAverage) {
-      ann.averageLine.value = lastAverage;
-      ann.averageLine.label.content = `${lastAverage.toFixed(cfg.numDecimal)}`;
-    }
-
-    if (lastMinimum !== null && Number.isFinite(lastMinimum) && ann.minimumLine?.value !== lastMinimum) {
-      ann.minimumLine.value = lastMinimum;
-      ann.minimumLine.label.content = `${lastMinimum.toFixed(cfg.numDecimal)}`;
-    }
-
-    if (lastMaximum !== null && Number.isFinite(lastMaximum) && ann.maximumLine?.value !== lastMaximum) {
-      ann.maximumLine.value = lastMaximum;
-      ann.maximumLine.label.content = `${lastMaximum.toFixed(cfg.numDecimal)}`;
-    }
+    this.updateAnnotationVisibility();
   }
 
   private transformDatasetRows(rows: IDatasetServiceDatapoint[], datasetType): IDataSetRow[] {

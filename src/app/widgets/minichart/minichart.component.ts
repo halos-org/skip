@@ -7,12 +7,11 @@ import { CanvasService } from '../../core/services/canvas.service';
 import { ITheme } from '../../core/services/app-service';
 import { UnitsService } from '../../core/services/units.service';
 
-import { Chart, ChartConfiguration, ChartData, ChartType, TimeUnit, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, CategoryScale } from 'chart.js';
+import { Chart, ChartConfiguration, ChartData, ChartType, TimeUnit } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import ChartStreaming from '@aziham/chartjs-plugin-streaming';
+import { registerChartComponents } from '../../core/utils/chart-registration.util';
 
-
-Chart.register(ChartStreaming, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, CategoryScale);
+registerChartComponents();
 
 interface IChartColors {
   valueLine: string | undefined,
