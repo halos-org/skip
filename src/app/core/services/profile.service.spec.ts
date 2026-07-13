@@ -4,6 +4,7 @@ import { ProfileService } from './profile.service';
 import { StorageService } from './storage.service';
 import { SettingsService } from './settings.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
+import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 
 const cfg = (theme = 'x'): IConfig => ({
   app: { configVersion: 13 } as IConfig['app'],
@@ -92,6 +93,13 @@ describe('ProfileService', () => {
       expect(config.app).toBeTruthy();
       expect(Array.isArray(config.dashboards)).toBe(true);
       expect(config.dashboards.length).toBeGreaterThan(0);
+      // Every page gets a fresh, distinct id — not just page 0. Reverting the fix to
+      // `dashboards[0].id = UUID.create()` would leave later pages sharing the constant's
+      // static ids across every profile; this guards that regression.
+      expect(config.dashboards).toHaveLength(DefaultDashboard.length);
+      const pageIds = config.dashboards.map(d => d.id);
+      expect(new Set(pageIds).size).toBe(pageIds.length);
+      config.dashboards.forEach((d, i) => expect(d.id).not.toBe(DefaultDashboard[i].id));
     });
 
     it('does not auto-switch into the created profile', async () => {

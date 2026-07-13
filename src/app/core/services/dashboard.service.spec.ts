@@ -85,17 +85,21 @@ describe('DashboardService', () => {
   });
 
   describe('initialization', () => {
-    it('seeds a blank default dashboard with a fresh UUID when settings has none', () => {
+    it('seeds the default dashboards with fresh UUIDs when settings has none', () => {
       setup([]);
       const dashboards = service.dashboards();
-      expect(dashboards).toHaveLength(1);
-      expect(dashboards[0].name).toBe('Page 1');
-      expect(dashboards[0].id).toMatch(UUID_PATTERN);
-      expect(widgetsOf(dashboards[0])[0].input.widgetProperties.type).toBe('widget-tutorial');
-      // The blank dashboard deep-clones the DefaultDashboard constant so later in-place edits cannot corrupt the shared default.
-      expect(dashboards[0].configuration).not.toBe(DefaultDashboard[0].configuration);
+      expect(dashboards).toHaveLength(DefaultDashboard.length);
+      dashboards.forEach((dashboard, i) => {
+        expect(dashboard.id).toMatch(UUID_PATTERN);
+        // A fresh id, not the constant's own — proves regeneration rather than shape alone
+        // (the constant now carries real UUIDs, so UUID_PATTERN would match either way).
+        expect(dashboard.id).not.toBe(DefaultDashboard[i].id);
+        expect(dashboard.name).toBe(DefaultDashboard[i].name);
+        // Each page deep-clones the shared DefaultDashboard constant so later in-place edits cannot corrupt it.
+        expect(dashboard.configuration).not.toBe(DefaultDashboard[i].configuration);
+        expect(dashboard.configuration).toEqual(DefaultDashboard[i].configuration);
+      });
       expect(widgetsOf(dashboards[0])[0]).not.toBe(DefaultDashboard[0].configuration![0]);
-      expect(dashboards[0].configuration).toEqual(DefaultDashboard[0].configuration);
       expect(consoleWarn).toHaveBeenCalled();
     });
 
@@ -539,5 +543,44 @@ describe('DashboardService', () => {
       TestBed.tick();
       expect(settings.saveDashboards).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('DefaultDashboard seed constant', () => {
+  const widgets = DefaultDashboard.flatMap(d => (d.configuration ?? []) as NgGridStackWidget[]);
+
+  it('gives every page a unique id', () => {
+    const ids = DefaultDashboard.map(d => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('gives every widget a unique gridstack id that matches its widgetProperties uuid', () => {
+    const ids = widgets.map(w => w.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    widgets.forEach(w => expect(w.id).toBe(w.input.widgetProperties.uuid));
+  });
+
+  it('pins no vessel-specific $source — every source resolves to the server default', () => {
+    // The seed is extracted from a live boat; a stray non-'default' source or a
+    // pinned trackedDevices entry would bind to one vessel's hardware and blank
+    // the widget on every other install (and leak a device id into the package).
+    const offenders: string[] = [];
+    const scan = (node: unknown, path: string): void => {
+      if (Array.isArray(node)) {
+        node.forEach((v, i) => scan(v, `${path}[${i}]`));
+      } else if (node && typeof node === 'object') {
+        for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+          if ((k === 'source' || k === 'datachartSource') && typeof v === 'string' && v !== '' && v !== 'default') {
+            offenders.push(`${path}/${k}=${v}`);
+          } else if (k === 'trackedDevices' && Array.isArray(v) && v.length > 0) {
+            offenders.push(`${path}/${k} pins ${v.length} device(s)`);
+          } else {
+            scan(v, `${path}/${k}`);
+          }
+        }
+      }
+    };
+    DefaultDashboard.forEach((d, i) => scan(d.configuration, `page${i}`));
+    expect(offenders).toEqual([]);
   });
 });

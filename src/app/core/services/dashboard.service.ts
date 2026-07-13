@@ -55,7 +55,7 @@ export class DashboardService {
     const dashboardsConfig = this._settings.getDashboardConfig();
 
     if (!dashboardsConfig || dashboardsConfig.length === 0) {
-      console.warn('[Dashboard Service] No dashboards found in settings, creating blank dashboard');
+      console.warn('[Dashboard Service] No dashboards found in settings, seeding default dashboards');
       const newBlankDashboard = DefaultDashboard.map(dashboard => ({
         ...cloneDeep(dashboard),
         id: UUID.create()
