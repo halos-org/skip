@@ -7,7 +7,7 @@ import { v10IConfig, v10IThemeConfig } from '../interfaces/v10-config-interface'
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
-import { REMOTE_CONFIG_FILE_VERSION } from '../constants/config-versions.const';
+import { LATEST_APP_CONFIG_VERSION, REMOTE_CONFIG_FILE_VERSION } from '../constants/config-versions.const';
 
 // The app-config schema version the legacy v10/v11 transforms produce. Pinned on purpose:
 // bumping LATEST_APP_CONFIG_VERSION must not change what these transforms stamp — a newer
@@ -23,6 +23,20 @@ const V13_MIGRATION_OUTPUT_VERSION = 13;
 // NOTE: This service encapsulates the app-config upgrades — the legacy migration (remote file
 // version 9 / app-config version 10) and the v11 remote upgrade — each stamping the upgraded
 // config with MIGRATION_OUTPUT_VERSION.
+
+/**
+ * Lowest app-config version an uploaded config can be migrated from on import. Deliberately the
+ * fork's own floor: v11 reaches fork-era KIP exports, while the pre-fork v9/v10 localStorage
+ * transforms are dead in Skip's storage namespace and so are out of scope for import.
+ */
+export const MIN_IMPORTABLE_APP_CONFIG_VERSION = 11;
+
+/** Outcome of an in-memory import migration: the ready-to-store config and whether any step ran. */
+export interface ImportedConfigMigration {
+  config: IConfig;
+  migrated: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ConfigurationUpgradeService {
   private _storage = inject(StorageService);
@@ -131,7 +145,7 @@ export class ConfigurationUpgradeService {
             );
 
             this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${MIGRATION_OUTPUT_VERSION}.`);
-            const migratedConfig = this.upgradeConfig(config);
+            const migratedConfig = this.migrateOneAppVersion(config, 11);
             if (!migratedConfig) continue; // skip if not eligible
 
             this.pushMsg(`[Upgrade] Saving upgraded configurations...`);
@@ -163,7 +177,7 @@ export class ConfigurationUpgradeService {
           try {
             const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
             this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V13_MIGRATION_OUTPUT_VERSION}.`);
-            const migratedConfig = this.upgradeConfigV12toV13(config);
+            const migratedConfig = this.migrateOneAppVersion(config, 12);
             if (!migratedConfig) continue; // skip if not a v12 slot
 
             await this._storage.setConfig(item.scope, item.name, migratedConfig);
@@ -259,6 +273,54 @@ export class ConfigurationUpgradeService {
       localStorage.removeItem(LOCAL_CONFIG_KEYS.widgetConfig);
       localStorage.removeItem(LOCAL_CONFIG_KEYS.layoutConfig);
       this.upgrading.set(false);
+    }
+  }
+
+  /**
+   * Upgrade an uploaded config to the current app-config version PURELY IN MEMORY — no slot I/O,
+   * no reload. The boot-time paths in runUpgrade() read/write server slots and reload the app;
+   * import must do neither, so this reuses only the per-version transforms against the passed
+   * object. Returns the ready-to-store config and whether any step ran, and throws a distinct,
+   * actionable error for a below-floor, unrecognized, or too-new version. The caller is expected
+   * to have already validated the config's shape.
+   */
+  public migrateImportedConfig(config: IConfig): ImportedConfigMigration {
+    const version = config.app?.configVersion;
+    if (typeof version !== 'number' || !Number.isInteger(version)) {
+      throw new Error('This configuration has no recognizable version number and cannot be imported.');
+    }
+    if (version === LATEST_APP_CONFIG_VERSION) {
+      return { config, migrated: false };
+    }
+    if (version > LATEST_APP_CONFIG_VERSION) {
+      throw new Error(`This configuration is version ${version}, which is newer than this version of KIP supports (version ${LATEST_APP_CONFIG_VERSION}). Update KIP and try again.`);
+    }
+    if (version < MIN_IMPORTABLE_APP_CONFIG_VERSION) {
+      throw new Error(`This configuration is version ${version}, which is too old to import automatically (the minimum is version ${MIN_IMPORTABLE_APP_CONFIG_VERSION}). Load it into an older KIP, export it again, then import it here.`);
+    }
+
+    let working = cloneDeep(config);
+    let current = version;
+    while (current < LATEST_APP_CONFIG_VERSION) {
+      const upgraded = this.migrateOneAppVersion(working, current);
+      const nextVersion = upgraded?.app?.configVersion;
+      if (!upgraded || typeof nextVersion !== 'number' || nextVersion <= current) {
+        throw new Error(`This configuration could not be migrated from version ${current}.`);
+      }
+      working = upgraded;
+      current = nextVersion;
+    }
+    return { config: working, migrated: true };
+  }
+
+  // Single source of truth for the per-version upgrade dispatch: both the boot-time slot upgrades
+  // (runUpgrade) and the in-memory import chain (migrateImportedConfig) route through here, so a new
+  // LATEST_APP_CONFIG_VERSION can only be reached by adding its transform to this one switch.
+  private migrateOneAppVersion(config: IConfig, fromVersion: number): IConfig | null {
+    switch (fromVersion) {
+      case 11: return this.upgradeConfig(config);
+      case 12: return this.upgradeConfigV12toV13(config);
+      default: return null;
     }
   }
 

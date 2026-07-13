@@ -143,6 +143,36 @@ describe('SettingsConfigComponent', () => {
     expect(toastMock.show).toHaveBeenCalledWith('boom', 0, false, 'error');
   });
 
+  it('reports a migration in the import success toast when the config was migrated', async () => {
+    profileMock.importProfile.mockResolvedValueOnce(true);
+    const file = new File(
+      [JSON.stringify({ app: { configVersion: 11 }, theme: { themeName: '' }, dashboards: [] })],
+      'c.json', { type: 'application/json' });
+    const input = { files: [file], value: 'x' } as unknown as HTMLInputElement;
+
+    component.uploadJsonConfig({ target: input } as unknown as Event);
+
+    await vi.waitFor(() => expect(toastMock.show).toHaveBeenCalled());
+    const [message, , , severity] = toastMock.show.mock.calls.at(-1) ?? [];
+    expect(message).toMatch(/migrat/i);
+    expect(severity).toBe('success');
+  });
+
+  it('omits migration wording in the success toast when no migration was needed', async () => {
+    profileMock.importProfile.mockResolvedValueOnce(false);
+    const file = new File(
+      [JSON.stringify({ app: { configVersion: 13 }, theme: { themeName: '' }, dashboards: [] })],
+      'c.json', { type: 'application/json' });
+    const input = { files: [file], value: 'x' } as unknown as HTMLInputElement;
+
+    component.uploadJsonConfig({ target: input } as unknown as Event);
+
+    await vi.waitFor(() => expect(toastMock.show).toHaveBeenCalled());
+    const message = toastMock.show.mock.calls.at(-1)?.[0] as string;
+    expect(message).toMatch(/imported/i);
+    expect(message).not.toMatch(/migrat/i);
+  });
+
   it('exports the server-held config, never a stale localStorage copy', () => {
     const settings = TestBed.inject(SettingsService) as unknown as {
       getAppConfig: ReturnType<typeof vi.fn>;

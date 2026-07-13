@@ -189,12 +189,19 @@ export class SettingsConfigComponent {
             return;
           }
           try {
-            await this.profileService.importProfile(result.name, parsed);
-            this.toast.show(`Profile "${result.name}" imported`, 1000, true, 'success');
+            const migrated = await this.profileService.importProfile(result.name, parsed);
+            const message = migrated
+              ? `Profile "${result.name}" imported and migrated to the current version`
+              : `Profile "${result.name}" imported`;
+            this.toast.show(message, 1000, true, 'success');
           } catch (err) {
             this.reportError(err);
           }
         });
+    };
+    reader.onerror = () => {
+      this.toast.show('Could not read the selected file.', 0, false, 'error');
+      console.error('File read error:', reader.error);
     };
     reader.readAsText(file);
     input.value = '';

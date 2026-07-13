@@ -1,8 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConfigurationUpgradeService } from './configuration-upgrade.service';
+import { ConfigurationUpgradeService, MIN_IMPORTABLE_APP_CONFIG_VERSION } from './configuration-upgrade.service';
 import { StorageService } from './storage.service';
 import { SettingsService } from './settings.service';
+import { IConfig } from '../interfaces/app-settings.interfaces';
+import { LATEST_APP_CONFIG_VERSION } from '../constants/config-versions.const';
+
+const importConfig = (version: unknown): IConfig =>
+    ({
+        app: version === undefined ? {} : { configVersion: version },
+        theme: { themeName: '' },
+        dashboards: []
+    } as unknown as IConfig);
 
 describe('ConfigurationUpgradeService', () => {
     let service: ConfigurationUpgradeService;
@@ -226,6 +235,82 @@ describe('ConfigurationUpgradeService', () => {
         // transformConfig returns null for the app-less slot, so nothing is persisted and
         // the prior config.app.configVersion TypeError no longer fires.
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
+    describe('migrateImportedConfig (in-memory import migration matrix)', () => {
+        it('accepts a current-version config unchanged, running no migration and no slot I/O', () => {
+            const result = service.migrateImportedConfig(importConfig(LATEST_APP_CONFIG_VERSION));
+
+            expect(result.migrated).toBe(false);
+            expect(result.config.app?.configVersion).toBe(LATEST_APP_CONFIG_VERSION);
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(mockStorage.getConfig).not.toHaveBeenCalled();
+            expect(mockStorage.listConfigs).not.toHaveBeenCalled();
+            expect(mockAppSettings.reloadApp).not.toHaveBeenCalled();
+        });
+
+        it('migrates a floor (v11) config up to the current version purely in memory — no slot I/O, no reload', () => {
+            const original = importConfig(MIN_IMPORTABLE_APP_CONFIG_VERSION);
+
+            const result = service.migrateImportedConfig(original);
+
+            expect(result.migrated).toBe(true);
+            expect(result.config.app?.configVersion).toBe(LATEST_APP_CONFIG_VERSION);
+            // The migration must not touch storage or reload the app — that is the reload trap #175 pins.
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(mockStorage.getConfig).not.toHaveBeenCalled();
+            expect(mockStorage.listConfigs).not.toHaveBeenCalled();
+            expect(mockAppSettings.reloadApp).not.toHaveBeenCalled();
+            // The caller's object is left untouched (the chain works on a clone).
+            expect(original.app?.configVersion).toBe(MIN_IMPORTABLE_APP_CONFIG_VERSION);
+        });
+
+        it('migrates an intermediate (v12) config up to the current version', () => {
+            const result = service.migrateImportedConfig(importConfig(12));
+
+            expect(result.migrated).toBe(true);
+            expect(result.config.app?.configVersion).toBe(LATEST_APP_CONFIG_VERSION);
+        });
+
+        it('rejects a below-floor config with a distinct "too old" error and no write', () => {
+            expect(() => service.migrateImportedConfig(importConfig(10))).toThrow(/too old/i);
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+        });
+
+        it('rejects a config with no recognizable version with a distinct error and no write', () => {
+            expect(() => service.migrateImportedConfig(importConfig(undefined))).toThrow(/recognizable version/i);
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+        });
+
+        it('rejects a too-new config with a distinct "newer" error and no write', () => {
+            expect(() => service.migrateImportedConfig(importConfig(LATEST_APP_CONFIG_VERSION + 1))).toThrow(/newer/i);
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+        });
+
+        it('has an upgrade transform for every version from the import floor up to latest (guards future LATEST bumps)', () => {
+            const dispatch = service as unknown as {
+                migrateOneAppVersion(config: IConfig, from: number): IConfig | null;
+            };
+            for (let from = MIN_IMPORTABLE_APP_CONFIG_VERSION; from < LATEST_APP_CONFIG_VERSION; from++) {
+                const upgraded = dispatch.migrateOneAppVersion(importConfig(from), from);
+                // A bump of LATEST_APP_CONFIG_VERSION that forgets to register the new transform lands
+                // here: the dispatch returns null for the now-in-range version, which would make every
+                // current export non-importable through the migration loop.
+                expect(upgraded, `no upgrade transform registered for config version ${from}`).not.toBeNull();
+                expect(upgraded?.app?.configVersion).toBeGreaterThan(from);
+            }
+        });
+
+        it('throws the distinct loop-reject error when an in-range version has no working transform', () => {
+            const dispatch = service as unknown as {
+                migrateOneAppVersion(config: IConfig, from: number): IConfig | null;
+            };
+            vi.spyOn(dispatch, 'migrateOneAppVersion').mockReturnValue(null);
+
+            expect(() => service.migrateImportedConfig(importConfig(MIN_IMPORTABLE_APP_CONFIG_VERSION)))
+                .toThrow(/could not be migrated from version 11/i);
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+        });
     });
 
     it('startFresh skips a legacy slot missing its app section and still retires the rest', async () => {
