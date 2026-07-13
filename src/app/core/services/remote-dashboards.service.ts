@@ -60,12 +60,10 @@ export class RemoteDashboardsService {
   private readonly requests = inject(SignalkRequestsService);
 
   private readonly KIP_UUID = this.settings.KipUUID;
-  private readonly ACTIVE_SCREEN_PATH = `self.displays.${this.KIP_UUID}.screenIndex`;
   private readonly CHANGE_SCREEN_PATH = `self.displays.${this.KIP_UUID}.activeScreen`;
 
   private readonly displayName = this.settings.instanceName;
   private readonly isRemoteControl = this.settings.isRemoteControl;
-  private readonly remoteScreenPosition = toSignal(this.data.subscribePath(this.ACTIVE_SCREEN_PATH, 'default'));
   private readonly changeDashboardTo = toSignal(this.data.subscribePath(this.CHANGE_SCREEN_PATH, 'default'));
   private previousIsRemoteControl = false;
 
@@ -76,11 +74,9 @@ export class RemoteDashboardsService {
     this.clearActiveScreenOnRemote(this.KIP_UUID, null);
     console.log('[Remote Dashboards] Cleaning paths on server');
 
-    // Share dashboards configuration when Remote Control is toggled or when display name changes
+    // Share dashboards configuration and active index when Remote Control is toggled
     effect(() => {
       const isRemoteControl = this.isRemoteControl();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const displayName = this.displayName();
 
       untracked(() => {
         if (!isRemoteControl && !this.previousIsRemoteControl) return;
@@ -94,7 +90,7 @@ export class RemoteDashboardsService {
           screensPayload = this.getScreensPayload(this.dashboard.dashboards());
           const activeDashboard = this.dashboard.activeDashboard()
           if (activeDashboard !== null) {
-            this.setActiveDashboardOnRemote(this.KIP_UUID, this.dashboard.activeDashboard())
+            this.setActiveDashboardOnRemote(this.KIP_UUID, activeDashboard)
           }
         }
 
@@ -102,9 +98,10 @@ export class RemoteDashboardsService {
       });
     });
 
-    // Push dashboard configuration to remote
+    // Republish screens (not the active index) when the dashboards or the display name change
     effect(() => {
       const dashboards = this.dashboard.dashboards();
+      this.displayName();
 
       untracked(() => {
         if (!this.isRemoteControl()) return;
@@ -199,7 +196,7 @@ export class RemoteDashboardsService {
   public setScreensOnRemote(kipId: string, screensPayload: IScreensPayload | null | undefined): void {
     const payload: IRemoteDisplayCommand = {
       displayId: kipId,
-      display: screensPayload == null ? null : { ...screensPayload }
+      display: screensPayload == null ? null : { ...screensPayload, screens: [...screensPayload.screens] }
     };
     const requestId = this.requests.putRequest(this.COMMAND_SET_DISPLAY_PATH, payload, this.KIP_UUID);
     if (!requestId) {
