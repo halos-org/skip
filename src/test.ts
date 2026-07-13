@@ -146,31 +146,15 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { MatDialogRef } from '@angular/material/dialog';
 import { MatBottomSheetRef, MAT_BOTTOM_SHEET_DATA } from '@angular/material/bottom-sheet';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { UnitsService } from './app/core/services/units.service';
-import { AppNetworkInitService } from './app/core/services/app-initNetwork.service';
-import { AuthenticationService } from './app/core/services/authentication.service';
 import { ActivatedRoute } from '@angular/router';
-import { SettingsService } from './app/core/services/settings.service';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 import { ReactiveFormsModule, FormGroupDirective, FormGroup } from '@angular/forms';
-// Note: Avoid globally providing directive stubs for Host2 directives because it breaks their own specs.
-// If a specific spec needs them, it should declare/provide local stubs in that spec.
-import { SignalKConnectionService } from './app/core/services/signalk-connection.service';
-import { ConnectionStateMachine } from './app/core/services/connection-state-machine.service';
-import { PluginConfigClientService } from './app/core/services/plugin-config-client.service';
-import { WidgetRuntimeDirective } from './app/core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from './app/core/directives/widget-streams.directive';
-import { WidgetMetadataDirective } from './app/core/directives/widget-metadata.directive';
-import { ENVIRONMENT_INITIALIZER, signal, inject as diInject, provideZonelessChangeDetection } from '@angular/core';
-import type { IWidgetSvcConfig } from './app/core/interfaces/widgets-interface';
-import type { IAppConfig } from './app/core/interfaces/app-settings.interfaces';
-import type {
-  IPluginApiCapabilities,
-  IPluginApiResult,
-  IPluginConfigSaveResult,
-  ISignalkPlugin,
-} from './app/core/interfaces/signalk-plugin-config.interfaces';
-import type { IUnitDefaults } from './app/core/services/units.service';
+// App services/directives are intentionally NOT provided globally: under the @angular/build:unit-test
+// runner the setup file's classes are different module instances than the app bundle's, so any
+// provider here for an app class is DI-inert (#159). providedIn:'root' services resolve to their real
+// instance anyway; a non-root service (like UnitsService) or a fake must be provided locally by the
+// spec that needs it. Only framework tokens, env/DOM shims, and icon registration take effect here.
+import { ENVIRONMENT_INITIALIZER, inject as diInject, provideZonelessChangeDetection } from '@angular/core';
 // Global provider setup (HttpClient, RouterTestingModule, animation & material stubs, etc.)
 import { TestBed } from '@angular/core/testing';
 import type { Provider } from '@angular/core';
@@ -212,241 +196,12 @@ function readTestIconsSvg(): string {
 })();
 class MatBottomSheetRefStub { dismiss(): void { /* noop */ } }
 class MatDialogRefStub { close(): void { /* noop */ } }
-class AppNetworkInitServiceStub {
-  private _bootstrapStatusSubject = new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready');
-  private _bootstrapIssueSubject = new BehaviorSubject<{ reason: 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked'; statusCode?: number; sharedConfigName?: string; cause?: 'budget-exhausted' | 'sign-in-required' }>({ reason: 'none' });
-
-  public bootstrapStatus$ = this._bootstrapStatusSubject.asObservable();
-  public bootstrapIssue$ = this._bootstrapIssueSubject.asObservable();
-}
-class AuthenticationServiceStub {
-  // Minimal stub surface for tests that inject AuthenticationService. Skip authenticates only through
-  // the same-origin server session, so the surface is loginStatus-derived (no tokens, no auth mode).
-  private _isLoggedIn$ = new BehaviorSubject<boolean>(false);
-  public isLoggedIn$ = this._isLoggedIn$.asObservable();
-  private _loginStatus$ = new BehaviorSubject<unknown>(null);
-  public loginStatus$ = this._loginStatus$.asObservable();
-  private _isUserSession$ = new BehaviorSubject<boolean>(false);
-  public isUserSession$ = this._isUserSession$.asObservable();
-  private _canWriteUserData$ = new BehaviorSubject<boolean>(false);
-  public canWriteUserData$ = this._canWriteUserData$.asObservable();
-  public get loginStatusValue(): unknown { return this._loginStatus$.getValue(); }
-  refreshLoginStatus = async (): Promise<unknown> => null;
-}
 // ActivatedRoute stub must expose observable params/queryParams for components piping them
 const ActivatedRouteStub = {
   snapshot: { params: {}, queryParams: {} },
   params: new BehaviorSubject<Record<string, unknown>>({}),
   queryParams: new BehaviorSubject<Record<string, unknown>>({})
 } as unknown as Partial<ActivatedRoute>;
-
-// Minimal SignalK/Connection stubs to satisfy services that subscribe/pipe on these
-interface IEndpointStatusStub { operation: number; httpServiceUrl?: string; WsServiceUrl?: string; subscribeAll?: boolean }
-class SignalKConnectionServiceStub {
-  public serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatusStub>({ operation: 0, httpServiceUrl: '', WsServiceUrl: '', subscribeAll: false });
-  public serverVersion$ = new BehaviorSubject<string>(null);
-  // Provide a default URL object to satisfy services building API URLs
-  public signalKURL = { url: 'http://localhost' } as { url: string };
-
-  getServiceEndpointStatusAsO() {
-    return this.serverServiceEndpoint$.asObservable();
-  }
-}
-enum ConnectionStateStub { Idle = 0, WebSocketConnecting = 1, Connected = 2, Disconnected = 3, WebSocketError = 4, PermanentFailure = 5 }
-class ConnectionStateMachineStub {
-  public state$ = new BehaviorSubject<ConnectionStateStub>(ConnectionStateStub.Idle);
-  // Minimal status$ stream matching the shape AppComponent expects to subscribe to
-  public status$ = new BehaviorSubject<{ state: string; operation: number; message: string; retryCount?: number; maxRetries?: number; timestamp: Date }>({
-    state: 'Disconnected',
-    operation: 0,
-    message: 'Test: not connected',
-    timestamp: new Date()
-  });
-  setWebSocketRetryCallback(): void { /* noop */ }
-  isFullyConnected(): boolean { return false; }
-  startWebSocketConnection(): void { /* noop */ }
-  onWebSocketConnected(): void { /* noop */ }
-  onWebSocketError(): void { /* noop */ }
-}
-
-class PluginConfigClientServiceStub implements Partial<PluginConfigClientService> {
-  private readonly stubCapabilities: IPluginApiCapabilities = {
-    listSupported: true,
-    detailSupported: true,
-    saveConfigSupported: true,
-    detailFallbackToList: false,
-  };
-
-  async getPlugin(pluginId: string): Promise<IPluginApiResult<ISignalkPlugin>> {
-    return {
-      ok: false,
-      error: {
-        reason: 'not-found',
-        statusCode: 404,
-        message: `Plugin not found: ${pluginId}`,
-      },
-      capabilities: this.stubCapabilities,
-    };
-  }
-
-  async listPlugins(): Promise<IPluginApiResult<ISignalkPlugin[]>> {
-    return {
-      ok: true,
-      data: [],
-      capabilities: this.stubCapabilities,
-    };
-  }
-
-  async setPluginEnabled(pluginId: string, enabled: boolean): Promise<IPluginApiResult<IPluginConfigSaveResult>> {
-    return {
-      ok: true,
-      data: {
-        pluginId,
-        state: {
-          configuration: {},
-          enabled,
-          enableDebug: false,
-          enableLogging: false,
-        },
-      },
-      capabilities: this.stubCapabilities,
-    };
-  }
-}
-
-// A robust global SettingsService stub exposing both sync getters and observable getters
-class SettingsServiceStub {
-  private themeNameSubject = new BehaviorSubject<string>('light');
-  private redNightModeSubject = new BehaviorSubject<boolean>(false);
-  private autoNightModeSubject = new BehaviorSubject<boolean>(false);
-  private dashboards: unknown[] = [];
-  private unitDefaultsSubject = new BehaviorSubject<Record<string, string>>({});
-  private instanceNameSubject = new BehaviorSubject<string>('');
-  private _isRemoteControlSubject = new BehaviorSubject<boolean>(false);
-  private _configUpgradeSubject = new BehaviorSubject<boolean>(false);
-  private nightModeBrightnessSubject = new BehaviorSubject<number>(0.2);
-  // Connection & identity fields used by various services (RemoteDashboardsService, Freeboard, etc.)
-  public signalkUrl = { url: 'http://localhost', new: false };
-  private _kipUUID = 'test-uuid';
-  private _connectionConfig: import('./app/core/interfaces/app-settings.interfaces').IConnectionConfig = {
-    configVersion: 13,
-    signalKUrl: 'http://localhost',
-    proxyEnabled: false,
-    signalKSubscribeAll: false,
-    sharedConfigName: '',
-    kipUUID: 'test-uuid',
-    isRemoteControl: false,
-    instanceName: ''
-  };
-  private _notificationConfig = new BehaviorSubject<import('./app/core/interfaces/app-settings.interfaces').INotificationConfig>({
-    disableNotifications: true,
-    menuGrouping: false,
-    security: { disableSecurity: true },
-    devices: { disableDevices: true, showNormalState: false, showNominalState: false },
-    sound: { disableSound: true, muteNormal: true, muteNominal: true, muteWarn: true, muteAlert: true, muteAlarm: true, muteEmergency: true }
-  });
-
-  // Readonly signal surface mirroring the real service (post-#17 rewrite); consumers read
-  // these directly, so the stub must expose them even while it stays DI-inert (#159).
-  public readonly unitDefaults = signal<Record<string, string>>({});
-  public readonly themeName = signal('light');
-  public readonly notificationConfig = signal(this._notificationConfig.value);
-  public readonly autoNightMode = signal(false);
-  public readonly redNightMode = signal(false);
-  public readonly nightModeBrightness = signal(0.2);
-  public readonly isRemoteControl = signal(false);
-  public readonly instanceName = signal('');
-  public readonly browserTabTitle = signal('Skip');
-
-  // Synchronous getters for places not using observables
-  getThemeName(): string { return this.themeNameSubject.value; }
-  getRedNightMode(): boolean { return this.redNightModeSubject.value; }
-  getAutoNightMode(): boolean { return this.autoNightModeSubject.value; }
-
-  // Test utilities to control state from specs when needed
-  setThemeName(name: string): void { this.themeNameSubject.next(name); this.themeName.set(name); }
-  setRedNightMode(v: boolean): void { this.redNightModeSubject.next(v); this.redNightMode.set(v); }
-  setAutoNightMode(v: boolean): void { this.autoNightModeSubject.next(v); this.autoNightMode.set(v); }
-
-  // Dashboards APIs used by DashboardService and specs
-  getDashboardConfig(): unknown[] { return this.dashboards; }
-  saveDashboards(d: unknown[]): void { this.dashboards = d; }
-
-  // Units defaults used by UnitsService
-  getDefaultUnitsAsO(): Observable<Record<string, string>> { return this.unitDefaultsSubject.asObservable(); }
-  getDefaultUnits(): Record<string, string> { return this.unitDefaultsSubject.value; }
-  setDefaultUnits(v: Record<string, string>): void { this.unitDefaultsSubject.next(v); this.unitDefaults.set(v); }
-
-  // Instance name used by RemoteDashboardsService and others
-  getInstanceName(): string { return this.instanceNameSubject.value; }
-  setInstanceName(v: string): void { this.instanceNameSubject.next(v); this.instanceName.set(v); }
-
-  // Remote control mode flag used by RemoteDashboardsService and others
-  getIsRemoteControl(): boolean { return this._isRemoteControlSubject.value; }
-  setIsRemoteControl(v: boolean): void { this._isRemoteControlSubject.next(v); this.isRemoteControl.set(v); }
-
-  // Minimal signal-like shim for the configUpgrade flag
-  // Supports both reading as a function and optional .set(boolean) for specs that toggle it
-  // Strongly-typed signal-like shim for configUpgrade
-  private _buildConfigUpgradeShim() {
-    type BoolSignalLike = (() => boolean) & { set: (v: boolean) => void };
-    const getter = (() => this._configUpgradeSubject.value).bind(this) as () => boolean;
-    const shim = Object.assign(getter, { set: (v: boolean) => this._configUpgradeSubject.next(!!v) }) as unknown as BoolSignalLike;
-    return shim;
-  }
-  public configUpgrade = this._buildConfigUpgradeShim();
-
-  // App-level getters used by multiple services
-  public getAppConfig(): IAppConfig {
-    return {
-      configVersion: 13,
-      autoNightMode: this.autoNightModeSubject.value,
-      redNightMode: this.redNightModeSubject.value,
-      nightModeBrightness: this.nightModeBrightnessSubject.value,
-      unitDefaults: this.unitDefaultsSubject.value as IUnitDefaults,
-      notificationConfig: this._notificationConfig.value,
-    };
-  }
-
-  public get KipUUID(): string { return this._kipUUID; }
-
-  // Additional APIs required by various specs/services
-  public getConnectionConfig() { return this._connectionConfig; }
-  public setConnectionConfig(v: typeof this._connectionConfig) { this._connectionConfig = { ...v }; }
-  public getNightModeBrightness(): number { return this.nightModeBrightnessSubject.value; }
-  public setNightModeBrightness(v: number): void { this.nightModeBrightnessSubject.next(v); this.nightModeBrightness.set(v); }
-  public getDisablePathValidation(): boolean { return false; }
-  public setDisablePathValidation(): void { /* noop */ }
-  public getNotificationServiceConfigAsO(): Observable<import('./app/core/interfaces/app-settings.interfaces').INotificationConfig> { return this._notificationConfig.asObservable(); }
-  public getNotificationConfig(): import('./app/core/interfaces/app-settings.interfaces').INotificationConfig { return this._notificationConfig.value; }
-}
-
-// Lightweight runtime directive stub so components can inject it in tests
-class WidgetRuntimeDirectiveStub implements Partial<WidgetRuntimeDirective> {
-  // Expose API surface commonly used by widgets; provide safe defaults
-  public options = signal<IWidgetSvcConfig | undefined>({} as unknown as IWidgetSvcConfig);
-  public firstPathKey = signal<string | undefined>(undefined);
-  public getPathCfg(pathKey: string): string | undefined { void pathKey; return undefined; }
-  public setRuntimeConfig(cfg: IWidgetSvcConfig | undefined): void { void cfg; }
-  public initialize(defaultCfg: IWidgetSvcConfig | undefined, savedCfg: IWidgetSvcConfig | undefined): void { void defaultCfg; void savedCfg; }
-}
-
-// Lightweight streams directive stub so components can inject it in tests without wiring live data
-class WidgetStreamsDirectiveStub implements Partial<WidgetStreamsDirective> {
-  private _cfg: IWidgetSvcConfig | undefined;
-  public setStreamsConfig(cfg: IWidgetSvcConfig | undefined): void { this._cfg = cfg; }
-  public applyStreamsConfigDiff(cfg: IWidgetSvcConfig | undefined): void { this._cfg = cfg; }
-  public observe(): void { /* no-op stub */ }
-}
-
-// Metadata directive stub to satisfy injections in widgets using zones metadata
-class WidgetMetadataDirectiveStub implements Partial<WidgetMetadataDirective> {
-  public zones = signal([]);
-  public setMetaConfig(): void { /* noop */ }
-  public applyMetaConfigDiff(): void { /* noop */ }
-  public observe(): void { /* noop */ }
-  public reset(): void { /* noop */ }
-}
 
 // Monkey-patch TestBed to always merge in our global imports/providers for every spec
 const GLOBAL_IMPORTS = [RouterTestingModule, ReactiveFormsModule, MatIconModule];
@@ -494,21 +249,11 @@ const GLOBAL_PROVIDERS: GlobalProvider[] = [
   provideHttpClient(withInterceptorsFromDi()),
   provideHttpClientTesting(),
   provideNoopAnimations(),
-  UnitsService,
   { provide: MAT_DIALOG_DATA, useValue: {} },
   { provide: MatBottomSheetRef, useClass: MatBottomSheetRefStub },
   { provide: MatDialogRef, useClass: MatDialogRefStub },
   { provide: MAT_BOTTOM_SHEET_DATA, useValue: {} },
-  { provide: AppNetworkInitService, useClass: AppNetworkInitServiceStub },
-  { provide: AuthenticationService, useClass: AuthenticationServiceStub },
   { provide: ActivatedRoute, useValue: ActivatedRouteStub },
-  { provide: SettingsService, useClass: SettingsServiceStub },
-  { provide: SignalKConnectionService, useClass: SignalKConnectionServiceStub },
-  { provide: ConnectionStateMachine, useClass: ConnectionStateMachineStub },
-  { provide: PluginConfigClientService, useClass: PluginConfigClientServiceStub },
-  { provide: WidgetRuntimeDirective, useClass: WidgetRuntimeDirectiveStub },
-  { provide: WidgetStreamsDirective, useClass: WidgetStreamsDirectiveStub },
-  { provide: WidgetMetadataDirective, useClass: WidgetMetadataDirectiveStub },
   { provide: FormGroupDirective, useValue: { control: new FormGroup({}) } as Partial<FormGroupDirective> }
 ];
 
@@ -517,19 +262,8 @@ const tbPatched = TestBed as unknown as { configureTestingModule: (moduleDef: Pa
 const _origConfigure = tbPatched.configureTestingModule.bind(TestBed);
 tbPatched.configureTestingModule = (moduleDef: PartialTestingModule = {}) => {
   moduleDef.imports = [...(moduleDef.imports ?? []), ...GLOBAL_IMPORTS];
-  const localProviders = moduleDef.providers ?? [];
-  const hasProvide = (prov: unknown): prov is { provide: unknown } => !!prov && typeof prov === 'object' && 'provide' in prov;
-  const alreadyProvidesWidgetStreams = localProviders.some((p: unknown) => p === WidgetStreamsDirective || (hasProvide(p) && p.provide === WidgetStreamsDirective));
-  const alreadyProvidesWidgetMetadata = localProviders.some((p: unknown) => p === WidgetMetadataDirective || (hasProvide(p) && p.provide === WidgetMetadataDirective));
-  let globals = GLOBAL_PROVIDERS;
-  if (alreadyProvidesWidgetStreams) {
-    globals = globals.filter((p: unknown) => !(hasProvide(p) && p.provide === WidgetStreamsDirective));
-  }
-  if (alreadyProvidesWidgetMetadata) {
-    globals = globals.filter((p: unknown) => !(hasProvide(p) && p.provide === WidgetMetadataDirective));
-  }
-  // Prepend globals so spec-local providers can override by later entries
-  moduleDef.providers = [...globals, ...localProviders];
+  // Prepend globals so spec-local providers can override by later entries.
+  moduleDef.providers = [...GLOBAL_PROVIDERS, ...(moduleDef.providers ?? [])];
   return _origConfigure(moduleDef);
 };
 
