@@ -201,9 +201,9 @@ describe('AppService', () => {
       expect(toggle).toHaveBeenCalledTimes(1);
     });
 
-    // The mode effect only reacts to mode changes; enabling the setting alone
-    // leaves an already-active night mode unapplied until the next transition.
-    it('does not apply the current night mode when auto night mode is enabled later', () => {
+    // Enabling the setting while the environment is already night applies the
+    // current mode immediately, without waiting for the next transition.
+    it('applies the current night mode when auto night mode is enabled later', () => {
       const service = createService();
       envMode$.next(modeUpdate('night'));
       TestBed.tick();
@@ -211,7 +211,9 @@ describe('AppService', () => {
 
       settings.autoNightMode.set(true);
       TestBed.tick();
-      expect(service.isNightMode()).toBe(false);
+      expect(service.isNightMode()).toBe(true);
+      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('0.27');
+      expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toContain('sepia(0.5)');
 
       envMode$.next(modeUpdate('day'));
       TestBed.tick();
