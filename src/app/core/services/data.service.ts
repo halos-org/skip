@@ -1,5 +1,5 @@
 import { DestroyRef, inject, Injectable, OnDestroy } from '@angular/core';
-import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, of, interval, filter } from 'rxjs';
+import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, of, interval, filter, Subscription } from 'rxjs';
 import { ISkPathData, IPathValueData, IPathMetaData, IMeta, IPathUpdateEvent } from "../interfaces/app-interfaces";
 import { ISignalKDataValueUpdate, ISkMetadata, ISignalKNotification, States, TState } from '../interfaces/signalk-interfaces'
 import { SignalKDeltaService } from './signalk-delta.service';
@@ -78,27 +78,32 @@ const buildPathData = (value: unknown, rawTimestamp: string | number | Date | nu
  * Each registration is used to share the same Subject with multiple Observers.
  * The `subscribePath()` method returns the registration's subject as an Observable.
  *
- * Registrations are app-lifetime objects, bounded by the unique `(path, source)` pairs a session
- * encounters, and are intentionally never torn down individually: a subject is shared across every
- * co-subscriber of a `(path, source)` pair, so completing one would terminate the stream for the
- * others. Consumers scope their own subscriptions with `takeUntilDestroyed`/`finalize` instead.
+ * A registration's subject is shared across every co-subscriber of a `(path, source)` pair,
+ * so completing one caller's stream would terminate it for the others. `refCount` tracks the
+ * live co-subscribers: `subscribePath()` bumps it, `unsubscribePath()` decrements it, and the
+ * registration is only torn down once it reaches zero. Consumers still scope their own
+ * subscriptions with `takeUntilDestroyed`/`finalize`; releasing frees the shared registration.
  *
  * @property {string} path - A Signal K path.
  * @property {string} source - The Signal K data path source. This is used when multiple sources exist for the same path. If set, the Signal K default source will be ignored.
+ * @property {number} refCount - Number of live callers sharing this registration; torn down only at 0.
  * @property {BehaviorSubject<IPathData>} _pathData$ - A BehaviorSubject of the private path value.
  * @property {BehaviorSubject<TState>} _pathState$ - A BehaviorSubject of the private path data state property.
  * @property {BehaviorSubject<IPathUpdate>} pathDataUpdate$ - A BehaviorSubject that contains path value and value state.
  * @property {BehaviorSubject<ISkMetadata | null>} pathMeta$ - A BehaviorSubject containing available meta or null.
+ * @property {Subscription} combinedSub - The internal combineLatest subscription feeding pathDataUpdate$, torn down on release.
  *
  * @interface IPathRegistration
  */
 interface IPathRegistration {
   path: string;
   source: string;
+  refCount: number;
   _pathData$: BehaviorSubject<IPathData>;
   _pathState$: BehaviorSubject<TState>;
   pathDataUpdate$: BehaviorSubject<IPathUpdate>;
   pathMeta$: BehaviorSubject<ISkMetadata | null>;
+  combinedSub?: Subscription;
 }
 
 export interface IDeltaUpdate {
@@ -155,7 +160,6 @@ export class DataService implements OnDestroy {
   private _skDataArrayCache: ISkPathData[] = [];
   /** Path -> index lookup for `_skDataArrayCache` to enable O(1) upserts. */
   private _skDataIndexByPath = new Map<string, number>();
-  private _pathRegister: IPathRegistration[] = []; // List of paths used by Kip (Widgets or App (Notifications and such))
   /** Path -> registrations index for fast lookups during updates. */
   private _pathRegisterByPath = new Map<string, IPathRegistration[]>();
 
@@ -234,9 +238,10 @@ export class DataService implements OnDestroy {
 
   public subscribePath(path: string, source: string): Observable<IPathUpdate> {
     const registrations = this._pathRegisterByPath.get(path);
-    const matchingPaths = registrations?.find(item => item.path === path && item.source === source);
-    if (matchingPaths) {
-      return matchingPaths.pathDataUpdate$;
+    const matching = registrations?.find(item => item.path === path && item.source === source);
+    if (matching) {
+      matching.refCount++;
+      return matching.pathDataUpdate$;
     }
 
     let currentValue: string | null = null;
@@ -274,6 +279,7 @@ export class DataService implements OnDestroy {
     const newPathSubject: IPathRegistration = {
       path: path,
       source: source,
+      refCount: 1,
       _pathData$: new BehaviorSubject<IPathData>(pathUpdate.data),
       _pathState$: new BehaviorSubject<TState>(pathUpdate.state),
       pathDataUpdate$: new BehaviorSubject<IPathUpdate>(pathUpdate),
@@ -284,15 +290,94 @@ export class DataService implements OnDestroy {
       map(([d, s]) => ({ data: d, state: s } as IPathUpdate))
     );
 
-    combined$.subscribe(value => newPathSubject.pathDataUpdate$.next(value));
+    newPathSubject.combinedSub = combined$.subscribe(value => newPathSubject.pathDataUpdate$.next(value));
 
-    this._pathRegister.push(newPathSubject);
     if (registrations) {
       registrations.push(newPathSubject);
     } else {
       this._pathRegisterByPath.set(path, [newPathSubject]);
     }
     return newPathSubject.pathDataUpdate$;
+  }
+
+  /**
+   * Release a registration acquired via {@link subscribePath}. The registration's subject is
+   * shared across co-subscribers of the same `(path, source)` pair, so it is torn down only
+   * once the last caller releases it — matched by path AND source. The count is over
+   * `subscribePath` calls, not RxJS subscriptions, so each caller must release exactly once per
+   * call it made. Releasing a `(path, source)` that has no registration is a safe no-op; but
+   * over-releasing one that co-subscribers still hold tears their shared stream down early, so
+   * callers must balance acquire and release.
+   *
+   * @param {string} path The Signal K path
+   * @param {string} source The source the caller subscribed with
+   * @memberof DataService
+   */
+  public unsubscribePath(path: string, source: string): void {
+    const registrations = this._pathRegisterByPath.get(path);
+    if (!registrations?.length) return;
+    const pathIndex = registrations.findIndex(item => item.source === source);
+    if (pathIndex === -1) return;
+
+    const registration = registrations[pathIndex];
+    registration.refCount--;
+    if (registration.refCount > 0) return;
+
+    registration.combinedSub?.unsubscribe();
+    registration._pathData$.complete();
+    registration._pathState$.complete();
+    registration.pathDataUpdate$.complete();
+    registration.pathMeta$.complete();
+
+    registrations.splice(pathIndex, 1);
+    if (registrations.length === 0) {
+      this._pathRegisterByPath.delete(path);
+    }
+  }
+
+  /**
+   * Prune all cached path data under a vessel context (e.g. an evicted AIS target), freeing
+   * memory that would otherwise grow without bound as contexts churn. Only cached data, meta,
+   * and pending state are removed — active registrations are left alive, so a widget still
+   * bound to such a path simply stops receiving deltas. No-op for the self context.
+   *
+   * @param {string} context The Signal K context to remove (e.g. 'vessels.urn:mrn:...')
+   * @memberof DataService
+   */
+  public removePathsForContext(context: string): void {
+    if (context === SELFROOTDEF || context === this._selfUrn) return;
+    const prefix = `${context}.`;
+
+    let removedSkData = false;
+    for (const path of Array.from(this._skData.keys())) {
+      if (path.startsWith(prefix)) {
+        this._skData.delete(path);
+        removedSkData = true;
+      }
+    }
+    for (const path of Array.from(this._pendingPathStates.keys())) {
+      if (path.startsWith(prefix)) {
+        this._pendingPathStates.delete(path);
+      }
+    }
+    if (removedSkData && this._isSkDataFullTreeActive) {
+      this.refreshSkDataCache();
+      this.scheduleSkDataFullTreeEmit();
+    }
+
+    let removedMeta = false;
+    for (const path of Array.from(this._dataServiceMetaByPath.keys())) {
+      if (path.startsWith(prefix)) {
+        this._dataServiceMetaByPath.delete(path);
+        removedMeta = true;
+      }
+    }
+    if (removedMeta) {
+      this._dataServiceMeta = Array.from(this._dataServiceMetaByPath.values());
+      if (this._isSkMetaFullTreeActive) {
+        this._dataServiceMetaSubject$.next(this._dataServiceMeta);
+      }
+    }
   }
 
   /**
