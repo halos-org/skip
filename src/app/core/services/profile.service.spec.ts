@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileService } from './profile.service';
 import { StorageService } from './storage.service';
 import { SettingsService } from './settings.service';
+import { ConfigurationUpgradeService } from './configuration-upgrade.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 
@@ -47,6 +48,7 @@ describe('ProfileService', () => {
     TestBed.configureTestingModule({
       providers: [
         ProfileService,
+        ConfigurationUpgradeService, // real service: its migrateImportedConfig is pure (no storage/settings I/O)
         { provide: StorageService, useValue: storage },
         { provide: SettingsService, useValue: settings }
       ]
@@ -142,10 +144,21 @@ describe('ProfileService', () => {
   });
 
   describe('import', () => {
-    it('imports a valid config as a new profile (no auto-switch)', async () => {
+    it('imports a current-version config as a new profile (no migration, no auto-switch)', async () => {
       await service.refresh();
-      await service.importProfile('imported', cfg('imp'));
+      const migrated = await service.importProfile('imported', cfg('imp'));
+      expect(migrated).toBe(false);
       expect(storage.setConfig).toHaveBeenCalledWith('user', 'imported', expect.objectContaining({ theme: { themeName: 'imp' } }));
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
+
+    it('migrates an older-but-supported config to the current version before writing, and reports it', async () => {
+      await service.refresh();
+      const older = { app: { configVersion: 11 }, theme: { themeName: 'old' }, dashboards: [] };
+      const migrated = await service.importProfile('imported', older);
+      expect(migrated).toBe(true);
+      const written = storage.setConfig.mock.calls.at(-1)?.[2] as IConfig;
+      expect(written.app?.configVersion).toBe(13);
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
     });
 
@@ -155,10 +168,17 @@ describe('ProfileService', () => {
       expect(storage.setConfig).not.toHaveBeenCalled();
     });
 
-    it('rejects a shape-valid config with an unsupported version without writing', async () => {
+    it('rejects a shape-valid but below-floor config without writing', async () => {
       await service.refresh();
       const stale = { app: { configVersion: 9 }, theme: { themeName: 'old' }, dashboards: [] };
-      await expect(service.importProfile('imported', stale)).rejects.toThrow(/version/i);
+      await expect(service.importProfile('imported', stale)).rejects.toThrow(/too old/i);
+      expect(storage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('rejects a shape-valid config with no recognizable version without writing', async () => {
+      await service.refresh();
+      const versionless = { app: {}, theme: { themeName: 'old' }, dashboards: [] };
+      await expect(service.importProfile('imported', versionless)).rejects.toThrow(/recognizable version/i);
       expect(storage.setConfig).not.toHaveBeenCalled();
     });
 

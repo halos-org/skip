@@ -3,6 +3,7 @@ import { cloneDeep } from 'lodash-es';
 import { IConfig } from '../interfaces/app-settings.interfaces';
 import { StorageService } from './storage.service';
 import { SettingsService } from './settings.service';
+import { ConfigurationUpgradeService } from './configuration-upgrade.service';
 import { defaultConfig } from '../../../default-config/config.blank.const';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 import { UUID } from '../utils/uuid.util';
@@ -30,6 +31,7 @@ const PROFILE_SCOPE = 'user';
 export class ProfileService {
   private readonly storage = inject(StorageService);
   private readonly settings = inject(SettingsService);
+  private readonly upgrade = inject(ConfigurationUpgradeService);
 
   private readonly _profiles = signal<IProfileSummary[]>([]);
   public readonly profiles = this._profiles.asReadonly();
@@ -77,23 +79,23 @@ export class ProfileService {
 
   /**
    * Import an arbitrary config as a NEW profile (never overwrites an existing one, never
-   * auto-switches). The config is structurally validated AND its version checked before it is written,
-   * so a shape-valid but unsupported-version file cannot become a switchable, unbootable slot.
+   * auto-switches). The config is structurally validated, then an older-but-supported version is
+   * migrated to the current version PURELY IN MEMORY before it is written — so onboarding an older
+   * Skip or fork-era KIP export never yields a switchable, unbootable slot. Resolves to whether a
+   * migration ran, so the caller can tell the user. Below-floor, unrecognized, and too-new versions
+   * are rejected with distinct, actionable errors.
    */
-  public async importProfile(name: string, config: unknown): Promise<void> {
+  public async importProfile(name: string, config: unknown): Promise<boolean> {
     return this.exclusive(async () => {
       await this.refresh();
       const normalized = this.validateNewName(name);
       if (!this.isValidConfigShape(config)) {
         throw new Error('The selected file is not a valid KIP configuration.');
       }
-      const supported = defaultConfig.app?.configVersion;
-      const version = config.app?.configVersion;
-      if (version !== supported) {
-        throw new Error(`This configuration is version ${version ?? 'unknown'}, but this version of KIP supports version ${supported}. Re-export it from a current KIP and try again.`);
-      }
-      await this.storage.setConfig(PROFILE_SCOPE, normalized, config);
+      const { config: prepared, migrated } = this.upgrade.migrateImportedConfig(config);
+      await this.storage.setConfig(PROFILE_SCOPE, normalized, prepared);
       await this.refresh();
+      return migrated;
     });
   }
 
