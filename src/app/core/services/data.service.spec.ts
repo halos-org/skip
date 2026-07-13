@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IMeta, IPathValueData } from '../interfaces/app-interfaces';
+import { IMeta, IPathValueData, IPathMetaData } from '../interfaces/app-interfaces';
 import { ISignalKDataValueUpdate, States } from '../interfaces/signalk-interfaces';
 import { DataService, IPathUpdate, IPathUpdateWithPath } from './data.service';
 import { SignalKDeltaService } from './signalk-delta.service';
@@ -67,6 +67,179 @@ describe('DataService', () => {
     // Both co-subscribers keep receiving from the shared stream; there is no teardown that could complete it.
     expect(firstValues.at(-1)).toBe(12.5);
     expect(secondValues.at(-1)).toBe(12.5);
+  });
+
+  describe('unsubscribePath (refcounted release)', () => {
+    const PATH = 'self.navigation.speedOverGround';
+
+    it('tears down a shared registration only once every subscriber has released it', () => {
+      let firstCompleted = false;
+      let secondCompleted = false;
+      service.subscribePath(PATH, 'default').subscribe({ complete: () => (firstCompleted = true) });
+      service.subscribePath(PATH, 'default').subscribe({ complete: () => (secondCompleted = true) });
+
+      service.unsubscribePath(PATH, 'default');
+      expect(firstCompleted).toBe(false);
+      expect(secondCompleted).toBe(false);
+
+      service.unsubscribePath(PATH, 'default');
+      expect(firstCompleted).toBe(true);
+      expect(secondCompleted).toBe(true);
+    });
+
+    it('matches by path and source, leaving other sources on the same path alive', () => {
+      let defaultCompleted = false;
+      let otherCompleted = false;
+      service.subscribePath(PATH, 'default').subscribe({ complete: () => (defaultCompleted = true) });
+      const other$ = service.subscribePath(PATH, 'gps-2');
+      other$.subscribe({ complete: () => (otherCompleted = true) });
+
+      service.unsubscribePath(PATH, 'default');
+      expect(defaultCompleted).toBe(true);
+      expect(otherCompleted).toBe(false);
+
+      // The surviving source still delivers values after its sibling was released.
+      let latestOther: IPathUpdate | undefined;
+      other$.subscribe(update => (latestOther = update));
+      dataPathUpdates$.next({
+        context: 'self',
+        path: 'navigation.speedOverGround',
+        source: 'gps-2',
+        timestamp: '2026-01-01T00:00:01.000Z',
+        value: 3.2,
+      });
+      expect(latestOther!.data.value).toBe(3.2);
+    });
+
+    it('is a safe no-op for an unknown path or source', () => {
+      service.subscribePath(PATH, 'default');
+      expect(() => service.unsubscribePath('self.does.not.exist', 'default')).not.toThrow();
+      expect(() => service.unsubscribePath(PATH, 'no-such-source')).not.toThrow();
+
+      // The live registration is untouched by the no-op releases.
+      let latest: IPathUpdate | undefined;
+      service.subscribePath(PATH, 'default').subscribe(update => (latest = update));
+      dataPathUpdates$.next({
+        context: 'self',
+        path: 'navigation.speedOverGround',
+        source: 'gps',
+        timestamp: '2026-01-01T00:00:01.000Z',
+        value: 6.0,
+      });
+      expect(latest!.data.value).toBe(6.0);
+    });
+
+    it('mints a fresh live registration after a full teardown, not the completed one', () => {
+      service.subscribePath(PATH, 'default');
+      service.unsubscribePath(PATH, 'default');
+
+      // A subscribe after teardown must get a working subject, not the completed one
+      // (which would replay its last value then complete, ignoring later deltas).
+      let latest: IPathUpdate | undefined;
+      let completed = false;
+      service.subscribePath(PATH, 'default').subscribe({
+        next: update => (latest = update),
+        complete: () => (completed = true),
+      });
+      dataPathUpdates$.next({
+        context: 'self',
+        path: 'navigation.speedOverGround',
+        source: 'gps',
+        timestamp: '2026-01-01T00:00:01.000Z',
+        value: 7.7,
+      });
+      expect(completed).toBe(false);
+      expect(latest!.data.value).toBe(7.7);
+    });
+  });
+
+  describe('removePathsForContext', () => {
+    const vesselA = 'vessels.urn:mrn:imo:mmsi:100000001';
+    const vesselB = 'vessels.urn:mrn:imo:mmsi:100000002';
+    const TS = '2026-01-01T00:00:01.000Z';
+
+    function seedSog(context: string, value: number): void {
+      dataPathUpdates$.next({ context, path: 'navigation.speedOverGround', source: 'gps', timestamp: TS, value });
+    }
+
+    it('removes cached path data for a context, leaving other contexts untouched', () => {
+      seedSog('self', 1.1);
+      seedSog(vesselA, 2.2);
+      seedSog(vesselB, 3.3);
+      expect(service.getPathObject(`${vesselA}.navigation.speedOverGround`)).not.toBeNull();
+
+      service.removePathsForContext(vesselA);
+
+      expect(service.getPathObject(`${vesselA}.navigation.speedOverGround`)).toBeNull();
+      expect(service.getPathObject('self.navigation.speedOverGround')).not.toBeNull();
+      expect(service.getPathObject(`${vesselB}.navigation.speedOverGround`)).not.toBeNull();
+      expect(service.getCachedPaths()).not.toContain(`${vesselA}.navigation.speedOverGround`);
+    });
+
+    it('prunes the full-tree data and meta caches when they are active', () => {
+      service.startSkDataFullTree();
+      let latestMeta: IPathMetaData[] = [];
+      service.startSkMetaFullTree().subscribe(meta => (latestMeta = meta));
+
+      seedSog(vesselA, 2.2);
+      metadataUpdates$.next({
+        context: vesselA,
+        path: 'navigation.speedOverGround',
+        meta: { description: 'SOG', units: 'm/s', properties: {} },
+      });
+
+      expect(service.getCachedPaths()).toContain(`${vesselA}.navigation.speedOverGround`);
+      expect(latestMeta.some(m => m.path === `${vesselA}.navigation.speedOverGround`)).toBe(true);
+
+      service.removePathsForContext(vesselA);
+
+      expect(service.getCachedPaths()).not.toContain(`${vesselA}.navigation.speedOverGround`);
+      expect(latestMeta.some(m => m.path === `${vesselA}.navigation.speedOverGround`)).toBe(false);
+    });
+
+    it('prunes _skData even while the full tree is inactive, reflected after a later rebuild', () => {
+      seedSog(vesselA, 2.2);
+      service.removePathsForContext(vesselA);
+
+      // Open the tree only now; the rebuild reads the already-pruned _skData.
+      service.startSkDataFullTree();
+      expect(service.getCachedPaths()).not.toContain(`${vesselA}.navigation.speedOverGround`);
+    });
+
+    it('is a no-op for the self context', () => {
+      seedSog('self', 1.1);
+      service.removePathsForContext('self');
+      expect(service.getPathObject('self.navigation.speedOverGround')).not.toBeNull();
+      expect(service.getCachedPaths()).toContain('self.navigation.speedOverGround');
+    });
+
+    it('does not re-emit the meta full tree when no path matches the removed context', () => {
+      let metaEmits = 0;
+      service.startSkMetaFullTree().subscribe(() => metaEmits++);
+      seedSog(vesselA, 2.2);
+      metadataUpdates$.next({
+        context: vesselA,
+        path: 'navigation.speedOverGround',
+        meta: { description: 'SOG', units: 'm/s', properties: {} },
+      });
+      const before = metaEmits;
+
+      service.removePathsForContext('vessels.urn:mrn:imo:mmsi:999999999');
+
+      expect(metaEmits).toBe(before);
+    });
+
+    it('does not clobber a sibling context that is a string prefix of the removed one', () => {
+      const shortCtx = 'vessels.urn:mrn:imo:mmsi:100';
+      const longCtx = 'vessels.urn:mrn:imo:mmsi:1002';
+      seedSog(shortCtx, 1.0);
+      seedSog(longCtx, 2.0);
+
+      service.removePathsForContext(shortCtx);
+
+      expect(service.getPathObject(`${shortCtx}.navigation.speedOverGround`)).toBeNull();
+      expect(service.getPathObject(`${longCtx}.navigation.speedOverGround`)).not.toBeNull();
+    });
   });
 
   it('applies notification state to path value updates', () => {
