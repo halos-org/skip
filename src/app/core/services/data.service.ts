@@ -715,15 +715,21 @@ export class DataService implements OnDestroy {
    * timeout a path value and reset it to null. This is useful for widgets
    * that need to know if a path has timed out.
    *
+   * Only the registration matching `source` is reset: one source timing out
+   * must not null a sibling widget bound to a different, still-live source of
+   * the same path (e.g. redundant GPS or wind sensors).
+   *
    * @param {string} path The Signal K path to timeout
+   * @param {string} source The source whose stream timed out; only its registration is reset
    * @param {string} pathType The type of the path value (string, Date, number, multiple, etc)
    * @memberof SignalKDataService
    */
-  public timeoutPathObservable(path: string, pathType: string): void {
+  public timeoutPathObservable(path: string, source: string, pathType: string): void {
     if (!['string', 'Date', 'number', 'multiple'].includes(pathType)) return;
     const registrations = this._pathRegisterByPath.get(path);
     if (!registrations) return;
     for (const registration of registrations) {
+      if (registration.source !== source) continue;
       registration.pathDataUpdate$.next({
         data: {
           value: null,
