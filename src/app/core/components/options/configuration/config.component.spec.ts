@@ -72,8 +72,7 @@ describe('SettingsConfigComponent', () => {
             loadConfigFromLocalStorage: vi.fn(),
             reloadApp: vi.fn(),
             resetSettings: vi.fn(),
-            resetConnection: vi.fn(),
-            loadDemoConfig: vi.fn()
+            resetConnection: vi.fn()
           }
         }
       ]

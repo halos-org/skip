@@ -78,7 +78,7 @@ export class StorageService {
     return this.http.post(arg.url, arg.document)
       .pipe(
         // Bound each queued write so a hung applicationData POST cannot stall the serial queue —
-        // and, since setConfig now awaits its turn, every full-file write (reset/demo/profile) behind
+        // and, since setConfig now awaits its turn, every full-file write (reset/profile) behind
         // it. A timeout fails the queue item like any other error: reject, count, advance.
         timeout(REMOTE_CONFIG_TIMEOUT_MS),
         tap({

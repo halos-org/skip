@@ -108,7 +108,6 @@ a:link, a:visited {
   grid-template-areas:
     "download-txt download-btn"
     "upload-txt upload-btn"
-    "demo-txt demo-btn"
     "reset-txt reset-btn"
     "config-txt config-btn";
   row-gap: 20px;
@@ -129,14 +128,6 @@ a:link, a:visited {
 
 .download-btn {
   grid-area: download-btn;
-}
-
-.demo-txt {
-  grid-area: demo-txt;
-}
-
-.demo-btn {
-  grid-area: demo-btn;
 }
 
 .reset-txt {

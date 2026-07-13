@@ -11,7 +11,6 @@ import { IConfig, IAppConfig, IConnectionConfig, IThemeConfig, INotificationConf
 import { DefaultAppConfig, DefaultConnectionConfig as DefaultConnectionConfig, DefaultThemeConfig } from '../../../default-config/config.blank.const';
 import { DefaultUnitsConfig } from '../../../default-config/config.blank.units.const'
 import { DefaultNotificationConfig } from '../../../default-config/config.blank.notification.const';
-import { DemoAppConfig, DemoThemeConfig, DemoDashboardsConfig } from '../../../default-config/config.demo.const';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { StorageService, TConfigObjectType } from './storage.service';
@@ -489,37 +488,6 @@ export class SettingsService {
       })
       .catch(error => {
         console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
-        this.snackBar.open(
-          'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
-          'Close',
-          {
-            duration: 0,
-            verticalPosition: 'top'
-          }
-        );
-      });
-  }
-
-  public loadDemoConfig() {
-    if (!this.storage.storageServiceReady$.getValue()) {
-      console.warn("[AppSettings Service] Storage not ready; cannot load demo configuration.");
-      return;
-    }
-    const demoConfig: IConfig = {
-      app: DemoAppConfig,
-      dashboards: DemoDashboardsConfig,
-      theme: DemoThemeConfig
-    };
-    console.log("[AppSettings Service] Loading Demo configuration settings to the server and reloading app.");
-    // Wait for the server write to land before reloading; reloading mid-request
-    // aborts the POST and leaves the previous configuration in place. Storage
-    // readiness is already guaranteed by the guard above.
-    this.storage.setConfig('user', this.sharedConfigName, demoConfig)
-      .then(() => {
-        this.reloadApp();
-      })
-      .catch(error => {
-        console.error("[AppSettings Service] Error saving demo configuration to the server", error);
         this.snackBar.open(
           'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
           'Close',
