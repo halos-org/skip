@@ -98,9 +98,10 @@ export class WidgetStreamsDirective {
     // Build base observable if missing, or refresh when path/source changed
     this.ensureStreamsMap();
     const baseKey = this.computeBaseKey(normalizedPath, pathCfg.source);
+    const effectiveSource = pathCfg.source?.trim() || 'default';
     const currentBaseKey = this.baseSignatures.get(pathName);
     if (!this.streams!.has(pathName) || currentBaseKey !== baseKey) {
-      this.streams!.set(pathName, this.dataService.subscribePath(normalizedPath, pathCfg.source?.trim() || 'default'));
+      this.streams!.set(pathName, this.dataService.subscribePath(normalizedPath, effectiveSource));
       this.baseSignatures.set(pathName, baseKey);
     }
     const base$ = this.streams!.get(pathName)!;
@@ -154,7 +155,7 @@ export class WidgetStreamsDirective {
           each: dataTimeout,
           with: () => throwError(() => {
             console.log(timeoutErrorMsg + normalizedPath);
-            this.dataService.timeoutPathObservable(normalizedPath, pathType);
+            this.dataService.timeoutPathObservable(normalizedPath, effectiveSource, pathType);
           })
         }),
         retryWhen(error => error.pipe(

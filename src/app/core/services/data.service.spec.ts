@@ -308,39 +308,53 @@ describe('DataService', () => {
     });
     expect(latest!.data.value).toBe(5.5);
 
-    service.timeoutPathObservable('self.environment.wind.speedApparent', 'number');
+    service.timeoutPathObservable('self.environment.wind.speedApparent', 'default', 'number');
 
     expect(latest!.data.value).toBeNull();
     expect(latest!.data.timestamp).toBeNull();
     expect(latest!.state).toBe(States.Normal);
   });
 
-  it('resets every source registration for a path on timeout, not just the first', () => {
+  it('resets only the timed-out source registration, leaving sibling sources live', () => {
     let latestDefault: IPathUpdate | undefined;
-    let latestSource: IPathUpdate | undefined;
+    let latestSourceA: IPathUpdate | undefined;
+    let latestSourceB: IPathUpdate | undefined;
     service
       .subscribePath('self.electrical.batteries.10.voltage', 'default')
       .subscribe(update => (latestDefault = update));
     service
-      .subscribePath('self.electrical.batteries.10.voltage', 'test-source')
-      .subscribe(update => (latestSource = update));
+      .subscribePath('self.electrical.batteries.10.voltage', 'test-source-a')
+      .subscribe(update => (latestSourceA = update));
+    service
+      .subscribePath('self.electrical.batteries.10.voltage', 'test-source-b')
+      .subscribe(update => (latestSourceB = update));
 
     dataPathUpdates$.next({
       context: 'self',
       path: 'electrical.batteries.10.voltage',
-      source: 'test-source',
+      source: 'test-source-a',
       timestamp: '2026-01-01T00:00:01.000Z',
       value: 12.5,
     });
-    expect(latestDefault!.data.value).toBe(12.5);
-    expect(latestSource!.data.value).toBe(12.5);
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'electrical.batteries.10.voltage',
+      source: 'test-source-b',
+      timestamp: '2026-01-01T00:00:02.000Z',
+      value: 13.0,
+    });
+    expect(latestSourceA!.data.value).toBe(12.5);
+    expect(latestSourceB!.data.value).toBe(13.0);
+    expect(latestDefault!.data.value).toBe(13.0);
 
-    service.timeoutPathObservable('self.electrical.batteries.10.voltage', 'number');
+    // Only test-source-a's stream timed out; its live siblings (test-source-b and
+    // the default bucket, still fed by test-source-b) must be left untouched.
+    service.timeoutPathObservable('self.electrical.batteries.10.voltage', 'test-source-a', 'number');
 
-    // Both the default bucket and the per-source registration must clear on timeout.
-    expect(latestDefault!.data.value).toBeNull();
-    expect(latestSource!.data.value).toBeNull();
-    expect(latestSource!.state).toBe(States.Normal);
+    expect(latestSourceA!.data.value).toBeNull();
+    expect(latestSourceA!.state).toBe(States.Normal);
+    expect(latestSourceB!.data.value).toBe(13.0);
+    expect(latestDefault!.data.value).toBe(13.0);
   });
 
   it('does not emit on timeout for an unrecognised pathType', () => {
@@ -350,7 +364,7 @@ describe('DataService', () => {
       .subscribe(update => updates.push(update));
 
     const countBefore = updates.length;
-    service.timeoutPathObservable('self.navigation.position', 'object');
+    service.timeoutPathObservable('self.navigation.position', 'default', 'object');
 
     expect(updates.length).toBe(countBefore);
     expect(updates.every(update => update !== undefined)).toBe(true);
