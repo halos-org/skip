@@ -284,12 +284,6 @@
       </defs>
       <path fill="currentColor" d="M0 0h48v48H0z" mask="url(#ipTControl0)" />
     </svg>
-    <svg id="tutorialWidget" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
-        <path fill="var(--mat-sys-primary)" fill-opacity="0.4" d="M4 21.4V2.6a.6.6 0 0 1 .6-.6h11.652a.6.6 0 0 1 .424.176l3.148 3.148A.6.6 0 0 1 20 5.75V21.4a.6.6 0 0 1-.6.6H4.6a.6.6 0 0 1-.6-.6M8 10h8m-8 8h8m-8-4h4" />
-        <path d="M16 2v3.4a.6.6 0 0 0 .6.6H20" />
-      </g>
-    </svg>
     <svg id="racetimerWidget" height="24px" viewBox="0 -960 960 960" width="24px">
       <path fill="currentColor" d="M360-840v-80h240v80H360Zm80 440h80v-240h-80v240Zm40 320q-74 0-139.5-28.5T226-186q-49-49-77.5-114.5T120-440q0-74 28.5-139.5T226-694q49-49 114.5-77.5T480-800q62 0 119 20t107 58l56-56 56 56-56 56q38 50 58 107t20 119q0 74-28.5 139.5T734-186q-49 49-114.5 77.5T480-80Zm0-80q116 0 198-82t82-198q0-116-82-198t-198-82q-116 0-198 82t-82 198q0 116 82 198t198 82Zm0-280Z"/>
     </svg>
