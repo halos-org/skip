@@ -14,7 +14,6 @@ const KIP_UUID = 'test-kip-uuid';
 const SET_DISPLAY_PATH = 'self.kip.remote.setDisplay';
 const SET_SCREEN_INDEX_PATH = 'self.kip.remote.setScreenIndex';
 const REQUEST_ACTIVE_SCREEN_PATH = 'self.kip.remote.requestActiveScreen';
-const OWN_SCREEN_INDEX_PATH = `self.displays.${KIP_UUID}.screenIndex`;
 const OWN_ACTIVE_SCREEN_PATH = `self.displays.${KIP_UUID}.activeScreen`;
 
 const DASHBOARDS: Dashboard[] = [
@@ -108,11 +107,10 @@ describe('RemoteDashboardsService', () => {
       expect(requests.putRequest).toHaveBeenNthCalledWith(3, REQUEST_ACTIVE_SCREEN_PATH, { displayId: KIP_UUID, screenIdx: null }, KIP_UUID);
     });
 
-    it('subscribes to its own display screenIndex and activeScreen paths', () => {
+    it('subscribes only to its own display activeScreen path', () => {
       createService();
 
       expect(data.subscribedPaths).toEqual([
-        { path: OWN_SCREEN_INDEX_PATH, source: 'default' },
         { path: OWN_ACTIVE_SCREEN_PATH, source: 'default' }
       ]);
     });
@@ -169,6 +167,22 @@ describe('RemoteDashboardsService', () => {
       expect(callsTo(SET_SCREEN_INDEX_PATH)).toHaveLength(0);
       expect(callsTo(SET_DISPLAY_PATH)).toHaveLength(1);
     });
+
+    it('publishes the screens on init when constructed with remote control already enabled', () => {
+      settings.isRemoteControl.set(true);
+
+      createService();
+
+      const published = callsTo(SET_DISPLAY_PATH)
+        .map(call => call[1] as { display: IScreensPayload | null })
+        .filter(payload => payload.display !== null);
+      expect(published.length).toBeGreaterThan(0);
+      expect(published[published.length - 1].display?.screens).toEqual([
+        { id: 'dash-0', name: 'Navigation', icon: 'sailing' },
+        { id: 'dash-1', name: 'Engine', icon: 'engine' },
+        { id: 'dash-2', name: 'Anchor', icon: 'anchor' }
+      ]);
+    });
   });
 
   describe('disabling remote control', () => {
@@ -204,7 +218,7 @@ describe('RemoteDashboardsService', () => {
       expect((displayCalls[0][1] as { display: IScreensPayload }).display.displayName).toBe('Nav Station');
     });
 
-    it('re-sends the active dashboard index on a name change', () => {
+    it('republishes screens only, without re-sending the active dashboard index', () => {
       dashboard.activeDashboard.set(2);
       createService();
       enableRemoteControl();
@@ -213,9 +227,8 @@ describe('RemoteDashboardsService', () => {
       settings.instanceName.set('Nav Station');
       TestBed.tick();
 
-      expect(callsTo(SET_SCREEN_INDEX_PATH)).toEqual([
-        [SET_SCREEN_INDEX_PATH, { displayId: KIP_UUID, screenIdx: 2 }, KIP_UUID]
-      ]);
+      expect(callsTo(SET_DISPLAY_PATH)).toHaveLength(1);
+      expect(callsTo(SET_SCREEN_INDEX_PATH)).toHaveLength(0);
     });
 
     it('ignores name changes while disabled', () => {
@@ -372,7 +385,7 @@ describe('RemoteDashboardsService', () => {
       expect(requests.putRequest).toHaveBeenNthCalledWith(2, REQUEST_ACTIVE_SCREEN_PATH, { displayId: 'other-display', screenIdx: 7 }, KIP_UUID);
     });
 
-    it('publishes a shallow copy of the screens payload', () => {
+    it('publishes a deep-enough copy of the screens payload, sharing no reference with the caller', () => {
       const service = createService();
       requests.putRequest.mockClear();
 
@@ -383,7 +396,7 @@ describe('RemoteDashboardsService', () => {
       expect(sent.displayId).toBe('other-display');
       expect(sent.display).toEqual(payload);
       expect(sent.display).not.toBe(payload);
-      expect(sent.display.screens).toBe(payload.screens);
+      expect(sent.display.screens).not.toBe(payload.screens);
     });
 
     it('logs an error without throwing when the server rejects a request', () => {
