@@ -277,9 +277,6 @@ exports[`strictNullChecks`] = {
     ],
     "src/default-config/config.blank.const.ts:2019243563": [
       [31, 2, 12, "Type \'null\' is not assignable to type \'string\'.", "3195809883"]
-    ],
-    "src/default-config/config.blank.dashboard.ts:3810089117": [
-      [4, 6, 2, "Type \'null\' is not assignable to type \'string\'.", "5861160"]
     ]
   }`
 };

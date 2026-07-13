@@ -39,7 +39,6 @@ export interface DynamicWidget {
   widgetProperties: IWidget;
   theme: ITheme;
   defaultConfig: IWidgetSvcConfig;
-  unlockStatus?: boolean; // only used by Tutorial
 }
 
 /**

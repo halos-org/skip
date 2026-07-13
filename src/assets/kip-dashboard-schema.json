@@ -2636,24 +2636,6 @@
       "selector": "widget-text"
     },
     {
-      "bindingKind": "none",
-      "category": "Component",
-      "componentClassName": "WidgetTutorialComponent",
-      "defaultConfig": {
-        "filterSelfPaths": true
-      },
-      "defaultHeight": 6,
-      "defaultWidth": 4,
-      "description": "An instructional widget that guides new users through basic navigation, gestures, and dashboard editing steps.",
-      "icon": "helpWidget",
-      "minHeight": 4,
-      "minWidth": 4,
-      "name": "Tutorial",
-      "pathSlots": [],
-      "requiredPlugins": [],
-      "selector": "widget-tutorial"
-    },
-    {
       "bindingKind": "paths-record",
       "category": "Component",
       "componentClassName": "WidgetWindComponent",

@@ -120,7 +120,6 @@ export class WidgetService {
     WidgetTextComponent: () => import('../../widgets/widget-text/widget-text.component').then(m => m.WidgetTextComponent),
     WidgetWindTrendsChartComponent: () => import('../../widgets/widget-windtrends-chart/widget-windtrends-chart.component').then(m => m.WidgetWindTrendsChartComponent),
     WidgetWindComponent: () => import('../../widgets/widget-windsteer/widget-windsteer.component').then(m => m.WidgetWindComponent),
-    WidgetTutorialComponent: () => import('../../widgets/widget-tutorial/widget-tutorial.component').then(m => m.WidgetTutorialComponent),
     WidgetSliderComponent: () => import('../../widgets/widget-slider/widget-slider.component').then(m => m.WidgetSliderComponent),
     WidgetSimpleLinearComponent: () => import('../../widgets/widget-simple-linear/widget-simple-linear.component').then(m => m.WidgetSimpleLinearComponent),
     WidgetRacesteerComponent: () => import('../../widgets/widget-racesteer/widget-racesteer.component').then(m => m.WidgetRacesteerComponent),
@@ -546,19 +545,6 @@ export class WidgetService {
       requiredPlugins: [],
       selector: 'widget-iframe',
       componentClassName: 'WidgetIframeComponent',
-    },
-    {
-      name: 'Tutorial',
-      description: 'An instructional widget that guides new users through basic navigation, gestures, and page editing steps.',
-      icon: 'helpWidget',
-      minWidth: 4,
-      minHeight: 4,
-      defaultWidth: 4,
-      defaultHeight: 6,
-      category: 'Component',
-      requiredPlugins: [],
-      selector: 'widget-tutorial',
-      componentClassName: 'WidgetTutorialComponent'
     },
     {
       name: 'Video',

@@ -193,9 +193,10 @@ export class ProfileService {
 
   private buildBlankConfig(): IConfig {
     const config = cloneDeep(defaultConfig);
-    const dashboards = cloneDeep(DefaultDashboard);
-    dashboards[0].id = UUID.create();
-    config.dashboards = dashboards;
+    config.dashboards = cloneDeep(DefaultDashboard).map(dashboard => ({
+      ...dashboard,
+      id: UUID.create()
+    }));
     return config;
   }
 

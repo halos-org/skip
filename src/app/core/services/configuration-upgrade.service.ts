@@ -56,8 +56,7 @@ export class ConfigurationUpgradeService {
     'WidgetAutopilotComponent': 'widget-autopilot',
     'WidgetDataChart': 'widget-data-chart',
     'WidgetRaceTimerComponent': 'widget-racetimer',
-    'WidgetIframeComponent': 'widget-iframe',
-    'WidgetTutorial': 'widget-tutorial'
+    'WidgetIframeComponent': 'widget-iframe'
   };
 
   /**
