@@ -261,6 +261,15 @@ describe('DashboardService', () => {
       expect(consoleError).toHaveBeenCalledTimes(2);
     });
 
+    it('rejects a fractional index without removing anything', () => {
+      setup();
+      service.setActiveDashboardIndex(0);
+      service.delete(1.5);
+      expect(service.dashboards().map(d => d.id)).toEqual(['d-0', 'd-1', 'd-2']);
+      expect(service.activeDashboard()).toBe(0);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+    });
+
     it('clamps the active index when it falls past the end', () => {
       setup();
       service.setActiveDashboardIndex(2);
@@ -288,6 +297,22 @@ describe('DashboardService', () => {
       expect(service.duplicate(-1, 'Copy', 'icon')).toBe(-1);
       expect(service.dashboards()).toHaveLength(3);
       expect(consoleError).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns -1 for a fractional index instead of crashing on a missing dashboard', () => {
+      setup();
+      expect(service.duplicate(1.5, 'Copy', 'icon')).toBe(-1);
+      expect(service.dashboards()).toHaveLength(3);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns -1 for NaN without throwing on a missing dashboard', () => {
+      setup();
+      let result: number | undefined;
+      expect(() => { result = service.duplicate(NaN, 'Copy', 'icon'); }).not.toThrow();
+      expect(result).toBe(-1);
+      expect(service.dashboards()).toHaveLength(3);
+      expect(consoleError).toHaveBeenCalledTimes(1);
     });
 
     it('deep clones with fresh dashboard and widget UUIDs kept in sync', () => {
@@ -381,6 +406,13 @@ describe('DashboardService', () => {
       service.navigateTo(3);
       expect(router.navigate).toHaveBeenCalledTimes(1);
       expect(consoleError).toHaveBeenCalled();
+    });
+
+    it('navigateTo rejects a fractional index without navigating', () => {
+      service.navigateTo(1.5);
+      service.navigateTo(-1);
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledTimes(2);
     });
 
     it('navigateToNextDashboard routes forward and navigateToPreviousDashboard backward, with wrap', () => {

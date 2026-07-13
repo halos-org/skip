@@ -131,6 +131,11 @@ export class DashboardService {
     }
   }
 
+  /** True when index is an integer within the current dashboards bounds [0, length). */
+  private isValidDashboardIndex(index: number): boolean {
+    return Number.isInteger(index) && index >= 0 && index < this.dashboards().length;
+  }
+
   /**
    * Sets the active dashboard index in the service.
    * This only updates the internal state and does NOT trigger navigation or URL changes.
@@ -141,11 +146,11 @@ export class DashboardService {
     // No change if the same dashboard is selected to prevent unnecessary cascading updates
     if (itemIndex === this.activeDashboard()) return true;
 
-    if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex < this.dashboards().length) {
+    if (this.isValidDashboardIndex(itemIndex)) {
       this.activeDashboard.set(itemIndex);
       return true;
     }
-    console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
+    console.error(`[Dashboard Service] Invalid dashboard index: ${itemIndex}`);
     return false;
   }
 
@@ -200,8 +205,8 @@ export class DashboardService {
    * @param itemIndex The index of the dashboard to delete.
    */
   public delete(itemIndex: number): void {
-    if (itemIndex < 0 || itemIndex >= this.dashboards().length) {
-      console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
+    if (!this.isValidDashboardIndex(itemIndex)) {
+      console.error(`[Dashboard Service] Invalid dashboard index: ${itemIndex}`);
       return;
     }
 
@@ -243,8 +248,8 @@ export class DashboardService {
    * @returns                     The new dashboard's index, or -1 on failure.
    */
   public duplicate(itemIndex: number, newName: string, newIcon: string): number {
-    if (itemIndex < 0 || itemIndex >= this.dashboards().length) {
-      console.error(`[Dashboard Service] Invalid itemIndex: ${itemIndex}`);
+    if (!this.isValidDashboardIndex(itemIndex)) {
+      console.error(`[Dashboard Service] Invalid dashboard index: ${itemIndex}`);
       return -1;
     }
 
@@ -341,14 +346,14 @@ export class DashboardService {
    */
   public navigateTo(itemIndex: number): void {
     if (this.isPageTransitioning()) return;
-    if (itemIndex >= 0 && itemIndex < this.dashboards().length) {
+    if (this.isValidDashboardIndex(itemIndex)) {
       const active = this.activeDashboard() ?? 0;
       if (itemIndex !== active) {
         this._pendingPageDirection = itemIndex > active ? 'next' : 'prev';
       }
       this._router.navigate(['/page', itemIndex]);
     } else {
-      console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
+      console.error(`[Dashboard Service] Invalid dashboard index: ${itemIndex}`);
     }
   }
 
