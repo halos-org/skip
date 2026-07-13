@@ -1,8 +1,9 @@
 # Unreleased
 ## New Features
-* Freeboard-SK panel: Skip registers itself as a Freeboard-SK plotter extension, so a supporting Freeboard-SK (3.0.0-beta or later) shows a toolbar button that opens Skip in a side panel. Ships as a Signal K server plugin bundled in the Skip package, enabled by default.
+* Freeboard-SK panel: Skip registers itself as a Freeboard-SK plotter extension, so a supporting Freeboard-SK shows a map-toolbar button that opens Skip in a side panel. The plugin manifest declares the host capabilities it needs (`requires: ['panels.iframe', 'buttons']`) and targets the map toolbar (`slot: 'mapToolbar'`), so only a Freeboard-SK build that provides those capabilities surfaces the button; the exact minimum Freeboard-SK version is confirmed at deploy. Ships as a Signal K server plugin bundled in the Skip package, enabled by default.
 * Same-origin Signal K sign-in (SSO): when KIP is served by a Signal K server on the same origin, it authenticates with the server's session cookie instead of its own username/password form. With an OIDC/SSO server, KIP joins the existing session and redirects to the server login when needed — no second sign-in, and OIDC-provisioned users (who have no server-local password) can use KIP. Cross-origin standalone use (a PWA pointed at a remote server) keeps the existing token sign-in.
 ## Improvements
+* Freeboard-SK panel: the plugin manifest now declares the host capabilities it uses (`requires: ['panels.iframe', 'buttons']`) and targets the map toolbar (`slot: 'mapToolbar'`), so a GA Freeboard-SK that enforces capability declarations still surfaces the Skip button. Added a standalone Node test suite covering the plugin's running gate, read-only rejections, id, and manifest shape.
 * The Connectivity settings show your Signal K session identity in same-origin mode (including a read-only-session indicator) instead of a credential form.
 * Security: the Signal K login password is no longer stored in the browser; it is used only in memory to obtain a session token.
 ## Fixes

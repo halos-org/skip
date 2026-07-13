@@ -22,7 +22,7 @@ module.exports = function (app) {
       description: 'Opens the Skip instrument panel inside Freeboard-SK.',
       version,
       apiVersion: '1',
-      requires: [],
+      requires: ['panels.iframe', 'buttons'],
       optional: [],
       panels: [
         {
@@ -37,7 +37,7 @@ module.exports = function (app) {
         {
           id: 'skip-open',
           title: 'Skip',
-          slot: 'primary',
+          slot: 'mapToolbar',
           icon: 'insights',
           action: { type: 'togglePanel', panel: 'skip-panel' }
         }
