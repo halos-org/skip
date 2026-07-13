@@ -21,7 +21,8 @@ export class SvgBooleanButtonComponent implements DoCheck, OnDestroy {
   private toggleOn = "0 0 180 35";
   private oldTheme: ITheme | null = null;
 
-  private holdTimeoutId: ReturnType<typeof setTimeout> | null = null; // delay before starting momentary emit
+  private static readonly HOLD_DELAY_MS = 75;
+  private holdTimeoutId: ReturnType<typeof setTimeout> | null = null; // brief hold before actuating; a swipe cancels it
   private emitIntervalId: ReturnType<typeof setInterval> | null = null; // repeating emit while pressed
   private pressed = false;
   private isSwiping = false;
@@ -55,40 +56,34 @@ export class SvgBooleanButtonComponent implements DoCheck, OnDestroy {
     this.pointerStartX = event.clientX;
     this.pointerStartY = event.clientY;
 
-    // Wait 250ms before emitting the state
     this.clearTimers();
+
+    const data = this.data();
+    if (!data) return;
+
+    // Brief hold before actuating so a swipe/scroll starting on the button cancels before any emit.
     this.holdTimeoutId = setTimeout(() => {
-      if (!this.isSwiping) {
-        // Momentary mode
-        this.pressed = true;
-
-        const data = this.data();
-        if (!data) return;
-        const state: IDynamicControl = cloneDeep(data);
-        state.value = this.pressed;
-
-        // Start emitting the state every 100ms
+      this.holdTimeoutId = null;
+      if (this.isSwiping) return;
+      this.pressed = true;
+      const state: IDynamicControl = cloneDeep(data);
+      state.value = this.pressed;
+      this.toggleClick.emit(state);
+      this.emitIntervalId = setInterval(() => {
         this.toggleClick.emit(state);
-        this.emitIntervalId = setInterval(() => {
-          this.toggleClick.emit(state);
-        }, 100);
-      }
-    }, 200);
+      }, 100);
+    }, SvgBooleanButtonComponent.HOLD_DELAY_MS);
   }
 
   public handlePointerMove(event: PointerEvent): void {
     const deltaX = Math.abs(event.clientX - this.pointerStartX);
     const deltaY = Math.abs(event.clientY - this.pointerStartY);
 
-    // Mark as swiping if movement exceeds a threshold
+    // Mark as swiping if movement exceeds a threshold and cancel the emit
     if (deltaX > 30 || deltaY > 30) {
       this.isSwiping = true;
-
-      // Cancel the timeout if swiping is detected
-      if (this.holdTimeoutId) {
-        clearTimeout(this.holdTimeoutId);
-        this.holdTimeoutId = null;
-      }
+      this.pressed = false;
+      this.clearTimers();
     }
   }
 
@@ -100,16 +95,7 @@ export class SvgBooleanButtonComponent implements DoCheck, OnDestroy {
     }
 
     this.pressed = false;
-
-    // Clear the interval if it was set
-    if (this.emitIntervalId) {
-      clearInterval(this.emitIntervalId);
-      this.emitIntervalId = null;
-    }
-    if (this.holdTimeoutId) {
-      clearTimeout(this.holdTimeoutId);
-      this.holdTimeoutId = null;
-    }
+    this.clearTimers();
   }
 
   private getColors(color: string): void {
