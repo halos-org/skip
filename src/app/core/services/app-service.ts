@@ -77,6 +77,7 @@ export class AppService {
   private _environmentMode = toSignal(this._data.subscribePath(this.MODE_PATH, 'default'));
 
   private previousEnvironmentMode: string | null = null;
+  private previousUseAutoNightMode = false;
 
   public readonly appVersion = signal<string>(packageInfo.version);
   public readonly browserVersion = signal<string>('Unknown');
@@ -99,30 +100,30 @@ export class AppService {
 
     effect(() => {
       const environmentMode = this._environmentMode();
+      const useAutoNightMode = this._useAutoNightMode();
 
       untracked(() => {
         if (!environmentMode) return;
         const mode = environmentMode.data.value;
-        if (this.previousEnvironmentMode === mode) return; // No change in mode
+        const modeChanged = this.previousEnvironmentMode !== mode;
+        const autoNightModeJustEnabled = useAutoNightMode && !this.previousUseAutoNightMode;
 
         this.previousEnvironmentMode = mode;
+        this.previousUseAutoNightMode = useAutoNightMode;
 
-        if (this._useAutoNightMode()) {
-          this.isNightMode.set(mode === "night");
-          this.toggleDayNightMode();
-        }
+        if (!useAutoNightMode) return;
+        if (!modeChanged && !autoNightModeJustEnabled) return;
+
+        this.isNightMode.set(mode === "night");
+        this.toggleDayNightMode();
       });
     });
 
     effect(() => {
-      const redNightMode = this._redNightMode();
+      this._redNightMode();
 
       untracked(() => {
-        if (redNightMode) {
-          this.toggleDayNightMode();
-        } else {
-          this.toggleDayNightMode();
-        }
+        this.toggleDayNightMode();
       });
     });
 
