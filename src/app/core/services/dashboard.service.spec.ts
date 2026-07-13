@@ -133,6 +133,23 @@ describe('DashboardService', () => {
       expect(service.activeDashboard()).toBe(0);
     });
 
+    it('defaults to 0 when the first NavigationEnd param is a finite but out-of-range index', () => {
+      setup();
+      router.setIdParam('9');
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(0);
+      // The rejected id is still logged once; the fallback to page 0 is silent.
+      expect(consoleError).toHaveBeenCalledTimes(1);
+    });
+
+    it('defaults to 0 when the first NavigationEnd param is a fractional index', () => {
+      setup();
+      router.setIdParam('1.5');
+      router.emitNavigationEnd();
+      expect(service.activeDashboard()).toBe(0);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+    });
+
     it('follows id param changes on later navigations', () => {
       setup();
       router.emitNavigationEnd();

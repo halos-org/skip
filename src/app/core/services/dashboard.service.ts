@@ -123,23 +123,30 @@ export class DashboardService {
       return;
     }
 
-    this.setActiveDashboardIndex(parsed);
+    // A finite but out-of-range or non-integer id (e.g. a stale /page/9 deep link)
+    // is rejected by setActiveDashboardIndex; on the initial (default-to-zero) path,
+    // land on page 0 rather than leaving the dashboard unset and rendering blank.
+    if (!this.setActiveDashboardIndex(parsed) && defaultToZero) {
+      this.setActiveDashboardIndex(0);
+    }
   }
 
   /**
    * Sets the active dashboard index in the service.
    * This only updates the internal state and does NOT trigger navigation or URL changes.
    * @param itemIndex The index of the dashboard to activate.
+   * @returns true if the index was valid and applied (or already active); false if rejected.
    */
-  public setActiveDashboardIndex(itemIndex: number): void {
-    if (itemIndex === this.activeDashboard()) return;
+  public setActiveDashboardIndex(itemIndex: number): boolean {
     // No change if the same dashboard is selected to prevent unnecessary cascading updates
+    if (itemIndex === this.activeDashboard()) return true;
 
     if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex < this.dashboards().length) {
       this.activeDashboard.set(itemIndex);
-    } else {
-      console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
+      return true;
     }
+    console.error(`[Dashboard Service] Invalid dashboard ID: ${itemIndex}`);
+    return false;
   }
 
   /**
