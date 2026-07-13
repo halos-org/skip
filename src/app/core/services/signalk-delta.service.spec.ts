@@ -489,6 +489,84 @@ describe('SignalKDeltaService', () => {
           { context: CTX, path: 'navigation.speedOverGround', meta: value },
         ]);
       });
+
+      it('drops a value whose update is missing $source without throwing', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const noSource = { timestamp: TS, values: [{ path: 'navigation.speedOverGround', value: 1 }] } as unknown as ISignalKUpdateMessage;
+        expect(() => parse(service, { context: CTX, updates: [noSource] })).not.toThrow();
+        expect(out).toEqual([]);
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
+      });
+
+      it('drops a value whose update is missing timestamp without throwing', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const noTs = { $source: 'src.1', values: [{ path: 'navigation.speedOverGround', value: 1 }] } as unknown as ISignalKUpdateMessage;
+        expect(() => parse(service, { context: CTX, updates: [noTs] })).not.toThrow();
+        expect(out).toEqual([]);
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
+      });
+
+      it('still emits a sibling update with a valid $source and timestamp when another update is invalid', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        const noSource = { timestamp: TS, values: [{ path: 'navigation.courseOverGround', value: 1 }] } as unknown as ISignalKUpdateMessage;
+        parse(service, { context: CTX, updates: [noSource, update([{ path: 'navigation.speedOverGround', value: 2 }])] });
+        expect(out).toEqual([
+          { context: CTX, path: 'navigation.speedOverGround', source: 'src.1', timestamp: TS, value: 2 },
+        ]);
+      });
+
+      it('warns once per update, not once per value, when a multi-value update lacks $source', () => {
+        const { service } = setup();
+        const out = collectData(service);
+        const notes: ISignalKDataValueUpdate[] = [];
+        service.subscribeNotificationsUpdates().subscribe(v => notes.push(v));
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const note = { path: 'notifications.mob', value: { state: 'alarm', message: 'MOB' } };
+        const noSource = { timestamp: TS, values: [
+          { path: 'navigation.speedOverGround', value: 1 },
+          { path: 'navigation.courseOverGround', value: 2 },
+          note,
+        ] } as unknown as ISignalKUpdateMessage;
+        parse(service, { context: CTX, updates: [noSource] });
+        expect(out).toEqual([]);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(notes).toEqual([note]);
+        warn.mockRestore();
+      });
+
+      it('drops a meta item whose path is missing without throwing', () => {
+        const { service } = setup();
+        const metas: IMeta[] = [];
+        service.subscribeMetadataUpdates().subscribe(v => metas.push(v));
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const meta = [{ value: { units: 'm/s', description: 'Speed over ground' } } as unknown as ISignalKMeta];
+        expect(() => parse(service, { context: CTX, updates: [update([], { meta })] })).not.toThrow();
+        expect(metas).toEqual([]);
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
+      });
+
+      it('still emits a sibling meta item with a valid path when another lacks one', () => {
+        const { service } = setup();
+        const metas: IMeta[] = [];
+        service.subscribeMetadataUpdates().subscribe(v => metas.push(v));
+        const sogMeta = { units: 'm/s', description: 'Speed over ground' };
+        const meta = [
+          { value: { units: 'rad', description: 'Latitude' } } as unknown as ISignalKMeta,
+          skMeta('navigation.speedOverGround', sogMeta),
+        ];
+        parse(service, { context: CTX, updates: [update([], { meta })] });
+        expect(metas).toEqual([
+          { context: CTX, path: 'navigation.speedOverGround', meta: sogMeta },
+        ]);
+      });
     });
   });
 });
