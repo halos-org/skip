@@ -2,8 +2,9 @@ import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementR
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Chart, ChartConfiguration, ChartDataset, Color, LegendItem, LineController, LineElement, LinearScale, PointElement, TimeScale, Tooltip, Legend } from 'chart.js';
+import { Chart, ChartConfiguration, ChartDataset, Color, LegendItem } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import { registerChartComponents } from '../../utils/chart-registration.util';
 import { IWidget } from '../../interfaces/widgets-interface';
 import { IKipSeriesDefinition } from '../../services/kip-series-api-client.service';
 import { isKipTemplateSeriesDefinition, type IKipConcreteSeriesDefinition, type IKipTemplateSeriesDefinition } from '../../contracts/kip-series-contract';
@@ -26,7 +27,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { FormsModule} from '@angular/forms';
 
-Chart.register(LineController, LineElement, LinearScale, PointElement, TimeScale, Tooltip, Legend);
+registerChartComponents();
 
 interface ChartPoint {
   x: number;

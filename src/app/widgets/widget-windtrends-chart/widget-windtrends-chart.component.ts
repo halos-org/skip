@@ -12,11 +12,11 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { ITheme } from '../../core/services/app-service';
 import { TimeScaleFormat } from '../../core/interfaces/dataset.interfaces';
 
-import { Chart, ChartConfiguration, ChartData, ChartType, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle, ChartArea, Scale, ChartTypeRegistry } from 'chart.js';
+import { Chart, ChartConfiguration, ChartData, ChartType, ChartArea, Scale, ChartTypeRegistry } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import ChartStreaming from '@aziham/chartjs-plugin-streaming';
+import { registerChartComponents } from '../../core/utils/chart-registration.util';
 
-Chart.register(ChartStreaming, TimeScale, LinearScale, LineController, PointElement, LineElement, Filler, Title, SubTitle);
+registerChartComponents();
 
 /** Windtrends plots two fixed wind paths (direction + speed) over the widget's configured window. */
 const WINDTRENDS_PERIOD = 30;

@@ -18,11 +18,13 @@ vi.mock('chart.js', () => {
   }
   return {
     Chart: MockChart,
+    registerables: [],
     TimeScale: {}, LinearScale: {}, LineController: {}, PointElement: {},
     LineElement: {}, Filler: {}, CategoryScale: {}
   };
 });
 vi.mock('chartjs-adapter-date-fns', () => ({}));
+vi.mock('chartjs-plugin-annotation', () => ({ default: {} }));
 vi.mock('@aziham/chartjs-plugin-streaming', () => ({ default: {} }));
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
