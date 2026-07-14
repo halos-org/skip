@@ -34,4 +34,29 @@ describe('UnitsService', () => {
 
     expect(service.getDefaults()).toEqual({ Speed: 'kph' });
   });
+
+  describe('getUnitDisplaySymbol', () => {
+    it('returns the dedicated display symbol for a measure', () => {
+      const service = setup({});
+      expect(service.getUnitDisplaySymbol('knots')).toBe('kn');
+      expect(service.getUnitDisplaySymbol('celsius')).toBe('°C');
+      expect(service.getUnitDisplaySymbol('kph')).toBe('km/h');
+      expect(service.getUnitDisplaySymbol('percent')).toBe('%');
+      expect(service.getUnitDisplaySymbol('latitudeMin')).toBe('lat ′');
+    });
+
+    it('falls back to the raw measure when it has no dedicated symbol', () => {
+      const service = setup({});
+      expect(service.getUnitDisplaySymbol('mph')).toBe('mph');
+      expect(service.getUnitDisplaySymbol('m/s')).toBe('m/s');
+    });
+
+    it('returns an unknown measure unchanged, and empty string for null/undefined/empty', () => {
+      const service = setup({});
+      expect(service.getUnitDisplaySymbol('not-a-unit')).toBe('not-a-unit');
+      expect(service.getUnitDisplaySymbol(null)).toBe('');
+      expect(service.getUnitDisplaySymbol(undefined)).toBe('');
+      expect(service.getUnitDisplaySymbol('')).toBe('');
+    });
+  });
 });

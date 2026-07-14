@@ -285,7 +285,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     g.title = this.displayName();
     g.minValue = scale.min;
     g.maxValue = scale.max;
-    g.units = cfg.paths?.['gaugePath']?.convertUnitTo;
+    g.units = this.unitsService.getUnitDisplaySymbol(cfg.paths?.['gaugePath']?.convertUnitTo);
     g.highlights = [];
     // Include initial highlights if already available (after view init effect will re-apply).
     const initialHl = this.highlights();

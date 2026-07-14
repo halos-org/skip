@@ -7,6 +7,7 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
 import { CanvasService } from '../../core/services/canvas.service';
+import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { States } from '../../core/interfaces/signalk-interfaces';
@@ -57,6 +58,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private readonly stream = inject(WidgetStreamsDirective);
 
   private readonly canvas = inject(CanvasService);
+  private readonly unitsService = inject(UnitsService);
   protected miniChart = viewChild(MinichartComponent);
   private canvasMainRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
 
@@ -284,10 +286,10 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
             this.cssHeight,
             0.1
           );
-          if (unit !== undefined && !['unitless', 'percent', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
+          if (unit !== undefined && !['unitless', 'percent', 'percentraw', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
             this.canvas.drawText(
               bitmapCtx,
-              unit,
+              this.unitsService.getUnitDisplaySymbol(unit),
               this.cssWidth - marginX,
               this.cssHeight - marginY,
               Math.floor(this.cssWidth * 0.25),

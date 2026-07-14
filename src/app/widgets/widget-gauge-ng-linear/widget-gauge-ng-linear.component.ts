@@ -272,7 +272,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     opt.needleStart = enableNeedle ? (isVertical ? 200 : 155) : -45;
     opt.needleEnd = enableNeedle ? (isVertical ? 175 : 180) : 55;
     opt.needleShadow = true; opt.needleSide = 'both';
-    opt.units = cfg.paths?.['gaugePath']?.convertUnitTo; opt.fontUnits = 'Roboto'; opt.fontUnitsWeight = 'normal';
+    opt.units = this.unitsService.getUnitDisplaySymbol(cfg.paths?.['gaugePath']?.convertUnitTo); opt.fontUnits = 'Roboto'; opt.fontUnitsWeight = 'normal';
     opt.borders = false; opt.borderOuterWidth = 0; opt.borderMiddleWidth = 0; opt.borderInnerWidth = 0; opt.borderShadowWidth = 0; opt.borderRadius = 0;
     // Value box
     opt.valueBox = true; opt.valueBoxWidth = 35; opt.valueBoxStroke = 0; opt.valueBoxBorderRadius = 10;

@@ -6,6 +6,7 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
 import { ITheme } from '../../core/services/app-service';
+import { UnitsService } from '../../core/services/units.service';
 
 // Default rolling window (seconds) for the wind-sector history; the single
 // source of truth for both the default config and the missing-value fallback.
@@ -159,6 +160,7 @@ export class WidgetWindComponent implements OnDestroy {
 
   public readonly runtime = inject(WidgetRuntimeDirective); // accessed in template
   private readonly stream = inject(WidgetStreamsDirective);
+  private readonly unitsService = inject(UnitsService);
 
   // Removed local registeredPaths guard; rely on WidgetStreamsDirective diff + idempotent observe() with stable callbacks
 
@@ -208,8 +210,8 @@ export class WidgetWindComponent implements OnDestroy {
       const cfg = this.runtime.options();
       if (!cfg) return;
       untracked(() => {
-        this.appWindSpeedUnit.set(cfg.paths['appWindSpeed'].convertUnitTo);
-        this.trueWindSpeedUnit.set(cfg.paths['trueWindSpeed'].convertUnitTo);
+        this.appWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths['appWindSpeed'].convertUnitTo));
+        this.trueWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths['trueWindSpeed'].convertUnitTo));
         this.registerStreams();
         this.stopWindSectors();
         this.startWindSectors();

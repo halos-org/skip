@@ -4,8 +4,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { WidgetWindComponent, computeTrueWindBaseAngle } from './widget-windsteer.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { UnitsService } from '../../core/services/units.service';
 import { IPathUpdate } from '../../core/services/data.service';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+
+const unitsServiceStub = { getUnitDisplaySymbol: (measure: string | null | undefined) => measure ?? '' };
 
 /**
  * Regression tests for #1066 / #1063.
@@ -76,7 +79,8 @@ describe('WidgetWindComponent live compass-mode toggle (#73)', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: WidgetRuntimeDirective, useValue: { options } },
-        { provide: WidgetStreamsDirective, useValue: streamsMock }
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
       ]
     });
 
@@ -124,7 +128,8 @@ describe('WidgetWindComponent true-wind sector source', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: WidgetRuntimeDirective, useValue: { options } },
-        { provide: WidgetStreamsDirective, useValue: streamsMock }
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
       ]
     });
     component = TestBed.runInInjectionContext(() => new WidgetWindComponent());

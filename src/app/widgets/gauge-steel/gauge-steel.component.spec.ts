@@ -16,6 +16,7 @@ describe('GaugeSteelComponent', () => {
           provide: UnitsService,
           useValue: {
             convertToUnit: (_unit: string, value: number) => value,
+            getUnitDisplaySymbol: (unit: string) => unit,
           },
         },
       ],

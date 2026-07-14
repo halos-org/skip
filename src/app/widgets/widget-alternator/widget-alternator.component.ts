@@ -811,7 +811,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
       return '-';
     }
 
-    return `${value.toFixed(1)} ${this.units.getDefaults().Temperature === 'celsius' ? '°C' : '°F'}`;
+    return `${value.toFixed(1)} ${this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature)}`;
   }
 
   private formatRevolutions(value: number | null | undefined): string {

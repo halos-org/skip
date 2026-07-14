@@ -219,8 +219,8 @@ exports[`strictNullChecks`] = {
       [44, 9, 9, "Type \'null\' is not assignable to type \'string\'.", "2966443234"],
       [148, 40, 27, "Object is possibly \'undefined\'.", "3506675417"]
     ],
-    "src/app/widgets/widget-gauge-ng-compass/widget-gauge-ng-compass.component.ts:1976286112": [
-      [235, 30, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
+    "src/app/widgets/widget-gauge-ng-compass/widget-gauge-ng-compass.component.ts:3154966941": [
+      [237, 30, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
     ],
     "src/app/widgets/widget-iframe/widget-iframe.component.ts:2602616758": [
       [30, 4, 9, "Type \'null\' is not assignable to type \'string | undefined\'.", "2966443234"]
@@ -238,14 +238,14 @@ exports[`strictNullChecks`] = {
     "src/app/widgets/widget-race-timer/widget-race-timer.component.ts:602896548": [
       [66, 25, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
     ],
-    "src/app/widgets/widget-racer-line/widget-racer-line.component.ts:1502528665": [
-      [61, 4, 5, "Type \'{ dtsPath: { description: string; path: string; source: string; pathType: \\"number\\"; pathRequired: false; isPathConfigurable: false; convertUnitTo: string; showPathSkUnitsFilter: true; pathSkUnitsFilter: \\"m\\"; sampleTime: number; }; ... 5 more ...; ttbPath: { ...; }; }\' is not assignable to type \'IPathArray | IWidgetPath[] | undefined\'.\\n  The types of \'startLineNamePath.convertUnitTo\' are incompatible between these types.\\n    Type \'null\' is not assignable to type \'string | undefined\'.", "187670523"],
-      [174, 10, 13, "Type \'null\' is not assignable to type \'string\'.", "363509612"],
-      [187, 34, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
-      [338, 4, 6, "Type \'string | null\' is not assignable to type \'string\'.\\n  Type \'null\' is not assignable to type \'string\'.", "2123913871"],
-      [342, 4, 6, "Type \'string | null\' is not assignable to type \'string\'.\\n  Type \'null\' is not assignable to type \'string\'.", "2123913871"],
-      [486, 25, 13, "Argument of type \'number | null\' is not assignable to parameter of type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "2241094794"],
-      [490, 25, 13, "Argument of type \'number | null\' is not assignable to parameter of type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "2926687684"]
+    "src/app/widgets/widget-racer-line/widget-racer-line.component.ts:1630258628": [
+      [63, 4, 5, "Type \'{ dtsPath: { description: string; path: string; source: string; pathType: \\"number\\"; pathRequired: false; isPathConfigurable: false; convertUnitTo: string; showPathSkUnitsFilter: true; pathSkUnitsFilter: \\"m\\"; sampleTime: number; }; ... 5 more ...; ttbPath: { ...; }; }\' is not assignable to type \'IPathArray | IWidgetPath[] | undefined\'.\\n  The types of \'startLineNamePath.convertUnitTo\' are incompatible between these types.\\n    Type \'null\' is not assignable to type \'string | undefined\'.", "187670523"],
+      [176, 10, 13, "Type \'null\' is not assignable to type \'string\'.", "363509612"],
+      [189, 34, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
+      [340, 4, 6, "Type \'string | null\' is not assignable to type \'string\'.\\n  Type \'null\' is not assignable to type \'string\'.", "2123913871"],
+      [344, 4, 6, "Type \'string | null\' is not assignable to type \'string\'.\\n  Type \'null\' is not assignable to type \'string\'.", "2123913871"],
+      [488, 25, 13, "Argument of type \'number | null\' is not assignable to parameter of type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "2241094794"],
+      [492, 25, 13, "Argument of type \'number | null\' is not assignable to parameter of type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "2926687684"]
     ],
     "src/app/widgets/widget-racer-timer/widget-racer-timer.component.ts:3969781521": [
       [96, 34, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
@@ -268,9 +268,9 @@ exports[`strictNullChecks`] = {
       [148, 8, 15, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4102914388"],
       [154, 29, 3, "\'cfg\' is possibly \'undefined\'.", "193415815"]
     ],
-    "src/app/widgets/widget-windsteer/widget-windsteer.component.ts:965751974": [
-      [210, 34, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
-      [211, 35, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"]
+    "src/app/widgets/widget-windsteer/widget-windsteer.component.ts:1696845112": [
+      [212, 73, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
+      [213, 74, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"]
     ],
     "src/app/widgets/widget-zones-state-panel/widget-zones-state-panel.component.ts:2501103102": [
       [78, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
