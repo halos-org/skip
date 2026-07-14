@@ -2,11 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, afterEach } from 'vitest';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { BehaviorSubject } from 'rxjs';
-import { SignalKConnectionService, IEndpointStatus } from './signalk-connection.service';
+import { EndpointStatus, SignalKConnectionService, IEndpointStatus } from './signalk-connection.service';
 import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 
 const CONNECTED_ENDPOINT: IEndpointStatus = {
-  operation: 2,
+  state: EndpointStatus.Connected,
   message: 'Connected',
   serverDescription: 'Signal K',
   httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -16,7 +16,7 @@ const VALUES_URL = 'http://localhost:3000/signalk/v2/api/history/values';
 
 class SignalKConnectionServiceStub {
   public serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({
-    operation: 0,
+    state: EndpointStatus.Disconnected,
     message: 'Not connected',
     serverDescription: null,
     httpServiceUrl: null,
@@ -60,7 +60,7 @@ describe('HistoryApiClientService', () => {
 
   it('should pass duration to history values endpoint', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -96,7 +96,7 @@ describe('HistoryApiClientService', () => {
 
   it('should fetch values from v2 history endpoint with resolution in seconds', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -132,7 +132,7 @@ describe('HistoryApiClientService', () => {
 
   it('should pass through string resolution without restriction', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -163,7 +163,7 @@ describe('HistoryApiClientService', () => {
 
   it('should pass duration query to history paths endpoint', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -187,7 +187,7 @@ describe('HistoryApiClientService', () => {
 
   it('should pass from/to query to history contexts endpoint', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -215,7 +215,7 @@ describe('HistoryApiClientService', () => {
 
   it('should pass numeric zero resolution when provided', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -246,7 +246,7 @@ describe('HistoryApiClientService', () => {
 
   it('should return null when history values endpoint returns 404 (plugin/API missing)', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -307,7 +307,7 @@ describe('HistoryApiClientService', () => {
 
   it('should return null when history paths endpoint returns 500', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -332,7 +332,7 @@ describe('HistoryApiClientService', () => {
 
   it('should return null when history contexts endpoint returns 500', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
@@ -354,7 +354,7 @@ describe('HistoryApiClientService', () => {
 
   it('should still preload history when endpoint is available', async () => {
     connectionStub.serverServiceEndpoint$.next({
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'Signal K',
       httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',

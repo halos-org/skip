@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { signal } from '@angular/core';
 import { AppComponent } from './app.component';
+import { ConnectionState, IConnectionStatus } from './core/services/connection-state-machine.service';
 import { AppNetworkInitService } from './core/services/app-initNetwork.service';
 import { DashboardService } from './core/services/dashboard.service';
 import { uiEventService } from './core/services/uiEvent.service';
@@ -16,6 +17,10 @@ interface AppComponentHotkeyApi {
   dashboardVisible: { set: (v: boolean) => void };
   handleKeyDown: (key: string, event: { shiftKey: boolean }) => void;
   onShellPointerDown: (event: { target: { closest: (sel: string) => unknown } }) => void;
+}
+
+interface AppComponentNotifyApi {
+  displayConnectionsStatusNotification: (status: IConnectionStatus) => void;
 }
 
 describe('AppComponent', () => {
@@ -68,6 +73,7 @@ describe('AppComponent', () => {
     chrome = { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() };
     toast = { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) };
     appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'none' });
+    appNetworkInitServiceStub.bootstrapStatus$.next('ready');
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],
@@ -128,6 +134,62 @@ describe('AppComponent', () => {
       action$.next();
 
       expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('connection status notifications', () => {
+    // Exercised through the private handler directly: mapping IConnectionStatus.state to the right
+    // toast is the behavior under test, and driving it through the real root ConnectionStateMachine
+    // would hinge on its retry timers and debounce. bootstrapStatus is 'ready', so
+    // silentDuringBootstrap is false.
+    function notify(state: ConnectionState, message = 'status message'): void {
+      const app = create() as unknown as AppComponentNotifyApi;
+      toast.show.mockClear();
+      app.displayConnectionsStatusNotification({ state, message, timestamp: new Date() });
+    }
+
+    it('shows a transient toast when disconnected', () => {
+      notify(ConnectionState.Disconnected, 'Not connected');
+      expect(toast.show).toHaveBeenCalledWith('Not connected', 5000, true);
+    });
+
+    it('warns while retrying the connection', () => {
+      notify(ConnectionState.WebSocketRetrying, 'Retrying');
+      expect(toast.show).toHaveBeenCalledWith('Retrying', 3000, false, 'warn');
+    });
+
+    it('shows a persistent toast on permanent failure', () => {
+      notify(ConnectionState.PermanentFailure, 'Gave up');
+      expect(toast.show).toHaveBeenCalledWith('Gave up', 0, false);
+    });
+
+    it('stays silent while connecting or connected', () => {
+      notify(ConnectionState.Connected, 'Connected');
+      expect(toast.show).not.toHaveBeenCalled();
+    });
+
+    it('silences the warn and permanent-failure toasts while the app is still bootstrapping', () => {
+      appNetworkInitServiceStub.bootstrapStatus$.next('starting');
+      const app = create() as unknown as AppComponentNotifyApi;
+      TestBed.tick();
+      toast.show.mockClear();
+
+      app.displayConnectionsStatusNotification({ state: ConnectionState.WebSocketRetrying, message: 'Retrying', timestamp: new Date() });
+      expect(toast.show).toHaveBeenCalledWith('Retrying', 3000, true, 'warn');
+
+      toast.show.mockClear();
+      app.displayConnectionsStatusNotification({ state: ConnectionState.PermanentFailure, message: 'Gave up', timestamp: new Date() });
+      expect(toast.show).toHaveBeenCalledWith('Gave up', 0, true);
+    });
+
+    it('reports an unrecognized state as an error toast', () => {
+      const app = create() as unknown as AppComponentNotifyApi;
+      toast.show.mockClear();
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      app.displayConnectionsStatusNotification({ state: 'Bogus' as ConnectionState, message: 'weird', timestamp: new Date() });
+      expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Unknown connection status'), 0, false, 'error');
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 

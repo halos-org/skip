@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { StorageService, IPatchFailure } from './storage.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
-import { SignalKConnectionService, IEndpointStatus } from './signalk-connection.service';
+import { EndpointStatus, SignalKConnectionService, IEndpointStatus } from './signalk-connection.service';
 import { AuthenticationService } from './authentication.service';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
 
@@ -276,12 +276,12 @@ class AuthStub {
   isLoggedIn$ = new BehaviorSubject<boolean>(false);
 }
 class ConnStub {
-  serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({ operation: 0 } as IEndpointStatus);
+  serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({ state: EndpointStatus.Disconnected } as IEndpointStatus);
   serverVersion$ = new BehaviorSubject<string | null>(null);
 }
 
-function endpoint(httpServiceUrl: string, operation = 2): IEndpointStatus {
-  return { operation, message: '', serverDescription: '', httpServiceUrl, WsServiceUrl: '' };
+function endpoint(httpServiceUrl: string, state: EndpointStatus = EndpointStatus.Connected): IEndpointStatus {
+  return { state, message: '', serverDescription: '', httpServiceUrl, WsServiceUrl: '' };
 }
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));

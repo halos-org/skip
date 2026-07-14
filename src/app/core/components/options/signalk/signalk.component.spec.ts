@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SettingsSignalkComponent } from './signalk.component';
-import { SignalKConnectionService } from '../../../services/signalk-connection.service';
-import { SignalKDeltaService } from '../../../services/signalk-delta.service';
+import { EndpointStatus, SignalKConnectionService } from '../../../services/signalk-connection.service';
+import { SignalKDeltaService, StreamStatus } from '../../../services/signalk-delta.service';
 
 describe('SettingsSignalkComponent', () => {
   let component: SettingsSignalkComponent;
@@ -34,7 +34,7 @@ describe('SettingsSignalkComponent', () => {
   it('updates the endpoint line on a same-reference status re-emit', () => {
     const connection = TestBed.inject(SignalKConnectionService);
     const status = {
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: 'Connected',
       serverDescription: 'signalk-server 2.5.0',
       httpServiceUrl: 'http://localhost:3000',
@@ -52,7 +52,7 @@ describe('SettingsSignalkComponent', () => {
 
   it('updates the stream line on a same-reference status re-emit', () => {
     const delta = TestBed.inject(SignalKDeltaService);
-    const status = { operation: 2, message: 'Connected' };
+    const status = { state: StreamStatus.Connected, message: 'Connected' };
     delta.streamEndpoint$.next(status);
     fixture.detectChanges();
     expect(statusText()).toContain('Connected');

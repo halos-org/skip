@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { SignalKDeltaService } from './signalk-delta.service';
 import { AuthenticationService } from './authentication.service';
-import { SignalKConnectionService } from './signalk-connection.service';
+import { EndpointStatus, SignalKConnectionService } from './signalk-connection.service';
 import { ConnectionStateMachine } from './connection-state-machine.service';
 import { ISignalKDeltaMessage, ISignalKUpdateMessage, ISignalKDataValueUpdate, ISignalKMeta, ISkMetadata } from '../interfaces/signalk-interfaces';
 import { IPathValueData, IMeta } from '../interfaces/app-interfaces';
@@ -14,7 +14,7 @@ class AuthStub {
 }
 
 class ConnStub {
-  serverServiceEndpoint$ = new BehaviorSubject<{ operation: number; WsServiceUrl?: string; subscribeAll?: boolean }>({ operation: 0 });
+  serverServiceEndpoint$ = new BehaviorSubject<{ state: EndpointStatus; WsServiceUrl?: string; subscribeAll?: boolean }>({ state: EndpointStatus.Disconnected });
   setServerInfo(): void { /* noop */ }
 }
 
@@ -63,7 +63,7 @@ describe('SignalKDeltaService', () => {
   describe('WebSocket URL', () => {
     it('never appends an auth token (the same-origin session cookie authenticates the upgrade)', () => {
       const { service, conn } = setup();
-      conn.serverServiceEndpoint$.next({ operation: 2, WsServiceUrl: 'wss://host/signalk/v1/stream', subscribeAll: false });
+      conn.serverServiceEndpoint$.next({ state: EndpointStatus.Connected, WsServiceUrl: 'wss://host/signalk/v1/stream', subscribeAll: false });
 
       const url = (service as unknown as DeltaInternals).buildWebSocketUrl();
       expect(url).not.toContain('token=');

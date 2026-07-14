@@ -5,7 +5,7 @@
 //
 exports[`strictNullChecks`] = {
   value: `{
-    "src/app/app.component.ts:2963952310": [
+    "src/app/app.component.ts:281943337": [
       [111, 19, 25, "Object is possibly \'undefined\'.", "255143637"]
     ],
     "src/app/core/components/dashboard/dashboard.component.ts:3995263170": [

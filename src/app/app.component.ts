@@ -9,7 +9,7 @@ import { Title } from '@angular/platform-browser';
 import { AuthenticationService } from './core/services/authentication.service';
 import { SettingsService } from './core/services/settings.service';
 import { SignalKDeltaService } from './core/services/signalk-delta.service';
-import { ConnectionStateMachine, IConnectionStatus } from './core/services/connection-state-machine.service';
+import { ConnectionState, ConnectionStateMachine, IConnectionStatus } from './core/services/connection-state-machine.service';
 import { GestureDirective } from './core/directives/gesture.directive';
 import { ChromeIntent, PageNavDirection, ScrollNavDirective } from './core/directives/scroll-nav.directive';
 import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
@@ -279,24 +279,27 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private displayConnectionsStatusNotification(connectionStatus: IConnectionStatus) {
     const message = connectionStatus.message;
     const silentDuringBootstrap = this.bootstrapStatus() !== 'ready';
-    switch (connectionStatus.operation) {
-      case 0:
+    switch (connectionStatus.state) {
+      case ConnectionState.Disconnected:
         this.toast.show(message, 5000, true);
         break;
-      case 1:
-      case 2:
+      case ConnectionState.HTTPDiscovering:
+      case ConnectionState.WebSocketConnecting:
+      case ConnectionState.HTTPConnected:
+      case ConnectionState.Connected:
+        // Transient/steady connecting states — no user-facing toast.
         break;
-      case 3:
+      case ConnectionState.HTTPError:
+      case ConnectionState.WebSocketError:
+      case ConnectionState.HTTPRetrying:
+      case ConnectionState.WebSocketRetrying:
         this.toast.show(message, 3000, silentDuringBootstrap, 'warn');
         break;
-      case 4:
-        this.toast.show(message, 3000, true, 'info');
-        break;
-      case 5:
+      case ConnectionState.PermanentFailure:
         this.toast.show(message, 0, silentDuringBootstrap);
         break;
       default:
-        console.error('[AppComponent] Unknown operation code:', connectionStatus.operation);
+        console.error('[AppComponent] Unknown connection state:', connectionStatus.state);
         this.toast.show(`Unknown connection status: ${connectionStatus.state}`, 0, silentDuringBootstrap, 'error');
     }
   }
