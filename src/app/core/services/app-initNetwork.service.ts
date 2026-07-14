@@ -7,7 +7,6 @@
 * All execution in this service delays app start. Keep code small and simple.
 **/
 import { inject, Injectable, OnDestroy } from '@angular/core';
-import { Router } from '@angular/router';
 import { IConfig, IConnectionConfig } from "../interfaces/app-settings.interfaces";
 import { SignalKConnectionService } from "./signalk-connection.service";
 import { AuthenticationService, ILoginStatus } from './authentication.service';
@@ -45,7 +44,6 @@ export class AppNetworkInitService implements OnDestroy {
   private readonly auth = inject(AuthenticationService);
   private readonly ssoRedirect = inject(SsoRedirectService);
   private readonly connectionStateMachine = inject(ConnectionStateMachine);
-  private readonly router = inject(Router);
   private readonly delta = inject(SignalKDeltaService); // Init to get data before app starts
   private readonly data = inject(DataService); // Init to get data before app starts
   private readonly storage = inject(StorageService); // Init to get data before app starts
@@ -196,27 +194,24 @@ export class AppNetworkInitService implements OnDestroy {
     } catch (error) {
       startupDegraded = true;
       if (error?.status === 0) {
-        this._bootstrapIssue$.next({ reason: 'network-unreachable', statusCode: 0 });
-      } else if (error?.status === 401) {
-        this._bootstrapIssue$.next({ reason: 'unauthorized', statusCode: 401 });
-      } else {
-        this._bootstrapIssue$.next({ reason: 'unknown', statusCode: error?.status });
-      }
-
-      if (error.status === 0) {
+        // Only after the HTTP retry cycle resolves do we know the accurate recovery message: a link
+        // that came back must not raise a "cannot reach the server" toast. Either way the bootstrap
+        // never completed (config not loaded), so recovery is offered in place — never a redirect (#190).
         const finalState = await this.waitForHttpRetryCompletion();
         if (finalState === ConnectionState.HTTPConnected || this.connectionStateMachine.isHTTPConnected()) {
-          console.warn('[AppInit Network Service] Initial connection recovered during retry cycle. Skipping fallback route.');
+          console.warn('[AppInit Network Service] Connection recovered during retry cycle but bootstrap did not complete; offering reload.');
+          this._bootstrapIssue$.next({ reason: 'unknown', statusCode: 0 });
         } else {
-          console.warn("[AppInit Network Service] Initialization failed after HTTP retries. Redirecting to settings page.");
-          await this.router.navigate(['/options']);
+          console.warn('[AppInit Network Service] Network unreachable after HTTP retries; offering in-place recovery (no redirect).');
+          this._bootstrapIssue$.next({ reason: 'network-unreachable', statusCode: 0 });
         }
-      } else if (error.status === 401) {
+      } else if (error?.status === 401) {
+        this._bootstrapIssue$.next({ reason: 'unauthorized', statusCode: 401 });
         console.warn("[AppInit Network Service] Initialization failed. Unauthorized access. Routing to re-authentication.");
         this.routeToReauth();
       } else {
-        console.warn("[AppInit Network Service] Initialization failed. Error: ", JSON.stringify(error));
-        await this.router.navigate(['/options']);
+        this._bootstrapIssue$.next({ reason: 'unknown', statusCode: error?.status });
+        console.warn("[AppInit Network Service] Initialization failed. Error: ", JSON.stringify(error), "— recovery offered in place (no redirect).");
       }
       console.warn('[AppInit Network Service] Startup continuing in degraded mode to allow UI feedback.');
       this._bootstrapStatus$.next('degraded');

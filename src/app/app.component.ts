@@ -75,6 +75,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   protected dashboardVisible = signal<boolean>(false);
   private missingConfigPromptShown = false;
   private authBlockedPromptShown = false;
+  private connectionErrorPromptShown = false;
 
   private readonly _hotkeyHandler = (key: string, event: KeyboardEvent) => this.handleKeyDown(key, event);
   private _lastPeekAt = Number.NEGATIVE_INFINITY;
@@ -188,6 +189,23 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       ref.onAction()
         .pipe(takeUntilDestroyed(this._destroyRef))
         .subscribe(() => this._ssoRedirect.manualSignIn());
+    });
+
+    // Bootstrap could not reach or load from the Signal K server: keep the user in place (no
+    // redirect to the legacy connectivity page, #190) and offer a persistent Retry that reloads.
+    effect(() => {
+      const issue = this.bootstrapIssue();
+      if ((issue.reason !== 'network-unreachable' && issue.reason !== 'unknown') || this.connectionErrorPromptShown) {
+        return;
+      }
+      this.connectionErrorPromptShown = true;
+      const message = issue.reason === 'network-unreachable'
+        ? 'Cannot reach the Signal K server. Check the connection, then retry.'
+        : 'Signal K server startup failed. Retry to reload the app.';
+      const ref = this.toast.show(message, 0, true, 'warn', 'Retry');
+      ref.onAction()
+        .pipe(takeUntilDestroyed(this._destroyRef))
+        .subscribe(() => this.settings.reloadApp());
     });
   }
 

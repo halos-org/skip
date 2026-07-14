@@ -8,6 +8,8 @@ import { DashboardService } from './core/services/dashboard.service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { AppService } from './core/services/app-service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
+import { ToastService } from './core/services/toast.service';
+import { SettingsService } from './core/services/settings.service';
 
 // Access the component's private surface without widening the class API.
 interface AppComponentHotkeyApi {
@@ -44,6 +46,7 @@ describe('AppComponent', () => {
     hide: ReturnType<typeof vi.fn>;
     pulsePeek: ReturnType<typeof vi.fn>;
   };
+  let toast: { show: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     dashboard = {
@@ -63,6 +66,8 @@ describe('AppComponent', () => {
     };
     appService = { toggleNightMode: vi.fn() };
     chrome = { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() };
+    toast = { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) };
+    appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'none' });
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],
@@ -72,6 +77,7 @@ describe('AppComponent', () => {
         { provide: uiEventService, useValue: uiEvent },
         { provide: AppService, useValue: appService },
         { provide: ChromeVisibilityService, useValue: chrome },
+        { provide: ToastService, useValue: toast },
       ],
     }).compileComponents();
   });
@@ -83,6 +89,46 @@ describe('AppComponent', () => {
 
   it('should create the app', () => {
     expect(create()).toBeTruthy();
+  });
+
+  describe('bootstrap recovery toast (#190)', () => {
+    it('offers a persistent Retry toast when the server is unreachable at bootstrap', () => {
+      create();
+      toast.show.mockClear();
+      appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'network-unreachable' });
+      TestBed.tick();
+
+      expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Cannot reach'), 0, true, 'warn', 'Retry');
+    });
+
+    it('offers a Retry toast on an unknown bootstrap failure', () => {
+      create();
+      toast.show.mockClear();
+      appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'unknown' });
+      TestBed.tick();
+
+      expect(toast.show).toHaveBeenCalledWith(expect.any(String), 0, true, 'warn', 'Retry');
+    });
+
+    it('does not show the recovery toast on a clean bootstrap', () => {
+      create();
+      toast.show.mockClear();
+      TestBed.tick();
+
+      expect(toast.show).not.toHaveBeenCalledWith(expect.any(String), 0, true, 'warn', 'Retry');
+    });
+
+    it('reloads the app via the settings seam when Retry is invoked', () => {
+      const action$ = new Subject<void>();
+      toast.show.mockReturnValue({ onAction: () => action$ });
+      const reloadSpy = vi.spyOn(TestBed.inject(SettingsService), 'reloadApp').mockImplementation(() => undefined);
+      create();
+      appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'network-unreachable' });
+      TestBed.tick();
+      action$.next();
+
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('consolidated hotkeys', () => {
