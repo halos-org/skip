@@ -15,12 +15,13 @@ import { MatButton } from '@angular/material/button';
 import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel, MatError } from '@angular/material/form-field';
 import { FormsModule } from '@angular/forms';
-import Chart from 'chart.js/auto';
+import { Chart } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { CanvasService } from '../../../services/canvas.service';
 import { InternetReachabilityService } from '../../../services/internet-reachability.service';
+import { registerChartComponents } from '../../../utils/chart-registration.util';
 
-
+registerChartComponents();
 
 /**
  * Signal K settings component for managing server connection configuration.

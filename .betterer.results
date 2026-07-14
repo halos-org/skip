@@ -71,11 +71,11 @@ exports[`strictNullChecks`] = {
       [54, 6, 17, "Object is possibly \'undefined\'.", "2944426029"],
       [55, 6, 17, "Object is possibly \'undefined\'.", "27783321"]
     ],
-    "src/app/core/components/options/signalk/signalk.component.ts:3082783318": [
-      [101, 10, 6, "Type \'null\' is not assignable to type \'Chart<keyof ChartTypeRegistry, (number | [number, number] | Point | BubbleDataPoint | null)[], unknown>\'.", "3491622934"],
-      [110, 45, 20, "Object is possibly \'undefined\'.", "235433357"],
-      [171, 28, 20, "Object is possibly \'undefined\'.", "235433357"],
-      [171, 28, 51, "Argument of type \'CanvasRenderingContext2D | null\' is not assignable to parameter of type \'ChartItem\'.\\n  Type \'null\' is not assignable to type \'ChartItem\'.", "38422540"]
+    "src/app/core/components/options/signalk/signalk.component.ts:2801402843": [
+      [102, 10, 6, "Type \'null\' is not assignable to type \'Chart<keyof ChartTypeRegistry, (number | [number, number] | Point | BubbleDataPoint | null)[], unknown>\'.", "3491622934"],
+      [111, 45, 20, "Object is possibly \'undefined\'.", "235433357"],
+      [172, 28, 20, "Object is possibly \'undefined\'.", "235433357"],
+      [172, 28, 51, "Argument of type \'CanvasRenderingContext2D | null\' is not assignable to parameter of type \'ChartItem\'.\\n  Type \'null\' is not assignable to type \'ChartItem\'.", "38422540"]
     ],
     "src/app/core/components/options/units/units.component.ts:2220224509": [
       [36, 19, 4, "Argument of type \'IUnit\' is not assignable to parameter of type \'never\'.", "2087995779"]

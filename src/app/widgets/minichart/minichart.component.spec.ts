@@ -20,7 +20,7 @@ vi.mock('chart.js', () => {
     Chart: MockChart,
     registerables: [],
     TimeScale: {}, LinearScale: {}, LineController: {}, PointElement: {},
-    LineElement: {}, Filler: {}, CategoryScale: {}
+    LineElement: {}, Filler: {}, Legend: {}, Tooltip: {}, Title: {}, SubTitle: {}, CategoryScale: {}
   };
 });
 vi.mock('chartjs-adapter-date-fns', () => ({}));
