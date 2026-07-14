@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { BehaviorSubject, Subject } from 'rxjs';
+import { signal, WritableSignal } from '@angular/core';
+import { Subject } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { INotification, INotificationInfo, NotificationsService } from './notifications.service';
 import { DataService } from './data.service';
@@ -46,7 +47,7 @@ function makeDelta(path: string, value: ISignalKNotification | null): ISignalKDa
 }
 
 describe('NotificationsService', () => {
-  let configSubject: BehaviorSubject<INotificationConfig>;
+  let configSignal: WritableSignal<INotificationConfig>;
   let notificationMsg$: Subject<ISignalKDataValueUpdate>;
   let notificationMeta$: Subject<IMeta>;
   let isReset$: Subject<boolean>;
@@ -54,15 +55,15 @@ describe('NotificationsService', () => {
   let service: NotificationsService;
 
   function setup(initialConfig: INotificationConfig = makeConfig()): void {
-    configSubject = new BehaviorSubject<INotificationConfig>(initialConfig);
+    configSignal = signal<INotificationConfig>(initialConfig);
     notificationMsg$ = new Subject<ISignalKDataValueUpdate>();
     notificationMeta$ = new Subject<IMeta>();
     isReset$ = new Subject<boolean>();
     putRequest = vi.fn().mockReturnValue(null);
 
     const settingsStub: Partial<SettingsService> = {
-      getNotificationServiceConfigAsO: () => configSubject.asObservable(),
-      getNotificationConfig: () => configSubject.value,
+      notificationConfig: configSignal,
+      getNotificationConfig: () => configSignal(),
     };
     const dataStub: Partial<DataService> = {
       getNotificationMsgObservable: () => notificationMsg$.asObservable(),
@@ -140,7 +141,8 @@ describe('NotificationsService', () => {
       notificationMsg$.next(makeDelta('notifications.ok', makeValue(States.Normal, [Methods.Visual, Methods.Sound])));
       expect(latestInfo().alarmCount).toBe(0);
 
-      configSubject.next(makeConfig({ showNormalState: true }));
+      configSignal.set(makeConfig({ showNormalState: true }));
+      TestBed.tick();
       expect(latestInfo().alarmCount).toBe(1);
     });
 
@@ -149,7 +151,8 @@ describe('NotificationsService', () => {
       notificationMsg$.next(makeDelta('notifications.fine', makeValue(States.Nominal, [Methods.Visual, Methods.Sound])));
       expect(latestInfo().alarmCount).toBe(0);
 
-      configSubject.next(makeConfig({ showNominalState: true }));
+      configSignal.set(makeConfig({ showNominalState: true }));
+      TestBed.tick();
       expect(latestInfo().alarmCount).toBe(1);
     });
 
@@ -323,7 +326,8 @@ describe('NotificationsService', () => {
       notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Emergency, [Methods.Visual, Methods.Sound])));
       expect(activeTrack()).toBe(1004);
 
-      configSubject.next(makeConfig({ disableSound: true }));
+      configSignal.set(makeConfig({ disableSound: true }));
+      TestBed.tick();
       expect(activeTrack()).toBe(1000);
 
       notificationMsg$.next(makeDelta('notifications.b', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
@@ -336,11 +340,22 @@ describe('NotificationsService', () => {
       setup();
       let observed: INotificationConfig | undefined;
       service.observeNotificationConfiguration().subscribe(c => observed = c);
-      expect(observed).toBe(configSubject.value);
+      expect(observed).toBe(configSignal());
 
       const next = makeConfig({ showNormalState: true });
-      configSubject.next(next);
+      configSignal.set(next);
+      TestBed.tick();
       expect(observed).toBe(next);
+    });
+
+    it('does not re-apply the seeded config on the effect first flush (reference guard)', () => {
+      setup();
+      let emissions = 0;
+      service.observeNotificationConfiguration().subscribe(() => emissions++);
+      // The seed applied once at construction; the effect first flush re-reads the same config and
+      // the reference guard must skip it — no duplicate config emission.
+      TestBed.tick();
+      expect(emissions).toBe(1);
     });
 
     it('disabling notifications clears the list and detaches the stream', () => {
@@ -348,7 +363,8 @@ describe('NotificationsService', () => {
       notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
       expect(latestNotifications()).toHaveLength(1);
 
-      configSubject.next(makeConfig({ disableNotifications: true }));
+      configSignal.set(makeConfig({ disableNotifications: true }));
+      TestBed.tick();
       expect(latestNotifications()).toHaveLength(0);
       expect(latestInfo()).toMatchObject({ audioSev: 0, visualSev: 0, alarmCount: 0 });
 
@@ -361,7 +377,8 @@ describe('NotificationsService', () => {
       notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
       expect(latestNotifications()).toHaveLength(0);
 
-      configSubject.next(makeConfig());
+      configSignal.set(makeConfig());
+      TestBed.tick();
       notificationMsg$.next(makeDelta('notifications.b', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
       expect(latestNotifications()).toHaveLength(1);
     });
