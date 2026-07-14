@@ -1,12 +1,12 @@
 ## Historical Widget Data
 
-KIP is primarily designed for live sailing data, but most numeric widgets can also show recent history — both as a pop-up history chart you open from a widget and as startup seeding for chart widgets, so they show recent trends immediately instead of starting empty.
+Skip is primarily designed for live sailing data, but most numeric widgets can also show recent history — both as a pop-up history chart you open from a widget and as startup seeding for chart widgets, so they show recent trends immediately instead of starting empty.
 
-History is served by an external **Signal K History API provider** — a server plugin such as `signalk-to-influxdb2` or `signalk-parquet`. KIP does not record or store data itself; it reads history from whatever provider your Signal K server runs. When no provider is available, KIP shows live data only, starting from when a widget was opened.
+History is served by an external **Signal K History API provider** — a server plugin such as `signalk-to-influxdb2` or `signalk-parquet`. Skip does not record or store data itself; it reads history from whatever provider your Signal K server runs. When no provider is available, Skip shows live data only, starting from when a widget was opened.
 
 See [History-API Provider](#/help/history-api.md) in the Integrations help menu for how to install and configure a provider.
 
-## What KIP Does With History
+## What Skip Does With History
 - Pre-seeds Data Chart and Wind Trends so they show recent trends immediately on open.
 - Provides a pop-up historical view for numeric-value widgets on your pages.
 
@@ -38,4 +38,4 @@ Most widgets that use numeric paths support history, including Horizon, Battery 
 
 ## Questions or Issues?
 - Refer to [History-API Provider](#/help/history-api.md) to install and configure a provider.
-- For general questions or issues, see the Contact-Us help page. The KIP community is active on Discord and GitHub.
+- For general questions or issues, see the Contact-Us help page. The Signal K community is active on Discord and GitHub.

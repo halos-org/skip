@@ -1,6 +1,6 @@
 ## Contributing Widgets
 
-KIP widgets are community-powered. If you need a widget that does not exist yet, you can request one from the community or build and contribute it.
+Skip widgets are community-powered. If you need a widget that does not exist yet, you can request one from the community or build and contribute it.
 
 ## For End Users
 
@@ -29,7 +29,7 @@ Developer references:
 2. Generate and implement the widget.
 3. Generate and implement the widget test when necessary.
 4. Add an svg icon
-5. Update README.md and KIP documentation with your plugin information.
+5. Update README.md and Skip documentation with your plugin information.
 6. Validate with lint/tests (ng lint/ng test).
 7. Submit a pull request with screenshots and a short behavior summary.
 

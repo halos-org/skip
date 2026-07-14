@@ -1,10 +1,10 @@
 ## Digital Switching, Node-RED, and PUT
 
-Use KIP digital switching controls when you want to do real actions from your dashboard, like turning devices on/off, changing levels, or selecting operating modes. This guide helps you choose the right Signal K path for Switch Panel, Slider, and Multi State Switch controls so they work reliably in daily use.
+Use Skip digital switching controls when you want to do real actions from your dashboard, like turning devices on/off, changing levels, or selecting operating modes. This guide helps you choose the right Signal K path for Switch Panel, Slider, and Multi State Switch controls so they work reliably in daily use.
 
-The focus here is practical KIP setup: what path type to use, what PUT support is needed, and how to avoid common configuration mistakes. This guide supports built-in server handlers, custom plugins, and Node-RED flows.
+The focus here is practical Skip setup: what path type to use, what PUT support is needed, and how to avoid common configuration mistakes. This guide supports built-in server handlers, custom plugins, and Node-RED flows.
 
-If you are new to Node-RED, start with this guide, then continue with **[Node-RED Control Flows for KIP Widgets (Beginner Guide)](#/help/nodered-control-flows.md)** for beginner flow examples.
+If you are new to Node-RED, start with this guide, then continue with **[Node-RED Control Flows for Skip Widgets (Beginner Guide)](#/help/nodered-control-flows.md)** for beginner flow examples.
 
 ## What PUT Does (and Does Not Do)
 
@@ -15,13 +15,13 @@ PUT writes a value to a Signal K path. By itself, that write does not trigger ha
 Examples of server-side handlers:
 - A built-in server handler
 - A Signal K plugin (see Popular Digital Switching Plugins)
-- A Node-RED flow (see Node-RED Control Flows for KIP Widgets - Beginner Guide)
+- A Node-RED flow (see Node-RED Control Flows for Skip Widgets - Beginner Guide)
 
 ## Basic Requirements
 
 Check these basics first:
 
-1. For security reasons, KIP must be authenticated against Signal K for the server to accept PUTs.
+1. For security reasons, Skip must be authenticated against Signal K for the server to accept PUTs.
 2. The target path must exist in Signal K and have metadata matching the digital switching widget type.
 3. For control widgets that send commands, the path metadata must report that PUT Support is enabled.
 4. The appropriate server-side handler must be present to react to value changes and control the targeted hardware.
@@ -56,7 +56,7 @@ Follow these steps in order:
 3. If using Node-RED, include a Signal K **put handler** node in your flow so widget commands are received.
 4. Confirm path exists in Data Inspector.
 5. Confirm type and PUT support are compatible with widget/control type.
-6. Configure the widget in KIP.
+6. Configure the widget in Skip.
 7. Trigger the control and verify the value changes in Data Inspector.
 8. Validate the server-side handler executes the expected real-world action.
 
@@ -96,6 +96,6 @@ If something does not work, check these first.
 
 Use these guides next as needed.
 
-- **Node-RED beginners:** [Node-RED Control Flows for KIP Widgets (Beginner Guide)](#/help/nodered-control-flows.md)
+- **Node-RED beginners:** [Node-RED Control Flows for Skip Widgets (Beginner Guide)](#/help/nodered-control-flows.md)
 - **Path discovery and validation:** [Data Inspector](#/help/datainspector.md)
 - **Widget overview and placement:** [Pages and Layout](#/help/dashboards.md)

@@ -1,8 +1,8 @@
 # Online Community Content
 
-> Want to contribute a video or resource? Share your links by [submitting a PR to this page](https://github.com/mxtommy/Kip/blob/master/src/assets/help-docs/community.md), use the [KIP Discord channel](https://discord.gg/AMDYT2DQga) or open a [GitHub issue](https://github.com/mxtommy/Kip/issues)**!
+> Want to contribute a video or resource? Share your links by [submitting a PR to this page](https://github.com/halos-org/skip/blob/main/src/assets/help-docs/community.md), use the upstream [Kip Discord channel](https://discord.gg/AMDYT2DQga) or open a [GitHub issue](https://github.com/halos-org/skip/issues)**!
 
-Explore KIP in action and learn from the community. Below are curated videos, creator channels, and related ecosystem resources.
+Explore Skip in action and learn from the community. Below are curated videos, creator channels, and related ecosystem resources.
 
 ## Community Video Library
 Curated videos created by community members. Ordered to highlight broad onboarding value first.
@@ -19,7 +19,7 @@ Improve or add entries: PR or Discord #showcase.
 
 
 ## Authors & Channels
-Creator channels producing helpful KIP or Signal K related content.
+Creator channels producing helpful Kip or Signal K related content.
 
 ### Boating with the Baileys
 - Channel: https://www.youtube.com/@BoatingwiththeBaileys
@@ -55,7 +55,7 @@ Open a PR or post in Discord #showcase with:
 
 ## More Community Resources
 
-- [Signal K Home page](https://signalk.org/) — The open marine data standard powering KIP
+- [Signal K Home page](https://signalk.org/) — The open marine data standard powering Skip
 - [Signal K Discord](https://discord.com/invite/uuZrwz4dCS) — Live chat server: questions, support, contribute and collaborate
 - [Signal K GitHub Project](https://github.com/SignalK) — Feature requests, bug reports, and feedback
 - [SensESP](https://signalk.org/SensESP/) — A Signal K sensor development toolkit for the ESP32 platform

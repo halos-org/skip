@@ -1,6 +1,6 @@
 ## Harness the Power of Data State Notifications
 
-Stay informed about your vessel’s data with Signal K’s state notifications. For example, Signal K can flag certain sensor readings—such as depth or temperature—when they reach critical levels. KIP can then visually or audibly alert you. For instance, if the depth drops to 3 meters or less, KIP can highlight this with a warning sound or visual cue. This powerful feature combines **Zones Configuration** and **Notification Methods** in Signal K.
+Stay informed about your vessel’s data with Signal K’s state notifications. For example, Signal K can flag certain sensor readings—such as depth or temperature—when they reach critical levels. Skip can then visually or audibly alert you. For instance, if the depth drops to 3 meters or less, Skip can highlight this with a warning sound or visual cue. This powerful feature combines **Zones Configuration** and **Notification Methods** in Signal K.
 
 
 ## Zones & Notification Configuration
@@ -8,21 +8,21 @@ Stay informed about your vessel’s data with Signal K’s state notifications. 
 **Zones** are value ranges defined as metadata for each data path. Learn more at the [Signal K Metadata documentation](https://signalk.org/specification/1.7.0/doc/data_model_metadata.html).  
 To configure metadata in Signal K, visit the [Data Browser server page](/../../admin/#/databrowser) and enable the **Meta Data** switch. Here, you can add or edit **methods** and **zones** for any path you want to monitor.
 
-> **Note:** Zone values use base units (e.g., wind speed in meters per second). Define your zone ranges using the base unit for each path. KIP will automatically convert and display these values according to your widget’s unit settings.
+> **Note:** Zone values use base units (e.g., wind speed in meters per second). Define your zone ranges using the base unit for each path. Skip will automatically convert and display these values according to your widget’s unit settings.
 
 For more details on path units, see the [Keys Reference (Vessel)](https://signalk.org/specification/1.7.0/doc/vesselsBranch.html) and [Keys Reference (Other)](https://signalk.org/specification/1.7.0/doc/otherBranches.html).
 
-As path values move between zone ranges, Signal K generates a notification sent to KIP. Each notification includes a state (severity), optional presentation methods (visual and/or sound), and an optional message.
+As path values move between zone ranges, Signal K generates a notification sent to Skip. Each notification includes a state (severity), optional presentation methods (visual and/or sound), and an optional message.
 
 
 ### Zone State and Method Guidance
 
 - The **Nominal** and **Emergency** zones are special-purpose zones and should not be used.
 - You do **not** need to configure a **Normal** zone; it is the default when no other zone matches.
-- KIP displays a notification in the Notifications menu for all zone states that include the **visual** method, except for the **Normal** and **Nominal** zones. Excluding the **visual** method for a zone does not prevent supporting widgets from displaying zones. This can be achieved by configuring individual widgets to ignore zones settings.
-- KIP emits audio prompts for all zone states that include the **sound** method, except for the **Normal** and **Nominal** zones.
-- KIP uses predefined, state specific sound files.
-- You can configure KIP to globally ignore audio prompts in **Settings > Notifications**; this applies globally to all notifications and paths.
+- Skip displays a notification in the Notifications menu for all zone states that include the **visual** method, except for the **Normal** and **Nominal** zones. Excluding the **visual** method for a zone does not prevent supporting widgets from displaying zones. This can be achieved by configuring individual widgets to ignore zones settings.
+- Skip emits audio prompts for all zone states that include the **sound** method, except for the **Normal** and **Nominal** zones.
+- Skip uses predefined, state specific sound files.
+- You can configure Skip to globally ignore audio prompts in **Settings > Notifications**; this applies globally to all notifications and paths.
 
 >**Tips:**
 >1. You don’t need zones for every path.
@@ -39,7 +39,7 @@ You can **Silence** or **Resolve** notifications.
 - Manually resolving a notification tells Signal K to treat the current value as **Normal** until a new value is received. **Normal** zones method have no visual and sound methods defined.
 
 **Important:**  
-- Signal K and KIP do **not** persist data through power cycles. If a device is off when Signal K starts, no value or notification will be present until then device is powered on and it sends data.
+- Signal K and Skip do **not** persist data through power cycles. If a device is off when Signal K starts, no value or notification will be present until then device is powered on and it sends data.
 - If you turn off a device, then resolve its last notification, it will remain resolved until the device is powered back on and sends new data.
 - Different devices send data at different intervals—some multiple times per second, others as infrequently as once per day. Check your device or plugin documentation for details. Once a notification is silenced or resolved, it will stay in this state until a new value is received and evaluated.
 
@@ -68,7 +68,7 @@ You can **Silence** or **Resolve** notifications.
 
   #### Quick setup
   1. In Signal K **Data Browser**, enable **Meta Data** and add **zones** (and optional **methods/messages**) for the paths you care about.
-  2. In KIP, add a **Zones State Panel** widget to a systems page.
+  2. In Skip, add a **Zones State Panel** widget to a systems page.
   3. Configure each panel/control with the paths you want to monitor.
   4. Optionally hide the widget label (useful for compact “status strip” pages).
 
@@ -78,8 +78,8 @@ You can **Silence** or **Resolve** notifications.
   Widgets such as **Numeric**, **Simple Linear**, **Linear**, **Radial**, and **Steel Style** visually highlight relevant data ranges according to their configured zones and integrate notification states into their display. You can configure each widget to ignore zones if desired.
 
 
-## KIP Notification Configuration Override
+## Skip Notification Configuration Override
 
 In **Settings > Notifications**, you can customize which notification states are displayed and enable or disable audio prompts to suit your preferences.
 
-> **Note:** Muting all notifications will also mute other KIP system sounds, such as those played when KIP connects to or disconnects from Signal K, not just zone-related alerts.
+> **Note:** Muting all notifications will also mute other Skip system sounds, such as those played when Skip connects to or disconnects from Signal K, not just zone-related alerts.

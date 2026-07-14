@@ -1,12 +1,12 @@
 ## Raspberry Pi Kiosk Mode (Chromium)
 
-This guide launches Chromium in kiosk mode to display KIP at:
+This guide launches Chromium in kiosk mode to display Skip at:
 http://<sk_server_IP>:3000/@halos-org/skip/#/page/0
 
 It supports Raspberry Pi OS Bullseye (X11/LXDE) and Bookworm (Wayland).
 
 ## What is “kiosk mode”?
-Kiosk mode runs a single application full-screen and suppresses most desktop UI. In this guide, Chromium loads KIP and stays on screen like a dedicated instrument display.
+Kiosk mode runs a single application full-screen and suppresses most desktop UI. In this guide, Chromium loads Skip and stays on screen like a dedicated instrument display.
 
 - What it does:
   - Launches Chromium full-screen without toolbars (“chrome”).
@@ -53,7 +53,7 @@ Paste:
 #!/usr/bin/env bash
 set -euo pipefail
 
-# URL for KIP (adjust as needed)
+# URL for Skip (adjust as needed)
 URL="${URL:-http://<sk_server_IP>:3000/@halos-org/skip/#/page/0}"
 
 # Pick Chromium binary
@@ -140,7 +140,7 @@ Paste:
 ```ini
 [Desktop Entry]
 Type=Application
-Name=KIP Kiosk
+Name=Skip Kiosk
 Exec=/home/pi/kiosk.sh
 Terminal=false
 X-GNOME-Autostart-enabled=true
@@ -161,7 +161,7 @@ Paste:
 
 ```ini
 [Unit]
-Description=KIP Chromium Kiosk
+Description=Skip Chromium Kiosk
 After=graphical-session.target network-online.target
 Wants=network-online.target
 
@@ -203,6 +203,6 @@ http://<sk_server_IP>:3000/@halos-org/skip/#/page/0
 
 - Blank screen on Bookworm: confirm Screen Blanking is disabled in raspi-config (Wayland ignores xset).
 - Chromium not found: install package `chromium-browser` or `chromium` (varies by OS version).
-- Wrong URL: KIP is served under /@halos-org/skip/. Ensure the full path is used.
+- Wrong URL: Skip is served under /@halos-org/skip/. Ensure the full path is used.
 - Certificates: prefer HTTP or trusted TLS. Avoid `--ignore-certificate-errors` in kiosk.
 - systemd service not starting: check `journalctl --user -u kiosk.service -f

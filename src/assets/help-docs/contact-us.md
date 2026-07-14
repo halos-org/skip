@@ -1,10 +1,10 @@
 ## Get in Touch
 
-We’d love to hear from you. The KIP community is active and friendly—whether you are just getting started, troubleshooting an installation, or brainstorming a new idea.
+We’d love to hear from you. The Skip community is active and friendly—whether you are just getting started, troubleshooting an installation, or brainstorming a new idea.
 
-👉 **Chat with the community in the [KIP Discord channel](https://discord.gg/AMDYT2DQga).**
+👉 **Chat with the community in the upstream [Kip Discord channel](https://discord.gg/AMDYT2DQga).**
 
-Use Discord for quick questions, sharing dashboards, comparing hardware setups, and learning how others integrate KIP with Signal K.
+Use Discord for quick questions, sharing dashboards, comparing hardware setups, and learning how others integrate Skip with Signal K.
 
 
 ## When to Use GitHub Issues
@@ -15,7 +15,7 @@ Please open a GitHub issue anytime you:
 - Notice incorrect documentation
 - Have a reproducible performance or stability problem
 
-🔗 **Create or review issues here: [KIP GitHub Issues](https://github.com/mxtommy/Kip/issues)**
+🔗 **Create or review issues here: [Skip GitHub Issues](https://github.com/halos-org/skip/issues)**
 
 Before creating a new issue:
 1. Use the search box to see if it already exists (add keywords like the widget name, setting, or error text).
@@ -25,7 +25,7 @@ Before creating a new issue:
 Provide clear, specific details so we can reproduce and fix the problem faster:
 - What you expected vs. what happened
 - Steps to reproduce (numbered list if possible)
-- KIP version (see About / build info) and deployment method (e.g. Signal K app store, manual build)
+- Skip version (see About / build info) and deployment method (e.g. Signal K app store, manual build)
 - Signal K server version
 - Browser + version (e.g. Firefox 128, Chrome 129, Safari 18)
 - Relevant widget(s) or data paths (e.g. `navigation.speedOverGround`)
@@ -57,6 +57,6 @@ If something critical slips through, feel free to politely bump the issue after 
 
 
 ## Thank You
-Your feedback, curiosity, and ideas directly shape KIP. Whether it’s a tiny typo fix or a major feature concept—every contribution moves the project forward.
+Your feedback, curiosity, and ideas directly shape Skip. Whether it’s a tiny typo fix or a major feature concept—every contribution moves the project forward.
 
 Fair winds, and happy hacking.
