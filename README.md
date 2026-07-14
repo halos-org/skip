@@ -22,7 +22,7 @@ Skip is designed for sailors and boaters who want:
 - A **modern, polished interface** optimized for marine displays.
 - **Touch-optimized design**: touch-first, intuitive design for tablets, phones, and other touch-enabled devices.
 - **Cross-platform support**: runs on phones, tablets, laptops, Raspberry Pi, Web Enabled TV or other fixed displays - anywhere you can run a web browser.
-- **Instant access to all Signal K data**: displays gauges, charts, switches, and other widgets right out of the box.
+- **Instant access to all Signal K data**: displays gauges, plots, switches, and other widgets right out of the box.
 - **Flexible dashboards**: customize layouts, drag-and-drop widgets, night/day mode, kiosk/fullscreen and remote control support.
 
 With Skip, you get the **familiar feel of professional Multi-Function Displays** combined with the flexibility of Signal K. It’s simple, reliable, and highly usable — a modern, touch-first Multi-Function Display for [Signal K](https://signalk.org) vessels.
@@ -115,7 +115,7 @@ All Skip widgets are visual presentation controls that are very versatile, with 
 - **AC/DC Charger**- Monitor charging performance at a glance with a compact AC/DC Charger Widget. View single or multiple chargers with charge mode, voltage, current, power and temperature. Chargers are discovered automatically.
 - **Freeboard-SK** – Adds the Freeboard-SK chart plotter as a widget with automatic sign-in.
 - **Autopilot Head** – Typical autopilot controls for compatible Signal K Autopilot devices.
-- **Realtime Data Chart** – Visualizes data on a real-time chart with actuals, averages, and min/max.
+- **Realtime Data Plot** – Visualizes data on a real-time plot with actuals, averages, and min/max.
 - **AIS Radar**: Display AIS targets with range rings, interactive target details, and quick zoom and filtering controls.
 - **Embed Webpage Viewer** – Embeds external web apps (Grafana, Node-RED, etc.) into your dashboard.
 - **Racesteer** – Race steering display fusing polar performance data with live conditions for optimal tactics.
@@ -139,7 +139,7 @@ Grafana integration with other widgets
 ![Embedded Webpage Concept Image](./images/KipGaugeSample3-1024x508.png)
 
 ## Historical Data
-Skip charts recent history for your numeric data by reading it from an external Signal K History API provider (such as `signalk-to-influxdb2` or `signalk-parquet`). Press and hold (long-press) a widget to open its history dialog, or use a Realtime Data Chart or Wind Trends widget to see recent trends. Skip does **not** record or store data itself — the detail and time span available depend on whatever provider your Signal K server runs, and charts show live data only when no provider is present. See the [History-API Provider](src/assets/help-docs/history-api.md) help file for setup.
+Skip plots recent history for your numeric data by reading it from an external Signal K History API provider (such as `signalk-to-influxdb2` or `signalk-parquet`). Press and hold (long-press) a widget to open its history dialog, or use a Realtime Data Plot or Wind Trends widget to see recent trends. Skip does **not** record or store data itself — the detail and time span available depend on whatever provider your Signal K server runs, and plots show live data only when no provider is present. See the [History-API Provider](src/assets/help-docs/history-api.md) help file for setup.
 
 ## Night Modes
 Keep your night vision with automatic or manual day and night switching to a color preserving dim mode or an all Red theme. The images below look very dark, but at night... they are perfect!
@@ -175,7 +175,7 @@ Typical complementary components you may install (most are often bundled with Si
 - **Node‑RED** – Low‑code, flow‑based wiring of devices, APIs, online services, and custom logic (alert escalation, device control automation, data enrichment, protocol bridging).
 
 **Data Storage & Analytics**
-- **InfluxDB / other TSDB** – High‑resolution historical storage of sensor & performance metrics beyond what lightweight widget charts should retain.
+- **InfluxDB / other TSDB** – High‑resolution historical storage of sensor & performance metrics beyond what lightweight widget plots should retain.
 - **Grafana** – Rich exploratory / comparative dashboards, ad‑hoc queries, alert rules on stored metrics, correlation across heterogeneous data sources.
 
 ## Harness the Power of Data State Notifications
@@ -191,7 +191,7 @@ Please ensure you submit an issue (bug/feature) before submitting a pull request
 What Skip IS about:
 - Real‑time presentation of vessel & environment data (navigation, performance, systems) pulled from Signal K.
 - Fast, legible, touchscreen‑friendly dashboards for underway decision making.
-- Configurable widgets (gauges, charts, timers, controls) tuned for sailing operations.
+- Configurable widgets (gauges, plots, timers, controls) tuned for sailing operations.
 
 What Skip deliberately IS NOT trying to become:
 - A full data lake / long‑term time‑series historian.

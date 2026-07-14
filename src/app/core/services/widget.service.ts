@@ -156,7 +156,7 @@ export class WidgetService {
   private readonly _widgetDefinition: readonly WidgetDescription[] = [
     {
       name: 'Numeric',
-      description: 'Displays numeric data in a clear and concise format, with options to show minimum and/or maximum recorded values. Includes an optional background minichart for quick visual trend insights.',
+      description: 'Displays numeric data in a clear and concise format, with options to show minimum and/or maximum recorded values. Includes an optional background mini plot for quick visual trend insights.',
       icon: 'numericWidget',
       minWidth: 1,
       minHeight: 2,
@@ -481,8 +481,8 @@ export class WidgetService {
       componentClassName: 'WidgetAutopilotComponent'
     },
     {
-      name: 'Realtime Data Chart',
-      description: 'Visualizes data on a real-time chart with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the KIP Dataset to be configured.',
+      name: 'Realtime Data Plot',
+      description: 'Visualizes data on a real-time plot with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the KIP Dataset to be configured.',
       icon: 'datachartWidget',
       minWidth: 2,
       minHeight: 3,
