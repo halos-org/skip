@@ -43,41 +43,57 @@ describe('SvgBooleanButtonComponent momentary emit', () => {
     vi.clearAllMocks();
   });
 
-  it('actuates after the short hold, not before', () => {
+  it('emits immediately on press, with no hold delay', () => {
     setup();
     vi.useFakeTimers();
 
+    // The hold-timeout path is gone: the emit fires synchronously on press-down,
+    // before any timer can advance.
     component.handleClickDown(pointerAt(10, 10));
-    expect(emitted).toHaveLength(0);
-    vi.advanceTimersByTime(74);
-    expect(emitted).toHaveLength(0);
 
-    vi.advanceTimersByTime(1);
     expect(emitted).toHaveLength(1);
     expect(emitted[0].value).toBe(true);
   });
 
-  it('does not actuate when a swipe cancels within the hold window', () => {
+  it('stops emitting once a swipe is detected', () => {
     setup();
     vi.useFakeTimers();
 
     component.handleClickDown(pointerAt(10, 10));
-    // A scroll/swipe crossing the threshold before the hold elapses must suppress actuation entirely.
+    expect(emitted).toHaveLength(1);
+
+    // A scroll/swipe crossing the threshold cancels the repeat, so no further emits arrive.
     component.handlePointerMove(pointerAt(60, 12));
     vi.advanceTimersByTime(500);
 
-    expect(emitted).toHaveLength(0);
+    expect(emitted).toHaveLength(1);
   });
 
-  it('does not actuate on a quick tap released within the hold window', () => {
+  it('stops emitting once a vertical swipe is detected', () => {
     setup();
     vi.useFakeTimers();
 
     component.handleClickDown(pointerAt(10, 10));
-    component.handleClickUp();
+    expect(emitted).toHaveLength(1);
+
+    // Vertical scroll: deltaX=2 stays under threshold, deltaY=50 crosses it and cancels the repeat.
+    component.handlePointerMove(pointerAt(12, 60));
     vi.advanceTimersByTime(500);
 
-    expect(emitted).toHaveLength(0);
+    expect(emitted).toHaveLength(1);
+  });
+
+  it('keeps repeating when movement stays below the swipe threshold', () => {
+    setup();
+    vi.useFakeTimers();
+
+    component.handleClickDown(pointerAt(10, 10));
+    // 25px/5px move — under the 30px threshold, so it must not cancel.
+    component.handlePointerMove(pointerAt(35, 15));
+
+    vi.advanceTimersByTime(100);
+    expect(emitted).toHaveLength(2);
+    expect(emitted[1].value).toBe(true);
   });
 
   it('repeats every 100ms while held', () => {
@@ -85,7 +101,6 @@ describe('SvgBooleanButtonComponent momentary emit', () => {
     vi.useFakeTimers();
 
     component.handleClickDown(pointerAt(10, 10));
-    vi.advanceTimersByTime(75);
     expect(emitted).toHaveLength(1);
 
     vi.advanceTimersByTime(100);
@@ -94,25 +109,11 @@ describe('SvgBooleanButtonComponent momentary emit', () => {
     expect(emitted).toHaveLength(3);
   });
 
-  it('keeps the press when movement stays below the swipe threshold', () => {
-    setup();
-    vi.useFakeTimers();
-
-    component.handleClickDown(pointerAt(10, 10));
-    // 25px/5px move — under the 30px threshold, so it must not cancel.
-    component.handlePointerMove(pointerAt(35, 15));
-    vi.advanceTimersByTime(75);
-
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0].value).toBe(true);
-  });
-
   it('stops repeating once the pointer is released', () => {
     setup();
     vi.useFakeTimers();
 
     component.handleClickDown(pointerAt(10, 10));
-    vi.advanceTimersByTime(75);
     expect(emitted).toHaveLength(1);
 
     // A lifted finger clears the repeat interval, so actuation stops.

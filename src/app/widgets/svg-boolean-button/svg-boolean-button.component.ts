@@ -21,8 +21,6 @@ export class SvgBooleanButtonComponent implements DoCheck, OnDestroy {
   private toggleOn = "0 0 180 35";
   private oldTheme: ITheme | null = null;
 
-  private static readonly HOLD_DELAY_MS = 75;
-  private holdTimeoutId: ReturnType<typeof setTimeout> | null = null; // brief hold before actuating; a swipe cancels it
   private emitIntervalId: ReturnType<typeof setInterval> | null = null; // repeating emit while pressed
   private pressed = false;
   private isSwiping = false;
@@ -61,18 +59,14 @@ export class SvgBooleanButtonComponent implements DoCheck, OnDestroy {
     const data = this.data();
     if (!data) return;
 
-    // Brief hold before actuating so a swipe/scroll starting on the button cancels before any emit.
-    this.holdTimeoutId = setTimeout(() => {
-      this.holdTimeoutId = null;
-      if (this.isSwiping) return;
-      this.pressed = true;
-      const state: IDynamicControl = cloneDeep(data);
-      state.value = this.pressed;
+    // Emit on press for low control latency; a swipe later resets pressed and clears the repeat.
+    this.pressed = true;
+    const state: IDynamicControl = cloneDeep(data);
+    state.value = this.pressed;
+    this.toggleClick.emit(state);
+    this.emitIntervalId = setInterval(() => {
       this.toggleClick.emit(state);
-      this.emitIntervalId = setInterval(() => {
-        this.toggleClick.emit(state);
-      }, 100);
-    }, SvgBooleanButtonComponent.HOLD_DELAY_MS);
+    }, 100);
   }
 
   public handlePointerMove(event: PointerEvent): void {
@@ -151,10 +145,6 @@ export class SvgBooleanButtonComponent implements DoCheck, OnDestroy {
   }
 
   private clearTimers(): void {
-    if (this.holdTimeoutId) {
-      clearTimeout(this.holdTimeoutId);
-      this.holdTimeoutId = null;
-    }
     if (this.emitIntervalId) {
       clearInterval(this.emitIntervalId);
       this.emitIntervalId = null;
