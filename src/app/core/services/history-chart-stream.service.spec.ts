@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Subject, firstValueFrom } from 'rxjs';
+import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from './history-chart-stream.service';
 import { HistoryApiClientService, HistoryRequestError } from './history-api-client.service';
 import { HistoryToChartMapperService } from './history-to-chart-mapper.service';
 import { DataService, IPathUpdate } from './data.service';
+import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { IDatasetServiceDatapoint } from '../interfaces/dataset.interfaces';
 
 const PARAMS: IHistoryChartStreamParams = {
@@ -18,6 +19,7 @@ const PARAMS: IHistoryChartStreamParams = {
 
 describe('HistoryChartStreamService', () => {
   let path$: Subject<IPathUpdate>;
+  let state$: BehaviorSubject<ConnectionState>;
   const history = { getValues: vi.fn() };
   const mapper = { mapValuesToChartDatapoints: vi.fn() };
   const data = { subscribePath: vi.fn(), getPathUnitType: vi.fn() };
@@ -28,7 +30,8 @@ describe('HistoryChartStreamService', () => {
         HistoryChartStreamService,
         { provide: HistoryApiClientService, useValue: history },
         { provide: HistoryToChartMapperService, useValue: mapper },
-        { provide: DataService, useValue: data }
+        { provide: DataService, useValue: data },
+        { provide: ConnectionStateMachine, useValue: { state$ } }
       ]
     });
     return TestBed.inject(HistoryChartStreamService);
@@ -36,6 +39,9 @@ describe('HistoryChartStreamService', () => {
 
   beforeEach(() => {
     path$ = new Subject<IPathUpdate>();
+    // Charts mount while already connected; the reconnect re-backfill fires only on LATER Connected
+    // transitions, so a stuck-Connected stream leaves the existing live-tail behavior unchanged.
+    state$ = new BehaviorSubject<ConnectionState>(ConnectionState.Connected);
     history.getValues.mockReset();
     mapper.mapValuesToChartDatapoints.mockReset().mockReturnValue([]);
     data.subscribePath.mockReset().mockReturnValue(path$);
@@ -385,5 +391,550 @@ describe('HistoryChartStreamService', () => {
     // Circular mean of 350° and 10° is ~0° in the direction domain, NOT the ~180° a linear mean gives.
     // Pre-#133 this path resolved to 'scalar' and lastAverage would be ~π.
     expect(Math.min(avg, 2 * Math.PI - avg)).toBeLessThan(0.02);
+  });
+
+  describe('reconnect re-backfill (#85)', () => {
+    it('does not re-backfill on the initial connect — only the constructor backfill runs', async () => {
+      history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+      mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+      make().getBackfillThenLive(PARAMS).subscribe();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // state$ replays its seeded Connected once during wiring; that first Connected must not trigger a
+      // second History request on top of the constructor's backfill.
+      expect(history.getValues).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-fetches only the missed interval on reconnect and appends it as a batch', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]); // empty initial backfill
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0); // settle initial backfill → live subscribes
+
+        // A live sample fixes lastLiveTs at the client clock (1_000_000).
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        // The WS drops; 20s pass; the re-backfill will return one gap sample at 1_010_000.
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_020_000);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_020_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([
+          { timestamp: 990_000, data: { value: 1 } },   // at/behind the seam → dropped
+          { timestamp: 1_010_000, data: { value: 9 } }   // inside the gap → kept
+        ]);
+        const callsBefore = history.getValues.mock.calls.length;
+
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0); // settle the re-backfill
+
+        // Exactly one extra request, scoped to the gap: biased earlier than the seam by the skew margin
+        // but still within the window. The stale-side point it re-admits is dropped by the > seam de-dup.
+        expect(history.getValues.mock.calls.length).toBe(callsBefore + 1);
+        const reQuery = history.getValues.mock.calls[history.getValues.mock.calls.length - 1][0];
+        expect(Date.parse(reQuery.from)).toBeLessThanOrEqual(1_000_000);
+        expect(Date.parse(reQuery.from)).toBeGreaterThanOrEqual(1_020_000 - PARAMS.windowMs);
+
+        // The batch carries only the point newer than the seam; the stale-side point is de-duped.
+        const batch = emissions.filter(e => Array.isArray(e)).pop() as IDatasetServiceDatapoint[];
+        expect(batch.map(p => p.data.value)).toEqual([9]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('holds the live tail while disconnected so no gap is drawn mid-drop', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+        state$.next(ConnectionState.Disconnected);
+
+        // Well past the staleness window: a CONNECTED silent source would gap here (see the #131 test),
+        // but a disconnect must not — the reconnect re-backfill fills it instead.
+        await vi.advanceTimersByTimeAsync(31_000);
+        const gaps = emissions.filter(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(gaps.length).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not re-backfill after the stream is torn down', async () => {
+      history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+      mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+      const sub = make().getBackfillThenLive(PARAMS).subscribe();
+      await Promise.resolve();
+      await Promise.resolve();
+      const callsAfterInit = history.getValues.mock.calls.length;
+
+      sub.unsubscribe();
+      state$.next(ConnectionState.Disconnected);
+      state$.next(ConnectionState.Connected);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(history.getValues.mock.calls.length).toBe(callsAfterInit);
+    });
+
+    it('breaks the trace with a gap when the re-backfill fails over a long outage (no interpolation)', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_040_000); // 40s outage — past the 30s bootstrap staleness threshold
+        history.getValues.mockRejectedValue(new HistoryRequestError(503)); // provider down at reconnect
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        // No batch (fetch failed); a NaN gap breaks the trace so the live tail cannot interpolate a
+        // straight line across the outage.
+        const last = emissions[emissions.length - 1];
+        expect(Array.isArray(last)).toBe(false);
+        expect(Number.isNaN((last as IDatasetServiceDatapoint).data.value)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('breaks the trace with a gap when the re-backfill returns no rows over a long outage', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_040_000); // 40s outage — past the 30s bootstrap staleness threshold
+        // Provider up but no rows for the window (e.g. a non-recorded path).
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_040_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        const last = emissions[emissions.length - 1];
+        expect(Number.isNaN((last as IDatasetServiceDatapoint).data.value)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not gap a brief blip the re-backfill cannot fill', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_001_000); // 1s blip — well under the staleness threshold
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_001_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        // A sub-threshold blip is indistinguishable from normal live cadence — no marker.
+        const gaps = emissions.filter(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(gaps.length).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('recovers a failed initial backfill on the first connect, without waiting for a WS drop', async () => {
+      // The constructor backfill fails transiently, so ctx.seeded stays false; the replayed first
+      // Connected must then drive a recovery re-backfill rather than being skipped.
+      history.getValues.mockReset();
+      history.getValues
+        .mockRejectedValueOnce(new HistoryRequestError(503))
+        .mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+      mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+
+      const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+      make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+      await new Promise(resolve => setTimeout(resolve));
+      await new Promise(resolve => setTimeout(resolve));
+
+      // The transient failure did not disable the chart, and the seeded=false first Connected drove a
+      // second (recovery) fetch on top of the constructor's failed one.
+      expect(emissions.some(e => !Array.isArray(e) && 'unavailable' in e)).toBe(false);
+      expect(history.getValues.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('coalesces a reconnect that lands mid-fetch and re-runs from the advanced seam', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        // Hold the first reconnect's re-backfill fetch open with a manual promise.
+        let releaseFirst: (v: unknown) => void = () => { /* set below */ };
+        const firstFetch = new Promise(res => { releaseFirst = res; });
+        history.getValues.mockReturnValueOnce(firstFetch);
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_010_000);
+        state$.next(ConnectionState.Connected); // reBackfill #1 issues its fetch, then awaits
+        await vi.advanceTimersByTimeAsync(0);
+        const callsAfterFirst = history.getValues.mock.calls.length;
+        const runAFrom = Date.parse(history.getValues.mock.calls[callsAfterFirst - 1][0].from);
+
+        // A second drop/reconnect lands WHILE #1 is in flight: coalesced, no second fetch yet.
+        state$.next(ConnectionState.Disconnected);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(history.getValues.mock.calls.length).toBe(callsAfterFirst);
+
+        // Run A delivers a point at 1_005_000 → the seam advances; the coalesced re-run (run B) must then
+        // re-fetch from the ADVANCED seam, not the original one. Run B's fetch returns the same point,
+        // which its > seam de-dup now drops (proving the seam advanced).
+        mapper.mapValuesToChartDatapoints.mockReturnValue([{ timestamp: 1_005_000, data: { value: 8 } }]);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_010_000).toISOString() }, values: [], data: [] });
+        releaseFirst({ context: 'vessels.self', range: { to: new Date(1_010_000).toISOString() }, values: [], data: [] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(history.getValues.mock.calls.length).toBe(callsAfterFirst + 1);
+        const runBFrom = Date.parse(history.getValues.mock.calls[callsAfterFirst][0].from);
+        expect(runBFrom).toBeGreaterThan(runAFrom); // re-run starts from the advanced seam
+
+        // Run A's batch landed and no NaN gap was drawn out of order (the seam advanced, so run B's
+        // > seam de-dup keeps the trace monotonic).
+        const batch = emissions.filter(e => Array.isArray(e)).pop() as IDatasetServiceDatapoint[];
+        expect(batch.map(p => p.data.value)).toEqual([8]);
+        const anyGap = emissions.some(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(anyGap).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('holds a live sample tick that arrives while a re-backfill fetch is in flight', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        // Hold the reconnect re-backfill fetch open so backfillInFlight stays true.
+        let releaseFetch: (v: unknown) => void = () => { /* set below */ };
+        const heldFetch = new Promise(res => { releaseFetch = res; });
+        history.getValues.mockReturnValueOnce(heldFetch);
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_005_000);
+        state$.next(ConnectionState.Connected); // backfillInFlight = true, awaiting heldFetch
+        await vi.advanceTimersByTimeAsync(0);
+
+        // A sampled tick fires WHILE the fetch is in flight: the gate must suppress the replayed value so
+        // it cannot append ahead of the pending batch.
+        const countMidFetch = emissions.length;
+        await vi.advanceTimersByTimeAsync(PARAMS.sampleTime);
+        expect(emissions.length).toBe(countMidFetch);
+
+        // Once the batch lands the gate reopens and the batch is emitted.
+        mapper.mapValuesToChartDatapoints.mockReturnValue([{ timestamp: 1_004_000, data: { value: 7 } }]);
+        releaseFetch({ context: 'vessels.self', range: { to: new Date(1_005_000).toISOString() }, values: [], data: [] });
+        await vi.advanceTimersByTimeAsync(0);
+        const batch = emissions.filter(e => Array.isArray(e)).pop() as IDatasetServiceDatapoint[];
+        expect(batch.map(p => p.data.value)).toEqual([7]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not gap a slow-cadence source on a reconnect shorter than its update interval', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+
+        // Establish a ~10s source cadence (two samples 10s apart).
+        path$.next({ data: { value: 1, timestamp: new Date(1_000_000) }, state: 'normal' });
+        vi.setSystemTime(1_010_000);
+        path$.next({ data: { value: 2, timestamp: new Date(1_010_000) }, state: 'normal' });
+
+        // A 12s drop — well past the flat 3s floor but under the 3× cadence threshold, so the source
+        // could not have produced data during it and no gap should be drawn.
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_022_000);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_022_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        const gaps = emissions.filter(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(gaps.length).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('gaps a known-cadence source when the reconnect outage exceeds its interval', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+
+        // Learn a ~5s cadence → gap threshold = max(3s, 3×5s) = 15s.
+        path$.next({ data: { value: 1, timestamp: new Date(1_000_000) }, state: 'normal' });
+        vi.setSystemTime(1_005_000);
+        path$.next({ data: { value: 2, timestamp: new Date(1_005_000) }, state: 'normal' });
+
+        // A 25s outage — past the 15s threshold → a real gap must be drawn (locks the gap-drawing side of
+        // the cadence branch; a regression inflating the known-cadence threshold would suppress it).
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_025_000);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_025_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        const gaps = emissions.filter(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(gaps.length).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not fold the outage into the cadence when a delta arrives during the re-backfill', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+
+        // Learn a ~5s cadence → threshold 15s.
+        path$.next({ data: { value: 1, timestamp: new Date(1_000_000) }, state: 'normal' });
+        vi.setSystemTime(1_005_000);
+        path$.next({ data: { value: 2, timestamp: new Date(1_005_000) }, state: 'normal' });
+
+        // Long outage; hold the re-backfill fetch open across it.
+        let releaseFetch: (v: unknown) => void = () => { /* set below */ };
+        const heldFetch = new Promise(res => { releaseFetch = res; });
+        history.getValues.mockReturnValueOnce(heldFetch);
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_040_000); // 40s outage
+        state$.next(ConnectionState.Connected); // reBackfill awaits heldFetch
+        await vi.advanceTimersByTimeAsync(0);
+
+        // The resumed WS delivers a fresh delta DURING the fetch, ~40s after the pre-drop sample. Folding
+        // that gap into the EWMA cadence would inflate the threshold past 40s and suppress the gap below.
+        path$.next({ data: { value: 9, timestamp: new Date(1_040_000) }, state: 'normal' });
+
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_040_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        releaseFetch({ context: 'vessels.self', range: { to: new Date(1_040_000).toISOString() }, values: [], data: [] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        // The cadence stayed ~5s (threshold ~15s), so the 40s outage still draws its honest gap.
+        const gaps = emissions.filter(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(gaps.length).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('caps the live-tail hold on a slow provider — draws the gap and resumes live instead of freezing', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        // Reconnect while the history provider hangs (never resolves) — the freeze scenario.
+        history.getValues.mockReturnValueOnce(new Promise<never>(() => { /* hangs */ }));
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_030_000);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        // Just before the hold cap (RECONNECT_HOLD_MS = 3000ms) elapses: still held, no gap yet.
+        await vi.advanceTimersByTimeAsync(2_900);
+        expect(emissions.some(e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value))).toBe(false);
+
+        // Past the cap: the hold releases and the honest gap is drawn even though the fetch is still hung.
+        await vi.advanceTimersByTimeAsync(200);
+        const gaps = emissions.filter(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(gaps.length).toBe(1);
+
+        // And the gate is released: a fresh live delta renders again instead of being dropped.
+        vi.setSystemTime(1_034_000);
+        path$.next({ data: { value: 7, timestamp: new Date(1_034_000) }, state: 'normal' });
+        await vi.advanceTimersByTimeAsync(PARAMS.sampleTime);
+        const rendered = emissions.some(
+          e => !Array.isArray(e) && !('unavailable' in e) && (e as IDatasetServiceDatapoint).data.value === 7
+        );
+        expect(rendered).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('advances the seam past a drawn gap so a lagging provider cannot backfill behind it', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' }); // seam 1_000_000
+
+        // Reconnect #1: the provider is still ingesting and returns no rows → a gap is drawn at ~1_040_000.
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_040_000);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_040_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(emissions.filter(e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)).length).toBe(1);
+
+        // Reconnect #2: the provider has now ingested the backdated outage samples (all older than the gap).
+        state$.next(ConnectionState.Disconnected);
+        state$.next(ConnectionState.Connected);
+        mapper.mapValuesToChartDatapoints.mockReturnValue([
+          { timestamp: 1_005_000, data: { value: 1 } },
+          { timestamp: 1_038_000, data: { value: 2 } }
+        ]);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_040_000).toISOString() }, values: [], data: [] });
+        await vi.advanceTimersByTimeAsync(0);
+
+        // The seam advanced to the gap timestamp, so those backdated points are de-duped — never drawn
+        // behind the break.
+        const drewBackdated = emissions.some(
+          e => Array.isArray(e) && (e as IDatasetServiceDatapoint[]).some(p => p.data.value === 1)
+        );
+        expect(drewBackdated).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('survives an unexpected (non-request) error during the reconnect re-backfill', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_040_000); // 40s outage
+        history.getValues.mockRejectedValue(new Error('mapper boom')); // unexpected, not a HistoryRequestError
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        // The unexpected error is logged, the stream is not disabled (no HISTORY_UNAVAILABLE), and the
+        // trace still breaks honestly rather than throwing out of the async handler.
+        expect(errorSpy).toHaveBeenCalled();
+        expect(emissions.some(e => !Array.isArray(e) && 'unavailable' in e)).toBe(false);
+        const last = emissions[emissions.length - 1];
+        expect(Number.isNaN((last as IDatasetServiceDatapoint).data.value)).toBe(true);
+      } finally {
+        errorSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it('re-backfills the first connect when mounted during an outage — the seed is not contemporaneous (#85)', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        // Mount while the WS is already down (HTTP still up, so the constructor backfill succeeds). The
+        // seeded window and the first Connected land minutes apart, so that Connected is a real reconnect
+        // whose elapsed interval must be re-fetched — not the free skip a contemporaneous seed would earn.
+        state$.next(ConnectionState.Disconnected);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([{ timestamp: 1_000_000, data: { value: 5 } }]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0); // settle the mount backfill → beginLive replays Disconnected
+
+        // 20s of outage elapse, then the WS reconnects.
+        vi.setSystemTime(1_020_000);
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_020_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([
+          { timestamp: 990_000, data: { value: 1 } },   // at/behind the seam → dropped
+          { timestamp: 1_010_000, data: { value: 9 } }   // inside the gap → kept
+        ]);
+        const callsBefore = history.getValues.mock.calls.length; // the single mount backfill
+
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0); // settle the re-backfill
+
+        // Exactly one re-backfill fires, scoped to the gap; without it the outage would draw a silent line.
+        expect(history.getValues.mock.calls.length).toBe(callsBefore + 1);
+        const batch = emissions.filter(e => Array.isArray(e)).pop() as IDatasetServiceDatapoint[];
+        expect(batch.map(p => p.data.value)).toEqual([9]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
