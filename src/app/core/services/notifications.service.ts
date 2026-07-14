@@ -9,6 +9,7 @@ import { INotificationConfig } from '../interfaces/app-settings.interfaces';
 import { DefaultNotificationConfig } from '../../../default-config/config.blank.notification.const';
 import { SignalkRequestsService } from './signalk-requests.service';
 import { DataService } from './data.service';
+import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { isEqual } from 'lodash-es';
 import { UUID } from '../utils/uuid.util';
 import { TMethod, ISignalKDataValueUpdate, ISkMetadata, ISignalKNotification, States, Methods } from '../interfaces/signalk-interfaces';
@@ -53,6 +54,7 @@ export class NotificationsService implements OnDestroy {
   private audioBlockedNotificationShown = false;
   private data = inject(DataService);
   private requests = inject(SignalkRequestsService);
+  private connectionStateMachine = inject(ConnectionStateMachine);
 
   private static readonly ALARM_SEVERITIES: IAlarmSeverities = {
     normal: { sound: 0, visual: 0 },
@@ -65,7 +67,8 @@ export class NotificationsService implements OnDestroy {
 
   private _notificationDataStreamSubscription: Subscription | null = null;
   private _notificationMetaStreamSubscription: Subscription | null = null;
-  private _resetServiceSubscription: Subscription;
+  private _connectionResetSubscription: Subscription;
+  private _wasConnected = false;
 
   private _notificationConfig: INotificationConfig;
   private _notificationConfig$ = new BehaviorSubject<INotificationConfig>(DefaultNotificationConfig);
@@ -88,8 +91,18 @@ export class NotificationsService implements OnDestroy {
     this.applyNotificationConfig(this.settings.notificationConfig());
     effect(() => this.applyNotificationConfig(this.settings.notificationConfig()));
 
-    this._resetServiceSubscription = this.data.isResetService().subscribe(reset => {
-      if (reset) this.reset();
+    this._connectionResetSubscription = this.connectionStateMachine.state$.subscribe(state => {
+      const connected = state === ConnectionState.Connected;
+      // On a (re)connection, drop notifications carried over from the previous session so stale
+      // alarms from a dropped or switched connection cannot linger. A drop alone does NOT clear —
+      // the last-known alarms stay visible through the outage. This is a blind clear that relies on
+      // the Signal K server re-delivering still-active notifications in its post-resubscribe snapshot
+      // (standard signalk-server behaviour) to repopulate them. Hardening the transient blank/audio
+      // restart into a reconcile (mark-stale + sweep) is tracked in #275.
+      if (connected && !this._wasConnected) {
+        this.clearNotifications();
+      }
+      this._wasConnected = connected;
     });
 
     // Pre-cache silent track player
@@ -132,10 +145,18 @@ export class NotificationsService implements OnDestroy {
   }
 
   private reset() {
+    // Clears the list ONLY when notifications are disabled (a #147-pinned behaviour); otherwise it
+    // just recomputes the aggregate. Distinct from clearNotifications(), which always clears.
     if (this._notificationConfig.disableNotifications) {
       this._notifications = [];
       this._notifications$.next([]);
     }
+    this.updateNotificationsState();
+  }
+
+  private clearNotifications(): void {
+    this._notifications = [];
+    this._notifications$.next([]);
     this.updateNotificationsState();
   }
 
@@ -198,6 +219,11 @@ export class NotificationsService implements OnDestroy {
 
       if ((alarm.value['state'] === States.Normal && !this._notificationConfig.devices.showNormalState) ||
           (alarm.value['state'] === States.Nominal && !this._notificationConfig.devices.showNominalState)) {
+        continue;
+      }
+
+      // An unrecognized state contributes no severity; it must not inflate the alarm count either.
+      if (!NotificationsService.ALARM_SEVERITIES[alarm.value['state']]) {
         continue;
       }
 
@@ -409,7 +435,7 @@ export class NotificationsService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this._resetServiceSubscription?.unsubscribe();
+    this._connectionResetSubscription?.unsubscribe();
     this._notificationDataStreamSubscription?.unsubscribe();
     this._notificationMetaStreamSubscription?.unsubscribe();
 

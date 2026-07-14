@@ -6,6 +6,7 @@ import { INotification, INotificationInfo, NotificationsService } from './notifi
 import { DataService } from './data.service';
 import { SettingsService } from './settings.service';
 import { SignalkRequestsService } from './signalk-requests.service';
+import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { INotificationConfig } from '../interfaces/app-settings.interfaces';
 import { ISignalKDataValueUpdate, ISignalKNotification, ISkMetadata, Methods, States, TMethod, TState } from '../interfaces/signalk-interfaces';
 import { IMeta } from '../interfaces/app-interfaces';
@@ -50,7 +51,7 @@ describe('NotificationsService', () => {
   let configSignal: WritableSignal<INotificationConfig>;
   let notificationMsg$: Subject<ISignalKDataValueUpdate>;
   let notificationMeta$: Subject<IMeta>;
-  let isReset$: Subject<boolean>;
+  let connectionState$: Subject<ConnectionState>;
   let putRequest: ReturnType<typeof vi.fn>;
   let service: NotificationsService;
 
@@ -58,7 +59,7 @@ describe('NotificationsService', () => {
     configSignal = signal<INotificationConfig>(initialConfig);
     notificationMsg$ = new Subject<ISignalKDataValueUpdate>();
     notificationMeta$ = new Subject<IMeta>();
-    isReset$ = new Subject<boolean>();
+    connectionState$ = new Subject<ConnectionState>();
     putRequest = vi.fn().mockReturnValue(null);
 
     const settingsStub: Partial<SettingsService> = {
@@ -68,7 +69,6 @@ describe('NotificationsService', () => {
     const dataStub: Partial<DataService> = {
       getNotificationMsgObservable: () => notificationMsg$.asObservable(),
       getNotificationMetaObservable: () => notificationMeta$.asObservable(),
-      isResetService: () => isReset$.asObservable(),
     };
     const requestsStub: Partial<SignalkRequestsService> = {
       putRequest: putRequest as SignalkRequestsService['putRequest'],
@@ -79,6 +79,7 @@ describe('NotificationsService', () => {
         { provide: SettingsService, useValue: settingsStub },
         { provide: DataService, useValue: dataStub },
         { provide: SignalkRequestsService, useValue: requestsStub },
+        { provide: ConnectionStateMachine, useValue: { state$: connectionState$.asObservable() } },
       ],
     });
     service = TestBed.inject(NotificationsService);
@@ -156,11 +157,11 @@ describe('NotificationsService', () => {
       expect(latestInfo().alarmCount).toBe(1);
     });
 
-    it('counts notifications with an unknown state at zero severity', () => {
+    it('excludes notifications with an unknown state from the alarm count', () => {
       setup();
       notificationMsg$.next(makeDelta('notifications.odd', makeValue('bogus' as TState, [Methods.Visual, Methods.Sound])));
 
-      expect(latestInfo()).toEqual({ audioSev: 0, visualSev: 0, alarmCount: 1, isMuted: false, isWarn: false, isAlarmEmergency: false });
+      expect(latestInfo()).toEqual({ audioSev: 0, visualSev: 0, alarmCount: 0, isMuted: false, isWarn: false, isAlarmEmergency: false });
     });
   });
 
@@ -384,17 +385,42 @@ describe('NotificationsService', () => {
     });
   });
 
-  describe('reset signal from DataService', () => {
-    // Pins current behavior: reset() only clears the list when notifications
-    // are disabled, so a data-service reset leaves enabled notifications intact.
-    it('keeps existing notifications on reset while notifications are enabled', () => {
+  describe('clear on connection reconnect', () => {
+    it('keeps alarms across a drop, clears them on reconnect, and repopulates from the fresh snapshot', () => {
       setup();
+      connectionState$.next(ConnectionState.Connected);
       notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      expect(latestNotifications()).toHaveLength(1);
+      expect(activeTrack()).toBe(1003);
 
-      isReset$.next(true);
-
+      // A drop alone must NOT clear: the last-known alarm stays visible (and sounding) during the outage.
+      connectionState$.next(ConnectionState.Disconnected);
       expect(latestNotifications()).toHaveLength(1);
       expect(latestInfo().alarmCount).toBe(1);
+      expect(activeTrack()).toBe(1003);
+
+      // Reconnect clears the carried-over list and silences its audio so nothing stale lingers...
+      connectionState$.next(ConnectionState.Connected);
+      expect(latestNotifications()).toHaveLength(0);
+      expect(latestInfo().alarmCount).toBe(0);
+      expect(activeTrack()).toBe(1000);
+
+      // ...then the fresh server snapshot re-delivers a still-active alarm, which reappears (#275).
+      notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      expect(latestNotifications()).toHaveLength(1);
+      expect(latestInfo().alarmCount).toBe(1);
+      expect(activeTrack()).toBe(1003);
+    });
+
+    it('does not clear notifications while the connection stays up', () => {
+      setup();
+      connectionState$.next(ConnectionState.Connected);
+      notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+
+      // A repeated Connected emission without an intervening drop must not clear.
+      connectionState$.next(ConnectionState.Connected);
+
+      expect(latestNotifications()).toHaveLength(1);
     });
   });
 
