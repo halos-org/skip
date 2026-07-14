@@ -248,6 +248,16 @@ describe('AppNetworkInitService', () => {
             expect(latestIssue()).toEqual({ reason: 'auth-blocked', cause: 'budget-exhausted' });
         });
 
+        it('framed boot: framed outcome -> auth-blocked/sign-in-required even if a stale shared budget is exhausted (#217)', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('framed');
+            mockSsoRedirect.isBudgetExhausted.mockReturnValue(true);
+
+            expect(handleCookieAuth({ status: 'notLoggedIn', authenticationRequired: true, oidcAutoLogin: true })).toBe('auth-blocked');
+
+            // The framed prompt must never inherit a stale standalone budget's 'budget-exhausted' wording.
+            expect(latestIssue()).toEqual({ reason: 'auth-blocked', cause: 'sign-in-required' });
+        });
+
         it('oidcAutoLogin disabled: does not auto-redirect, surfaces sign-in-required', () => {
             const status: ILoginStatus = { status: 'notLoggedIn', authenticationRequired: true, oidcAutoLogin: false, oidcEnabled: true };
 

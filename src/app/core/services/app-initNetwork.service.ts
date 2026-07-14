@@ -89,13 +89,17 @@ export class AppNetworkInitService implements OnDestroy {
    * auth-blocked recovery state (budget exhausted, or a manual sign-in is required).
    */
   private attemptCookieRedirect(status: ILoginStatus | null): 'redirecting' | 'blocked' {
-    if (status?.oidcAutoLogin !== false && this.ssoRedirect.attemptAutoRedirect(status) === 'redirected') {
+    const outcome = status?.oidcAutoLogin !== false ? this.ssoRedirect.attemptAutoRedirect(status) : null;
+    if (outcome === 'redirected') {
       return 'redirecting';
     }
-    this._bootstrapIssue$.next({
-      reason: 'auth-blocked',
-      cause: this.ssoRedirect.isBudgetExhausted() ? 'budget-exhausted' : 'sign-in-required'
-    });
+    // A framed boot deliberately skips the redirect without spending budget, so its recovery is
+    // always an explicit sign-in — never a stale (shared per-origin-per-tab) budget's
+    // 'budget-exhausted' wording.
+    const cause: TAuthBlockedCause = outcome !== 'framed' && this.ssoRedirect.isBudgetExhausted()
+      ? 'budget-exhausted'
+      : 'sign-in-required';
+    this._bootstrapIssue$.next({ reason: 'auth-blocked', cause });
     return 'blocked';
   }
 
