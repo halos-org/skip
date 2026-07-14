@@ -1,8 +1,7 @@
 import { Component, DoCheck, input, output } from '@angular/core';
 import { ChangeDetectionStrategy } from '@angular/core';
-import type { IDynamicControl } from '../../core/interfaces/widgets-interface';
+import type { IDynamicControl, IDimensions } from '../../core/interfaces/widgets-interface';
 import type { ITheme } from '../../core/services/app-service';
-import { IDimensions } from '../widget-boolean-switch/widget-boolean-switch.component';
 
 
 

@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, input, signal, untracked, ChangeDetectionStrategy } from '@angular/core';
 import { ITheme } from '../../core/services/app-service';
-import { IWidgetSvcConfig, IDynamicControl, IWidgetPath } from '../../core/interfaces/widgets-interface';
+import { IWidgetSvcConfig, IDynamicControl, IWidgetPath, IDimensions } from '../../core/interfaces/widgets-interface';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 import { getColors } from '../../core/utils/themeColors.utils';
@@ -9,11 +9,6 @@ import { KipResizeObserverDirective } from '../../core/directives/kip-resize-obs
 import { SvgZoneStatesComponent } from '../svg-zone-states/svg-zone-states.component';
 import { INotification, NotificationsService } from '../../core/services/notifications.service';
 import { toSignal } from '@angular/core/rxjs-interop';
-
-export interface IDimensions {
-  height: number,
-  width: number
-}
 
 @Component({
   selector: 'widget-zones-state-panel',

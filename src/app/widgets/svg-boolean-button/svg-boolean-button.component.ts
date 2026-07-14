@@ -1,8 +1,7 @@
 import { cloneDeep } from 'lodash-es';
 import { Component, DoCheck, OnDestroy, input, output, ChangeDetectionStrategy } from '@angular/core';
-import type { IDynamicControl } from '../../core/interfaces/widgets-interface';
+import type { IDynamicControl, IDimensions } from '../../core/interfaces/widgets-interface';
 import type { ITheme } from '../../core/services/app-service';
-import { IDimensions } from '../widget-boolean-switch/widget-boolean-switch.component';
 
 @Component({
   selector: 'app-svg-boolean-button',

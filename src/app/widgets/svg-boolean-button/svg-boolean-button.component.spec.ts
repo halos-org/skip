@@ -1,8 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SvgBooleanButtonComponent } from './svg-boolean-button.component';
-import type { IDynamicControl } from '../../core/interfaces/widgets-interface';
-import type { IDimensions } from '../widget-boolean-switch/widget-boolean-switch.component';
+import type { IDynamicControl, IDimensions } from '../../core/interfaces/widgets-interface';
 
 const controlMock: IDynamicControl = {
   ctrlLabel: 'Bilge Pump',
