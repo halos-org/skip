@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { Subject } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INotification, INotificationInfo, NotificationsService } from './notifications.service';
 import { DataService } from './data.service';
 import { SettingsService } from './settings.service';
@@ -99,6 +99,10 @@ describe('NotificationsService', () => {
 
   function activeTrack(): number | null {
     return (service as unknown as { _activeAlarmSoundtrack: number | null })._activeAlarmSoundtrack;
+  }
+
+  function alarmPlayer(track: number): HTMLAudioElement {
+    return (service as unknown as { _players: Map<number, HTMLAudioElement> })._players.get(track)!;
   }
 
   describe('alarm state aggregation from deltas', () => {
@@ -385,34 +389,129 @@ describe('NotificationsService', () => {
     });
   });
 
-  describe('clear on connection reconnect', () => {
-    it('keeps alarms across a drop, clears them on reconnect, and repopulates from the fresh snapshot', () => {
-      setup();
-      connectionState$.next(ConnectionState.Connected);
-      notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
-      expect(latestNotifications()).toHaveLength(1);
-      expect(activeTrack()).toBe(1003);
-
-      // A drop alone must NOT clear: the last-known alarm stays visible (and sounding) during the outage.
-      connectionState$.next(ConnectionState.Disconnected);
-      expect(latestNotifications()).toHaveLength(1);
-      expect(latestInfo().alarmCount).toBe(1);
-      expect(activeTrack()).toBe(1003);
-
-      // Reconnect clears the carried-over list and silences its audio so nothing stale lingers...
-      connectionState$.next(ConnectionState.Connected);
-      expect(latestNotifications()).toHaveLength(0);
-      expect(latestInfo().alarmCount).toBe(0);
-      expect(activeTrack()).toBe(1000);
-
-      // ...then the fresh server snapshot re-delivers a still-active alarm, which reappears (#275).
-      notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
-      expect(latestNotifications()).toHaveLength(1);
-      expect(latestInfo().alarmCount).toBe(1);
-      expect(activeTrack()).toBe(1003);
+  describe('reconcile on connection reconnect', () => {
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
-    it('does not clear notifications while the connection stays up', () => {
+    it('keeps an active alarm across a reconnect without clearing it or restarting its tone', () => {
+      setup();
+      connectionState$.next(ConnectionState.Connected);
+      notificationMsg$.next(makeDelta('notifications.bilge', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      expect(latestNotifications()).toHaveLength(1);
+      expect(activeTrack()).toBe(1003);
+
+      const player = alarmPlayer(1003);
+      const playSpy = vi.spyOn(player, 'play');
+      const pauseSpy = vi.spyOn(player, 'pause');
+
+      vi.useFakeTimers();
+      // A drop must not clear; the reconnect that follows must not blank or silence the alarm.
+      connectionState$.next(ConnectionState.Disconnected);
+      connectionState$.next(ConnectionState.Connected);
+      expect(latestNotifications()).toHaveLength(1);
+      expect(latestInfo().alarmCount).toBe(1);
+      expect(activeTrack()).toBe(1003);
+
+      // The snapshot re-delivers the same still-active alarm: recognised as the existing entry, not
+      // cleared-and-re-added, so the looping player is never paused/restarted.
+      notificationMsg$.next(makeDelta('notifications.bilge', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      vi.runOnlyPendingTimers();
+
+      expect(latestNotifications()).toHaveLength(1);
+      expect(latestInfo().alarmCount).toBe(1);
+      expect(activeTrack()).toBe(1003);
+      expect(playSpy).not.toHaveBeenCalled();
+      expect(pauseSpy).not.toHaveBeenCalled();
+    });
+
+    it('sweeps a notification the server no longer reports once the snapshot settles', () => {
+      setup();
+      connectionState$.next(ConnectionState.Connected);
+      notificationMsg$.next(makeDelta('notifications.engine', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      notificationMsg$.next(makeDelta('notifications.bilge', makeValue(States.Warn, [Methods.Visual, Methods.Sound])));
+      expect(latestNotifications()).toHaveLength(2);
+
+      vi.useFakeTimers();
+      connectionState$.next(ConnectionState.Disconnected);
+      connectionState$.next(ConnectionState.Connected);
+
+      // The snapshot re-delivers only the engine alarm; the bilge warning resolved during the outage.
+      notificationMsg$.next(makeDelta('notifications.engine', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+
+      // Nothing is removed until the grace window elapses.
+      expect(latestNotifications()).toHaveLength(2);
+
+      vi.runOnlyPendingTimers();
+
+      expect(latestNotifications().map(n => n.path)).toEqual(['notifications.engine']);
+      expect(latestInfo().alarmCount).toBe(1);
+    });
+
+    it('adds notifications that first appear after a reconnect', () => {
+      setup();
+      connectionState$.next(ConnectionState.Connected);
+      notificationMsg$.next(makeDelta('notifications.engine', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+
+      vi.useFakeTimers();
+      connectionState$.next(ConnectionState.Disconnected);
+      connectionState$.next(ConnectionState.Connected);
+
+      // The snapshot re-confirms the existing alarm and introduces a brand-new one.
+      notificationMsg$.next(makeDelta('notifications.engine', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      notificationMsg$.next(makeDelta('notifications.mob', makeValue(States.Emergency, [Methods.Visual, Methods.Sound])));
+      expect(latestNotifications().map(n => n.path)).toContain('notifications.mob');
+
+      vi.runOnlyPendingTimers();
+
+      expect(latestNotifications().map(n => n.path).sort()).toEqual(['notifications.engine', 'notifications.mob']);
+      expect(latestInfo().alarmCount).toBe(2);
+    });
+
+    it('keeps an unconfirmed alarm when the server re-delivers no snapshot on reconnect', () => {
+      setup();
+      connectionState$.next(ConnectionState.Connected);
+      notificationMsg$.next(makeDelta('notifications.mob', makeValue(States.Emergency, [Methods.Visual, Methods.Sound])));
+      expect(latestNotifications()).toHaveLength(1);
+      expect(activeTrack()).toBe(1004);
+
+      vi.useFakeTimers();
+      connectionState$.next(ConnectionState.Disconnected);
+      connectionState$.next(ConnectionState.Connected);
+      // No delta arrives after reconnect (a server that emits only on change, not on subscribe).
+      vi.runOnlyPendingTimers();
+
+      // The still-active alarm must not be silently dropped for lack of a snapshot.
+      expect(latestNotifications()).toHaveLength(1);
+      expect(latestInfo().alarmCount).toBe(1);
+      expect(activeTrack()).toBe(1004);
+    });
+
+    it('does not sweep a carried alarm when only an unrelated new path arrives after reconnect', () => {
+      setup();
+      connectionState$.next(ConnectionState.Connected);
+      notificationMsg$.next(makeDelta('notifications.bilge', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      expect(latestNotifications()).toHaveLength(1);
+      expect(activeTrack()).toBe(1003);
+
+      const pauseSpy = vi.spyOn(alarmPlayer(1003), 'pause');
+
+      vi.useFakeTimers();
+      connectionState$.next(ConnectionState.Disconnected);
+      connectionState$.next(ConnectionState.Connected);
+
+      // A change-only server never re-delivers bilge; only an unrelated new path updates in the
+      // window. That is not evidence the carried alarm was re-streamed, so it must not arm the sweep.
+      notificationMsg$.next(makeDelta('notifications.other', makeValue(States.Normal, [Methods.Visual])));
+      vi.runOnlyPendingTimers();
+
+      expect(latestNotifications().map(n => n.path)).toContain('notifications.bilge');
+      expect(latestInfo().alarmCount).toBe(1);
+      expect(activeTrack()).toBe(1003);
+      expect(pauseSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not reconcile or clear notifications while the connection stays up', () => {
       setup();
       connectionState$.next(ConnectionState.Connected);
       notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
