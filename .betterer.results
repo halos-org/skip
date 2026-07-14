@@ -163,7 +163,7 @@ exports[`strictNullChecks`] = {
       [42, 57, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
       [43, 57, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"]
     ],
-    "src/app/widgets/svg-windsteer/svg-windsteer.component.ts:3559272095": [
+    "src/app/widgets/svg-windsteer/svg-windsteer.component.ts:2551054731": [
       [28, 59, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
       [40, 50, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
       [45, 46, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],

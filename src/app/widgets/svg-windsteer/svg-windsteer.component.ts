@@ -362,10 +362,19 @@ export class SvgWindsteerComponent implements OnDestroy {
     if (isPort) this.portLaylineAnimId = id; else this.stbdLaylineAnimId = id;
   }
 
-  private drawLayline(angleDeg: number, isPort: boolean) {
+  /** Project a dial angle (degrees, 0 = up) onto the dial circle. Unrounded; callers round if needed. */
+  private dialPoint(angleDeg: number): [number, number] {
     const radian = (angleDeg * Math.PI) / 180;
-    const x = Math.floor(this.RADIUS * Math.sin(radian) + this.CENTER);
-    const y = Math.floor((this.RADIUS * Math.cos(radian) * -1) + this.CENTER);
+    return [
+      this.RADIUS * Math.sin(radian) + this.CENTER,
+      (this.RADIUS * Math.cos(radian) * -1) + this.CENTER,
+    ];
+  }
+
+  private drawLayline(angleDeg: number, isPort: boolean) {
+    const [px, py] = this.dialPoint(angleDeg);
+    const x = Math.floor(px);
+    const y = Math.floor(py);
     if (isPort) {
       this.closeHauledLinePortPath.set(`M ${this.CENTER},${this.CENTER} L ${x},${y}`);
     } else {
@@ -530,12 +539,9 @@ export class SvgWindsteerComponent implements OnDestroy {
     const midAngle = this.toDialLocal(this.addHeading(this.addHeading(state.mid, -heading), offset));
     const maxAngle = this.toDialLocal(this.addHeading(this.addHeading(state.max, -heading), offset));
 
-    const minX = this.RADIUS * Math.sin((minAngle * Math.PI) / 180) + this.CENTER;
-    const minY = (this.RADIUS * Math.cos((minAngle * Math.PI) / 180) * -1) + this.CENTER;
-    const midX = this.RADIUS * Math.sin((midAngle * Math.PI) / 180) + this.CENTER;
-    const midY = (this.RADIUS * Math.cos((midAngle * Math.PI) / 180) * -1) + this.CENTER;
-    const maxX = this.RADIUS * Math.sin((maxAngle * Math.PI) / 180) + this.CENTER;
-    const maxY = (this.RADIUS * Math.cos((maxAngle * Math.PI) / 180) * -1) + this.CENTER;
+    const [minX, minY] = this.dialPoint(minAngle);
+    const [midX, midY] = this.dialPoint(midAngle);
+    const [maxX, maxY] = this.dialPoint(maxAngle);
 
     const largeArcFlag = Math.abs(angle([minX, minY], [midX, midY], [maxX, maxY])) > Math.PI / 2 ? 0 : 1;
     const sweepFlag = angle([maxX, maxY], [minX, minY], [midX, midY]) > 0 ? 0 : 1;
