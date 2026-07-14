@@ -74,6 +74,13 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
   private pendingDatasets: HistoryChartDataset[] = [];
   private dualAxisDescriptorCache = new Map<string, IDualAxisSeriesDescriptor | null>();
 
+  /**
+   * Fallback retention-scale window for enumerating template concretes when a series carries no
+   * explicit retentionDurationMs. Matches the auto-retention the series are stamped with (24h) and is
+   * decoupled from the chart display window so a briefly-quiet device is not dropped from enumeration.
+   */
+  private readonly DEFAULT_ENUMERATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+
   constructor() {
     effect(() => {
       const canvas = this.chartCanvas();
@@ -412,8 +419,12 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       return [series];
     }
 
-    const duration = this.resolveDuration(series);
-    const availablePaths = await this.historyApiClient.getPaths({ duration });
+    // Enumerate concretes over the retention window, not the (possibly short) chart display window:
+    // getPaths only lists paths with a sample inside the window, so a briefly-quiet device would be
+    // dropped if enumerated over the display window alone. The chart data itself is still fetched over
+    // the display window in buildDatasetForSeries.
+    const enumerationDuration = this.resolveEnumerationDuration(series);
+    const availablePaths = await this.historyApiClient.getPaths({ duration: enumerationDuration });
     if (!availablePaths?.length) {
       return [series];
     }
@@ -757,6 +768,15 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     }
 
     return this.selectedPeriod();
+  }
+
+  private resolveEnumerationDuration(series: IKipSeriesDefinition): string {
+    const retentionMs = series.retentionDurationMs;
+    const windowMs = typeof retentionMs === 'number' && Number.isFinite(retentionMs) && retentionMs > 0
+      ? retentionMs
+      : this.DEFAULT_ENUMERATION_WINDOW_MS;
+    const seconds = Math.max(1, Math.round(windowMs / 1000));
+    return `PT${seconds}S`;
   }
 
   private durationFromScaleAndPeriod(scaleRaw: string, periodRaw: number): string {

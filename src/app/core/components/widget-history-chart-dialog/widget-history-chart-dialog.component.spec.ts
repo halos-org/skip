@@ -765,4 +765,154 @@ describe('WidgetHistoryChartDialogComponent', () => {
     expect((scales['yCurrent'] as { position?: string }).position).toBe('right');
     expect((scales['yFrequency'] as { position?: string }).position).toBe('left');
   });
+
+  it('enumerates a template concrete visible only in the retention window, not the short display window', async () => {
+    (component as unknown as {
+      data: {
+        title: string;
+        widget: IWidget;
+        seriesDefinitions: IKipSeriesDefinition[];
+      };
+    }).data = {
+      title: 'Solar History',
+      widget: {
+        uuid: 'widget-solar-1',
+        type: 'widget-solar-charger',
+        config: {
+          displayName: 'Solar Charger'
+        }
+      } as IWidget,
+      seriesDefinitions: [
+        {
+          seriesId: 'widget-solar-1:solar-template',
+          datasetUuid: 'widget-solar-1:solar-template',
+          ownerWidgetUuid: 'widget-solar-1',
+          ownerWidgetSelector: 'widget-solar-charger',
+          path: 'self.electrical.solar.*',
+          expansionMode: 'solar-tree',
+          familyKey: 'solar',
+          allowedIds: ['charger-1'],
+          retentionDurationMs: 24 * 60 * 60 * 1000,
+          enabled: true
+        }
+      ]
+    };
+
+    // The briefly-quiet device only shows up when paths are enumerated over the 24h retention window;
+    // the short 1h display window would omit it.
+    historyApiClientMock.getPaths.mockImplementation(({ duration }: { duration: string }) =>
+      Promise.resolve(duration === 'PT86400S'
+        ? ['electrical.solar.charger-1.panelPower', 'electrical.solar.charger-1.current']
+        : []));
+
+    await component.loadHistoryDatasets();
+
+    expect(historyApiClientMock.getPaths).toHaveBeenCalledWith(expect.objectContaining({ duration: 'PT86400S' }));
+    expect(historyApiClientMock.getPaths).not.toHaveBeenCalledWith(expect.objectContaining({ duration: 'PT1H' }));
+    expect(historyApiClientMock.getValues).toHaveBeenCalledWith(expect.objectContaining({
+      paths: 'electrical.solar.charger-1.panelPower:avg'
+    }));
+  });
+
+  it('widens only the enumeration window while leaving the chart data window at the display window', async () => {
+    (component as unknown as {
+      data: {
+        title: string;
+        widget: IWidget;
+        seriesDefinitions: IKipSeriesDefinition[];
+      };
+    }).data = {
+      title: 'Solar History',
+      widget: {
+        uuid: 'widget-solar-1',
+        type: 'widget-solar-charger',
+        config: {
+          displayName: 'Solar Charger'
+        }
+      } as IWidget,
+      seriesDefinitions: [
+        {
+          seriesId: 'widget-solar-1:solar-template',
+          datasetUuid: 'widget-solar-1:solar-template',
+          ownerWidgetUuid: 'widget-solar-1',
+          ownerWidgetSelector: 'widget-solar-charger',
+          path: 'self.electrical.solar.*',
+          expansionMode: 'solar-tree',
+          familyKey: 'solar',
+          allowedIds: ['charger-1'],
+          retentionDurationMs: 48 * 60 * 60 * 1000,
+          enabled: true
+        }
+      ]
+    };
+
+    historyApiClientMock.getPaths.mockResolvedValue([
+      'electrical.solar.charger-1.panelPower',
+      'electrical.solar.charger-1.current'
+    ]);
+
+    await component.loadHistoryDatasets();
+
+    // Enumeration follows the series' 48h retention window, decoupled from the display window.
+    expect(historyApiClientMock.getPaths).toHaveBeenCalledWith(expect.objectContaining({ duration: 'PT172800S' }));
+
+    // The chart data fetch still uses the 1-hour display window for every concrete.
+    const valueDurations = historyApiClientMock.getValues.mock.calls.map((call: [{ duration: string }]) => call[0].duration);
+    expect(valueDurations.length).toBeGreaterThan(0);
+    expect(valueDurations.every((duration: string) => duration === 'PT1H')).toBe(true);
+    expect(historyApiClientMock.getValues).not.toHaveBeenCalledWith(expect.objectContaining({ duration: 'PT172800S' }));
+  });
+
+  it('falls back to the 24h default enumeration window when the series carries no usable retention', async () => {
+    const baseTemplate = {
+      seriesId: 'widget-solar-1:solar-template',
+      datasetUuid: 'widget-solar-1:solar-template',
+      ownerWidgetUuid: 'widget-solar-1',
+      ownerWidgetSelector: 'widget-solar-charger' as const,
+      path: 'self.electrical.solar.*',
+      expansionMode: 'solar-tree' as const,
+      familyKey: 'solar' as const,
+      allowedIds: ['charger-1'],
+      enabled: true
+    };
+
+    const solarWidget = {
+      uuid: 'widget-solar-1',
+      type: 'widget-solar-charger',
+      config: {
+        displayName: 'Solar Charger'
+      }
+    } as IWidget;
+
+    historyApiClientMock.getPaths.mockResolvedValue([
+      'electrical.solar.charger-1.panelPower',
+      'electrical.solar.charger-1.current'
+    ]);
+
+    // Absent retention, plus every guard-falsy value, must collapse to the 24h default window.
+    const unusableRetentions: (number | null | undefined)[] = [undefined, null, 0, -1, Number.NaN];
+
+    for (const retentionDurationMs of unusableRetentions) {
+      historyApiClientMock.getPaths.mockClear();
+      (component as unknown as {
+        data: {
+          title: string;
+          widget: IWidget;
+          seriesDefinitions: IKipSeriesDefinition[];
+        };
+      }).data = {
+        title: 'Solar History',
+        widget: solarWidget,
+        seriesDefinitions: [
+          retentionDurationMs === undefined
+            ? { ...baseTemplate }
+            : { ...baseTemplate, retentionDurationMs }
+        ]
+      };
+
+      await component.loadHistoryDatasets();
+
+      expect(historyApiClientMock.getPaths).toHaveBeenCalledWith(expect.objectContaining({ duration: 'PT86400S' }));
+    }
+  });
 });
