@@ -1,9 +1,8 @@
 import { DataService } from './data.service';
-import { Injectable, OnDestroy, inject } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
 import Qty from 'js-quantities';
 
 import { SettingsService } from './settings.service';
-import { Subscription } from 'rxjs';
 
 /**
  * All valid Signal K numeric units supported by KIP.
@@ -99,11 +98,10 @@ type UnitConverter = (v: any) => any;
 
 @Injectable()
 
-export class UnitsService implements OnDestroy {
+export class UnitsService {
   private SettingsService = inject(SettingsService);
   private data = inject(DataService);
 
-  private _defaultUnitsSub: Subscription;
 
   /**
    * Definition of available Kip units to be used for conversion.
@@ -452,11 +450,12 @@ export class UnitsService implements OnDestroy {
   private _defaultUnits: IUnitDefaults = {};
 
   constructor() {
-      this._defaultUnitsSub = this.SettingsService.getDefaultUnitsAsO().subscribe(
-        appSettings => {
-          this._defaultUnits = appSettings;
-        }
-      );
+    // Seed synchronously (the former BehaviorSubject replayed its value on subscribe), then keep
+    // it current. The effect's initial run re-assigns the same value, which is a harmless no-op.
+    this._defaultUnits = this.SettingsService.unitDefaults();
+    effect(() => {
+      this._defaultUnits = this.SettingsService.unitDefaults();
+    });
   }
 
   private unitConversionFunctions: Record<string, UnitConverter> = {
@@ -704,7 +703,4 @@ export class UnitsService implements OnDestroy {
     }
   }
 
-  ngOnDestroy(): void {
-    this._defaultUnitsSub?.unsubscribe();
-  }
 }

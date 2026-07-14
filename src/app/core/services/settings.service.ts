@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { BehaviorSubject, Observable, filter } from 'rxjs';
+import { filter } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { cloneDeep } from 'lodash-es';
 
@@ -47,13 +47,6 @@ export class SettingsService {
   public readonly isRemoteControl = this._isRemoteControl.asReadonly();
   public readonly instanceName = this._instanceName.asReadonly();
   public readonly browserTabTitle = this._browserTabTitle.asReadonly();
-
-  // Observable bridges for the two remaining .subscribe() consumers (units.service,
-  // notifications.service — removed by #79). A fresh subscriber must receive the current value
-  // synchronously (notifications.service dereferences it in the same tick), which bare
-  // toObservable(signal) does not provide, so the write path feeds these alongside the signals.
-  private readonly unitDefaults$ = new BehaviorSubject<IUnitDefaults>(this._unitDefaults());
-  private readonly notificationConfig$ = new BehaviorSubject<INotificationConfig>(this._notificationConfig());
 
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
@@ -266,16 +259,12 @@ export class SettingsService {
     }
   }
 
-  // Update the two bridged values through one point so the signal and its observable bridge can
-  // never diverge.
   private applyUnitDefaults(value: IUnitDefaults): void {
     this._unitDefaults.set(value);
-    this.unitDefaults$.next(value);
   }
 
   private applyNotificationConfig(value: INotificationConfig): void {
     this._notificationConfig.set(value);
-    this.notificationConfig$.next(value);
   }
 
   /**
@@ -292,9 +281,6 @@ export class SettingsService {
   }
 
   //UnitDefaults
-  public getDefaultUnitsAsO(): Observable<IUnitDefaults> {
-    return this.unitDefaults$.asObservable();
-  }
   public getDefaultUnits(): IUnitDefaults {
     return this.unitDefaults();
   }
@@ -447,9 +433,6 @@ export class SettingsService {
   }
 
   // Notification Service Setting
-  public getNotificationServiceConfigAsO(): Observable<INotificationConfig> {
-    return this.notificationConfig$.asObservable();
-  }
   public getNotificationConfig(): INotificationConfig {
     return this.notificationConfig();
   }

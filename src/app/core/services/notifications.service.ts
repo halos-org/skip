@@ -1,7 +1,7 @@
 /**
  * This Service handles app notifications sent by the Signal K server.
  */
-import { Injectable, OnDestroy, inject } from '@angular/core';
+import { Injectable, OnDestroy, effect, inject } from '@angular/core';
 import { BehaviorSubject, map, Observable, Subscription } from 'rxjs';
 import { SettingsService } from "./settings.service";
 import { ToastService } from './toast.service';
@@ -63,7 +63,6 @@ export class NotificationsService implements OnDestroy {
     emergency: { sound: 4, visual: 2 },
   };
 
-  private _notificationSettingsSubscription: Subscription;
   private _notificationDataStreamSubscription: Subscription | null = null;
   private _notificationMetaStreamSubscription: Subscription | null = null;
   private _resetServiceSubscription: Subscription;
@@ -84,24 +83,10 @@ export class NotificationsService implements OnDestroy {
   private _lastEmittedValue: IAlarmInfo | null = null;
 
   constructor() {
-    this._notificationSettingsSubscription = this.settings.getNotificationServiceConfigAsO()
-      .subscribe((config: INotificationConfig) => {
-        this._notificationConfig = config;
-        this.reset();
-        this._notificationConfig$.next(config);
-        if (this._notificationConfig.disableNotifications && !this._notificationDataStreamSubscription?.closed) {
-          this.stopNotificationStream();
-        }
-        if (!this._notificationConfig.disableNotifications &&
-          (this._notificationDataStreamSubscription === null || this._notificationDataStreamSubscription?.closed)) {
-          this.startNotificationStream();
-        }
-        if (this._notificationConfig.sound.disableSound) {
-          this.playAlarm(1000);
-        } else {
-          this.updateNotificationsState();
-        }
-      });
+    // Seed synchronously so the alarm streams and state are configured in the same tick as
+    // construction (the former BehaviorSubject.subscribe fired synchronously), then track changes.
+    this.applyNotificationConfig(this.settings.notificationConfig());
+    effect(() => this.applyNotificationConfig(this.settings.notificationConfig()));
 
     this._resetServiceSubscription = this.data.isResetService().subscribe(reset => {
       if (reset) this.reset();
@@ -109,6 +94,27 @@ export class NotificationsService implements OnDestroy {
 
     // Pre-cache silent track player
     this.getPlayer(1000);
+  }
+
+  private applyNotificationConfig(config: INotificationConfig): void {
+    // The driving effect re-runs once on creation with the already-seeded config; skip that exact
+    // repeat (reference match) so construction does not apply the same config twice.
+    if (config === this._notificationConfig) return;
+    this._notificationConfig = config;
+    this.reset();
+    this._notificationConfig$.next(config);
+    if (this._notificationConfig.disableNotifications && !this._notificationDataStreamSubscription?.closed) {
+      this.stopNotificationStream();
+    }
+    if (!this._notificationConfig.disableNotifications &&
+      (this._notificationDataStreamSubscription === null || this._notificationDataStreamSubscription?.closed)) {
+      this.startNotificationStream();
+    }
+    if (this._notificationConfig.sound.disableSound) {
+      this.playAlarm(1000);
+    } else {
+      this.updateNotificationsState();
+    }
   }
 
   private startNotificationStream() {
@@ -403,7 +409,6 @@ export class NotificationsService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this._notificationSettingsSubscription?.unsubscribe();
     this._resetServiceSubscription?.unsubscribe();
     this._notificationDataStreamSubscription?.unsubscribe();
     this._notificationMetaStreamSubscription?.unsubscribe();
