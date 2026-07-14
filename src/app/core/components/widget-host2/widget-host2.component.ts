@@ -16,8 +16,6 @@ import { WIDGET_ACTIONS } from '../action-menu/widget-actions';
 import { WidgetService } from '../../services/widget.service';
 import { AppService } from '../../services/app-service';
 import { DashboardHistorySeriesSyncService } from '../../services/dashboard-history-series-sync.service';
-import { IKipSeriesDefinition, KipSeriesApiClientService } from '../../services/kip-series-api-client.service';
-import { isKipSeriesEnabled, isKipTemplateSeriesDefinition } from '../../contracts/kip-series-contract';
 import { getElectricalWidgetFamilyDescriptor } from '../../contracts/electrical-widget-family.contract';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { uiEventService } from '../../services/uiEvent.service';
@@ -70,7 +68,6 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   private readonly widgetService = inject(WidgetService);
   private readonly app = inject(AppService);
   private readonly historySync = inject(DashboardHistorySeriesSyncService);
-  private readonly kipSeries = inject(KipSeriesApiClientService);
   private readonly _uiEvent = inject(uiEventService);
 
   protected theme = toSignal(this.app.cssThemeColorRoles$, { requireSync: true });
@@ -380,7 +377,9 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
     }
 
     try {
-      const seriesDefinitions = await this.resolveEffectiveSeriesDefinitions();
+      // Templates stay unexpanded here; the history dialog resolves concrete paths itself via the
+      // History API.
+      const seriesDefinitions = this.historySync.resolveSeriesForWidget(this.widgetProperties);
       if (!this.isHistoryDialogEligible(this.widgetProperties, seriesDefinitions)) {
         this.releaseOverlay('history');
         return;
@@ -406,58 +405,6 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
         error
       });
     }
-  }
-
-  private async resolveEffectiveSeriesDefinitions(): Promise<IKipSeriesDefinition[]> {
-    const resolved = this.historySync.resolveSeriesForWidget(this.widgetProperties);
-    const hasTemplateSeries = resolved.some(isKipTemplateSeriesDefinition);
-
-    if (!hasTemplateSeries) {
-      return resolved;
-    }
-
-    const effective = await this.kipSeries.getSeriesDefinitions();
-    if (!effective) {
-      return resolved;
-    }
-
-    const widgetUuid = this.widgetProperties?.uuid;
-    if (!widgetUuid) {
-      return resolved;
-    }
-
-    const templatePathPrefixes = new Set(
-      resolved
-        .filter(isKipTemplateSeriesDefinition)
-        .map(series => {
-          const path = (series.path ?? '').trim();
-          const basePath = path.endsWith('.*') ? path.slice(0, -2) : path;
-          if (!basePath.length) {
-            return null;
-          }
-
-          return basePath.startsWith('self.') ? basePath.slice('self.'.length) : basePath;
-        })
-        .filter((path): path is string => !!path)
-    );
-
-    if (templatePathPrefixes.size === 0) {
-      return resolved;
-    }
-
-    return effective.filter(series => {
-      if (series.ownerWidgetUuid !== widgetUuid || !isKipSeriesEnabled(series)) {
-        return false;
-      }
-
-      const path = (series.path ?? '').trim();
-      if (!path.length) {
-        return false;
-      }
-
-      const normalizedPath = path.startsWith('self.') ? path.slice('self.'.length) : path;
-      return Array.from(templatePathPrefixes).some(prefix => normalizedPath.startsWith(`${prefix}.`));
-    });
   }
 
   private isHistoryDialogEligible(widget: IWidget | null | undefined, seriesDefinitions: { path?: string | null; enabled?: boolean; expansionMode?: string | null }[]): boolean {

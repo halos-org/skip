@@ -26,11 +26,6 @@ const DEFAULT_CAPABILITIES: IPluginApiCapabilities = {
   detailFallbackToList: false,
 };
 
-export interface IKipRuntimeModeConfig {
-  historySeriesServiceEnabled: boolean;
-  registerAsHistoryApiProvider: boolean;
-}
-
 const UNSUPPORTED_JSON_SCHEMA_KEYWORDS = new Set([
   'oneOf',
   'anyOf',
@@ -64,8 +59,6 @@ const UNSUPPORTED_JSON_SCHEMA_KEYWORDS = new Set([
 export class PluginConfigClientService {
   private readonly http = inject(HttpClient);
   private readonly connection = inject(SignalKConnectionService);
-  private kipRuntimeModeCache: IKipRuntimeModeConfig | null = null;
-  private kipRuntimeModePromise: Promise<IKipRuntimeModeConfig> | null = null;
 
   /**
    * Reactive capabilities state for the plugin REST surface.
@@ -255,69 +248,6 @@ export class PluginConfigClientService {
       return this.failure(pluginResult);
     }
     return this.success(pluginResult.data.state, pluginResult.capabilities);
-  }
-
-  private async resolveKipRuntimeModeConfig(pluginId = 'kip'): Promise<IKipRuntimeModeConfig> {
-    const defaults: IKipRuntimeModeConfig = {
-      historySeriesServiceEnabled: true,
-      registerAsHistoryApiProvider: true,
-    };
-
-    const pluginConfig = await this.getPluginConfig(pluginId);
-    if (this.isFailure(pluginConfig)) {
-      return defaults;
-    }
-
-    const configuration = pluginConfig.data.configuration ?? {};
-    return {
-      historySeriesServiceEnabled: this.resolveBooleanConfig(configuration, 'historySeriesServiceEnabled', defaults.historySeriesServiceEnabled),
-      registerAsHistoryApiProvider: this.resolveBooleanConfig(configuration, 'registerAsHistoryApiProvider', defaults.registerAsHistoryApiProvider),
-    };
-  }
-
-  /**
-   * Gets KIP runtime mode flags with service-level caching.
-   *
-   * Purpose:
-   * - Prevents duplicate plugin config requests across consumers.
-   * - Reuses one in-flight request when multiple callers ask concurrently.
-   *
-   * Parameters:
-   * - `pluginId`: Target plugin identifier. Defaults to `kip`.
-   * - `refresh`: When true, bypasses cache and reloads from server.
-   *
-   * Returns:
-   * - Promise resolving to normalized KIP runtime mode configuration.
-   *
-   * Example:
-   * ```ts
-   * const mode = await pluginConfigService.getKipRuntimeModeConfigCached();
-   * ```
-   */
-  public async getKipRuntimeModeConfigCached(pluginId = 'kip', refresh = false): Promise<IKipRuntimeModeConfig> {
-    if (refresh) {
-      this.kipRuntimeModeCache = null;
-      this.kipRuntimeModePromise = null;
-    }
-
-    if (this.kipRuntimeModeCache) {
-      return this.kipRuntimeModeCache;
-    }
-
-    if (this.kipRuntimeModePromise) {
-      return this.kipRuntimeModePromise;
-    }
-
-    this.kipRuntimeModePromise = this.resolveKipRuntimeModeConfig(pluginId)
-      .then(mode => {
-        this.kipRuntimeModeCache = mode;
-        return mode;
-      })
-      .finally(() => {
-        this.kipRuntimeModePromise = null;
-      });
-
-    return this.kipRuntimeModePromise;
   }
 
   /**
@@ -610,15 +540,6 @@ export class PluginConfigClientService {
 
     const base = configuredUrl.endsWith('/') ? configuredUrl.slice(0, -1) : configuredUrl;
     return `${base}${path}`;
-  }
-
-  private resolveBooleanConfig(configuration: Record<string, unknown>, key: string, fallback: boolean): boolean {
-    const direct = configuration[key];
-    if (typeof direct === 'boolean') {
-      return direct;
-    }
-
-    return fallback;
   }
 
   private getConfigMismatchKeys(requiredConfig: Record<string, unknown> | undefined, currentConfig: Record<string, unknown>): string[] {

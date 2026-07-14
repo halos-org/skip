@@ -9,7 +9,7 @@ import { HistoryApiClientService } from '../../services/history-api-client.servi
 import { HistoryToChartMapperService } from '../../services/history-to-chart-mapper.service';
 import { UnitsService } from '../../services/units.service';
 import { IWidget } from '../../interfaces/widgets-interface';
-import { IKipSeriesDefinition } from '../../services/kip-series-api-client.service';
+import { IKipSeriesDefinition } from '../../contracts/kip-series-contract';
 
 describe('WidgetHistoryChartDialogComponent', () => {
   let fixture: ComponentFixture<WidgetHistoryChartDialogComponent>;

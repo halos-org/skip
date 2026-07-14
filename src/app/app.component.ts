@@ -23,7 +23,6 @@ import { RemoteDashboardsService } from './core/services/remote-dashboards.servi
 import { ToastService } from './core/services/toast.service';
 import { AppNetworkInitService, IBootstrapIssue } from './core/services/app-initNetwork.service';
 import { SsoRedirectService } from './core/services/sso-redirect.service';
-import { DashboardHistorySeriesSyncService } from './core/services/dashboard-history-series-sync.service';
 import { NotificationOverlayService } from './core/services/notification-overlay.service';
 import { DialogService } from './core/services/dialog.service';
 import { resolveBrowserTabTitle } from './core/utils/browser-tab-title.util';
@@ -43,7 +42,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly _connectionStateMachine = inject(ConnectionStateMachine);
   private readonly _appNetworkInit = inject(AppNetworkInitService);
   private readonly _ssoRedirect = inject(SsoRedirectService);
-  private readonly _historySeriesReconcile = inject(DashboardHistorySeriesSyncService);
   public readonly authenticationService = inject(AuthenticationService);
 
   private readonly _dashboard = inject(DashboardService);

@@ -2,8 +2,8 @@
  * Resolves the base URL of a Signal K server plugin (`<server>/plugins/<pluginId>/`) from the
  * active connection endpoint.
  *
- * Generalises the per-plugin logic used by `kip-series-api-client.service` and the `sk-video`
- * clients so every plugin client agrees on how the base URL is derived. Pass the plugin
+ * Generalises the per-plugin logic used by the `sk-video` and other plugin clients so every
+ * plugin client agrees on how the base URL is derived. Pass the plugin
  * id (e.g. `'kip'`, `'sk-video'`); a user-configured Signal K URL takes precedence over the
  * discovered HTTP service endpoint.
  *

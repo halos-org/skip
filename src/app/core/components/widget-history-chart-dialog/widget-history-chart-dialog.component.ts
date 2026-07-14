@@ -6,7 +6,7 @@ import { Chart, ChartConfiguration, ChartDataset, Color, LegendItem } from 'char
 import 'chartjs-adapter-date-fns';
 import { registerChartComponents } from '../../utils/chart-registration.util';
 import { IWidget } from '../../interfaces/widgets-interface';
-import { IKipSeriesDefinition } from '../../services/kip-series-api-client.service';
+import { IKipSeriesDefinition } from '../../contracts/kip-series-contract';
 import { isKipTemplateSeriesDefinition, type IKipConcreteSeriesDefinition, type IKipTemplateSeriesDefinition } from '../../contracts/kip-series-contract';
 import {
   describeElectricalDualAxisSeries,
