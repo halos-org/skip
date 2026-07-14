@@ -83,6 +83,72 @@ describe('SsoRedirectService', () => {
     expect(navSpy.mock.calls[0][0]).toContain('noAutoLogin=true');
   });
 
+  it('does not auto-redirect when framed; surfaces recovery instead (frame-ancestors blocks the login)', () => {
+    const { service, navSpy } = setup();
+    vi.spyOn(service as unknown as { isFramed: () => boolean }, 'isFramed').mockReturnValue(true);
+
+    expect(service.attemptAutoRedirect(OIDC_STATUS)).toBe('framed');
+    expect(navSpy).not.toHaveBeenCalled();
+    expect(service.attempts()).toBe(0);
+  });
+
+  it('manualSignIn breaks out to the top window when framed', () => {
+    const authStub = new AuthStub();
+    authStub.loginStatusValue = OIDC_STATUS;
+    ensureLocalStorage();
+    ensureSessionStorage();
+    TestBed.configureTestingModule({
+      providers: [SsoRedirectService, { provide: AuthenticationService, useValue: authStub }]
+    });
+    const service = TestBed.inject(SsoRedirectService);
+    vi.spyOn(service as unknown as { isFramed: () => boolean }, 'isFramed').mockReturnValue(true);
+    const replace = vi.fn();
+    const originalTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: { location: { replace } } });
+
+    try {
+      service.manualSignIn();
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(replace.mock.calls[0][0]).toContain('/signalk/v1/auth/oidc/login');
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: originalTop });
+    }
+  });
+
+  it('detects a framed context for real (no isFramed mock) and returns framed without navigating', () => {
+    const { service, navSpy } = setup();
+    const originalTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: { name: 'host' } });
+
+    try {
+      expect(service.attemptAutoRedirect(OIDC_STATUS)).toBe('framed');
+      expect(navSpy).not.toHaveBeenCalled();
+      expect(service.attempts()).toBe(0);
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: originalTop });
+    }
+  });
+
+  it('navigate does not throw when framed with a null window.top (detached iframe)', () => {
+    const authStub = new AuthStub();
+    authStub.loginStatusValue = OIDC_STATUS;
+    ensureLocalStorage();
+    ensureSessionStorage();
+    TestBed.configureTestingModule({
+      providers: [SsoRedirectService, { provide: AuthenticationService, useValue: authStub }]
+    });
+    const service = TestBed.inject(SsoRedirectService);
+    vi.spyOn(service as unknown as { isFramed: () => boolean }, 'isFramed').mockReturnValue(true);
+    const originalTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: null });
+
+    try {
+      expect(() => service.manualSignIn()).not.toThrow();
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: originalTop });
+    }
+  });
+
   it('falls back to the admin login when OIDC is not enabled', () => {
     const { service, navSpy } = setup();
 

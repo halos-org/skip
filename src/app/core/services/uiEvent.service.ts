@@ -1,20 +1,7 @@
 import { Injectable, OnDestroy, signal } from '@angular/core';
 import screenfull from 'screenfull';
 import NoSleep from '@zakj/no-sleep';
-
-/**
- * Detects whether the app is running inside an iframe (e.g. Signal K app-dock, Freeboard).
- * When embedded, the host manages fullscreen, so KIP must defer to it (#1062).
- * Accessing `top` across origins throws a SecurityError, which itself means we are embedded.
- */
-export function isEmbeddedInIframe(win: { self: unknown; top: unknown } = window): boolean {
-  try {
-    return win.self !== win.top;
-  } catch {
-    // Reading window.top across origins throws a SecurityError -> we are embedded.
-    return true;
-  }
-}
+import { isEmbeddedInIframe } from '../utils/iframe.util';
 
 @Injectable({
   providedIn: 'root'

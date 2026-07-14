@@ -40,4 +40,18 @@ describe('WidgetLoginComponent', () => {
     expect(component.redirecting).toBe(false);
     expect(manualSignIn).not.toHaveBeenCalled();
   });
+
+  it('does not auto-redirect (frame-bust) when embedded in an iframe (#217)', async () => {
+    const originalTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: { name: 'host' } });
+
+    try {
+      const component = await createComponent();
+
+      expect(component.redirecting).toBe(false);
+      expect(manualSignIn).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: originalTop });
+    }
+  });
 });

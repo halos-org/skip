@@ -1,13 +1,14 @@
 import { inject, Injectable } from '@angular/core';
 import { AuthenticationService, ILoginStatus } from './authentication.service';
 import { buildLoginRedirectUrl, isSafeReturnTo } from '../utils/login-redirect.util';
+import { isEmbeddedInIframe } from '../utils/iframe.util';
 import { SSO_REDIRECT_BUDGET_KEY } from '../constants/config-storage.const';
 
 const REDIRECT_BUDGET_KEY = SSO_REDIRECT_BUDGET_KEY;
 const MAX_REDIRECT_ATTEMPTS = 3;
 const ADMIN_LOGIN_URL = '/admin/#/login'; // non-OIDC same-origin fallback login
 
-export type TAutoRedirectOutcome = 'redirected' | 'budget-exhausted';
+export type TAutoRedirectOutcome = 'redirected' | 'budget-exhausted' | 'framed';
 
 /**
  * Owns the cookie-mode SSO redirect: where to send the browser to sign in, and a reload-surviving
@@ -85,6 +86,12 @@ export class SsoRedirectService {
    * reports the budget is spent so the caller can show the auth-blocked recovery state instead.
    */
   public attemptAutoRedirect(status: ILoginStatus | null): TAutoRedirectOutcome {
+    // A framed SSO redirect is blocked by the login endpoint's frame-ancestors 'none' and would just
+    // render broken. Do not auto-redirect (and do not spend budget) when embedded; the caller then
+    // surfaces the auth-blocked recovery, whose explicit Sign in breaks out to the top window.
+    if (this.isFramed()) {
+      return 'framed';
+    }
     // Fail closed: if the budget cannot be tracked across reloads, do not auto-redirect (an explicit
     // user Sign in still can). Treating an untrackable budget as "0 attempts" would loop forever.
     if (!this.budgetStorageWorks() || this.isBudgetExhausted()) {
@@ -111,7 +118,18 @@ export class SsoRedirectService {
     }));
   }
 
+  /**
+   * True when Skip is running inside an iframe (e.g. the Freeboard panel). Delegates to the shared
+   * detector so this and uiEvent.service cannot drift; kept as a protected seam for test spies.
+   */
+  protected isFramed(): boolean {
+    return isEmbeddedInIframe();
+  }
+
   protected navigate(url: string): void {
-    window.location.replace(url);
+    // When framed, break the sign-in out to the top window: the login endpoint refuses to render in
+    // an iframe. Navigating window.top is permitted even cross-origin (only reading it is blocked).
+    const target = this.isFramed() ? window.top : window;
+    (target ?? window).location.replace(url);
   }
 }
