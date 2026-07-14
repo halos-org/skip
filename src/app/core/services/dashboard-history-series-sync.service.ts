@@ -1,26 +1,11 @@
-import { DestroyRef, effect, inject, Injectable } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NgGridStackWidget } from 'gridstack/dist/angular';
-import { Dashboard, DashboardService } from './dashboard.service';
+import { inject, Injectable } from '@angular/core';
 import { IWidget, IWidgetPath, IWidgetSvcConfig } from '../interfaces/widgets-interface';
-import { IKipSeriesDefinition, KipSeriesApiClientService } from './kip-series-api-client.service';
-import { IElectricalTrackedDeviceRef, IKipConcreteSeriesDefinition, IKipTemplateSeriesDefinition } from '../contracts/kip-series-contract';
-import { SignalKConnectionService } from './signalk-connection.service';
-import { PluginConfigClientService } from './plugin-config-client.service';
+import { IElectricalTrackedDeviceRef, IKipConcreteSeriesDefinition, IKipSeriesDefinition, IKipTemplateSeriesDefinition } from '../contracts/kip-series-contract';
 import { WidgetService } from './widget.service';
 import {
   ElectricalFamilyKey,
   getElectricalWidgetFamilyDescriptor,
 } from '../contracts/electrical-widget-family.contract';
-
-interface IGridWidgetNode extends NgGridStackWidget {
-  input?: {
-    widgetProperties?: IWidget;
-  };
-  subGridOpts?: {
-    children?: IGridWidgetNode[];
-  };
-}
 
 interface IBmsBankLike {
   memberIds?: unknown;
@@ -48,138 +33,9 @@ const FAMILY_CONFIG_PROPERTY: Record<ElectricalFamilyKey, TFamilyConfigProperty>
   providedIn: 'root'
 })
 export class DashboardHistorySeriesSyncService {
-  private readonly dashboard = inject(DashboardService);
-  private readonly kipSeries = inject(KipSeriesApiClientService);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly connection = inject(SignalKConnectionService);
-  private readonly pluginConfig = inject(PluginConfigClientService);
   private readonly widgetService = inject(WidgetService);
 
-  private readonly serverEndpoint = toSignal(this.connection.serverServiceEndpoint$, {
-    initialValue: null
-  });
-
-  private readonly RECONCILE_DEBOUNCE_MS = 750;
   private readonly AUTO_RETENTION_MS = 24 * 60 * 60 * 1000;
-  private reconcileTimer: number | null = null;
-  private lastSubmittedSignature: string | null = null;
-  private pendingDashboards: Dashboard[] | null = null;
-
-  constructor() {
-    effect(() => {
-      const endpoint = this.serverEndpoint();
-      const dashboards = this.dashboard.dashboards();
-
-      if (!endpoint?.httpServiceUrl) {
-        return;
-      }
-
-      this.scheduleReconcile(dashboards);
-    });
-
-    this.destroyRef.onDestroy(() => {
-      if (this.reconcileTimer !== null) {
-        clearTimeout(this.reconcileTimer);
-        this.reconcileTimer = null;
-      }
-    });
-  }
-
-  private scheduleReconcile(dashboards: Dashboard[]): void {
-    this.pendingDashboards = dashboards;
-
-    if (this.reconcileTimer !== null) {
-      clearTimeout(this.reconcileTimer);
-    }
-
-    this.reconcileTimer = window.setTimeout(() => {
-      void this.flushReconcile();
-    }, this.RECONCILE_DEBOUNCE_MS);
-  }
-
-  private async flushReconcile(): Promise<void> {
-    this.reconcileTimer = null;
-    const dashboards = this.pendingDashboards;
-    this.pendingDashboards = null;
-    if (!dashboards) {
-      return;
-    }
-
-    // Load every in-use widget type's static DEFAULT_CONFIG before extracting series, so history
-    // registration is deterministic regardless of which dashboard is currently rendered. Runs after
-    // first paint, so it does not affect the initial bundle/first-paint the lazy loading targets.
-    await this.ensureWidgetDefaultsLoaded(dashboards);
-
-    let desiredSeries: IKipSeriesDefinition[];
-    try {
-      desiredSeries = this.extractSeriesFromDashboards(dashboards);
-    } catch (error) {
-      console.error('[DashboardHistorySeriesSyncService] Error extracting series from dashboards:', error);
-      return;
-    }
-
-    const signature = this.getCanonicalSeriesSignature(desiredSeries);
-    if (signature === this.lastSubmittedSignature) {
-      return;
-    }
-
-    const modeConfig = await this.pluginConfig.getKipRuntimeModeConfigCached('kip');
-    if (!modeConfig.historySeriesServiceEnabled) {
-      console.warn('[DashboardHistorySeriesSyncService] Reconcile skipped because history series service mode is disabled');
-      this.lastSubmittedSignature = signature;
-      return;
-    }
-
-    try {
-      // reconcileSeries resolves to null on failure (it swallows errors and does
-      // NOT throw), so we must inspect the result. Only mark the signature as
-      // submitted on a real success; otherwise leave it unset so the next cycle retries.
-      const result = await this.kipSeries.reconcileSeries(desiredSeries);
-      if (result) {
-        this.lastSubmittedSignature = signature;
-      } else {
-        console.warn('[DashboardHistorySeriesSyncService] Reconcile did not complete; will retry on next cycle');
-      }
-    } catch (error) {
-      console.error('[DashboardHistorySeriesSyncService] Reconcile failed:', error);
-      // Don't update lastSubmittedSignature so next cycle will retry
-    }
-  }
-
-  private async ensureWidgetDefaultsLoaded(dashboards: Dashboard[]): Promise<void> {
-    const types = new Set<string>();
-    dashboards.forEach(dashboard => {
-      this.collectWidgetTypes(this.coerceNodeList(dashboard.configuration), types);
-    });
-    await Promise.all(
-      [...types].map(type => this.widgetService.getComponentType(type).catch(() => undefined))
-    );
-  }
-
-  private collectWidgetTypes(nodes: IGridWidgetNode[], sink: Set<string>): void {
-    nodes.forEach(node => {
-      const type = node?.input?.widgetProperties?.type;
-      if (type) {
-        sink.add(type);
-      }
-      const children = this.coerceNodeList(node?.subGridOpts?.children);
-      if (children.length > 0) {
-        this.collectWidgetTypes(children, sink);
-      }
-    });
-  }
-
-  private extractSeriesFromDashboards(dashboards: Dashboard[]): IKipSeriesDefinition[] {
-    const definitions: IKipSeriesDefinition[] = [];
-
-    dashboards.forEach(dashboard => {
-      const topLevelNodes = this.coerceNodeList(dashboard.configuration);
-      this.collectSeriesFromNodes(topLevelNodes, definitions);
-    });
-
-    return definitions
-      .sort((left, right) => left.seriesId.localeCompare(right.seriesId));
-  }
 
   /**
    * Resolves the historical series definitions for a single widget based on current
@@ -242,22 +98,10 @@ export class DashboardHistorySeriesSyncService {
   }
 
   private getDefaultConfigForType(widgetType: string): IWidgetSvcConfig | undefined {
-    // Reads the widget's static DEFAULT_CONFIG from WidgetService's cache. flushReconcile() awaits
-    // ensureWidgetDefaultsLoaded() before extracting series, so the cache is warm here for every
-    // in-use widget type, independently of which dashboard is currently rendered.
+    // Returns the widget type's static DEFAULT_CONFIG from WidgetService's cache when its component
+    // chunk has loaded (always true for the rendered widget being resolved); resolveWidgetConfig
+    // falls back to the saved config otherwise.
     return this.widgetService.getDefaultConfig(widgetType);
-  }
-
-  private collectSeriesFromNodes(nodes: IGridWidgetNode[], sink: IKipSeriesDefinition[]): void {
-    nodes.forEach(node => {
-      const widget = node?.input?.widgetProperties;
-      sink.push(...this.resolveSeriesForWidget(widget));
-
-      const children = this.coerceNodeList(node?.subGridOpts?.children);
-      if (children.length > 0) {
-        this.collectSeriesFromNodes(children, sink);
-      }
-    });
   }
 
   private mapDataChartWidget(widgetUuid: string, widgetType: string, cfg: IWidgetSvcConfig | undefined): IKipConcreteSeriesDefinition | null {
@@ -530,49 +374,5 @@ export class DashboardHistorySeriesSyncService {
       return null;
     }
     return value;
-  }
-
-  private coerceNodeList(nodes: unknown): IGridWidgetNode[] {
-    if (!Array.isArray(nodes)) {
-      return [];
-    }
-
-    return nodes as IGridWidgetNode[];
-  }
-
-  /**
-   * Creates a canonical signature for series definitions using field-by-field comparison.
-   * Normalizes arrays (sorting) and null/undefined values to ensure stable comparison
-   * independent of insertion order or property mutations.
-   *
-   * Mirrors the plugin's robust comparator logic for consistency.
-   */
-  private getCanonicalSeriesSignature(series: IKipSeriesDefinition[]): string {
-    const normalized = series.map(s => ({
-      seriesId: s.seriesId,
-      datasetUuid: s.datasetUuid,
-      ownerWidgetUuid: s.ownerWidgetUuid,
-      ownerWidgetSelector: s.ownerWidgetSelector,
-      path: s.path,
-      expansionMode: s.expansionMode ?? null,
-      familyKey: s.familyKey ?? null,
-      allowedIds: Array.isArray(s.allowedIds) ? [...s.allowedIds].sort() : null,
-      trackedDevices: Array.isArray(s.trackedDevices)
-        ? [...s.trackedDevices]
-          .map(device => ({ id: device.id, source: device.source }))
-          .sort((left, right) => {
-            const idCompare = left.id.localeCompare(right.id);
-            return idCompare !== 0 ? idCompare : left.source.localeCompare(right.source);
-          })
-        : null,
-      context: s.context ?? null,
-      source: s.source ?? null,
-      timeScale: s.timeScale ?? null,
-      period: s.period ?? null,
-      retentionDurationMs: s.retentionDurationMs ?? null,
-      sampleTime: s.sampleTime ?? null,
-      enabled: s.enabled,
-    }));
-    return JSON.stringify(normalized);
   }
 }

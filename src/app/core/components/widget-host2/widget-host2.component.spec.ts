@@ -11,7 +11,6 @@ import { AppService } from '../../services/app-service';
 import { DashboardHistorySeriesSyncService } from '../../services/dashboard-history-series-sync.service';
 import { uiEventService } from '../../services/uiEvent.service';
 import { UnitsService } from '../../services/units.service';
-import { KipSeriesApiClientService } from '../../services/kip-series-api-client.service';
 import { IWidget } from '../../interfaces/widgets-interface';
 
 class DashboardServiceStub {
@@ -36,9 +35,6 @@ describe('WidgetHost2Component', () => {
     let historySyncMock: {
         resolveSeriesForWidget: Mock;
     };
-    let kipSeriesMock: {
-        getSeriesDefinitions: Mock;
-    };
     let testWidget: IWidget;
 
     beforeEach(async () => {
@@ -62,9 +58,6 @@ describe('WidgetHost2Component', () => {
                     enabled: true
                 }
             ])
-        };
-        kipSeriesMock = {
-            getSeriesDefinitions: vi.fn().mockResolvedValue([])
         };
 
         await TestBed.configureTestingModule({
@@ -96,8 +89,7 @@ describe('WidgetHost2Component', () => {
                         isDragging: signal(false)
                     }
                 },
-                { provide: DashboardHistorySeriesSyncService, useValue: historySyncMock },
-                { provide: KipSeriesApiClientService, useValue: kipSeriesMock }
+                { provide: DashboardHistorySeriesSyncService, useValue: historySyncMock }
             ]
         }).compileComponents();
 
@@ -251,14 +243,14 @@ describe('WidgetHost2Component', () => {
         expect(dialogServiceMock.openWidgetHistoryDialog).not.toHaveBeenCalled();
     });
 
-    it('opens history dialog for widget-bms using effective plugin-expanded series', async () => {
+    it('opens history dialog for widget-bms with the unexpanded template series', async () => {
         dashboard.isDashboardStatic.set(true);
         testWidget.type = 'widget-bms';
         testWidget.config = {
             displayName: 'BMS',
         };
 
-        historySyncMock.resolveSeriesForWidget.mockReturnValue([
+        const templateSeries = [
             {
                 seriesId: 'widget-1:bms-template',
                 datasetUuid: 'widget-1:bms-template',
@@ -268,27 +260,22 @@ describe('WidgetHost2Component', () => {
                 expansionMode: 'bms-battery-tree',
                 enabled: true
             }
-        ]);
-
-        kipSeriesMock.getSeriesDefinitions.mockResolvedValue([
-            {
-                seriesId: 'widget-1:bms:bank-1:stateOfCharge:default',
-                datasetUuid: 'widget-1:bms:bank-1:stateOfCharge:default',
-                ownerWidgetUuid: 'widget-1',
-                ownerWidgetSelector: 'widget-bms',
-                path: 'electrical.batteries.bank-1.stateOfCharge',
-                enabled: true
-            }
-        ]);
+        ];
+        historySyncMock.resolveSeriesForWidget.mockReturnValue(templateSeries);
 
         component.onWidgetLongPress(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await Promise.resolve();
-        await Promise.resolve();
 
+        expect(historySyncMock.resolveSeriesForWidget).toHaveBeenCalledWith(testWidget);
         expect(dialogServiceMock.openWidgetHistoryDialog).toHaveBeenCalledTimes(1);
+        expect(dialogServiceMock.openWidgetHistoryDialog).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'BMS',
+            widget: testWidget,
+            seriesDefinitions: templateSeries
+        }));
     });
 
-    it('opens history dialog for widget-solar-charger using effective plugin-expanded series', async () => {
+    it('opens history dialog for widget-solar-charger with the unexpanded template series', async () => {
         dashboard.isDashboardStatic.set(true);
         testWidget.type = 'widget-solar-charger';
         testWidget.config = {
@@ -299,7 +286,7 @@ describe('WidgetHost2Component', () => {
             }
         } as IWidget['config'];
 
-        historySyncMock.resolveSeriesForWidget.mockReturnValue([
+        const templateSeries = [
             {
                 seriesId: 'widget-1:solar-template',
                 datasetUuid: 'widget-1:solar-template',
@@ -309,24 +296,19 @@ describe('WidgetHost2Component', () => {
                 expansionMode: 'solar-tree',
                 enabled: true
             }
-        ]);
-
-        kipSeriesMock.getSeriesDefinitions.mockResolvedValue([
-            {
-                seriesId: 'widget-1:solar:charger-1:current:default',
-                datasetUuid: 'widget-1:solar:charger-1:current:default',
-                ownerWidgetUuid: 'widget-1',
-                ownerWidgetSelector: 'widget-solar-charger',
-                path: 'electrical.solar.charger-1.current',
-                enabled: true
-            }
-        ]);
+        ];
+        historySyncMock.resolveSeriesForWidget.mockReturnValue(templateSeries);
 
         component.onWidgetLongPress(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await Promise.resolve();
-        await Promise.resolve();
 
+        expect(historySyncMock.resolveSeriesForWidget).toHaveBeenCalledWith(testWidget);
         expect(dialogServiceMock.openWidgetHistoryDialog).toHaveBeenCalledTimes(1);
+        expect(dialogServiceMock.openWidgetHistoryDialog).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Solar Charger',
+            widget: testWidget,
+            seriesDefinitions: templateSeries
+        }));
     });
 
 

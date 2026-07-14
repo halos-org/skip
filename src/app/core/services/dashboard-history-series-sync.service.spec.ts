@@ -1,628 +1,31 @@
 import type { Mock } from "vitest";
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
-import { signal } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
-import { Dashboard, DashboardService } from './dashboard.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardHistorySeriesSyncService } from './dashboard-history-series-sync.service';
-import { IKipSeriesDefinition, KipSeriesApiClientService } from './kip-series-api-client.service';
-import { IEndpointStatus, SignalKConnectionService } from './signalk-connection.service';
-import { PluginConfigClientService } from './plugin-config-client.service';
+import { IKipSeriesDefinition } from '../contracts/kip-series-contract';
 import { IWidget } from '../interfaces/widgets-interface';
 import { WidgetService } from './widget.service';
-
-class DashboardServiceStub {
-    public dashboards = signal<Dashboard[]>([]);
-}
-
-class SignalKConnectionServiceStub {
-    public serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({
-        operation: 0,
-        message: 'Not connected',
-        serverDescription: null,
-        httpServiceUrl: null,
-        WsServiceUrl: null
-    });
-}
-
-type TWidgetNode = NonNullable<Dashboard['configuration']>[number];
-
-function createAutomaticNode(uuid: string, selector: string, options?: {
-    supportAutomaticHistoricalSeries?: boolean;
-    numericPath?: string | null;
-    textPath?: string | null;
-    source?: string | null;
-    sampleTime?: number;
-    period?: number;
-    timeScale?: string;
-}): TWidgetNode {
-    const numericPath = options?.numericPath ?? 'navigation.speedThroughWater';
-    const textPath = options?.textPath ?? 'navigation.state';
-
-    return {
-        id: uuid,
-        selector: 'widget-host2',
-        input: {
-            widgetProperties: {
-                uuid,
-                type: selector,
-                config: {
-                    supportAutomaticHistoricalSeries: options?.supportAutomaticHistoricalSeries,
-                    timeScale: options?.timeScale ?? 'minute',
-                    period: options?.period ?? 10,
-                    paths: {
-                        numericPath: {
-                            description: 'Numeric Data',
-                            path: numericPath,
-                            source: options?.source ?? null,
-                            pathType: 'number',
-                            isPathConfigurable: true,
-                            sampleTime: options?.sampleTime ?? 1000
-                        },
-                        textPath: {
-                            description: 'Text Data',
-                            path: textPath,
-                            source: null,
-                            pathType: 'string',
-                            isPathConfigurable: true,
-                            sampleTime: 1000
-                        }
-                    }
-                }
-            }
-        }
-    } as TWidgetNode;
-}
-
-function createArrayPathsNode(uuid: string, selector: string, supportAutomaticHistoricalSeries?: boolean): TWidgetNode {
-    return {
-        id: uuid,
-        selector: 'widget-host2',
-        input: {
-            widgetProperties: {
-                uuid,
-                type: selector,
-                config: {
-                    supportAutomaticHistoricalSeries,
-                    timeScale: 'hour',
-                    period: 1,
-                    paths: [
-                        {
-                            description: 'Numeric Data',
-                            path: 'navigation.headingTrue',
-                            source: null,
-                            pathType: 'number',
-                            isPathConfigurable: true,
-                            sampleTime: 500
-                        },
-                        {
-                            description: 'Disabled Numeric Data',
-                            path: null,
-                            source: null,
-                            pathType: 'number',
-                            isPathConfigurable: true,
-                            sampleTime: 1000
-                        }
-                    ]
-                }
-            }
-        }
-    } as TWidgetNode;
-}
-
-function createDataChartNode(uuid: string, path: string, period = 10): TWidgetNode {
-    return {
-        id: uuid,
-        selector: 'widget-host2',
-        input: {
-            widgetProperties: {
-                uuid,
-                type: 'widget-data-chart',
-                config: {
-                    datachartPath: path,
-                    datachartSource: 'default',
-                    timeScale: 'minute',
-                    period
-                }
-            }
-        }
-    } as TWidgetNode;
-}
-
-function createWindTrendsNode(uuid: string): TWidgetNode {
-    return {
-        id: uuid,
-        selector: 'widget-host2',
-        input: {
-            widgetProperties: {
-                uuid,
-                type: 'widget-windtrends-chart',
-                config: {
-                    timeScale: 'Last 30 Minutes'
-                }
-            }
-        }
-    } as TWidgetNode;
-}
-
-function createNonHistoryNode(uuid: string): TWidgetNode {
-    return {
-        id: uuid,
-        selector: 'widget-host2',
-        input: {
-            widgetProperties: {
-                uuid,
-                type: 'widget-gauge-ng-rpm',
-                config: {}
-            }
-        }
-    } as TWidgetNode;
-}
 
 function seriesIds(series: IKipSeriesDefinition[]): string[] {
     return series.map(item => item.seriesId).sort();
 }
 
 describe('DashboardHistorySeriesSyncService', () => {
-    let dashboardStub: DashboardServiceStub;
-    let connectionStub: SignalKConnectionServiceStub;
-    let historySeriesServiceEnabled = true;
-    let pluginConfigMock: {
-        getKipRuntimeModeConfigCached: Mock;
-    };
     let widgetServiceMock: {
-        getComponentType: Mock;
         getDefaultConfig: Mock;
     };
-    let reconcileSpy: Mock;
 
     beforeEach(() => {
-        historySeriesServiceEnabled = true;
-        pluginConfigMock = {
-            getKipRuntimeModeConfigCached: vi.fn().mockImplementation(async () => ({
-                historySeriesServiceEnabled,
-                registerAsHistoryApiProvider: true
-            }))
-        };
-
-        reconcileSpy = vi.fn().mockResolvedValue({
-            created: 0,
-            updated: 0,
-            deleted: 0,
-            total: 0,
-        });
-
         widgetServiceMock = {
-            getComponentType: vi.fn().mockResolvedValue(undefined),
             getDefaultConfig: vi.fn().mockReturnValue(undefined)
         };
 
         TestBed.configureTestingModule({
             providers: [
                 DashboardHistorySeriesSyncService,
-                { provide: DashboardService, useClass: DashboardServiceStub },
-                { provide: SignalKConnectionService, useClass: SignalKConnectionServiceStub },
-                { provide: PluginConfigClientService, useValue: pluginConfigMock },
-                { provide: WidgetService, useValue: widgetServiceMock },
-                {
-                    provide: KipSeriesApiClientService,
-                    useValue: {
-                        reconcileSeries: reconcileSpy
-                    }
-                }
+                { provide: WidgetService, useValue: widgetServiceMock }
             ]
         });
-
-        dashboardStub = TestBed.inject(DashboardService) as unknown as DashboardServiceStub;
-        connectionStub = TestBed.inject(SignalKConnectionService) as unknown as SignalKConnectionServiceStub;
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-        vi.restoreAllMocks();
-    });
-
-    it('should not reconcile when HTTP endpoint is unavailable', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('widget-1', 'widget-numeric')
-                ]
-            }
-        ]);
-
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).not.toHaveBeenCalled();
-    });
-
-    it('loads in-use widget DEFAULT_CONFIG before reconciling (deterministic across dashboards)', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('widget-numeric-1', 'widget-numeric', {
-                        numericPath: 'navigation.speedThroughWater'
-                    })
-                ]
-            }
-        ]);
-
-        await vi.advanceTimersByTimeAsync(800);
-
-        // The reconcile warms each in-use widget type's DEFAULT_CONFIG (via getComponentType),
-        // independently of which dashboard is rendered, before extracting series.
-        expect(widgetServiceMock.getComponentType).toHaveBeenCalledWith('widget-numeric');
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it('should extract numeric path series and reconcile once after debounce', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('widget-numeric-1', 'widget-numeric', {
-                        numericPath: 'navigation.speedThroughWater',
-                        source: 'default',
-                        timeScale: 'minute',
-                        period: 10,
-                        sampleTime: 1200
-                    })
-                ]
-            }
-        ]);
-
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-
-        const submitted = vi.mocked(reconcileSpy).mock.lastCall[0];
-        expect(submitted.length).toBe(1);
-        expect(submitted[0]).toEqual({
-            seriesId: 'widget-numeric-1:auto:navigation-speedthroughwater:default',
-            datasetUuid: 'widget-numeric-1:navigation-speedthroughwater:default',
-            ownerWidgetUuid: 'widget-numeric-1',
-            ownerWidgetSelector: 'widget-numeric',
-            path: 'navigation.speedThroughWater',
-            context: null,
-            source: 'default',
-            timeScale: 'minute',
-            period: 10,
-            retentionDurationMs: 86400000,
-            sampleTime: 1200,
-            enabled: true,
-        });
-    });
-
-    it('should preserve dedicated data chart and wind trends sync mappings', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createDataChartNode('widget-data-1', 'navigation.speedThroughWater', 10),
-                    createWindTrendsNode('widget-wind-1'),
-                    createAutomaticNode('widget-numeric-1', 'widget-numeric', {
-                        numericPath: 'navigation.headingTrue',
-                        source: null,
-                        period: 5,
-                        sampleTime: 500
-                    })
-                ]
-            }
-        ]);
-
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-        const submitted = vi.mocked(reconcileSpy).mock.lastCall[0];
-        expect(seriesIds(submitted)).toEqual([
-            'widget-data-1:datachart',
-            'widget-numeric-1:auto:navigation-headingtrue:default',
-            'widget-wind-1:wind-direction',
-            'widget-wind-1:wind-speed'
-        ]);
-
-        const dataChart = submitted.find(series => series.seriesId === 'widget-data-1:datachart');
-        expect(dataChart?.path).toBe('navigation.speedThroughWater');
-
-        const windDirection = submitted.find(series => series.seriesId === 'widget-wind-1:wind-direction');
-        expect(windDirection?.path).toBe('self.environment.wind.directionTrue');
-
-        const windSpeed = submitted.find(series => series.seriesId === 'widget-wind-1:wind-speed');
-        expect(windSpeed?.path).toBe('self.environment.wind.speedTrue');
-    });
-
-    it('retries on the next cycle when a reconcile fails (resolves null instead of throwing)', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        // First reconcile attempt "fails": reconcileSeries returns null (it does not throw).
-        reconcileSpy.mockResolvedValueOnce(null);
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('widget-numeric-1', 'widget-numeric', { source: 'default', period: 10 })
-                ]
-            }
-        ]);
-        await vi.advanceTimersByTimeAsync(800);
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-
-        // Re-emit the SAME series content (new array reference). Because the prior attempt
-        // failed, the signature must NOT have been marked submitted, so this retries.
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('widget-numeric-1', 'widget-numeric', { source: 'default', period: 10 })
-                ]
-            }
-        ]);
-        await vi.advanceTimersByTimeAsync(800);
-        expect(reconcileSpy).toHaveBeenCalledTimes(2);
-    });
-
-    it('should skip reconcile when history series service mode is disabled', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        historySeriesServiceEnabled = false;
-
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('widget-data-1', 'widget-numeric')
-                ]
-            }
-        ]);
-
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).not.toHaveBeenCalled();
-    });
-
-    it('should reconcile when dashboards signal emits updated widget configuration', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('widget-data-1', 'widget-numeric', {
-                        source: 'default',
-                        period: 10
-                    })
-                ]
-            }
-        ]);
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-        reconcileSpy.mockClear();
-
-        dashboardStub.dashboards.update(dashboards => dashboards.map((dashboard, index) => {
-            if (index !== 0) {
-                return dashboard;
-            }
-
-            const nextConfiguration = [...(dashboard.configuration ?? [])];
-            const firstWidget = nextConfiguration[0] as unknown as {
-                input?: {
-                    widgetProperties?: {
-                        config?: Record<string, unknown>;
-                    };
-                };
-            };
-
-            const nextWidget = {
-                ...(nextConfiguration[0] as object),
-                input: {
-                    ...(firstWidget.input ?? {}),
-                    widgetProperties: {
-                        ...(firstWidget.input?.widgetProperties ?? {}),
-                        config: {
-                            ...(firstWidget.input?.widgetProperties?.config ?? {}),
-                            paths: {
-                                ...((firstWidget.input?.widgetProperties?.config?.paths as Record<string, unknown>) ?? {}),
-                                numericPath: {
-                                    description: 'Numeric Data',
-                                    path: 'navigation.speedOverGround',
-                                    source: 'default',
-                                    pathType: 'number',
-                                    isPathConfigurable: true,
-                                    sampleTime: 1000
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-
-            nextConfiguration[0] = nextWidget as never;
-            return {
-                ...dashboard,
-                configuration: nextConfiguration
-            };
-        }));
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-        const submitted = vi.mocked(reconcileSpy).mock.lastCall[0];
-        expect(submitted[0].path).toBe('navigation.speedOverGround');
-    });
-
-    it('should skip widgets explicitly opted out and include array/object numeric paths', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dash 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    createAutomaticNode('auto-1', 'widget-numeric', {
-                        supportAutomaticHistoricalSeries: true,
-                        numericPath: 'navigation.speedThroughWater',
-                        source: null
-                    }),
-                    createArrayPathsNode('array-1', 'widget-gauge-ng-radial', true),
-                    createAutomaticNode('auto-optout', 'widget-text', {
-                        supportAutomaticHistoricalSeries: false,
-                        numericPath: 'navigation.speedOverGround'
-                    }),
-                    createNonHistoryNode('nh-1')
-                ]
-            }
-        ]);
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-        const submitted = vi.mocked(reconcileSpy).mock.lastCall[0];
-        expect(seriesIds(submitted)).toEqual([
-            'array-1:auto:navigation-headingtrue:default',
-            'auto-1:auto:navigation-speedthroughwater:default'
-        ]);
-        expect(submitted.every(item => item.retentionDurationMs === 86400000)).toBe(true);
-    });
-
-    it('should deduplicate duplicate numeric paths with same source per widget', async () => {
-        vi.useFakeTimers();
-        TestBed.inject(DashboardHistorySeriesSyncService);
-        connectionStub.serverServiceEndpoint$.next({
-            operation: 2,
-            message: 'Connected',
-            serverDescription: 'Signal K',
-            httpServiceUrl: 'http://localhost:3000/signalk/v1/api/',
-            WsServiceUrl: 'ws://localhost:3000/signalk/v1/stream'
-        });
-
-        dashboardStub.dashboards.set([
-            {
-                id: 'dash-1',
-                name: 'Dashboard 1',
-                icon: 'dashboard-dashboard',
-                configuration: [
-                    {
-                        id: 'widget-dup',
-                        selector: 'widget-host2',
-                        input: {
-                            widgetProperties: {
-                                uuid: 'widget-dup',
-                                type: 'widget-numeric',
-                                config: {
-                                    supportAutomaticHistoricalSeries: true,
-                                    paths: {
-                                        numericPathA: {
-                                            description: 'A',
-                                            path: 'navigation.speedOverGround',
-                                            source: 'default',
-                                            pathType: 'number',
-                                            isPathConfigurable: true,
-                                            sampleTime: 500
-                                        },
-                                        numericPathB: {
-                                            description: 'B',
-                                            path: 'navigation.speedOverGround',
-                                            source: 'default',
-                                            pathType: 'number',
-                                            isPathConfigurable: true,
-                                            sampleTime: 1000
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                ]
-            }
-        ]);
-
-        await vi.advanceTimersByTimeAsync(800);
-
-        expect(reconcileSpy).toHaveBeenCalledTimes(1);
-        expect(vi.mocked(reconcileSpy).mock.lastCall[0].length).toBe(1);
     });
 
     it('resolves dedicated data chart and wind trends mappings via public widget resolver', () => {
@@ -650,13 +53,25 @@ describe('DashboardHistorySeriesSyncService', () => {
         const windSeries = service.resolveSeriesForWidget(windTrendsWidget);
 
         expect(dataChartSeries.map(item => item.seriesId)).toEqual(['widget-data-1:datachart']);
+        // Pin the fields the history dialog now consumes directly (path/source feed the SK history
+        // query; period/timeScale feed the backfill window). seriesId alone would not catch a
+        // mis-mapping that silently queries the wrong path or window.
+        expect(dataChartSeries[0]).toMatchObject({
+            path: 'navigation.speedThroughWater',
+            source: 'default',
+            timeScale: 'minute',
+            period: 10,
+        });
         expect(windSeries.map(item => item.seriesId).sort()).toEqual([
             'widget-wind-1:wind-direction',
             'widget-wind-1:wind-speed'
         ]);
+        const windByPath = Object.fromEntries(windSeries.map(s => [s.seriesId, s.path]));
+        expect(windByPath['widget-wind-1:wind-direction']).toBe('self.environment.wind.directionTrue');
+        expect(windByPath['widget-wind-1:wind-speed']).toBe('self.environment.wind.speedTrue');
     });
 
-    it('resolves widget-bms template mappings for plugin-side battery expansion', () => {
+    it('resolves widget-bms as an unexpanded battery template series (the dialog expands concretes)', () => {
         const service = TestBed.inject(DashboardHistorySeriesSyncService);
         const widget: IWidget = {
             uuid: 'widget-bms-1',
@@ -737,7 +152,7 @@ describe('DashboardHistorySeriesSyncService', () => {
     expect(series[0].allowedIds).toBeNull();
     });
 
-    it('resolves widget-solar-charger template mappings for plugin-side charger expansion', () => {
+    it('resolves widget-solar-charger as an unexpanded charger template series (the dialog expands concretes)', () => {
         const service = TestBed.inject(DashboardHistorySeriesSyncService);
         const widget: IWidget = {
             uuid: 'widget-solar-1',
@@ -1014,5 +429,13 @@ describe('DashboardHistorySeriesSyncService', () => {
             'widget-horizon-1:auto:self-navigation-attitude-pitch:default',
             'widget-horizon-1:auto:self-navigation-attitude-roll:default'
         ]);
+        // Pin the query/window fields the history dialog consumes for automatic series.
+        expect(series[0]).toMatchObject({
+            path: 'self.navigation.attitude.pitch',
+            source: 'default',
+            timeScale: 'minute',
+            period: 30,
+            sampleTime: 1000,
+        });
     });
 });

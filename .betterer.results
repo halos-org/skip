@@ -5,8 +5,8 @@
 //
 exports[`strictNullChecks`] = {
   value: `{
-    "src/app/app.component.ts:4055976915": [
-      [113, 19, 25, "Object is possibly \'undefined\'.", "255143637"]
+    "src/app/app.component.ts:2963952310": [
+      [111, 19, 25, "Object is possibly \'undefined\'.", "255143637"]
     ],
     "src/app/core/components/dashboard/dashboard.component.ts:3995263170": [
       [121, 12, 22, "Object is possibly \'undefined\'.", "2187394131"],
@@ -87,9 +87,9 @@ exports[`strictNullChecks`] = {
     "src/app/core/components/widget-embedded/widget-embedded.component.ts:3928020917": [
       [114, 4, 13, "Type \'Type<WidgetViewComponentBase> | undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.\\n  Type \'undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.", "2689238020"]
     ],
-    "src/app/core/components/widget-host2/widget-host2.component.ts:867588761": [
-      [137, 4, 13, "Type \'Type<WidgetViewComponentBase> | undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.\\n  Type \'undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.", "2689238020"],
-      [253, 32, 9, "Type \'null\' cannot be used as an index type.", "2171020380"]
+    "src/app/core/components/widget-host2/widget-host2.component.ts:4025766549": [
+      [134, 4, 13, "Type \'Type<WidgetViewComponentBase> | undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.\\n  Type \'undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.", "2689238020"],
+      [250, 32, 9, "Type \'null\' cannot be used as an index type.", "2171020380"]
     ],
     "src/app/core/components/widget-title/widget-title.component.ts:2551944470": [
       [25, 4, 14, "Type \'CanvasRenderingContext2D | null\' is not assignable to type \'CanvasRenderingContext2D\'.\\n  Type \'null\' is not assignable to type \'CanvasRenderingContext2D\'.", "912271434"],
