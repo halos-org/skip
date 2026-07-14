@@ -65,10 +65,16 @@ export class NotificationsService implements OnDestroy {
     emergency: { sound: 4, visual: 2 },
   };
 
+  // Window to let the server's post-resubscribe snapshot arrive before sweeping unconfirmed entries.
+  private static readonly RECONCILE_GRACE_MS = 3000;
+
   private _notificationDataStreamSubscription: Subscription | null = null;
   private _notificationMetaStreamSubscription: Subscription | null = null;
   private _connectionResetSubscription: Subscription;
   private _wasConnected = false;
+  private _reconcilePendingPaths: Set<string> | null = null;
+  private _reconcileSawSnapshot = false;
+  private _reconcileTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _notificationConfig: INotificationConfig;
   private _notificationConfig$ = new BehaviorSubject<INotificationConfig>(DefaultNotificationConfig);
@@ -93,14 +99,12 @@ export class NotificationsService implements OnDestroy {
 
     this._connectionResetSubscription = this.connectionStateMachine.state$.subscribe(state => {
       const connected = state === ConnectionState.Connected;
-      // On a (re)connection, drop notifications carried over from the previous session so stale
-      // alarms from a dropped or switched connection cannot linger. A drop alone does NOT clear —
-      // the last-known alarms stay visible through the outage. This is a blind clear that relies on
-      // the Signal K server re-delivering still-active notifications in its post-resubscribe snapshot
-      // (standard signalk-server behaviour) to repopulate them. Hardening the transient blank/audio
-      // restart into a reconcile (mark-stale + sweep) is tracked in #275.
+      // A drop alone does NOT clear — the last-known alarms stay visible (and sounding) through the
+      // outage. On (re)connection we reconcile the carried-over list against the server's fresh
+      // snapshot rather than blind-clearing, so an active alarm never transiently blanks or restarts
+      // its audio while the reconnect settles.
       if (connected && !this._wasConnected) {
-        this.clearNotifications();
+        this.beginReconnectReconcile();
       }
       this._wasConnected = connected;
     });
@@ -146,7 +150,7 @@ export class NotificationsService implements OnDestroy {
 
   private reset() {
     // Clears the list ONLY when notifications are disabled (a #147-pinned behaviour); otherwise it
-    // just recomputes the aggregate. Distinct from clearNotifications(), which always clears.
+    // just recomputes the aggregate.
     if (this._notificationConfig.disableNotifications) {
       this._notifications = [];
       this._notifications$.next([]);
@@ -154,10 +158,42 @@ export class NotificationsService implements OnDestroy {
     this.updateNotificationsState();
   }
 
-  private clearNotifications(): void {
-    this._notifications = [];
-    this._notifications$.next([]);
+  /**
+   * Reconcile carried-over notifications against the server's post-resubscribe snapshot instead of
+   * blind-clearing. Every current entry is marked pending; each delta that arrives during the grace
+   * window confirms its path. After the window, only still-unconfirmed entries are swept — and only
+   * when the server actually re-delivered a snapshot, so a server that emits notifications only on
+   * change (not on subscribe) leaves an active alarm in place rather than silently dropping it.
+   */
+  private beginReconnectReconcile(): void {
+    const pendingPaths = this._notifications.filter(n => n.value).map(n => n.path);
+    if (pendingPaths.length === 0) return;
+
+    this._reconcilePendingPaths = new Set(pendingPaths);
+    this._reconcileSawSnapshot = false;
+    this.clearReconcileTimer();
+    this._reconcileTimer = setTimeout(
+      () => this.sweepUnconfirmedNotifications(),
+      NotificationsService.RECONCILE_GRACE_MS
+    );
+  }
+
+  private sweepUnconfirmedNotifications(): void {
+    const pending = this._reconcilePendingPaths;
+    this._reconcileTimer = null;
+    this._reconcilePendingPaths = null;
+    if (!pending || !this._reconcileSawSnapshot || pending.size === 0) return;
+
+    this._notifications = this._notifications.filter(n => !pending.has(n.path));
     this.updateNotificationsState();
+    this.emitNotifications();
+  }
+
+  private clearReconcileTimer(): void {
+    if (this._reconcileTimer !== null) {
+      clearTimeout(this._reconcileTimer);
+      this._reconcileTimer = null;
+    }
   }
 
   private emitNotifications(): void {
@@ -252,6 +288,14 @@ export class NotificationsService implements OnDestroy {
 
   private processNotificationDeltaMsg(delta: ISignalKDataValueUpdate) {
     if (delta.path.startsWith("notifications.security")) return;
+
+    if (this._reconcilePendingPaths?.has(delta.path)) {
+      // Only re-delivery of a carried path is evidence the server sent a snapshot, and it confirms
+      // that path. An unrelated/new-path delta must NOT arm the sweep, or a change-only server's
+      // incidental update would let the sweep drop still-active carried alarms.
+      this._reconcileSawSnapshot = true;
+      this._reconcilePendingPaths.delete(delta.path);
+    }
 
     if (delta.value === null) {
       this.deleteValue(delta.path);
@@ -435,6 +479,7 @@ export class NotificationsService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearReconcileTimer();
     this._connectionResetSubscription?.unsubscribe();
     this._notificationDataStreamSubscription?.unsubscribe();
     this._notificationMetaStreamSubscription?.unsubscribe();
