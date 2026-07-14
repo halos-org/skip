@@ -26,17 +26,21 @@ interface ISignalKEndpointResponse {
 }
 
 /**
- * Operation value represent connection statuses.
- * @usageNotes `operation` field describes the type of operation being
- * performed on the connections.
- * `0 = Stopped
- * `1 = Connecting (connection being set up/under execution)
- * `2 = Connected
- * `3 = Error connecting
- * `4 = Resetting
+ * HTTP endpoint discovery status for the Signal K server connection.
+ */
+export enum EndpointStatus {
+  Disconnected = 'Disconnected',
+  Connecting = 'Connecting',
+  Connected = 'Connected',
+  Error = 'Error'
+}
+
+/**
+ * Signal K server HTTP endpoint discovery result: connection status plus the
+ * discovered service URLs.
  */
 export interface IEndpointStatus {
-  operation: number;
+  state: EndpointStatus;
   message: string;
   serverDescription: string | null;
   httpServiceUrl: string | null;     // v1 API endpoint
@@ -62,7 +66,7 @@ export class SignalKConnectionService {
   }
 
   public serverServiceEndpoint$: BehaviorSubject<IEndpointStatus> = new BehaviorSubject<IEndpointStatus>({
-    operation: 0,
+    state: EndpointStatus.Disconnected,
     message: "Not connected",
     serverDescription: null,
     httpServiceUrl: null,
@@ -171,7 +175,7 @@ export class SignalKConnectionService {
     this.currentSubscribeAll = subscribeAll;
 
     const serverServiceEndpoints: IEndpointStatus = {
-      operation: 1,
+      state: EndpointStatus.Connecting,
       message: "Connecting...",
       serverDescription: null,
       httpServiceUrl: null,
@@ -210,7 +214,7 @@ export class SignalKConnectionService {
       this.connectionStateMachine.onHTTPDiscoverySuccess();
 
     } catch (error) {
-      serverServiceEndpoints.operation = 3;
+      serverServiceEndpoints.state = EndpointStatus.Error;
       serverServiceEndpoints.message = error.message;
 
       // Notify ConnectionStateMachine of HTTP failure
@@ -275,7 +279,7 @@ export class SignalKConnectionService {
 
     } catch (error) {
       const serverServiceEndpoints: IEndpointStatus = {
-        operation: 3,
+        state: EndpointStatus.Error,
         message: error.message,
         serverDescription: null,
         httpServiceUrl: null,
@@ -318,7 +322,7 @@ export class SignalKConnectionService {
     }
 
     const serverServiceEndpoints: IEndpointStatus = {
-      operation: 2,
+      state: EndpointStatus.Connected,
       message: endpointResponse.status?.toString() || "Connected",
       serverDescription: `${endpointResponse.body.server.id} ${endpointResponse.body.server.version}`,
       httpServiceUrl: null,

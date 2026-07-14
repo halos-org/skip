@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SignalKConnectionService } from './signalk-connection.service';
+import { EndpointStatus, SignalKConnectionService } from './signalk-connection.service';
 import { ConnectionStateMachine } from './connection-state-machine.service';
 
 describe('SignalKConnectionService', () => {
@@ -24,7 +24,7 @@ describe('SignalKConnectionService', () => {
   // contract, including the fail-loud behavior for a malformed discovery response.
   const parseEndpoint = (body: unknown, proxyEnabled = false) =>
     (service as unknown as {
-      processEndpointResponse: (r: unknown, p?: boolean, s?: boolean) => { operation: number; httpServiceUrl: string | null };
+      processEndpointResponse: (r: unknown, p?: boolean, s?: boolean) => { state: EndpointStatus; httpServiceUrl: string | null };
     }).processEndpointResponse(new HttpResponse({ body, status: 200 }), proxyEnabled);
 
   const wellFormedBody = {
@@ -33,9 +33,9 @@ describe('SignalKConnectionService', () => {
   };
 
   describe('processEndpointResponse', () => {
-    it('returns a connected (operation 2) endpoint for a well-formed v1 response', () => {
+    it('returns a connected endpoint for a well-formed v1 response', () => {
       const status = parseEndpoint(wellFormedBody);
-      expect(status.operation).toBe(2);
+      expect(status.state).toBe(EndpointStatus.Connected);
       expect(status.httpServiceUrl).toBe('http://host:3000/signalk/v1/api/');
     });
 

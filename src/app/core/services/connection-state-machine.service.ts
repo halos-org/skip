@@ -22,7 +22,6 @@ export enum ConnectionState {
  */
 export interface IConnectionStatus {
   state: ConnectionState;
-  operation: number; // Legacy operation codes for compatibility
   message: string;
   retryCount?: number;
   maxRetries?: number;
@@ -308,35 +307,11 @@ export class ConnectionStateMachine implements OnDestroy {
   private createStatus(state: ConnectionState, message: string, retryCount?: number, maxRetries?: number): IConnectionStatus {
     return {
       state,
-      operation: this.stateToOperationCode(state),
       message,
       retryCount: retryCount || 0,
       maxRetries: maxRetries || 0,
       timestamp: new Date()
     };
-  }
-
-  private stateToOperationCode(state: ConnectionState): number {
-    switch (state) {
-      case ConnectionState.Disconnected:
-        return 0;
-      case ConnectionState.HTTPDiscovering:
-      case ConnectionState.WebSocketConnecting:
-        return 1; // Connecting
-      case ConnectionState.Connected:
-        return 2; // Connected
-      case ConnectionState.HTTPError:
-      case ConnectionState.WebSocketError:
-      case ConnectionState.HTTPRetrying:
-      case ConnectionState.WebSocketRetrying:
-        return 3; // Error/Retrying
-      case ConnectionState.HTTPConnected:
-        return 2; // Connected (HTTP level)
-      case ConnectionState.PermanentFailure:
-        return 5; // Permanent failure
-      default:
-        return 0;
-    }
   }
 
   private scheduleHTTPRetry(): void {

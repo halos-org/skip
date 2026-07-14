@@ -1,5 +1,5 @@
 import { cloneDeep } from 'lodash-es';
-import { IEndpointStatus, SignalKConnectionService } from './signalk-connection.service';
+import { EndpointStatus, IEndpointStatus, SignalKConnectionService } from './signalk-connection.service';
 import { Injectable, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { IConfig } from "../interfaces/app-settings.interfaces";
@@ -154,7 +154,7 @@ export class StorageService {
       this.serverEndpoint = this._networkStatus.httpServiceUrl.substring(0, this._networkStatus.httpServiceUrl.length - 4) + "applicationData/"; // this removes 'api/' from the end;
     }
 
-    if (this._networkStatus?.operation === 2 && this._isLoggedIn && this.serverEndpoint) {
+    if (this._networkStatus?.state === EndpointStatus.Connected && this._isLoggedIn && this.serverEndpoint) {
       this.storageServiceReady$.next(true);
       console.log(`[Remote Storage Service] Authenticated ${this._isLoggedIn}, AppData API: ${this.serverEndpoint}`);
     } else {

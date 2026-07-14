@@ -5,24 +5,25 @@ import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
 import { ISignalKDataValueUpdate, ISignalKDeltaMessage, ISignalKMeta, ISignalKUpdateMessage } from '../interfaces/signalk-interfaces';
 import { IMeta, IPathValueData } from "../interfaces/app-interfaces";
-import { SignalKConnectionService, IEndpointStatus } from './signalk-connection.service'
+import { SignalKConnectionService, IEndpointStatus, EndpointStatus } from './signalk-connection.service'
 import { AuthenticationService } from './authentication.service';
 import { ConnectionStateMachine, ConnectionState } from './connection-state-machine.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 
 /**
- * Operation value represent connection statuses.
- * @usageNotes `operation` field describes the type of operation being
- * performed on the connections.
- * `0 = Stopped
- * `1 = Connecting (connection being set up/under execution)
- * `2 = Connected
- * `3 = Error connecting
- * `4 = Resetting
+ * WebSocket delta-stream connection status.
  */
+export enum StreamStatus {
+  Disconnected = 'Disconnected',
+  Connecting = 'Connecting',
+  Connected = 'Connected',
+  Error = 'Error',
+  Closing = 'Closing'
+}
+
 export interface IStreamStatus {
-  operation: number;
+  state: StreamStatus;
   message: string;
 }
 
@@ -63,7 +64,7 @@ export class SignalKDeltaService implements OnDestroy {
 
   // Delta Service Endpoint status publishing
   public streamEndpoint: IStreamStatus = {
-    operation: 0,
+    state: StreamStatus.Disconnected,
     message: "Not connected",
   }
   public streamEndpoint$: BehaviorSubject<IStreamStatus> = new BehaviorSubject<IStreamStatus>(this.streamEndpoint);
@@ -106,7 +107,7 @@ export class SignalKDeltaService implements OnDestroy {
     this.server.serverServiceEndpoint$
       .pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe((endpointStatus: IEndpointStatus) => {
-        if (endpointStatus.operation === 2) {
+        if (endpointStatus.state === EndpointStatus.Connected) {
           this.endpointWS = endpointStatus.WsServiceUrl;
 
           // Set subscription type
@@ -153,7 +154,7 @@ export class SignalKDeltaService implements OnDestroy {
       .pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe(() => {
         this.streamEndpoint.message = "Connected";
-        this.streamEndpoint.operation = 2;
+        this.streamEndpoint.state = StreamStatus.Connected;
         console.log("[Delta Service] WebSocket connected");
         this.streamEndpoint$.next(this.streamEndpoint);
 
@@ -172,11 +173,11 @@ export class SignalKDeltaService implements OnDestroy {
         if (event.wasClean) {
           console.log('[Delta Service] WebSocket closed cleanly');
           this.streamEndpoint.message = "WebSocket closed";
-          this.streamEndpoint.operation = 0;
+          this.streamEndpoint.state = StreamStatus.Disconnected;
         } else {
           console.log('[Delta Service] WebSocket terminated due to socket error');
           this.streamEndpoint.message = "WebSocket error";
-          this.streamEndpoint.operation = 3;
+          this.streamEndpoint.state = StreamStatus.Error;
 
           // Notify ConnectionStateMachine of WebSocket error
           this.connectionStateMachine.onWebSocketError('WebSocket connection lost');
@@ -209,7 +210,7 @@ export class SignalKDeltaService implements OnDestroy {
    */
   public connectWS(reason: string): void {
     this.streamEndpoint.message = "Connecting";
-    this.streamEndpoint.operation = 1;
+    this.streamEndpoint.state = StreamStatus.Connecting;
     console.log(`[Delta Service] ${reason}: WebSocket opening...`);
     this.streamEndpoint$.next(this.streamEndpoint);
 
@@ -271,7 +272,7 @@ export class SignalKDeltaService implements OnDestroy {
     }
 
     this.streamEndpoint.message = "Not connected";
-    this.streamEndpoint.operation = 0;
+    this.streamEndpoint.state = StreamStatus.Disconnected;
     this.streamEndpoint$.next(this.streamEndpoint);
   }
 
@@ -303,7 +304,7 @@ export class SignalKDeltaService implements OnDestroy {
   */
   public closeWS(reason: string) {
     if (this.socketWS$) {
-      this.streamEndpoint.operation = 4; // closing status. Internal - no need to push to Observers
+      this.streamEndpoint.state = StreamStatus.Closing; // internal - no need to push to Observers
       console.log("[Delta Service] " + reason + ": WebSocket closing...");
       this.socketWS$.complete();
     }
