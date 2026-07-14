@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
-import { Router } from '@angular/router';
 
 import { AppNetworkInitService, IBootstrapIssue } from './app-initNetwork.service';
 import { IConfig, IConnectionConfig } from '../interfaces/app-settings.interfaces';
@@ -55,10 +54,6 @@ describe('AppNetworkInitService', () => {
         startWebSocketConnection: vi.fn()
     };
 
-    const mockRouter = {
-        navigate: vi.fn().mockResolvedValue(true)
-    };
-
     const validRemoteConfig = (): IConfig => ({ app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig);
 
     const mockStorage = {
@@ -84,7 +79,6 @@ describe('AppNetworkInitService', () => {
         mockStorage.bootstrapRemoteContext.mockClear();
         mockAuth.loginStatusValue = null;
         mockAuth.refreshLoginStatus.mockClear();
-        mockRouter.navigate.mockClear();
         mockSsoRedirect.attemptAutoRedirect.mockClear().mockReturnValue('redirected');
         mockSsoRedirect.resetBudget.mockClear();
         mockSsoRedirect.isBudgetExhausted.mockClear().mockReturnValue(false);
@@ -96,7 +90,6 @@ describe('AppNetworkInitService', () => {
                 { provide: AuthenticationService, useValue: mockAuth },
                 { provide: SsoRedirectService, useValue: mockSsoRedirect },
                 { provide: ConnectionStateMachine, useValue: mockConnectionStateMachine },
-                { provide: Router, useValue: mockRouter },
                 { provide: SignalKDeltaService, useValue: {} },
                 { provide: DataService, useValue: {} },
                 { provide: StorageService, useValue: mockStorage },
@@ -118,6 +111,12 @@ describe('AppNetworkInitService', () => {
         let issue: IBootstrapIssue = { reason: 'none' };
         service.bootstrapIssue$.subscribe(i => (issue = i)).unsubscribe();
         return issue;
+    }
+
+    function latestStatus(): string {
+        let status = '';
+        service.bootstrapStatus$.subscribe(s => (status = s)).unsubscribe();
+        return status;
     }
 
     function setConnConfig(cfg: Partial<IConnectionConfig>): void {
@@ -210,7 +209,6 @@ describe('AppNetworkInitService', () => {
             routeToReauth();
 
             expect(mockSsoRedirect.attemptAutoRedirect).toHaveBeenCalledWith(mockAuth.loginStatusValue);
-            expect(mockRouter.navigate).not.toHaveBeenCalled();
         });
 
         it('cookie mode honors oidcAutoLogin:false (no auto-redirect on a 401)', () => {
@@ -375,7 +373,34 @@ describe('AppNetworkInitService', () => {
 
             await service.initNetworkServices();
 
+            // Unknown bootstrap failure surfaces the in-place recovery state (degraded -> Retry toast),
+            // never a redirect to the legacy /options page (#190).
             expect(latestIssue()).toEqual({ reason: 'unknown', statusCode: 404 });
+            expect(latestStatus()).toBe('degraded');
+        });
+
+        it('network-unreachable (status 0) that stays down: raises the recovery issue, degraded, no redirect', async () => {
+            mockConnection.initializeConnection.mockRejectedValueOnce({ status: 0 });
+            // Terminal, non-recovered state so the HTTP retry wait returns at once.
+            mockConnectionStateMachine.currentState = ConnectionState.PermanentFailure;
+
+            await service.initNetworkServices();
+
+            expect(latestIssue()).toEqual({ reason: 'network-unreachable', statusCode: 0 });
+            expect(latestStatus()).toBe('degraded');
+        });
+
+        it('network-unreachable (status 0) that recovers during retry: reports startup-failed, not a false "cannot reach"', async () => {
+            mockConnection.initializeConnection.mockRejectedValueOnce({ status: 0 });
+            // HTTP is back by the time the retry wait checks -> recovery branch.
+            mockConnectionStateMachine.currentState = ConnectionState.HTTPConnected;
+
+            await service.initNetworkServices();
+
+            // Reachable again but bootstrap never completed -> an accurate 'unknown' recovery issue,
+            // NOT a misleading 'network-unreachable' that would claim the server is unreachable.
+            expect(latestIssue()).toEqual({ reason: 'unknown', statusCode: 0 });
+            expect(latestStatus()).toBe('degraded');
         });
 
         it('starts the WebSocket once from a fresh HTTPConnected state', async () => {
