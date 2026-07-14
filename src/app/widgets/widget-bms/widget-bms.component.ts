@@ -1231,7 +1231,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     const displayUnit = this.units.getDefaults().Temperature;
     const converted = this.units.convertToUnit(displayUnit, value);
     if (converted === null) return '';
-    return `${converted.toFixed(1)} ${displayUnit === 'celsius' ? '°C' : '°F'}`;
+    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(displayUnit)}`;
   }
 
   private splitMetricText(rawText: string, unitSuffix: string): { valueText: string; unitText: string } {

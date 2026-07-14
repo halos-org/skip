@@ -19,6 +19,7 @@ import {CanvasService} from '../../core/services/canvas.service';
 import {getColors} from '../../core/utils/themeColors.utils';
 import {DashboardService} from '../../core/services/dashboard.service';
 import {SignalkRequestsService} from '../../core/services/signalk-requests.service';
+import {UnitsService} from '../../core/services/units.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
@@ -44,6 +45,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private readonly canvas = inject(CanvasService);
   protected readonly dashboard = inject(DashboardService);
   private readonly signalk = inject(SignalkRequestsService);
+  private readonly unitsService = inject(UnitsService);
   private readonly destroyRef = inject(DestroyRef);
 
   // Static config from legacy defaultConfig
@@ -398,7 +400,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
 
     this.canvas.drawText(
       this.ctx,
-      (this.runtime.options()?.paths as IPathArray | undefined)?.['dtsPath']?.convertUnitTo || 'm',
+      this.unitsService.getUnitDisplaySymbol((this.runtime.options()?.paths as IPathArray | undefined)?.['dtsPath']?.convertUnitTo || 'm'),
       Math.floor(this.cssWidth * 0.975),
       Math.floor(this.cssHeight * 0.60),
       Math.floor(this.cssWidth * 0.95),
@@ -493,13 +495,13 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private setLenBias(): void {
     const cfg = this.runtime.options(); if (!cfg) return;
     if ((cfg.paths as IPathArray)['lineLengthPath'].path && this.lengthValue != null) {
-      let unit = (cfg.paths as IPathArray)['lineLengthPath'].convertUnitTo;
-      if (unit === 'feet') unit = '′';
+      const rawUnit = (cfg.paths as IPathArray)['lineLengthPath'].convertUnitTo;
+      const unit = rawUnit === 'feet' ? '′' : this.unitsService.getUnitDisplaySymbol(rawUnit);
       this.lineLengthValue.set(`―${this.applyDecorations(this.lengthValue.toFixed(cfg.numDecimal))}${unit}―`);
     }
     if ((cfg.paths as IPathArray)['lineBiasPath'].path && this.biasValue != null) {
-      let unit = (cfg.paths as IPathArray)['lineBiasPath'].convertUnitTo;
-      if (unit === 'feet') unit = '′';
+      const rawUnit = (cfg.paths as IPathArray)['lineBiasPath'].convertUnitTo;
+      const unit = rawUnit === 'feet' ? '′' : this.unitsService.getUnitDisplaySymbol(rawUnit);
       if (this.biasValue < 0) {
         this.portBiasValue.set('+' + (-this.biasValue).toFixed(cfg.numDecimal) + unit);
         this.stbBiasValue.set(this.biasValue.toFixed(cfg.numDecimal) + unit);

@@ -686,7 +686,7 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
 
   private formatTemperature(value: number | null | undefined): string {
     if (value == null || Number.isNaN(value)) return '-';
-    return `${value.toFixed(1)} ${this.units.getDefaults().Temperature === 'celsius' ? '°C' : '°F'}`;
+    return `${value.toFixed(1)} ${this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature)}`;
   }
 
   private toStringValue(value: unknown): string | null {

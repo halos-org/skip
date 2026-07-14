@@ -118,8 +118,10 @@ export class WidgetSimpleLinearComponent {
         });
 
         // Unit label (abr|full)
-        const unit = cfg.paths?.['gaugePath'].convertUnitTo;
-        this.unitsLabel.set(cfg.gauge?.unitLabelFormat === 'abr' ? unit?.substring(0,1) : unit);
+        const unit = this.unitsService.getUnitDisplaySymbol(cfg.paths?.['gaugePath'].convertUnitTo);
+        // Symbols are already compact; only truncate longer ones in 'abr' mode so short symbols that
+        // share a first character (°C/°F, kn) stay distinct.
+        this.unitsLabel.set(cfg.gauge?.unitLabelFormat === 'abr' && unit.length > 2 ? unit.substring(0,1) : unit);
       });
     });
 

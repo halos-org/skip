@@ -621,7 +621,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
   private getPrimaryAxisUnitLabel(): string {
     const convertUnitTo = this.resolveConvertUnitTo();
 
-    return this.getUnitsLabel(convertUnitTo);
+    return this.units.getUnitDisplaySymbol(convertUnitTo);
   }
 
   private resolveConvertUnitTo(rawPath?: string): string | null {
@@ -813,29 +813,5 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
   private normalizeContext(context: string | null | undefined): string | undefined {
     const trimmed = typeof context === 'string' ? context.trim() : '';
     return trimmed.length ? trimmed : undefined;
-  }
-
-  /**
-   * Returns a display label for the y-axis unit, based on widget config.
-   * @param unit The convertUnitTo string
-   * @returns string label for axis
-   */
-  private getUnitsLabel(unit: string | null | undefined): string {
-    if (!unit) return '';
-    switch (unit) {
-      case 'percent':
-      case 'percentraw':
-        return '%';
-      case 'latitudeMin':
-        return 'latitude in minutes';
-      case 'latitudeSec':
-        return 'latitude in secondes';
-      case 'longitudeMin':
-        return 'longitude in minutes';
-      case 'longitudeSec':
-        return 'longitude in secondes';
-      default:
-        return unit;
-    }
   }
 }

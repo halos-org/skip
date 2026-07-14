@@ -67,6 +67,8 @@ export interface IUnitGroup {
 export interface IUnit {
   measure: string;
   description: string;
+  /** Display-only label rendered next to values; falls back to `measure` when absent. */
+  symbol?: string;
 }
 
 /**
@@ -114,22 +116,22 @@ export class UnitsService {
       { measure: ' ', description: "No unit label - As-Is numeric value" }
     ] },
     { group: 'Speed', units: [
-      { measure: 'knots', description: "Knots - Nautical miles per hour"},
-      { measure: 'kph', description: "kph - Kilometers per hour"},
+      { measure: 'knots', symbol: 'kn', description: "Knots - Nautical miles per hour"},
+      { measure: 'kph', symbol: 'km/h', description: "kph - Kilometers per hour"},
       { measure: 'mph', description: "mph - Miles per hour"},
       { measure: 'm/s', description: "m/s - Meters per second (base)"}
     ] },
     { group: 'Flow', units: [
-      { measure: 'm3/s', description: "Cubic meters per second (base)"},
+      { measure: 'm3/s', symbol: 'm³/s', description: "Cubic meters per second (base)"},
       { measure: 'l/min', description: "Liters per minute"},
       { measure: 'l/h', description: "Liters per hour"},
-      { measure: 'g/min', description: "Gallons per minute"},
-      { measure: 'g/h', description: "Gallons per hour"}
+      { measure: 'g/min', symbol: 'gal/min', description: "Gallons per minute"},
+      { measure: 'g/h', symbol: 'gal/h', description: "Gallons per hour"}
     ] },
     { group: 'Fuel Distance', units: [
-      { measure: 'm/m3', description: "Meters per cubic meter (base)"},
+      { measure: 'm/m3', symbol: 'm/m³', description: "Meters per cubic meter (base)"},
       { measure: 'nm/l', description: "Nautical Miles per liter"},
-      { measure: 'nm/g', description: "Nautical Miles per gallon"},
+      { measure: 'nm/g', symbol: 'nm/gal', description: "Nautical Miles per gallon"},
       { measure: 'km/l', description: "Kilometers per liter"},
       { measure: 'mpg', description: "Miles per Gallon"},
     ] },
@@ -142,23 +144,23 @@ export class UnitsService {
     ] },
     { group: 'Temperature', units: [
       { measure: 'K', description: "Kelvin (base)"},
-      { measure: 'celsius', description: "Celsius"},
-      { measure: 'fahrenheit', description: "Fahrenheit"}
+      { measure: 'celsius', symbol: '°C', description: "Celsius"},
+      { measure: 'fahrenheit', symbol: '°F', description: "Fahrenheit"}
      ] },
     { group: 'Length', units: [
       { measure: 'm', description: "Meters (base)"},
       { measure: 'mm', description: "Millimeters"},
-      { measure: 'fathom', description: "Fathoms"},
+      { measure: 'fathom', symbol: 'ftm', description: "Fathoms"},
       { measure: 'nm', description: "Nautical Miles"},
       { measure: 'km', description: "Kilometers"},
       { measure: 'mi', description: "Miles"},
-      { measure: 'feet', description: "Feet"},
-      { measure: 'inch', description: "Inches"},
+      { measure: 'feet', symbol: 'ft', description: "Feet"},
+      { measure: 'inch', symbol: 'in', description: "Inches"},
     ] },
     { group: 'Volume', units: [
-      { measure: 'liter', description: "Liters (base)"},
-      { measure: 'm3', description: "Cubic Meters"},
-      { measure: 'gallon', description: "Gallons"},
+      { measure: 'liter', symbol: 'L', description: "Liters (base)"},
+      { measure: 'm3', symbol: 'm³', description: "Cubic Meters"},
+      { measure: 'gallon', symbol: 'gal', description: "Gallons"},
      ] },
     { group: 'Current', units: [
       { measure: 'A', description: "Amperes (base)"},
@@ -181,8 +183,8 @@ export class UnitsService {
       { measure: 'kWh', description: "Kilowatt*Hours"},
     ] },
     { group: 'Resistance', units: [
-      { measure: 'ohm', description: "\u2126 (base)"},
-      { measure: 'kiloohm', description: "k\u2126"},
+      { measure: 'ohm', symbol: "\u2126", description: "\u2126 (base)"},
+      { measure: 'kiloohm', symbol: "k\u2126", description: "k\u2126"},
     ] },
     { group: 'Pressure', units: [
       { measure: 'Pa', description: "Pa (base)" },
@@ -197,9 +199,9 @@ export class UnitsService {
     { group: 'Density', units: [ { measure: 'kg/m3', description: "Air density - kg/cubic meter (base)"} ] },
     { group: 'Time', units: [
       { measure: 's', description: "Seconds (base)" },
-      { measure: 'Minutes', description: "Minutes" },
-      { measure: 'Hours', description: "Hours" },
-      { measure: 'Days', description: "Days" },
+      { measure: 'Minutes', symbol: 'min', description: "Minutes" },
+      { measure: 'Hours', symbol: 'h', description: "Hours" },
+      { measure: 'Days', symbol: 'd', description: "Days" },
       { measure: 'D HH:MM:SS', description: "Day Hour:Minute:sec"}
     ] },
     { group: 'Angular Velocity', units: [
@@ -220,16 +222,16 @@ export class UnitsService {
       { measure: 'GHz', description: "GHz - Gigahertz" },
     ] },
     { group: 'Ratio', units: [
-      { measure: 'percent', description: "As percentage value" },
-      { measure: 'percentraw', description: "As ratio 0-1 with % sign" },
+      { measure: 'percent', symbol: '%', description: "As percentage value" },
+      { measure: 'percentraw', symbol: '%', description: "As ratio 0-1 with % sign" },
       { measure: 'ratio', description: "Ratio 0-1 (base)" }
     ] },
     { group: 'Position', units: [
-      { measure: 'pdeg', description: "Position Degrees" },
-      { measure: 'latitudeMin', description: "Latitude in minutes" },
-      { measure: 'latitudeSec', description: "Latitude in seconds" },
-      { measure: 'longitudeMin', description: "Longitude in minutes" },
-      { measure: 'longitudeSec', description: "Longitude in seconds" },
+      { measure: 'pdeg', symbol: '°', description: "Position Degrees" },
+      { measure: 'latitudeMin', symbol: 'lat ′', description: "Latitude in minutes" },
+      { measure: 'latitudeSec', symbol: 'lat ″', description: "Latitude in seconds" },
+      { measure: 'longitudeMin', symbol: 'lon ′', description: "Longitude in minutes" },
+      { measure: 'longitudeSec', symbol: 'lon ″', description: "Longitude in seconds" },
     ] },
   ];
 
@@ -648,6 +650,24 @@ export class UnitsService {
    */
   public getDefaults(): IUnitDefaults {
     return this._defaultUnits;
+  }
+
+  /**
+   * Resolves the display-only label for a measure (the on-screen unit symbol), falling back to the
+   * measure key itself when no dedicated symbol is defined. This is the single seam every render site
+   * uses so units are labelled consistently (no spelled-out words), independent of the internal key.
+   */
+  public getUnitDisplaySymbol(measure: string | null | undefined): string {
+    if (!measure) {
+      return '';
+    }
+    for (const group of this._conversionList) {
+      const unit = group.units.find(u => u.measure === measure);
+      if (unit) {
+        return unit.symbol ?? unit.measure;
+      }
+    }
+    return measure;
   }
 
   /**

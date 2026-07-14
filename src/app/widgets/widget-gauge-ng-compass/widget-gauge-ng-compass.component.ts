@@ -17,6 +17,7 @@ import { KipResizeObserverDirective } from '../../core/directives/kip-resize-obs
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { ITheme } from '../../core/services/app-service';
+import { UnitsService } from '../../core/services/units.service';
 
 function rgbaToHex(rgba: string) {
   const match = rgba.match(/(\d+(\.\d+)?|\.\d+)/g);
@@ -57,6 +58,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
   // Inject directives/services
   private readonly runtime = inject(WidgetRuntimeDirective);
   private readonly streams = inject(WidgetStreamsDirective);
+  private readonly unitsService = inject(UnitsService);
 
   // Static DEFAULT_CONFIG for Host2
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -210,7 +212,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
   private buildGaugeOptions(cfg: IWidgetSvcConfig, theme: ITheme) {
     const g = this.gaugeOptions = {} as RadialGaugeOptions;
     g.title = this.displayName();
-    g.minValue = 0; g.maxValue = 360; g.units = cfg.paths?.['gaugePath']?.convertUnitTo || '';
+    g.minValue = 0; g.maxValue = 360; g.units = this.unitsService.getUnitDisplaySymbol(cfg.paths?.['gaugePath']?.convertUnitTo);
     // Use configured integer/decimal digits (compass default: whole degrees)
     g.valueDec = cfg.numDecimal ?? 0; g.valueInt = cfg.numInt ?? 1;
     g.barProgress = false; g.barWidth = 0;

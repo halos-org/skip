@@ -810,7 +810,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       .attr('dx', 1)
       .attr('font-size', 6)
       .attr('fill', 'var(--kip-contrast-dim-color)')
-      .text(`${this.units.getDefaults().Temperature === 'celsius' ? '°C' : '°F'}`);
+      .text(this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature));
 
     merged.select('text.charger-mode')
       .attr('x', 5)

@@ -759,40 +759,6 @@ export class WidgetDataChartComponent implements OnDestroy {
     return colors;
   }
 
-  private getUnitsLabel(): string | null | undefined {
-    let label: string | null | undefined = null;
-    const unit = this.runtime.options()?.convertUnitTo;
-    switch (unit) {
-
-      case "percent":
-      case "percentraw":
-        label = "%";
-        break;
-
-      case "latitudeMin":
-        label = "latitude in minutes";
-        break;
-
-      case "latitudeSec":
-        label = "latitude in secondes";
-        break;
-
-      case "longitudeMin":
-        label = "longitude in minutes";
-        break;
-
-      case "longitudeSec":
-        label = "longitude in secondes";
-        break;
-
-      default:
-        label = unit;
-        break;
-    }
-
-    return label;
-  }
-
   private startStreaming(): void {
     const cfg = this.runtime.options();
     if (!cfg?.datachartPath) return;
@@ -855,7 +821,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (convertedTrack !== null && Number.isFinite(convertedTrack)) {
       const titlePlugin = this.chart.options.plugins?.title;
       if (titlePlugin) {
-        titlePlugin.text = `${convertedTrack.toFixed(cfg.numDecimal)} ${this.getUnitsLabel()} `;
+        titlePlugin.text = `${convertedTrack.toFixed(cfg.numDecimal)} ${this.unitsService.getUnitDisplaySymbol(unit)} `;
       }
     }
 

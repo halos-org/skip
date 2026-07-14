@@ -53,7 +53,7 @@ describe('WidgetDataChartComponent', () => {
 
   const runtimeMock = { options: vi.fn() };
   const historyMock = { getBackfillThenLive: vi.fn() };
-  const unitsMock = { convertToUnit: (_unit: string, value: number) => value };
+  const unitsMock = { convertToUnit: (_unit: string, value: number) => value, getUnitDisplaySymbol: (measure: string) => measure };
   const canvasMock = { releaseCanvas: vi.fn() };
 
   const setup = async (config: IWidgetSvcConfig): Promise<void> => {

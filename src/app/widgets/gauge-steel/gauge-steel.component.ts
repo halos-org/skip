@@ -109,7 +109,7 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
 
     //labels
     this.gaugeOptions['titleString'] = this.title();
-    this.gaugeOptions['unitString'] = this.units();
+    this.gaugeOptions['unitString'] = this.unitsService.getUnitDisplaySymbol(this.units());
 
     // Radial Arc size
     if (this.subType() == 'radial') {
