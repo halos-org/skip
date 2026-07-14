@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppService } from '../../services/app-service';
-import { ChromeVisibilityService } from '../../services/chrome-visibility.service';
+import { ChromeVisibilityService, CHROME_HOVER_DWELL_MS } from '../../services/chrome-visibility.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { DialogService } from '../../services/dialog.service';
 import { NotificationsService } from '../../services/notifications.service';
@@ -126,6 +126,117 @@ describe('ToolbarComponent', () => {
     chrome.revealed.set(true);
     init();
     expect(el.querySelector('.toolbar-host')!.classList.contains('revealed')).toBe(true);
+  });
+
+  describe('hover-reveal (peek-band dwell)', () => {
+    // Drive the component's document-pointermove handler directly: dispatching on `document` would also
+    // fire the leaked listeners of prior test fixtures, breaking isolation.
+    interface HoverApi { onDocumentPointerMove: (e: PointerEvent) => void }
+    const move = (clientY: number, pointerType = 'mouse') => ({ clientY, pointerType }) as PointerEvent;
+
+    it('reveals the toolbar after the cursor dwells in the top peek band', () => {
+      vi.useFakeTimers();
+      try {
+        init();
+        const api = fixture.componentInstance as unknown as HoverApi;
+        api.onDocumentPointerMove(move(4)); // within the 8px band
+        expect(chrome.reveal).not.toHaveBeenCalled(); // not until the dwell elapses
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS);
+        expect(chrome.reveal).toHaveBeenCalledTimes(1);
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('cancels the dwell when the cursor leaves the band before it elapses', () => {
+      vi.useFakeTimers();
+      try {
+        init();
+        const api = fixture.componentInstance as unknown as HoverApi;
+        api.onDocumentPointerMove(move(4));
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS - 50);
+        api.onDocumentPointerMove(move(200)); // leaves the band
+        vi.advanceTimersByTime(200);
+        expect(chrome.reveal).not.toHaveBeenCalled();
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('ignores a touch pointer (tap-to-reveal stays the touch path)', () => {
+      vi.useFakeTimers();
+      try {
+        init();
+        const api = fixture.componentInstance as unknown as HoverApi;
+        api.onDocumentPointerMove(move(4, 'touch'));
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS);
+        expect(chrome.reveal).not.toHaveBeenCalled();
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('does not arm a dwell while the toolbar is already revealed', () => {
+      vi.useFakeTimers();
+      try {
+        chrome.revealed.set(true);
+        init();
+        const api = fixture.componentInstance as unknown as HoverApi;
+        api.onDocumentPointerMove(move(4));
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS);
+        expect(chrome.reveal).not.toHaveBeenCalled();
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('stops a pending dwell on destroy', () => {
+      vi.useFakeTimers();
+      try {
+        init();
+        const api = fixture.componentInstance as unknown as HoverApi;
+        api.onDocumentPointerMove(move(4));
+        fixture.destroy();
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS);
+        expect(chrome.reveal).not.toHaveBeenCalled();
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('binds the passive document listener on construct and removes the same handler on destroy', () => {
+      const add = vi.spyOn(document, 'addEventListener');
+      init();
+      const registered = add.mock.calls.find((c) => c[0] === 'pointermove');
+      expect(registered).toBeTruthy();
+      expect(registered![2]).toEqual({ passive: true });
+
+      const remove = vi.spyOn(document, 'removeEventListener');
+      fixture.destroy();
+      expect(remove).toHaveBeenCalledWith('pointermove', registered![1]);
+
+      add.mockRestore();
+      remove.mockRestore();
+    });
+
+    it('keeps the original dwell running across small in-zone moves (dwell measures time in the band)', () => {
+      vi.useFakeTimers();
+      try {
+        init();
+        const api = fixture.componentInstance as unknown as HoverApi;
+        api.onDocumentPointerMove(move(4)); // enter → arm the dwell
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS - 50);
+        api.onDocumentPointerMove(move(3)); // a small move still inside the band must NOT reset the dwell
+        vi.advanceTimersByTime(50); // now CHROME_HOVER_DWELL_MS after the original entry
+        expect(chrome.reveal).toHaveBeenCalledTimes(1);
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('arms a fresh dwell after leaving and re-entering the band', () => {
+      vi.useFakeTimers();
+      try {
+        init();
+        const api = fixture.componentInstance as unknown as HoverApi;
+        api.onDocumentPointerMove(move(4));
+        api.onDocumentPointerMove(move(200)); // leave → cancels
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS);
+        expect(chrome.reveal).not.toHaveBeenCalled();
+
+        api.onDocumentPointerMove(move(4)); // re-enter → fresh dwell
+        vi.advanceTimersByTime(CHROME_HOVER_DWELL_MS);
+        expect(chrome.reveal).toHaveBeenCalledTimes(1);
+      } finally { vi.useRealTimers(); }
+    });
   });
 
   it('hides the night toggle in auto-night mode and fullscreen when unsupported', () => {

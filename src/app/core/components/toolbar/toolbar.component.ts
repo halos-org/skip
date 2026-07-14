@@ -4,7 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatBadgeModule } from '@angular/material/badge';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ChromeVisibilityService } from '../../services/chrome-visibility.service';
+import { ChromeVisibilityService, CHROME_HOVER_DWELL_MS } from '../../services/chrome-visibility.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { uiEventService } from '../../services/uiEvent.service';
 import { AppService } from '../../services/app-service';
@@ -13,12 +13,18 @@ import { DialogService } from '../../services/dialog.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { PageNavControlComponent } from '../page-nav-control/page-nav-control.component';
 
+/** Top-edge band (px) whose cursor dwell exposes the toolbar; matches `--peek-height` in the SCSS. */
+const PEEK_HOTZONE_PX = 8;
+
 /**
  * The auto-hiding navigation toolbar. Overlays the top of the app (never
  * reflows the grid), is shown/hidden via {@link ChromeVisibilityService}, and
  * hosts the global controls migrated off the old sidenavs plus the page-icon
  * navigator. Hovering the bar suppresses auto-hide so it never disappears
- * mid-interaction; the transient peek strip re-reveals it on click.
+ * mid-interaction. It is re-exposed either by clicking the transient peek strip
+ * (also the keyboard/touch path) or, on a hover-capable pointer, by dwelling the
+ * cursor in the top peek band; both routes call the same {@link reveal}, so the
+ * existing idle-hide re-arms cleanly when the cursor leaves.
  */
 @Component({
   selector: 'app-toolbar',
@@ -44,6 +50,43 @@ export class ToolbarComponent implements OnDestroy {
 
   private readonly notificationsInfo = toSignal(this.notifications.observerNotificationsInfo());
   protected readonly alarmCount = computed(() => this.notificationsInfo()?.alarmCount ?? 0);
+
+  private dwellTimer: ReturnType<typeof setTimeout> | null = null;
+  private inPeekZone = false;
+
+  /** Reveals the toolbar once the cursor dwells in the top peek band, on a hover-capable pointer. */
+  private readonly onDocumentPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') return; // touch has no hover; the tap-the-peek-strip path stays
+    const inZone = event.clientY <= PEEK_HOTZONE_PX;
+    if (inZone && !this.inPeekZone && !this.chrome.revealed()) {
+      this.armHoverDwell();
+    } else if (!inZone && this.inPeekZone) {
+      this.clearHoverDwell();
+    }
+    this.inPeekZone = inZone;
+  };
+
+  constructor() {
+    // Passive so it never blocks scrolling; a document listener sees moves over the peek band even
+    // though the strip is pointer-events:none until it peeks. Hover-reveal is gated per-event on a
+    // hover-capable pointer, leaving the tap-the-peek-strip path for touch.
+    document.addEventListener('pointermove', this.onDocumentPointerMove, { passive: true });
+  }
+
+  private armHoverDwell(): void {
+    this.clearHoverDwell();
+    this.dwellTimer = setTimeout(() => {
+      this.dwellTimer = null;
+      this.reveal();
+    }, CHROME_HOVER_DWELL_MS);
+  }
+
+  private clearHoverDwell(): void {
+    if (this.dwellTimer !== null) {
+      clearTimeout(this.dwellTimer);
+      this.dwellTimer = null;
+    }
+  }
 
   protected toggleFullScreen(): void {
     this.uiEvent.toggleFullScreen();
@@ -86,6 +129,8 @@ export class ToolbarComponent implements OnDestroy {
   // the ref-count on the singleton service would leak and pin the toolbar open.
   ngOnDestroy(): void {
     this.onPointerLeave();
+    document.removeEventListener('pointermove', this.onDocumentPointerMove);
+    this.clearHoverDwell();
   }
 
   private _hideSuppressed = false;
