@@ -555,11 +555,11 @@
       </g>
       <!-- Moved inside rotating dial so they rotate passively with the boat -->
       <g id="LayerLayline" [style.display]="closeHauledLineEnabled() && trueWindActive() ? 'inline' : 'none'">
-        <path id="PortLayline"
+        <path id="StbdLayline"
           [attr.d]="closeHauledLineStbdPath()"
           style="fill:none;stroke-width:5;stroke-dasharray:40, 20;stroke-dashoffset:0;stroke-opacity:0.6"
           class="laylines" />
-        <path id="StbdLayline"
+        <path id="PortLayline"
           [attr.d]="closeHauledLinePortPath()"
           class="laylines"
           style="fill:none;stroke-width:5;stroke-dasharray:40, 20;stroke-dashoffset:0;stroke-opacity:0.6" />
