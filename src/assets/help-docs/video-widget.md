@@ -4,7 +4,7 @@ The Video widget puts live cameras and saved video clips right on your page. Use
 eye on the water while docking, watch the foredeck under sail, check the engine room, or look back at
 a clip you saved earlier.
 
-<img src="assets/help-docs/img/video/widget-playing.png" alt="A Video widget playing a live camera on a KIP page" title="A live camera on the page" width="100%">
+<img src="assets/help-docs/img/video/widget-playing.png" alt="A Video widget playing a live camera on a Skip page" title="A live camera on the page" width="100%">
 
 There are three kinds of video you can show:
 
@@ -43,7 +43,7 @@ doesn't appear, pick the type by hand — MJPEG and WebRTC can't be detected fro
 ## Cameras (RTSP / IP cameras)
 
 Most onboard cameras speak **RTSP**, which browsers can't play directly. The **SK Video** add-on for
-your Signal K server does the translating for you, so KIP can show the picture. Once it's installed,
+your Signal K server does the translating for you, so Skip can show the picture. Once it's installed,
 choose **Camera** under **Source**.
 
 <img src="assets/help-docs/img/video/camera-setup.png" alt="Camera setup showing the saved-camera list, a Scan button, and the Add a camera form" title="Set up a camera" width="100%">
@@ -53,7 +53,7 @@ You have three ways to set up a camera:
 **1. Pick a saved camera.** Cameras you've already added show up in the **Camera** list. Choose one and
 you're done — its login and settings are remembered, so you never type them twice.
 
-**2. Scan for cameras.** Tap **Scan network** and KIP asks your boat's network for cameras that
+**2. Scan for cameras.** Tap **Scan network** and Skip asks your boat's network for cameras that
 announce themselves. Found cameras appear in a list; tap one to fill in its details for you.
 
 <img src="assets/help-docs/img/video/scan.png" alt="A list of cameras found on the network after scanning" title="Cameras found on the network" width="100%">

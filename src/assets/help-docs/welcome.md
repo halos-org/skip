@@ -1,5 +1,5 @@
 ## Touch, Mouse, and Keyboard Navigation
-KIP supports touch, mouse, and keyboard input across devices.
+Skip supports touch, mouse, and keyboard input across devices.
 
 | Action               | Touch                        | Mouse / wheel                         | Keyboard                                          |
 |----------------------|------------------------------|---------------------------------------|---------------------------------------------------|
@@ -14,7 +14,7 @@ KIP supports touch, mouse, and keyboard input across devices.
 > Note that the words Touch and Tap are synonymous with mouse click.
 
 ## The Toolbar
-KIP has no permanent navigation bar. A toolbar sits hidden at the top of the page and slides down when you need it — swipe down from the top, scroll up, or tap the thin strip that peeks at the top edge. It hides again when you scroll back, tap elsewhere, or leave it idle.
+Skip has no permanent navigation bar. A toolbar sits hidden at the top of the page and slides down when you need it — swipe down from the top, scroll up, or tap the thin strip that peeks at the top edge. It hides again when you scroll back, tap elsewhere, or leave it idle.
 
 The toolbar holds:
 1. Settings
@@ -30,35 +30,35 @@ When an alarm is active, a notification badge also appears in the lower-left cor
 
 **Only visible if automatic day and night is not enabled. See <Home / Settings / Display>.
 
-## Loading KIP on Phones, Tablets, Raspberry Pi, and Computers
-Simply navigate to `http://<Signal K Server URL>:<port>/@halos-org/skip/` to load KIP and enjoy its features remotely on any device.
+## Loading Skip on Phones, Tablets, Raspberry Pi, and Computers
+Simply navigate to `http://<Signal K Server URL>:<port>/@halos-org/skip/` to load Skip and enjoy its features remotely on any device.
 
 ## Mobile App
-Run KIP in full screen, without browser controls, just like a regular mobile app. This feature is supported on most mobile operating systems. Each browser has its own way of handling Progressive Web App (PWA) installations.
+Run Skip in full screen, without browser controls, just like a regular mobile app. This feature is supported on most mobile operating systems. Each browser has its own way of handling Progressive Web App (PWA) installations.
 
 **iOS**
 1. Press the "Share" button.
 2. Select "Add to Home Screen" from the action popup list.
 3. Tap "Add" in the top right corner to finish installation.
-KIP is now installed and available on your home screen.
+Skip is now installed and available on your home screen.
 
 **Android**
 1. Press the "three dot" icon in the upper right to open the menu.
 2. Select "Add to Home screen."
 3. Press the "Add" button in the popup.
-KIP is now installed and available on your home screen.
+Skip is now installed and available on your home screen.
 
 ## Fullscreen
 You can toggle fullscreen mode on and off, and disable the screen saver and computer sleep mode (if supported by the device/browser), by tapping the Expand/Reduce button on the toolbar or using the keyboard hotkey. This button is not available on mobile devices.
 
 ## Night Mode
-Save your night vision by automatically switching KIP to day or night mode based on sunrise and sunset hours (the Signal K Derived Data plugin is required for automatic switching). This feature can be enabled in the **Settings > Display** page. You can also manually set the mode by tapping the Moon/Sun button on the toolbar. Note that if automatic switching is enabled, brightness will reset to the Signal K mode value.
+Save your night vision by automatically switching Skip to day or night mode based on sunrise and sunset hours (the Signal K Derived Data plugin is required for automatic switching). This feature can be enabled in the **Settings > Display** page. You can also manually set the mode by tapping the Moon/Sun button on the toolbar. Note that if automatic switching is enabled, brightness will reset to the Signal K mode value.
 
 ## Multiple User Profiles and Configuration Sharing
-KIP supports multiple user profiles, allowing different roles on board—such as captain, skipper, tactician, navigator, or engineer—to tailor the interface to their needs. Profiles can also be used to tie specific configuration arrangements to use cases or device form factors. See the Login & Configurations help sections for mode details.
+Skip supports multiple user profiles, allowing different roles on board—such as captain, skipper, tactician, navigator, or engineer—to tailor the interface to their needs. Profiles can also be used to tie specific configuration arrangements to use cases or device form factors. See the Login & Configurations help sections for mode details.
 
-## Remote Control Other KIP Displays
-Control which page is shown on another KIP instance (for example: a mast display, a TV or pilot‑house screen that is hard to reach, or a device with no local input hardware).
+## Remote Control Other Skip Displays
+Control which page is shown on another Skip instance (for example: a mast display, a TV or pilot‑house screen that is hard to reach, or a device with no local input hardware).
 
 ### Typical Use Cases
 - Mast display: change pages from the cockpit without going forward.
@@ -67,16 +67,16 @@ Control which page is shown on another KIP instance (for example: a mast display
 
 ### Requirements
 - Both devices must be connected to the same Signal K server.
-- You must be logged in (authenticated) on both devices (Connectivity tab → Login to Server enabled).
+- You must be signed in (authenticated) to the Signal K server on both devices (Connectivity tab → Sign in).
 - The target device must explicitly allow remote control (Display tab → Remote Control option group).
 
 ### Good Naming Practice
 If multiple devices log in with the same Signal K user to share configuration, they inevitably share the same Instance Name. Whilst being confusing, it will still work. To fix this, you must use different Signal K users and set a descriptive name on each configuration (e.g. Mast Display, Helm Port, Nav Station) so you can identify them quickly.
 
 ### Setup
-1. On the device you want to control (Target KIP)
+1. On the device you want to control (Target Skip)
   - Open: Options → Display → Remote Control.
-  - Enable: Allow this KIP dashboard to be managed remotely.
+  - Enable: Allow this Skip dashboard to be managed remotely.
   - Set: Instance Name (this is what will appear in the controller list).
 2. On the controlling device
   - Open: reveal the toolbar → Settings → Remote Control.
@@ -103,4 +103,4 @@ If multiple devices log in with the same Signal K user to share configuration, t
 >- Use different Signal K users if you want fully isolated configurations.
 
 ### Privacy / Safety Note
-Anyone with access to a logged‑in controlling KIP instance can switch pages on enabled targets. Only enable remote management on displays where that is acceptable.
+Anyone with access to a logged‑in controlling Skip instance can switch pages on enabled targets. Only enable remote management on displays where that is acceptable.

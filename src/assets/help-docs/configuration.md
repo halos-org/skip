@@ -1,57 +1,61 @@
 ## Configuration Management
 
-KIP provides a "Login to Server" option that determines where your configuration is stored. It is **strongly recommended** to enable server login in the **Settings** under the **Connectivity** tab. This ensures your configurations are stored remotely on the Signal K server and allows automatic loading of configuration from any device. See the "Creating a Signal K user" section below for information on how to create a user.
+Skip keeps your setup in two separate places:
 
-- **Login to Server Enabled** (recommended setting): Configuration is stored remotely on the Signal K server. This mode allow automatic loading of your configuration from any device (also known as configuration sharing).
-- **Login to Server Disabled** (default value): Configuration is saved on your computer/device, in the browser's private storage. In this mode, the configuration is per browser.
+- **Connection settings** (Signal K server URL and connection options) are always stored **on this device**, in the browser. They are never shared between devices.
+- **Application configuration** (pages, widgets, layouts, and theme) is stored **on the Signal K server**, tied to your Signal K user account, so it follows you to any device where you sign in as the same user.
 
-You can manage your configurations using the **Configurations** page, accessible from the right menu. Depending on your login mode, different management options are available.
+## Signing In
+
+Skip signs in through your Signal K server's session (single sign-on). It **never asks you for a Signal K username or password directly** and never stores credentials — the sign-in happens on the server, and Skip only holds the resulting session.
+
+Open **Settings > Connectivity**:
+
+- If the server requires sign-in and you are not signed in yet, a **Sign in** button appears. It sends you to the Signal K server's login and returns you to Skip once you are authenticated.
+- When signed in, the Connectivity tab shows the account you are signed in as.
+- If your account has read-only access, Skip shows a **Read-only access** notice and configuration changes are disabled.
+- If your Signal K server does not require authentication, Skip connects without signing in.
+
+Application configuration is stored on the server under a Signal K user account. Without a signed-in user account, profile management and server-stored configuration are unavailable, and Skip runs with connection settings only.
 
 ## Creating a Signal K User
 
-To log in to Signal K, you must first create a user. Follow these steps to create a Signal K user:
+To sign in, your Signal K server needs a user account. To create one:
 
-1. Navigate to the Signal K server's **Security > Users** menu.
+1. In the Signal K server admin, open the **Security > Users** menu.
 2. Click **Add** to create a new user.
-3. Provide a **User ID** and **Password** for the user.
-4. Assign **Read/Write** permissions at a minimum. To allow access to the Global storage scope, assign **Admin** permissions as well.
+3. Provide a **User ID** and **Password**.
+4. Assign **Read/Write** permissions so the account can store configuration. A **Read-only** account can view configuration but not change it.
 5. Click **Apply** to save the new user.
 
-## Login to Server Mode
+Then sign in to that account from Skip via **Settings > Connectivity > Sign in**.
 
->In this mode, your configuration is shared across all devices **as long as you authenticate to Signal K using the same User ID**. It's that simple!
+## Profiles
 
-On the **Configurations** page, you can perform the following actions:
+A **profile** is a named set of pages, layouts, and theme, stored under your Signal K user account. Profiles let a single account keep several independent setups — for example one per station, role, or device form factor. Each device remembers which profile it is showing, so different displays signed in as the same user can each show a different profile.
 
-- **Backup**: Save the currently active configuration. Backups can be created in different scopes (see below for details).
-- **Delete**: Permanently delete a backup configuration. This action is irreversible.
-- **Restore**: Replace the active configuration with a selected backup and reload the app. It is recommended to back up your active configuration before restoring, to avoid losing it.
+Manage profiles in **Settings > Configurations**:
 
-### Storage Scopes
+- **New** — create a new profile.
+- **Switch** — show a different profile on this device.
+- **Rename** / **Duplicate** — rename a profile or copy it (including its configuration).
+- **Delete** — remove a profile. You cannot delete the active profile or the `default` profile.
 
-When using "Login to Server" mode, you can save and retrieve configuration backups from different storage scopes. Think of storage scopes as separate folders:
+Profile changes require a read/write session; they are disabled when you are signed in with a read-only account.
 
-- **User Scope**: Each user has their own private storage space. Users cannot access or view each other's storage.
-- **Global Scope**: Accessible only to users with Signal K "Admin" permissions. This shared storage space allows configuration backups to be shared between users. To share configurations, both users must, at least temporarily, have admin permissions.
+## Sharing Configuration Between Devices
 
-## Planning Configurations
+Because application configuration lives on the server under your Signal K user account, signing in as the **same** user on another device gives you the same profiles automatically — this is how configuration is shared across devices.
 
-If you log in with the same user credentials, your configuration will be consistent across all devices and browsers. 
+To keep devices independent, either sign in with **different** Signal K users, or switch each device to a different profile.
 
-To manage configurations for different devices, stations, or roles, you can create separate Signal K users, each with their own configurations. This approach allows you to tailor configurations to specific use cases. Plan carefully to take full advantage of KIP's flexible configuration management.
+## Backup, Import, and Reset
 
-## Local Storage
+The **Advanced** section of **Settings > Configurations** provides:
 
-If you do not log in to the server, KIP saves and retrieves configuration changes using your browser's local storage. In this mode:
+- **Download** — save the active profile's configuration to a file, for backup or to move it to another Signal K server.
+- **Import** — load a configuration file as a **new profile**. This never overwrites an existing profile.
+- **Default** — reset the active profile to a single Getting Started widget. Your connection settings are kept.
+- **Connection** — clear the Connectivity settings only; this does not affect your profiles.
 
-- Each browser instance has its own independent configuration.
-- Configurations **cannot be shared** between different devices or browsers.
-- Configuration management is limited to downloading and uploading configuration files.
-
-## Advanced Operations
-
-Use advanced operations with caution. All changes affect your active configuration in real time and are irreversible.
-
-KIP separates configuration into two parts:
-1. **Server Connection**: This configuration is always stored locally in your browser and is never shared. It is used in the **Connectivity** tab of the **Settings** page.
-2. **Application Settings**: This includes the configuration settings you can back up, delete, and restore with the **Configurations** page. It contains all pages, widgets and other configuration settings.
+Use these operations with care: they change your active configuration in real time and cannot be undone.

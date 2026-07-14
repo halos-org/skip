@@ -1,6 +1,6 @@
 ## Data Inspector
 
-The Data Inspector is a powerful tool in KIP that allows you to view all Signal K paths and the data received from the server in real time. It provides detailed insights into the data being transmitted, including metadata, sources, and supported operations. This guide explains how to use the Data Inspector effectively.
+The Data Inspector is a powerful tool in Skip that allows you to view all Signal K paths and the data received from the server in real time. It provides detailed insights into the data being transmitted, including metadata, sources, and supported operations. This guide explains how to use the Data Inspector effectively.
 
 The Data Inspector is a good way to validate raw data and available paths without the constraints that each widget can impose. It provides a clear and unrestricted view of the data, making it an essential tool for understanding the underlying Signal K data structure.
 
@@ -33,7 +33,7 @@ The Data Inspector is a good way to validate raw data and available paths withou
 4. **Unit Conversion**:
    - If a path supports unit conversion, you can change the data format to your preferred unit (e.g., converting speed from knots to kilometers per hour).
    - This feature is especially useful to quickly display data in a format that matches your preferences.
-   - Changing the units in the Data Inspector does not change KIP's default units or any widget's format settings. It is only for quick consultation.
+   - Changing the units in the Data Inspector does not change Skip's default units or any widget's format settings. It is only for quick consultation.
 
 ## Practical Use Cases
 
@@ -43,11 +43,11 @@ The Data Inspector is a good way to validate raw data and available paths withou
 - **Verify PUT Support**:
    - Check if a path supports PUT operations. It is required to configure widgets like Switch Panel, Slider, or Multi State Switch.
    - For more details on PUT support and how to use it, refer to the [Updating Signal K Data](#/help/putcontrols.md) help documentation.
-   - If you are learning Node-RED flows and want your flow to work with KIP digital switching widgets, continue with [Node-RED Control Flows for KIP Widgets (Beginner Guide)](#/help/nodered-control-flows.md).
+   - If you are learning Node-RED flows and want your flow to work with Skip digital switching widgets, continue with [Node-RED Control Flows for Skip Widgets (Beginner Guide)](#/help/nodered-control-flows.md).
 
 - **Troubleshoot Data Issues**:
    - The Data Inspector is a good troubleshooting tool, but it should be used with the Signal K Data Browser when trying to understand raw data and behavior. The combination of these tools provides a more complete picture of the data, its processing, and its behavior.
 
 ## Summary
 
-The Data Inspector is an essential tool for managing and understanding the data KIP receives from your Signal K server. With its real-time updates, filtering, and unit conversion capabilities, it provides a comprehensive view of your vessel's data whether you're monitoring performance, configuring widgets, or troubleshooting issues. For deeper analysis and understanding of raw data, pair it with the Signal K Data Browser.
+The Data Inspector is an essential tool for managing and understanding the data Skip receives from your Signal K server. With its real-time updates, filtering, and unit conversion capabilities, it provides a comprehensive view of your vessel's data whether you're monitoring performance, configuring widgets, or troubleshooting issues. For deeper analysis and understanding of raw data, pair it with the Signal K Data Browser.

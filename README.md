@@ -6,19 +6,17 @@
 
 > **Skip** is an experimental [HaLOS](https://halos.fi) fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin. It adds standard Signal K session/SSO authentication and account-independent named profiles, and may diverge from upstream as it evolves. The webapp is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)).
 
-*Original Kip readme follows.*
-
 ---
 
 [![Help Docs](https://img.shields.io/badge/Help-Docs-blue)](src/assets/help-docs/welcome.md)
 [![Community Videos](https://img.shields.io/badge/Community-Videos-purple)](src/assets/help-docs/community.md)
 [![Contact](https://img.shields.io/badge/Contact-Get_in_touch-success)](src/assets/help-docs/contact-us.md)
 
-**KIP is the most popular Signal K MFD and marine instrument panel: plug-and-play, touch-optimized, pre-installed, and ready-to-use across all devices.**
+**Skip is a Signal K MFD and marine instrument panel: touch-optimized and ready-to-use across all your devices.**
 
-Unlike many instrument panels, KIP offers full MFD functionality and is **automatically included with Signal K distributions**, so there’s nothing extra to install or configure. Simply start your [Signal K](https://signalk.org) server, open KIP in a browser, and it’s ready to go. A single instance works everywhere — no per‑device deployment is needed.
+Skip offers full MFD functionality as a Signal K webapp. Install it from the Signal K app store, then open Skip in a browser and it’s ready to go. A single instance works everywhere — no per‑device deployment is needed.
 
-KIP is designed for sailors and boaters who want:
+Skip is designed for sailors and boaters who want:
 
 - A **ready-to-use, classic marine app experience** with minimal setup.
 - A **modern, polished interface** optimized for marine displays.
@@ -27,9 +25,9 @@ KIP is designed for sailors and boaters who want:
 - **Instant access to all Signal K data**: displays gauges, charts, switches, and other widgets right out of the box.
 - **Flexible dashboards**: customize layouts, drag-and-drop widgets, night/day mode, kiosk/fullscreen and remote control support.
 
-With KIP, you get the **familiar feel of professional Multi-Function Displays** combined with the flexibility of Signal K. It’s simple, reliable, and highly usable — the ultimate ready-to-go, modern, touch-first, Multi-Function Display for [Signal K](https://signalk.org) vessels.
+With Skip, you get the **familiar feel of professional Multi-Function Displays** combined with the flexibility of Signal K. It’s simple, reliable, and highly usable — a modern, touch-first Multi-Function Display for [Signal K](https://signalk.org) vessels.
 
-![KIP](./images/KIPDemo.png)
+![Skip](./images/KIPDemo.png)
 
 ## Table of Content
 - [Installations Showcase](#installations-showcase)
@@ -37,19 +35,19 @@ With KIP, you get the **familiar feel of professional Multi-Function Displays** 
 - [User Experience](#user-experience)
 - [Dashboards and Configuration](#dashboards-and-configuration), [Widget Library](#widget-library) & [Historical Data](#historycal-data)
 - [Night Modes](#night-modes)
-- [Remote Control](#remote-control-other-kip-displays)
+- [Remote Control](#remote-control-other-skip-displays)
 - [Kiosk Mode](#dedicated-fullscreen-instrument-display-kiosk-mode)
 - [Progressive Web App (PWA)](#progressive-web-app-pwa)
 - [Multiple User Configurations](#multiple-user-configurations)
-- [How To Contribute](#how-to-contribute) & [Creating Your Own Widgets](#kip-widgets)
+- [How To Contribute](#how-to-contribute) & [Creating Your Own Widgets](#skip-widgets)
 - [Connect, Share, and Support](#connect-share-and-support) & [Features, Ideas, Bugs](#features-ideas-bugs)
 
 ## Installations Showcase
 ![Form factor support](./images/exterior_user_installs.png)
-In addition to the obvious navstation, wall mounted instrument panel and autopilot remote control usecases using PCs, tablets and phones, users have taken KIP into the elements using Raspberry Pi, Pi Zero, rugged tablets and all kinds of low cost AliExpress screens and industry leading, high quality, sunlight readable marine touch screens. KIP's native remote control feature opens up all kinds of possibilities.
+In addition to the obvious navstation, wall mounted instrument panel and autopilot remote control usecases using PCs, tablets and phones, users have taken Skip into the elements using Raspberry Pi, Pi Zero, rugged tablets and all kinds of low cost AliExpress screens and industry leading, high quality, sunlight readable marine touch screens. Skip's native remote control feature opens up all kinds of possibilities.
 
 ## Read the Help Introduction How-To
-You just installed KIP and you're stuck; read the [Introduction](https://github.com/mxtommy/Kip/blob/master/src/assets/help-docs/welcome.md) help file.
+You just installed Skip and you're stuck; read the [Introduction](src/assets/help-docs/welcome.md) help file.
 
 # Design Goal
 The goal is to replicate and enhance the functionality of modern marine instrumentation displays while providing unmatched customization and flexibility. The design principles include:
@@ -95,14 +93,14 @@ Intuitive widget configuration.
 See what Signal K has to offer that you can leverage with widgets. Select it and tweak the display options to suit your purpose.
 ![Paths Configuration Image](./images/KipWidgetConfig-paths-1024x488.png)
 
-Many units are supported. Choose your preferred app defaults, then tweak them widget-by-widget as necessary. KIP will automatically convert the units for you.
+Many units are supported. Choose your preferred app defaults, then tweak them widget-by-widget as necessary. Skip will automatically convert the units for you.
 ![Units Configuration Image](./images/KipConfig-Units-1024.png)
 
 Organize your dashboards and access tools.
 ![Options and Dashboards](./images/Options.png)
 
 ## Widget Library
-All KIP widgets are visual presentation controls that are very versatile, with multiple advanced configuration options available to suit your needs:
+All Skip widgets are visual presentation controls that are very versatile, with multiple advanced configuration options available to suit your needs:
 - **Compact Linear** – Simple horizontal linear gauge with a large value label and modern look.
 - **Linear** – Horizontal or vertical linear gauge with zone highlighting.
 - **Radial** – Radial gauge with configurable dials and zone highlighting.
@@ -125,7 +123,7 @@ All KIP widgets are visual presentation controls that are very versatile, with m
 - **Racer - Start Timer** – Advanced racing countdown timer with OCS status and auto dashboard switching.
 - **Countdown Timer** – Simple race start countdown timer with start, pause, sync, and reset options.
 
-Get the latest version of KIP to see what's new!
+Get the latest version of Skip to see what's new!
 
 ### Widget Samples
 Gauges sample
@@ -141,7 +139,7 @@ Grafana integration with other widgets
 ![Embedded Webpage Concept Image](./images/KipGaugeSample3-1024x508.png)
 
 ## Historical Data
-Experience effortless insight into your vessel’s past with KIP’s Widget Historical Charts—automatically track, store, and visualize key data, unlocking instant access charts showing up to the last full day of performance. Whether you’re sailing or docked, simply two-finger tap or right-click widgets to reveal a seamless history dialog—no setup, no clutter, just the trends you need. When combining data visualisation using Data Driven widgets, live-to-history transitions, KIP puts your boat’s story at your fingertips—so you can make smarter decisions, spot patterns, and sail with confidence.
+Skip charts recent history for your numeric data by reading it from an external Signal K History API provider (such as `signalk-to-influxdb2` or `signalk-parquet`). Press and hold (long-press) a widget to open its history dialog, or use a Realtime Data Chart or Wind Trends widget to see recent trends. Skip does **not** record or store data itself — the detail and time span available depend on whatever provider your Signal K server runs, and charts show live data only when no provider is present. See the [History-API Provider](src/assets/help-docs/history-api.md) help file for setup.
 
 ## Night Modes
 Keep your night vision with automatic or manual day and night switching to a color preserving dim mode or an all Red theme. The images below look very dark, but at night... they are perfect!
@@ -150,8 +148,8 @@ Keep your night vision with automatic or manual day and night switching to a col
 
 ![Night mode - Brightness](./images/KipBrightness-1024.png)
 
-## Remote Control Other KIP Displays
-Control which dashboard is shown on another KIP instance (e.g., a mast display, hard-to-reach screen, or a non‑touch device) from any KIP, including your phone.
+## Remote Control Other Skip Displays
+Control which dashboard is shown on another Skip instance (e.g., a mast display, hard-to-reach screen, or a non‑touch device) from any Skip, including your phone.
 
 Use cases
 - Mast display: change dashboards from the cockpit.
@@ -159,13 +157,13 @@ Use cases
 - Non‑touch/no input: select dashboards when no keyboard/mouse is connected or touch is not supported/disabled.
 
 ## Dedicated Fullscreen instrument display (Kiosk Mode)
-Runs KIP on Raspberry Pi as a single full-screen application, suppresses the desktop UI and stays on screen like a dedicated chartplotter or marine instrument panel at a fraction of the cost. Read the [Kiosk Mode](https://github.com/mxtommy/Kip/blob/master/src/assets/help-docs/kiosk.md) help file.
+Runs Skip on Raspberry Pi as a single full-screen application, suppresses the desktop UI and stays on screen like a dedicated chartplotter or marine instrument panel at a fraction of the cost. Read the [Kiosk Mode](src/assets/help-docs/kiosk.md) help file.
 
 ## Progressive Web App PWA
-Run KIP without browser controls, just like a native computer, tablet or phone app. This feature is supported on most mobile operating systems and desktop browser. It freezes up screen real estate and offers a native Android and iOS app experience with single icon launch. Follow your browser's instructions to install Progressiver Web Apps. It's usually just a few clicks, such as "Add to Home Screen".
+Run Skip without browser controls, just like a native computer, tablet or phone app. This feature is supported on most mobile operating systems and desktop browser. It freezes up screen real estate and offers a native Android and iOS app experience with single icon launch. Follow your browser's instructions to install Progressiver Web Apps. It's usually just a few clicks, such as "Add to Home Screen".
 
 ## Multiple User Configurations
-If you have different roles on board: captain, skipper, tactician, navigator, engineer—or simply different people with different needs, each can tailor KIP as they wish. The use of profiles also allows you to tie specific configuration arrangements to use cases or device form factors.
+If you have different roles on board: captain, skipper, tactician, navigator, engineer—or simply different people with different needs, each can tailor Skip as they wish. The use of profiles also allows you to tie specific configuration arrangements to use cases or device form factors.
 
 ## Complementary Components
 Typical complementary components you may install (most are often bundled with Signal K distributions):
@@ -182,73 +180,73 @@ Typical complementary components you may install (most are often bundled with Si
 
 ## Harness the Power of Data State Notifications
 Stay informed with notifications about the state of the data you are interested in.
-For example, Signal K will notify KIP when a water depth or temperature sensor reaches certain levels. In addition to KIP's centralized notification menu, individual widgets offer tailored visual representations appropriate to their design objectives, providing an optimal user experience.
+For example, Signal K will notify Skip when a water depth or temperature sensor reaches certain levels. In addition to Skip's centralized notification menu, individual widgets offer tailored visual representations appropriate to their design objectives, providing an optimal user experience.
 
 # How To Contribute
-KIP is under the MIT license and is built with Node and Angular using various open-source assets. All free! The project want's to insure your time is well invested by favouring discussion before submitting bug fixes and new features.
+Skip is under the MIT license and is built with Node and Angular using various open-source assets. All free! The project want's to insure your time is well invested by favouring discussion before submitting bug fixes and new features.
 
 Please ensure you submit an issue (bug/feature) before submitting a pull request.
 
 ## Project Scope
-What KIP IS about:
+What Skip IS about:
 - Real‑time presentation of vessel & environment data (navigation, performance, systems) pulled from Signal K.
 - Fast, legible, touchscreen‑friendly dashboards for underway decision making.
 - Configurable widgets (gauges, charts, timers, controls) tuned for sailing operations.
 
-What KIP deliberately IS NOT trying to become:
+What Skip deliberately IS NOT trying to become:
 - A full data lake / long‑term time‑series historian.
 - A general purpose automation / rules / orchestration engine.
 - A universal external web‑app embedding or mash‑up framework.
 - A low‑code integration hub for arbitrarily wiring protocols and services.
 
-Those domains already have excellent, specialized open‑source tools. Instead of re‑implementing them, KIP plays nicely alongside them within a Signal K based onboard stack.
+Those domains already have excellent, specialized open‑source tools. Instead of re‑implementing them, Skip plays nicely alongside them within a Signal K based onboard stack.
 
 ### Processing, Extensions and Widgets
 
 #### Signal K Plugins
-Domain‑specific enrichment (polars, performance calculations, derived environmental data, routing aids) published directly into the Signal K data model that KIP can then display.
+Domain‑specific enrichment (polars, performance calculations, derived environmental data, routing aids) published directly into the Signal K data model that Skip can then display.
 
-#### KIP Widgets
-Visual data representation component that use Signal K path data and API V2 features. Scaffolding a new widgets only takes a few moments and is backed by KIP AI agent instructions providing willed creative minds a personal assistant programmer.
+#### Skip Widgets
+Visual data representation component that use Signal K path data and API V2 features. Scaffolding a new widgets only takes a few moments and is backed by Skip AI agent instructions providing willed creative minds a personal assistant programmer.
 
 Run one simple command (example):
 ```
 npm run generate:widget
 ```
-or ask your AI to create a widget using the KIP project AI instructions.
+or ask your AI to create a widget using the Skip project AI instructions.
 
 For deeper details you can still look at `COPILOT.md`, but you don’t need to in order to get started.
 
 ### Why this separation matters
 
-Keeping KIP focused preserves responsiveness (lower CPU / memory), reduces UI clutter, and accelerates core sailing user experience development. Heavy analytics, complex workflow logic, and broad third‑party embedding stay where they are strongest—outside—but still feed KIP through the common Signal K data fabric.
+Keeping Skip focused preserves responsiveness (lower CPU / memory), reduces UI clutter, and accelerates core sailing user experience development. Heavy analytics, complex workflow logic, and broad third‑party embedding stay where they are strongest—outside—but still feed Skip through the common Signal K data fabric.
 
-In short: use KIP to see & act on live sailing information; use the complementary tools to store it long‑term, analyze it deeply, automate decisions, or build advanced integrations.
+In short: use Skip to see & act on live sailing information; use the complementary tools to store it long‑term, analyze it deeply, automate decisions, or build advanced integrations.
 
 ## Getting Started
 
 **Linux, Mac, RPi, or Windows dev platform supported**
 1. Download your favorite coding IDE (we use the free Visual Studio Code)
-2. Create your own GitHub KIP fork.
-3. Configure your IDE's source control to point it to your forked KIP instance (Visual Studio Code, GitHub support is built-in) and get the fork's master branch locally.
+2. Create your own GitHub Skip fork.
+3. Configure your IDE's source control to point it to your forked Skip instance (Visual Studio Code, GitHub support is built-in) and get the fork's main branch locally.
 4. Install `npm` and `node`. On macOS, you can use `brew install node` if you have Homebrew. See https://nodejs.org/en/download for more options.
 5. Install the Angular CLI using `npm install -g @angular/cli`
 
 **Project Setup**
-1. From your fork's master branch, create a working branch with a name such as: `new-widget-abc` or `fix-issue-abc`, etc.
+1. From your fork's main branch, create a working branch with a name such as: `new-widget-abc` or `fix-issue-abc`, etc.
 2. Check out this new branch.
 3. In a command shell (or in the Visual Studio Code Terminal window), go to the root of your local project folder, if not done automatically by your IDE.
-4. Install project dependencies using the NPM package and dependency manager: run `npm install`. NPM will read the KIP project dependencies, download, and install everything automatically for you.
-5. Build the app locally using Angular CLI: from that same project root folder, run `npm run build:prod`. The CLI tool will build KIP.
+4. Install project dependencies using the NPM package and dependency manager: run `npm install`. NPM will read the Skip project dependencies, download, and install everything automatically for you.
+5. Build the app locally using Angular CLI: from that same project root folder, run `npm run build:prod`. The CLI tool will build Skip.
 
 **Code and Test**
-1. Fire up your local KIP development instance with `npm run dev`.
+1. Fire up your local Skip development instance with `npm run dev`.
 2. Hit Run/Start Debugging in Visual Studio Code or manually point your favorite browser to `http://localhost:4200/@halos-org/skip`. Alternatively, to start the development server and allow remote devices connections, such as with your phone or RPi (blocked for security reasons by default):  
    `ng serve --configuration=dev --serve-path=/@halos-org/skip/ --host=<your computer's IP> --port=4200`
 3. Voila!
 
 *As you work on source code and save files, the app will automatically reload in the browser with your latest changes.*  
-*You will also need a running Signal K server for KIP to connect to and receive data. You could also use https://demo.signalk.org but without authentication enabled, your actions, features and test coverage will be limited.*
+*You will also need a running Signal K server for Skip to connect to and receive data. You could also use https://demo.signalk.org but without authentication enabled, your actions, features and test coverage will be limited.*
 
 **Apple PWA Icon Generation**
 
@@ -264,13 +262,13 @@ Once done with your work, from your fork's working branch, make a GitHub pull re
 For comprehensive development guidance, please refer to these instruction files:
 
 ### Primary Instructions
-- **[Project Instructions](./.github/instructions/project.instructions.md)**: KIP policy owner for architecture/domain rules, including widget creation and Host2 contracts.
+- **[Project Instructions](./.github/instructions/project.instructions.md)**: Skip policy owner for architecture/domain rules, including widget creation and Host2 contracts.
 - **[COPILOT.md](./COPILOT.md)**: Architecture context, rationale, and evolution notes (non-policy).
 - **[Angular Instructions](./.github/instructions/angular.instructions.md)**: Modern Angular v21+ coding standards, component patterns, and framework best practices.
 - **[Copilot Agent Instructions](./.github/copilot-instructions.md)**: Architecture details and coding-agent guardrails for this repository.
 
 ### Development Workflow
-1. **Start Here**: Read `.github/instructions/project.instructions.md` for KIP policy contracts.
+1. **Start Here**: Read `.github/instructions/project.instructions.md` for Skip policy contracts.
 2. **Angular Standards**: Follow `.github/instructions/angular.instructions.md` for modern Angular development.
 3. **Architecture Context**: Use `COPILOT.md` for rationale and dated architecture notes.
 4. **Setup & Build**: Use this README for project setup and build commands.
@@ -285,17 +283,16 @@ For comprehensive development guidance, please refer to these instruction files:
 ### Key Priorities
 - **Widget Development**: Use Host2 patterns and scaffold with the `create-host2-widget` schematic (see `docs/widget-schematic.md`).
 - **Angular Patterns**: Use signals, standalone components, and modern control flow.
-- **Theming**: Follow KIP's theme system for consistent UI.
+- **Theming**: Follow Skip's theme system for consistent UI.
 - **Code Quality**: Run `npm run lint` before commits.
 
-KIP is open-source under the MIT license, built by the community and 100% free. [Join the community](https://discord.gg/AMDYT2DQga) on Discord or contribute to the project on GitHub!
+Skip is open-source under the MIT license, built by the community and 100% free. Contribute to the project on [GitHub](https://github.com/halos-org/skip)!
 
 # Connect, Share, and Support
-KIP has its own Discord Signal K channel for getting in touch. Join us at https://discord.gg/AMDYT2DQga
+Report issues and request features on [Skip's GitHub project](https://github.com/halos-org/skip/issues). Skip is a fork of [Kip](https://github.com/mxtommy/Kip); the upstream Kip community chats on [Discord](https://discord.gg/AMDYT2DQga).
 
 # Features, Ideas, Bugs
-See KIP's GitHub project for the latest feature requests:
-https://github.com/mxtommy/Kip/issues
+See [Skip's GitHub project](https://github.com/halos-org/skip/issues) for the latest feature requests and bug reports.
 
 This repository may not be used to train machine learning or AI models
 without explicit permission from the author.

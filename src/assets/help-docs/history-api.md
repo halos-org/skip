@@ -1,6 +1,6 @@
 ## Using a History API Provider
 
-KIP reads historical data from an external Signal K History API provider plugin. With a compatible provider installed, KIP can:
+Skip reads historical data from an external Signal K History API provider plugin. With a compatible provider installed, Skip can:
 1. Pre-seed Data Chart and Wind Trends so they show recent trends immediately.
 2. Populate historical views for widgets on your pages that use numeric value paths.
 
@@ -27,7 +27,7 @@ Currently, two plugins support History API v2:
 - **Purpose:** Records Signal K data to an InfluxDB v2 time-series database (requires InfluxDB v2).
 - **Link:** [signalk-to-influxdb2](https://www.npmjs.com/package/signalk-to-influxdb2)
 - **Setup:** Follow the plugin documentation for installation and configuration.
-- **Path Configuration:** By default, records all paths. Configure filters, resolution, and related settings for the paths you want available in KIP charts.
+- **Path Configuration:** By default, records all paths. Configure filters, resolution, and related settings for the paths you want available in Skip charts.
 
 ### 2. signalk-parquet
 - **Purpose:** Records Signal K data to Parquet files for efficient storage and querying (no external database required).
@@ -35,12 +35,12 @@ Currently, two plugins support History API v2:
 - **Setup:** Follow the plugin documentation for installation and configuration.
 - **Path Configuration:** You must specify which paths to record; none are recorded by default.
 
-## How History Data Works in KIP
+## How History Data Works in Skip
 
 ### History Seeding
 When you open a chart widget with a larger time scale (minutes/hours):
-1. KIP checks whether history data is available through the History API.
-2. If available and the time window allows it (resolution >= 1000 ms), KIP requests historical data points.
+1. Skip checks whether history data is available through the History API.
+2. If available and the time window allows it (resolution >= 1000 ms), Skip requests historical data points.
 3. The chart displays the historical trend immediately.
 
 ### Live Updates
@@ -56,11 +56,11 @@ After history data loads:
 
 ## Provider Plugin Configuration
 
-For performance reasons, KIP charts display a maximum of 120 datapoints. KIP uses the chart's configured time window and asks the provider to return data for that window as up to 120 datapoints.
+For performance reasons, Skip charts display a maximum of 120 datapoints. Skip uses the chart's configured time window and asks the provider to return data for that window as up to 120 datapoints.
 
 When configuring provider sampling rates, ensure your rules support this behavior:
 - Slower sampling rates produce fewer datapoints (lower visual resolution).
-- Faster sampling rates do not produce more than 120 datapoints in KIP charts.
+- Faster sampling rates do not produce more than 120 datapoints in Skip charts.
 
 ### Widget Historical Charts
 
@@ -105,7 +105,7 @@ To seed charts with historical data, you must configure your provider to collect
 - Use chart time scales of **minutes or longer** for history seeding.
 
 **Check 6: Are there network or permission issues?**
-- Confirm KIP can reach the Signal K server History API endpoint.
+- Confirm Skip can reach the Signal K server History API endpoint.
 - Use the OpenAPI link in Signal K Server Admin pages to test endpoint availability.
 - Check browser console logs (F12) for HTTP errors from history requests.
 

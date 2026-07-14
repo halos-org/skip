@@ -43,7 +43,7 @@ In edit mode, widgets show dashed outlines.
 ## Viewing Widget History on a Locked Page
 When a page is locked (normal viewing mode), you can open a history chart for a widget without entering edit mode: **press and hold (long-press)** the widget.
 
-KIP opens a history chart dialog and loads historical series data for that widget using the History API. Only widgets bound to numeric data have a history — long-pressing anything else does nothing.
+Skip opens a history chart dialog and loads historical series data for that widget using the History API. Only widgets bound to numeric data have a history — long-pressing anything else does nothing.
 
 
 ## Workflow: From Idea to Page
@@ -56,7 +56,7 @@ KIP opens a history chart dialog and loads historical series data for that widge
 
 
 ## Widget Gallery (Overview)
-KIP widgets turn Signal K data into readable visuals and controls. Available widget types:
+Skip widgets turn Signal K data into readable visuals and controls. Available widget types:
 
 - **Numeric** – Displays numeric data in a clear and concise format, with options to show min/max values and a background minichart for trends.
 - **Text** – Displays text data with customizable color formatting.

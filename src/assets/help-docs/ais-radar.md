@@ -17,7 +17,7 @@ This page explains:
 
 > AIS data must be available in the Signal K server for the widget to function correctly. This usually means using compatible AIS hardware receiver or connecting to a Virtual AIS service over the internet with a Server Connection of type WebSocket.
 
-If the KIP Connection option does not include `Subscribe to remote source message such as AIS and DSC targets.`, the widget warns that AIS data is disabled and asks you to enable remote source subscription in Settings / Options.
+If the Skip Connection option does not include `Subscribe to remote source message such as AIS and DSC targets.`, the widget warns that AIS data is disabled and asks you to enable remote source subscription in Settings / Options.
 
 The Derived Data plugin must be installed, enabled and it's Traffic section options must be configured with attention to provide collision risk information.
 

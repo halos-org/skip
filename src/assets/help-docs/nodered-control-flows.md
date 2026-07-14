@@ -1,6 +1,6 @@
-## Node-RED Control Flows for KIP Widgets (Beginner Guide)
+## Node-RED Control Flows for Skip Widgets (Beginner Guide)
 
-This guide is for first-time Node-RED users who want KIP control widgets to trigger real actions (like GPIO or relay switching) through Signal K. It is not a full Node-RED product guide or a complete flow-programming course. It focuses on the Signal K and KIP-specific parts you need for digital switching.
+This guide is for first-time Node-RED users who want Skip control widgets to trigger real actions (like GPIO or relay switching) through Signal K. It is not a full Node-RED product guide or a complete flow-programming course. It focuses on the Signal K and Skip-specific parts you need for digital switching.
 
 Before you start building flows, read **[Digital Switching and PUT Path Setup](#/help/putcontrols.md)** so you understand the core concepts, data flow, and control logic.
 
@@ -8,11 +8,11 @@ Before you start building flows, read **[Digital Switching and PUT Path Setup](#
 
 Use this sequence as your basic mental model:
 
-KIP widget → Signal K path (PUT) → Node-RED **put handler** → action node (GPIO/relay/driver/Web Service/etc.)
+Skip widget → Signal K path (PUT) → Node-RED **put handler** → action node (GPIO/relay/driver/Web Service/etc.)
 
 This is the basic flow:
 
-1. A KIP widget sends a value to a Signal K path (PUT).
+1. A Skip widget sends a value to a Signal K path (PUT).
 2. Node-RED receives that path value through a **put handler** node.
 3. Your flow converts or uses that value to perform the final action.
 
@@ -20,10 +20,10 @@ Think of Signal K as the shared data bus and Node-RED as the automation logic.
 
 ### Why You Need a PUT Handler in the Flow
 
-To receive commands sent by KIP widgets, your flow needs a Signal K node named `put handler`.
+To receive commands sent by Skip widgets, your flow needs a Signal K node named `put handler`.
 
 Why it is needed:
-- KIP writes values to Signal K paths using PUT.
+- Skip writes values to Signal K paths using PUT.
 - The `put handler` listens for PUT updates on those paths.
 - Without it, your flow will not receive widget commands, so no action will run.
 
@@ -35,7 +35,7 @@ Where to find it:
 
 Check these basics first:
 
-1. KIP is connected and authenticated to Signal K.
+1. Skip is connected and authenticated to Signal K.
 2. You can see your target path in Data Inspector, unless you plan to create a new path with your flow.
 3. The path type matches your widget type.
 4. Your Node-RED environment can access target hardware (GPIO, relay board, Web Service, etc.).
@@ -50,23 +50,23 @@ Always test with non-critical outputs first.
 
 ## 5-Minute First Success
 
-Goal: prove the full command path works end-to-end (KIP → Signal K PUT → Node-RED `put handler` → value update).
+Goal: prove the full command path works end-to-end (Skip → Signal K PUT → Node-RED `put handler` → value update).
 
 1. In Node-RED, open **Import** (`Cmd+I` on Mac).
 2. In **Examples**, go to: `flows -> @signalk/node-red-embedded -> put-handler`, then click **Import**.
 3. Open the imported **put handler** node and note the path it listens to (default example: `self.red.autoLights.state`).  
    Leave defaults unchanged for this first test.
 4. Click **Deploy**.
-5. In KIP **Data Inspector**, search for `self.red.autoLights.state`.
+5. In Skip **Data Inspector**, search for `self.red.autoLights.state`.
    - Confirm the path exists.
    - Confirm **PUT Support** is enabled.
-6. In KIP, add a **Switch Panel** widget:
+6. In Skip, add a **Switch Panel** widget:
    - Add a **Toggle** control.
    - Set the control path to `self.red.autoLights.state`.
    - Save/apply widget settings.
-7. Toggle ON/OFF in KIP and verify:
+7. Toggle ON/OFF in Skip and verify:
    - The widget changes state without error notifications.
-   - The value updates in both Signal K Admin Data Browser and KIP Data Inspector.
+   - The value updates in both Signal K Admin Data Browser and Skip Data Inspector.
    - The updated value is visible in Node-RED under the **send autoLights** node (green status dot, e.g. **State: 1**).
 
 Note that this example flow uses numeric `1/0` path values. For ON/OFF control, the preferred value type is `boolean` (`true/false`).
