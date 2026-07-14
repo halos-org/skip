@@ -391,11 +391,12 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
   });
 
   // The persist-on-missing bootstrap fields: exactly these three (widgetHistoryDisabled was
-  // removed by #157). Each missing field fires its own whole-app patch during startup.
-  const persistOnMissing: { field: string; bootstrapDefault: unknown; read: (s: SettingsService) => unknown }[] = [
-    { field: 'autoNightMode', bootstrapDefault: false, read: (s) => s.getAutoNightMode() },
-    { field: 'redNightMode', bootstrapDefault: false, read: (s) => s.getRedNightMode() },
-    { field: 'nightModeBrightness', bootstrapDefault: 0.2, read: (s) => s.getNightModeBrightness() }
+  // removed by #157). A single missing field fires one whole-app patch built from fully-hydrated state;
+  // `loaded` is that field's value in the DEFAULT_LOADED fixture, used to pin sibling preservation.
+  const persistOnMissing: { field: string; bootstrapDefault: unknown; loaded: unknown; read: (s: SettingsService) => unknown }[] = [
+    { field: 'autoNightMode', bootstrapDefault: false, loaded: true, read: (s) => s.getAutoNightMode() },
+    { field: 'redNightMode', bootstrapDefault: false, loaded: true, read: (s) => s.getRedNightMode() },
+    { field: 'nightModeBrightness', bootstrapDefault: 0.2, loaded: 0.65, read: (s) => s.getNightModeBrightness() }
   ];
 
   for (const { field, bootstrapDefault, read } of persistOnMissing) {
@@ -413,17 +414,28 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
       expect(blob.unitDefaults).toEqual({ Speed: 'knots' });
       expect(blob.notificationConfig).toEqual(fullNotificationConfig());
       expect(read(service)).toBe(bootstrapDefault);
+      // The write for THIS absent field must not revert a sibling (#170, symmetric across all three): every
+      // other app-blob field rides along at its loaded value, not a pre-hydration default.
+      for (const other of persistOnMissing) {
+        if (other.field !== field) expect(blob[other.field]).toBe(other.loaded);
+      }
+      expect(blob.browserTabTitle).toBe('My Boat');
     });
   }
 
-  it('all three persist-on-missing fields absent fire one bootstrap patch each', () => {
+  it('all three persist-on-missing fields absent fire a single coalesced bootstrap patch', () => {
     const { patchSpy } = setupHydrated({
       app: loadedAppConfig(['autoNightMode', 'redNightMode', 'nightModeBrightness']),
       theme: null,
       dashboards: []
     });
-    expect(patchSpy).toHaveBeenCalledTimes(3);
-    expect(patchSpy.mock.calls.map((c) => c[0])).toEqual(['IAppConfig', 'IAppConfig', 'IAppConfig']);
+    expect(patchSpy).toHaveBeenCalledTimes(1);
+    const [objType, blob] = patchSpy.mock.calls[0];
+    expect(objType).toBe('IAppConfig');
+    expect(blob.autoNightMode).toBe(false);
+    expect(blob.redNightMode).toBe(false);
+    expect(blob.nightModeBrightness).toBe(0.2);
+    expect(blob.browserTabTitle).toBe('My Boat');
   });
 
   it('a missing browserTabTitle defaults to "Skip" in memory WITHOUT a bootstrap write', () => {

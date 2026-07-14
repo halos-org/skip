@@ -228,34 +228,20 @@ export class SettingsService {
     this.applyUnitDefaults(app.unitDefaults);
     this.applyNotificationConfig(app.notificationConfig);
 
-    if (app.autoNightMode === undefined) {
-      this.setAutoNightMode(false);
-    } else {
-      this._autoNightMode.set(app.autoNightMode);
-    }
+    // Hydrate every app-config holder from stored state (defaults for absent fields) BEFORE any persist.
+    // A persist-on-missing bootstrap write serializes the full IAppConfig from the holders it reads (the
+    // night-mode fields + browserTabTitle), so any of those still at its pre-hydration default when a
+    // write fires is captured wrong and reverted on the server (#170) — including one night-mode field
+    // reverting the others. Hydrate them all, then persist once. (dashboards is hydrated here too but is
+    // not part of the app blob.)
+    this._dashboards = this.activeConfig.dashboards === undefined ? [] : this.activeConfig.dashboards;
+    this._browserTabTitle.set(app.browserTabTitle === undefined ? 'Skip' : app.browserTabTitle);
+    this._autoNightMode.set(app.autoNightMode === undefined ? false : app.autoNightMode);
+    this._redNightMode.set(app.redNightMode === undefined ? false : app.redNightMode);
+    this._nightModeBrightness.set(app.nightModeBrightness === undefined ? 0.2 : app.nightModeBrightness);
 
-    if (app.redNightMode === undefined) {
-      this.setRedNightMode(false);
-    } else {
-      this._redNightMode.set(app.redNightMode);
-    }
-
-    if (app.nightModeBrightness === undefined) {
-      this.setNightModeBrightness(0.2);
-    } else {
-      this._nightModeBrightness.set(app.nightModeBrightness);
-    }
-
-    if (this.activeConfig.dashboards === undefined) {
-      this._dashboards = [];
-    } else {
-      this._dashboards = this.activeConfig.dashboards;
-    }
-
-    if (app.browserTabTitle === undefined) {
-      this._browserTabTitle.set('Skip');
-    } else {
-      this._browserTabTitle.set(app.browserTabTitle);
+    if (app.autoNightMode === undefined || app.redNightMode === undefined || app.nightModeBrightness === undefined) {
+      this.saveAppConfig();
     }
   }
 
