@@ -74,7 +74,8 @@ describe('WidgetHost2Component', () => {
                 {
                     provide: WidgetService,
                     useValue: {
-                        getComponentType: vi.fn().mockReturnValue(undefined)
+                        getComponentType: vi.fn().mockReturnValue(undefined),
+                        getWidgetName: vi.fn().mockReturnValue(undefined)
                     }
                 },
                 {

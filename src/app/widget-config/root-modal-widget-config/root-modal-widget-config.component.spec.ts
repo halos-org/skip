@@ -126,3 +126,38 @@ describe('ModalWidgetComponent', () => {
     expect([f.courseOverGroundEnable.disabled, f.waypointEnable.disabled, f.driftEnable.disabled]).toEqual([true, true, true]);
   });
 });
+
+describe('ModalWidgetComponent title composition (#180)', () => {
+  const unitsServiceStub: Pick<UnitsService, 'getConversionsForPath'> = {
+    getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }),
+  };
+  const appServiceStub: Pick<AppService, 'configurableThemeColors'> = {
+    configurableThemeColors: []
+  };
+
+  beforeEach(() => TestBed.resetTestingModule());
+
+  function createComponentWithData(data: object): RootModalWidgetConfigComponent {
+    TestBed.configureTestingModule({
+      imports: [RootModalWidgetConfigComponent],
+      providers: [
+        { provide: UnitsService, useValue: unitsServiceStub },
+        { provide: AppService, useValue: appServiceStub },
+        { provide: MAT_DIALOG_DATA, useValue: data },
+        { provide: MatDialogRef, useValue: { close: vi.fn() } },
+      ],
+    });
+    ensureTestIconsReady();
+    return TestBed.createComponent(RootModalWidgetConfigComponent).componentInstance;
+  }
+
+  it('composes the widget name in front of the base dialog title', () => {
+    const component = createComponentWithData({ widgetName: 'Numeric' });
+    expect(component.titleDialog).toBe('Numeric — Widget Settings');
+  });
+
+  it('falls back to the base title when no widget name is provided', () => {
+    const component = createComponentWithData({});
+    expect(component.titleDialog).toBe('Widget Settings');
+  });
+});
