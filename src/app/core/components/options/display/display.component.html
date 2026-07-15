@@ -82,14 +82,14 @@
           </mat-panel-title>
           @if (!isPhonePortrait().matches) {
             <mat-panel-description>
-              Configure remote dashboard operations between KIP instances.
+              Configure remote dashboard operations between Skip instances.
             </mat-panel-description>
           }
         </mat-expansion-panel-header>
         <mat-slide-toggle #isRemoteControlCb class="full-width"
           [(ngModel)]="isRemoteControl"
           name="isRemoteControl">
-            Allow remote KIP instances to view and control this dashboard.
+            Allow remote Skip instances to view and control this dashboard.
         </mat-slide-toggle>
         <mat-form-field class="optional-field">
           <mat-label>Name of this instance</mat-label>
