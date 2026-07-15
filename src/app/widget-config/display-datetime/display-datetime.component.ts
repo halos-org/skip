@@ -1,5 +1,5 @@
 import { Component, DestroyRef, OnInit, inject, input } from '@angular/core';
-import { AbstractControl, UntypedFormControl, ValidationErrors, ValidatorFn, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { AbstractControl, FormControl, ValidationErrors, ValidatorFn, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Observable, Subscription, debounceTime, map, startWith } from 'rxjs';
 import { MatOption } from '@angular/material/core';
 import { MatIconButton } from '@angular/material/button';
@@ -43,8 +43,8 @@ export const getDynamicTimeZones = (): ITzDefinition[] => {
 })
 export class DisplayDatetimeComponent implements OnInit {
   private readonly _destroyRef = inject(DestroyRef);
-  readonly dateFormat = input<UntypedFormControl>(undefined);
-  readonly dateTimezone = input<UntypedFormControl>(undefined);
+  readonly dateFormat = input<FormControl<string>>(undefined);
+  readonly dateTimezone = input<FormControl<string>>(undefined);
   private tz: ITzDefinition[] = [];
   public filteredTZ: Observable<ITzDefinition[]>;
   private filteredTZSubscription: Subscription = null;

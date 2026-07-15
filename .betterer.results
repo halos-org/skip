@@ -113,15 +113,15 @@ exports[`strictNullChecks`] = {
       [37, 10, 26, "Type \'null\' is not assignable to type \'Subscription\'.", "273497119"],
       [79, 8, 13, "Type \'null\' is not assignable to type \'string | undefined\'.", "2466344431"]
     ],
-    "src/app/widget-config/dataset-chart-options/dataset-chart-options.component.ts:2604195000": [
-      [82, 26, 10, "Argument of type \'ISkPathData | null\' is not assignable to parameter of type \'ISkPathData\'.\\n  Type \'null\' is not assignable to type \'ISkPathData\'.", "384538813"]
+    "src/app/widget-config/dataset-chart-options/dataset-chart-options.component.ts:155376543": [
+      [83, 26, 10, "Argument of type \'ISkPathData | null\' is not assignable to parameter of type \'ISkPathData\'.\\n  Type \'null\' is not assignable to type \'ISkPathData\'.", "384538813"]
     ],
-    "src/app/widget-config/display-chart-options/display-chart-options.component.ts:333710162": [
+    "src/app/widget-config/display-chart-options/display-chart-options.component.ts:2641875525": [
       [48, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"]
     ],
-    "src/app/widget-config/display-datetime/display-datetime.component.ts:1505324315": [
-      [45, 50, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'UntypedFormControl\'.", "2620553983"],
-      [46, 52, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'UntypedFormControl\'.", "2620553983"],
+    "src/app/widget-config/display-datetime/display-datetime.component.ts:2719976956": [
+      [45, 51, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'FormControl<string>\'.", "2620553983"],
+      [46, 53, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'FormControl<string>\'.", "2620553983"],
       [49, 10, 22, "Type \'null\' is not assignable to type \'Subscription\'.", "29842089"]
     ],
     "src/app/widget-config/electrical-family-setup/electrical-family-setup.component.ts:4115844403": [
@@ -139,7 +139,7 @@ exports[`strictNullChecks`] = {
       [85, 26, 49, "Object is possibly \'null\'.", "3725617003"],
       [89, 26, 49, "Object is possibly \'null\'.", "3725617003"]
     ],
-    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:104802355": [
+    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:1740588238": [
       [80, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
       [215, 8, 4, "Type \'null\' is not assignable to type \'UntypedFormControl\'.", "2087777580"],
       [236, 4, 9, "\'ctrlLabel\' is possibly \'null\'.", "2892925034"]

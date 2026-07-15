@@ -4,7 +4,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatOptionModule } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule, MatLabel } from '@angular/material/form-field';
-import { ReactiveFormsModule, UntypedFormControl } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
 import { MatRadioChange, MatRadioModule } from '@angular/material/radio';
@@ -19,30 +19,30 @@ import { MatRadioChange, MatRadioModule } from '@angular/material/radio';
 export class DisplayChartOptionsComponent implements OnInit {
   private app = inject(AppService);
 
-  readonly convertUnitTo = input.required<UntypedFormControl>();
-  readonly datasetAverageArray = input.required<UntypedFormControl>();
-  readonly showAverageData = input.required<UntypedFormControl>();
-  readonly showDataPoints = input.required<UntypedFormControl>();
-  readonly trackAgainstAverage = input.required<UntypedFormControl>();
-  readonly showDatasetMinimumValueLine = input.required<UntypedFormControl>();
-  readonly showDatasetMaximumValueLine = input.required<UntypedFormControl>();
-  readonly showDatasetAverageValueLine = input.required<UntypedFormControl>();
-  readonly showDatasetAngleAverageValueLine = input.required<UntypedFormControl>();
-  readonly verticalChart = input.required<UntypedFormControl>();
-  readonly inverseYAxis = input.required<UntypedFormControl>();
-  readonly showTimeScale = input.required<UntypedFormControl>();
+  readonly convertUnitTo = input.required<FormControl<string | null>>();
+  readonly datasetAverageArray = input.required<FormControl<string>>();
+  readonly showAverageData = input.required<FormControl<boolean>>();
+  readonly showDataPoints = input.required<FormControl<boolean>>();
+  readonly trackAgainstAverage = input.required<FormControl<boolean>>();
+  readonly showDatasetMinimumValueLine = input.required<FormControl<boolean>>();
+  readonly showDatasetMaximumValueLine = input.required<FormControl<boolean>>();
+  readonly showDatasetAverageValueLine = input.required<FormControl<boolean>>();
+  readonly showDatasetAngleAverageValueLine = input.required<FormControl<boolean>>();
+  readonly verticalChart = input.required<FormControl<boolean>>();
+  readonly inverseYAxis = input.required<FormControl<boolean>>();
+  readonly showTimeScale = input.required<FormControl<boolean>>();
 
-  readonly showYScale = input.required<UntypedFormControl>();
-  readonly startScaleAtZero = input.required<UntypedFormControl>();
-  readonly yScaleSuggestedMin = input.required<UntypedFormControl>();
-  readonly yScaleSuggestedMax = input.required<UntypedFormControl>();
+  readonly showYScale = input.required<FormControl<boolean>>();
+  readonly startScaleAtZero = input.required<FormControl<boolean>>();
+  readonly yScaleSuggestedMin = input.required<FormControl<number>>();
+  readonly yScaleSuggestedMax = input.required<FormControl<number>>();
 
-  readonly enableMinMaxScaleLimit = input.required<UntypedFormControl>();
-  readonly yScaleMin = input.required<UntypedFormControl>();
-  readonly yScaleMax = input.required<UntypedFormControl>();
+  readonly enableMinMaxScaleLimit = input.required<FormControl<boolean>>();
+  readonly yScaleMin = input.required<FormControl<number>>();
+  readonly yScaleMax = input.required<FormControl<number>>();
 
-  readonly numDecimal = input.required<UntypedFormControl>();
-  readonly color = input.required<UntypedFormControl>();
+  readonly numDecimal = input.required<FormControl<number>>();
+  readonly color = input.required<FormControl<string>>();
   protected colors = [];
 
   ngOnInit(): void {
