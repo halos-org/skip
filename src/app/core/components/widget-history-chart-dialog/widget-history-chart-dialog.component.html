@@ -6,7 +6,7 @@
 </div>
 <mat-dialog-content class="history-dialog-content">
   <div class="time-select">
-    <mat-button-toggle-group [(ngModel)]="selectedPeriod" hideSingleSelectionIndicator="true" aria-label="Chart Time Span Selection">
+    <mat-button-toggle-group [(ngModel)]="selectedPeriod" hideSingleSelectionIndicator="true" aria-label="Plot Time Span Selection">
       <mat-button-toggle value="PT15M" (click)="setPeriod('PT15M')">15 Minutes</mat-button-toggle>
       <mat-button-toggle value="PT1H" (click)="setPeriod('PT1H')">1 Hour</mat-button-toggle>
       <mat-button-toggle value="PT8H" (click)="setPeriod('PT8H')">8 Hours</mat-button-toggle>

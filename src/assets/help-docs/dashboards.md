@@ -41,9 +41,9 @@ In edit mode, widgets show dashed outlines.
 >**Tip:** If you can’t add a widget, free up space by resizing or moving existing ones first.
 
 ## Viewing Widget History on a Locked Page
-When a page is locked (normal viewing mode), you can open a history chart for a widget without entering edit mode: **press and hold (long-press)** the widget.
+When a page is locked (normal viewing mode), you can open a history plot for a widget without entering edit mode: **press and hold (long-press)** the widget.
 
-Skip opens a history chart dialog and loads historical series data for that widget using the History API. Only widgets bound to numeric data have a history — long-pressing anything else does nothing.
+Skip opens a history plot dialog and loads historical series data for that widget using the History API. Only widgets bound to numeric data have a history — long-pressing anything else does nothing.
 
 
 ## Workflow: From Idea to Page
@@ -58,7 +58,7 @@ Skip opens a history chart dialog and loads historical series data for that widg
 ## Widget Gallery (Overview)
 Skip widgets turn Signal K data into readable visuals and controls. Available widget types:
 
-- **Numeric** – Displays numeric data in a clear and concise format, with options to show min/max values and a background minichart for trends.
+- **Numeric** – Displays numeric data in a clear and concise format, with options to show min/max values and a background mini plot for trends.
 - **Text** – Displays text data with customizable color formatting.
 - **Date & Time** – Shows date and time with custom formatting and timezone correction.
 - **Position** – Displays latitude and longitude for location tracking and navigation.
@@ -81,7 +81,7 @@ Skip widgets turn Signal K data into readable visuals and controls. Available wi
 - **AC/DC Charger**- Monitor charging performance at a glance with a compact AC/DC Charger Widget. View single or multiple chargers with charge mode, voltage, current, power and temperature. Chargers are discovered automatically.
 - **Freeboard-SK** – Adds the Freeboard-SK chart plotter as a widget with automatic sign-in.
 - **Autopilot Head** – Typical autopilot controls for compatible Signal K Autopilot devices.
-- **Realtime Data Chart** – Visualizes data on a real-time chart with actuals, averages, and min/max.
+- **Realtime Data Plot** – Visualizes data on a real-time plot with actuals, averages, and min/max.
 - **AIS Radar**: Display AIS targets with range rings, interactive target details, and quick zoom and filtering controls. See [AIS Radar Widget](#/help/ais-radar.md).
 - **Embed Webpage Viewer** – Embeds external web apps (Grafana, Node-RED, etc.) into your dashboard.
 - **Racesteer** – Race steering display fusing polar performance data with live conditions for optimal tactics.

@@ -1,10 +1,10 @@
 ## Using a History API Provider
 
 Skip reads historical data from an external Signal K History API provider plugin. With a compatible provider installed, Skip can:
-1. Pre-seed Data Chart and Wind Trends so they show recent trends immediately.
+1. Pre-seed Data Plot and Wind Trends so they show recent trends immediately.
 2. Populate historical views for widgets on your pages that use numeric value paths.
 
-You must configure the provider plugin to capture the paths you want to chart, and it must have enough recorded data to cover your chart time span. This is not automatic.
+You must configure the provider plugin to capture the paths you want to plot, and it must have enough recorded data to cover your plot time span. This is not automatic.
 
 Running a provider gives you full control, including:
 - Long-term record keeping.
@@ -13,7 +13,7 @@ Running a provider gives you full control, including:
 
 ## Which Widgets Support History?
 
-Most widgets that use numeric paths support history, including Horizon, Battery Monitor, Solar, and similar numeric-based widgets. Your provider plugin must be configured to capture the paths you want to chart.
+Most widgets that use numeric paths support history, including Horizon, Battery Monitor, Solar, and similar numeric-based widgets. Your provider plugin must be configured to capture the paths you want to plot.
 
 ## Required Plugins and Signal K Version
 
@@ -27,7 +27,7 @@ Currently, two plugins support History API v2:
 - **Purpose:** Records Signal K data to an InfluxDB v2 time-series database (requires InfluxDB v2).
 - **Link:** [signalk-to-influxdb2](https://www.npmjs.com/package/signalk-to-influxdb2)
 - **Setup:** Follow the plugin documentation for installation and configuration.
-- **Path Configuration:** By default, records all paths. Configure filters, resolution, and related settings for the paths you want available in Skip charts.
+- **Path Configuration:** By default, records all paths. Configure filters, resolution, and related settings for the paths you want available in Skip plots.
 
 ### 2. signalk-parquet
 - **Purpose:** Records Signal K data to Parquet files for efficient storage and querying (no external database required).
@@ -38,31 +38,33 @@ Currently, two plugins support History API v2:
 ## How History Data Works in Skip
 
 ### History Seeding
-When you open a chart widget with a larger time scale (minutes/hours):
+When you open a plot widget with a larger time scale (minutes/hours):
 1. Skip checks whether history data is available through the History API.
 2. If available and the time window allows it (resolution >= 1000 ms), Skip requests historical data points.
-3. The chart displays the historical trend immediately.
+3. The plot displays the historical trend immediately.
 
 ### Live Updates
 After history data loads:
 - New data points continue to arrive through Signal K's live WebSocket connection.
-- The chart transitions smoothly from history to live updates.
+- The plot transitions smoothly from history to live updates.
 - Old points are removed to maintain a rolling window based on the configured time scale.
 
 ### When History Is Not Available
 - If no History API plugin is installed, or the provider reports that a path is not recorded, history requests are skipped silently.
-- The chart shows live data only, starting from when it was opened.
+- The plot shows live data only, starting from when it was opened.
 - This is expected behavior and does not indicate an error.
 
 ## Provider Plugin Configuration
 
-For performance reasons, Skip charts display a maximum of 120 datapoints. Skip uses the chart's configured time window and asks the provider to return data for that window as up to 120 datapoints.
+Skip does not impose a fixed datapoint limit. For each request it derives a resolution (sample interval) from the time window being shown and asks the provider to return data at that resolution:
+- The Realtime Data Plot targets roughly 500 points across its window (with a floor for very short windows), so finer sampling produces more detail rather than a capped number of points.
+- The pop-up history plot dialog targets a lighter density (about 120 points) across its fixed windows.
 
-When configuring provider sampling rates, ensure your rules support this behavior:
-- Slower sampling rates produce fewer datapoints (lower visual resolution).
-- Faster sampling rates do not produce more than 120 datapoints in Skip charts.
+A plot can only show detail the provider recorded. When configuring provider sampling rates:
+- If the provider stored data at a coarser interval than Skip requests, the plot shows that coarser detail (lower visual resolution), whatever the window.
+- Recording at a finer interval than Skip requests is fine — Skip asks for the resolution it needs and the provider returns data at that resolution.
 
-### Widget Historical Charts
+### Widget Historical Plots
 
 For the smallest fixed window (**last 15 minutes**), collect enough samples to provide useful resolution. A sampling interval around 7.5 seconds is ideal; 15 seconds is also usable.
 
@@ -74,11 +76,11 @@ The Wind Trends widget uses two fixed Signal K paths:
 
 To display Wind Trends history, both paths **must be captured by your selected History API plugin**.
 
-Choose a sampling rate that supports chart durations of 5 and 30 minutes.
+Choose a sampling rate that supports plot durations of 5 and 30 minutes.
 
 ## Limitations
 
-To seed charts with historical data, you must configure your provider to collect the required paths. This is not automatic.
+To seed plots with historical data, you must configure your provider to collect the required paths. This is not automatic.
 
 ## Troubleshooting
 
@@ -93,16 +95,16 @@ To seed charts with historical data, you must configure your provider to collect
 
 **Check 3: Are paths configured in the plugin?**
 - Open plugin configuration.
-- Confirm the paths you are charting (for example, `navigation.speedThroughWater`) are included in the capture list.
+- Confirm the paths you are plotting (for example, `navigation.speedThroughWater`) are included in the capture list.
 
 **Check 4: Is there historical data available?**
 - If the plugin was installed recently, data is only available from that point onward.
-- Charts cannot display history for periods before the plugin was enabled or before the path was configured.
+- Plots cannot display history for periods before the plugin was enabled or before the path was configured.
 - Allow time for data to accumulate before expecting deeper history.
 
-**Check 5: Is the chart time scale eligible?**
+**Check 5: Is the plot time scale eligible?**
 - Very short time scales (seconds) skip history seeding for performance.
-- Use chart time scales of **minutes or longer** for history seeding.
+- Use plot time scales of **minutes or longer** for history seeding.
 
 **Check 6: Are there network or permission issues?**
 - Confirm Skip can reach the Signal K server History API endpoint.
@@ -112,10 +114,10 @@ To seed charts with historical data, you must configure your provider to collect
 ## Next Steps
 
 1. Verify that a History API plugin is installed on your Signal K server.
-2. Configure the plugin to capture the paths you want to chart.
-3. Wait for the plugin to collect enough data to fill your chart time span.
-4. Open a Data Chart or Wind Trends widget with a time scale of minutes or longer.
-5. Let the chart load; history appears when available.
+2. Configure the plugin to capture the paths you want to plot.
+3. Wait for the plugin to collect enough data to fill your plot time span.
+4. Open a Data Plot or Wind Trends widget with a time scale of minutes or longer.
+5. Let the plot load; history appears when available.
 6. For more details, consult plugin documentation and Signal K community resources.
 
 ## Questions or Issues?
