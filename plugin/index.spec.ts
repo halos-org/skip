@@ -144,7 +144,8 @@ describe('Skip Freeboard panel plugin', () => {
     const manifest = await methods.getResource(PLUGIN_ID);
     const [panel] = manifest.panels;
     expect(panel.type).toBe('iframe');
-    expect(panel.url).toBe(SKIP_URL);
+    // The panel boots Skip in chromeless embed mode via the pre-hash query flag; no profile is baked in.
+    expect(panel.url).toBe(`${SKIP_URL}?embed=1`);
     expect(panel.lifecycle).toBe('keepAlive');
     const [button] = manifest.buttons;
     expect(button.slot).toBe('mapToolbar');
