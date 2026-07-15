@@ -34,27 +34,27 @@ export const routes: Routes = [
   {
     path: 'options',
     loadComponent: () => import('./core/components/options/tabs/tabs.component').then(m => m.TabsComponent),
-    title: 'KIP - Options'
+    title: 'Skip - Settings'
   },
   {
     path: 'remote',
     loadComponent: () => import('./core/components/remote-control/remote-control.component').then(m => m.RemoteControlComponent),
-    title: 'KIP - Remote Control'
+    title: 'Skip - Remote Control'
   },
   {
     path: 'help/:page',
     loadComponent: () => import('./core/components/app-help/app-help.component').then(m => m.AppHelpComponent),
-    title: 'KIP - Help'
+    title: 'Skip - Help'
   },
   {
     path: 'help',
     loadComponent: () => import('./core/components/app-help/app-help.component').then(m => m.AppHelpComponent),
-    title: 'KIP - Help'
+    title: 'Skip - Help'
   },
   {
     path: 'data',
     loadComponent: () => import('./core/components/data-inspector/data-inspector.component').then(m => m.DataInspectorComponent),
-    title: 'KIP - Data Inspector'
+    title: 'Skip - Data Inspector'
   },
   {
     path: 'login',
