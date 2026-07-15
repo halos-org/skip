@@ -17,6 +17,7 @@ import { DashboardService } from './core/services/dashboard.service';
 import { AppService } from './core/services/app-service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
+import { EmbedModeService } from './core/services/embed-mode.service';
 import { NotificationsService } from './core/services/notifications.service';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { RemoteDashboardsService } from './core/services/remote-dashboards.service';
@@ -53,6 +54,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly _uiEvent = inject(uiEventService);
   private readonly _app = inject(AppService);
   protected readonly chrome = inject(ChromeVisibilityService);
+  private readonly _embedMode = inject(EmbedModeService);
+  /** True in the chromeless embed render mode; the shell template unmounts the toolbar when set. */
+  protected readonly embed = this._embedMode.embed;
   private readonly _dialog = inject(DialogService);
   public readonly settings = inject(SettingsService);
   private readonly _titleService = inject(Title);

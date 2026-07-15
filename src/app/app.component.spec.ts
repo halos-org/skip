@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { signal } from '@angular/core';
@@ -9,8 +9,10 @@ import { DashboardService } from './core/services/dashboard.service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { AppService } from './core/services/app-service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
+import { EmbedModeService } from './core/services/embed-mode.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
+import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
 
 // Access the component's private surface without widening the class API.
 interface AppComponentHotkeyApi {
@@ -311,5 +313,65 @@ describe('AppComponent', () => {
       expect(chrome.hide).not.toHaveBeenCalled();
       expect(chrome.pulsePeek).not.toHaveBeenCalled();
     });
+  });
+});
+
+// Self-contained (no shared beforeEach): the toolbar mount gate depends on the injected
+// EmbedModeService, which the main suite does not stub. Under embed the toolbar is unmounted from
+// the DOM entirely (not CSS-hidden). (#216 E6)
+describe('AppComponent — embed mode chrome', () => {
+  async function render(embed: boolean): Promise<ComponentFixture<AppComponent>> {
+    const appNetworkInitServiceStub = {
+      bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
+      bootstrapIssue$: new BehaviorSubject({ reason: 'none' }),
+    };
+    const dashboard = {
+      isDashboardStatic: signal(true),
+      activeDashboard: signal<number | null>(null),
+      dashboards: signal<unknown[]>([]),
+      navigateToNextDashboard: vi.fn(),
+      navigateToPreviousDashboard: vi.fn(),
+      setStaticDashboard: vi.fn(),
+      widgetAction$: new Subject(),
+    };
+    const uiEvent = {
+      isDragging: signal(false),
+      addHotkeyListener: vi.fn(),
+      removeHotkeyListener: vi.fn(),
+      toggleFullScreen: vi.fn(),
+    };
+
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        { provide: AppNetworkInitService, useValue: appNetworkInitServiceStub },
+        { provide: DashboardService, useValue: dashboard },
+        { provide: uiEventService, useValue: uiEvent },
+        { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ToastService, useValue: { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) } },
+        { provide: ReloadService, useValue: { reload: vi.fn() } },
+        { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } },
+      ],
+    });
+    // Stub the toolbar's template so the mount/unmount gate can be asserted without wiring the
+    // toolbar's own heavy dependency tree; the `app-toolbar` host element still marks its presence.
+    TestBed.overrideComponent(ToolbarComponent, { set: { template: '<span class="stub-toolbar"></span>', imports: [] } });
+    await TestBed.compileComponents();
+
+    const fixture = TestBed.createComponent(AppComponent);
+    (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('unmounts the toolbar from the DOM under embed even on a visible dashboard', async () => {
+    const fixture = await render(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).toBeNull();
+  });
+
+  it('mounts the toolbar on a visible dashboard when not embedded', async () => {
+    const fixture = await render(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).not.toBeNull();
   });
 });

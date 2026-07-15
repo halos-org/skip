@@ -16,7 +16,7 @@
   (pointerdown)="onShellPointerDown($event)"
   (mousemove)="onMouseActivity()"
 >
-  @if (dashboardVisible()) {
+  @if (dashboardVisible() && !embed()) {
     <app-toolbar />
   }
   <router-outlet class="router-outlet-container" />

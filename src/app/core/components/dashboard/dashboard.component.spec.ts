@@ -11,6 +11,7 @@ import { ToastService } from '../../services/toast.service';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
 import { DialogService } from '../../services/dialog.service';
 import { uiEventService } from '../../services/uiEvent.service';
+import { EmbedModeService } from '../../services/embed-mode.service';
 
 interface DashboardComponentPrivateApi {
     saveDashboard: () => void;
@@ -474,5 +475,78 @@ describe('DashboardComponent', () => {
 
             expect(mockDashboardService.endPageTransition).toHaveBeenCalledTimes(1);
         });
+    });
+});
+
+// Self-contained (no shared beforeEach): the empty-state "Unlock and Customize" button renders in
+// the static branch, so the embed read-only pin leaves it visible-but-inert without an explicit
+// !embed() gate. Under embed the button must be absent from the DOM. (#216 E6)
+describe('DashboardComponent — embed mode empty state', () => {
+    function buildDashboardMock(): DashboardService {
+        return {
+            updateConfiguration: vi.fn(),
+            setStaticDashboard: vi.fn(),
+            notifyLayoutEditSaved: vi.fn(),
+            notifyLayoutEditCanceled: vi.fn(),
+            navigateToNextDashboard: vi.fn(),
+            navigateToPreviousDashboard: vi.fn(),
+            consumePendingPageDirection: vi.fn().mockReturnValue(null),
+            beginPageTransition: vi.fn(),
+            endPageTransition: vi.fn(),
+            isPageTransitioning: signal(false),
+            setWidgetClipboardFromNode: vi.fn(),
+            clearWidgetClipboard: vi.fn(),
+            isDashboardStatic: signal(true),
+            activeDashboard: signal(0),
+            dashboards: signal([{ id: 'd-0', configuration: [] }]),
+            widgetClipboard: signal(null),
+            widgetAction$: new Subject()
+        } as unknown as DashboardService;
+    }
+
+    async function render(embed: boolean): Promise<HTMLElement> {
+        await TestBed.configureTestingModule({
+            imports: [DashboardComponent],
+            providers: [
+                provideRouter([]),
+                { provide: DashboardService, useValue: buildDashboardMock() },
+                { provide: ToastService, useValue: { show: vi.fn() } },
+                { provide: PluginConfigClientService, useValue: { getPlugin: vi.fn(), setPluginEnabled: vi.fn() } },
+                { provide: DialogService, useValue: { openFrameDialog: vi.fn().mockReturnValue(of(null)) } },
+                { provide: uiEventService, useValue: { addHotkeyListener: vi.fn(), removeHotkeyListener: vi.fn(), isDragging: signal(false) } },
+                { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } }
+            ]
+        }).compileComponents();
+
+        const fixture = TestBed.createComponent(DashboardComponent);
+        const component = fixture.componentInstance;
+        vi.spyOn(component, 'ngOnDestroy').mockImplementation(() => undefined);
+        const grid = {
+            grid: {
+                getGridItems: vi.fn().mockReturnValue([]),
+                setStatic: vi.fn(),
+                on: vi.fn(),
+                save: vi.fn().mockReturnValue([]),
+                offAll: vi.fn(),
+                destroy: vi.fn(),
+                load: vi.fn(),
+                batchUpdate: vi.fn(),
+                getRow: vi.fn().mockReturnValue(24),
+                cellHeight: vi.fn()
+            }
+        };
+        vi.spyOn(component as unknown as { _gridstack: () => unknown }, '_gridstack').mockReturnValue(grid);
+        fixture.detectChanges();
+        return fixture.nativeElement as HTMLElement;
+    }
+
+    it('hides the Unlock and Customize button under embed', async () => {
+        const root = await render(true);
+        expect(root.querySelector('.empty-state-button')).toBeNull();
+    });
+
+    it('shows the Unlock and Customize button when not embedded', async () => {
+        const root = await render(false);
+        expect(root.querySelector('.empty-state-button')?.textContent).toContain('Unlock and Customize');
     });
 });

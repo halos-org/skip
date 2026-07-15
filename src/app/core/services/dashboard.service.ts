@@ -8,6 +8,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import isEqual from 'lodash-es/isEqual';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
+import { EmbedModeService } from './embed-mode.service';
 
 export interface Dashboard {
   id: string
@@ -34,6 +35,7 @@ export type PageTransitionDirection = 'next' | 'prev';
 export class DashboardService {
   private readonly _settings = inject(SettingsService);
   private readonly _router = inject(Router);
+  private readonly _embedMode = inject(EmbedModeService);
   private readonly _destroyRef = inject(DestroyRef);
   public dashboards = signal<Dashboard[]>([], { equal: isEqual });
   public readonly activeDashboard = signal<number | null>(null);
@@ -158,6 +160,8 @@ export class DashboardService {
    * Toggles the static/fixed state of the dashboard layout.
    */
   public toggleStaticDashboard(): void {
+    // Embed mode is strictly read-only: this single choke point stays locked, so never unlock.
+    if (this._embedMode.embed()) return;
     this.isDashboardStatic.set(!this.isDashboardStatic());
   }
 
@@ -483,6 +487,9 @@ export class DashboardService {
    * @param isStatic Whether the dashboard should be static.
    */
   public setStaticDashboard(isStatic: boolean): void {
+    // Embed mode is strictly read-only: ignore unlock requests so this single choke point stays
+    // locked. A redundant lock (isStatic=true) still applies.
+    if (this._embedMode.embed() && !isStatic) return;
     this.isDashboardStatic.set(isStatic);
   }
 
