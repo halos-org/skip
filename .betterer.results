@@ -131,13 +131,13 @@ exports[`strictNullChecks`] = {
       [119, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
       [120, 4, 20, "Object is possibly \'undefined\'.", "2522653710"]
     ],
-    "src/app/widget-config/paths-options/paths-options.component.ts:3600643100": [
+    "src/app/widget-config/paths-options/paths-options.component.ts:3797853945": [
       [31, 51, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'IAddNewPathObject\'.", "2620553983"],
       [32, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'string\'.", "2620553983"],
       [33, 54, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'IDynamicControl[]\'.", "2620553983"],
-      [42, 28, 49, "Object is possibly \'null\'.", "3725617003"],
-      [66, 26, 49, "Object is possibly \'null\'.", "3725617003"],
-      [70, 26, 49, "Object is possibly \'null\'.", "3725617003"]
+      [58, 28, 49, "Object is possibly \'null\'.", "3725617003"],
+      [85, 26, 49, "Object is possibly \'null\'.", "3725617003"],
+      [89, 26, 49, "Object is possibly \'null\'.", "3725617003"]
     ],
     "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:104802355": [
       [80, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],

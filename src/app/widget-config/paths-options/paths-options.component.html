@@ -14,9 +14,9 @@
     <span matTextSuffix>Seconds</span>
   </mat-form-field>
 </div>
-<ng-container [formGroup]="pathsFormGroup">
+<ng-container [formGroup]="pathsGroup">
   @if(isArray()) {
-    @for (group of pathsFormGroup.controls; track $index) {
+    @for (group of pathControlGroups; track $index) {
       <path-control-config style="display: block;"
         [pathFormGroup]="group"
         [filterSelfPaths]="filterSelfPaths().value"
@@ -24,9 +24,9 @@
       </path-control-config>
     }
   } @else {
-    @for (group of pathsFormGroup.controls | objectKeys; track $index) {
+    @for (key of pathsGroup.controls | objectKeys; track $index) {
       <path-control-config style="display: block;"
-        [pathFormGroup]="pathsFormGroup.get(group)"
+        [pathFormGroup]="pathGroupByKey(key)"
         [filterSelfPaths]="filterSelfPaths().value"
         [multiCTRLArray]="multiCTRLArray">
       </path-control-config>
