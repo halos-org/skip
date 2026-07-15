@@ -2,6 +2,7 @@ import { ITheme } from '../services/app-service';
 import { TValidSkUnits } from '../services/units.service';
 import { TScaleType } from './signalk-interfaces';
 import type { IElectricalCardModeConfig } from '../contracts/electrical-topology-card.contract';
+import type { FormControl } from '@angular/forms';
 
 /**
  * Ownership: Normalized widget app config interfaces.
@@ -546,6 +547,21 @@ export interface IDynamicControl {
   color: string;
   /** If the control should use numeric path instead of boolean */
   isNumeric: boolean;
+}
+
+/**
+ * Typed reactive-form control map for a single {@link IDynamicControl}, as produced by the
+ * widget-config multi-control factory. Each leaf control type is derived from the matching
+ * {@link IDynamicControl} field; controls are nullable because they are built by the untyped
+ * FormBuilder.
+ */
+export interface IDynamicControlGroup {
+  ctrlLabel: FormControl<IDynamicControl['ctrlLabel'] | null>;
+  type: FormControl<IDynamicControl['type'] | null>;
+  pathID: FormControl<IDynamicControl['pathID'] | null>;
+  color: FormControl<IDynamicControl['color'] | null>;
+  isNumeric: FormControl<IDynamicControl['isNumeric'] | null>;
+  value: FormControl<IDynamicControl['value']>;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { Component, OnInit, input, output, inject } from '@angular/core';
 import { AppService } from './../../core/services/app-service';
-import { UntypedFormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { IDynamicControlGroup } from './../../core/interfaces/widgets-interface';
 import { MatIconButton } from '@angular/material/button';
 import { MatOption } from '@angular/material/core';
 import { MatSelect } from '@angular/material/select';
@@ -22,7 +23,7 @@ export interface IDeleteEventObj {
 })
 export class BooleanControlConfigComponent implements OnInit {
   private app = inject(AppService);
-  readonly ctrlFormGroup = input.required<UntypedFormGroup>();
+  readonly ctrlFormGroup = input.required<FormGroup<IDynamicControlGroup>>();
   readonly controlIndex = input<number>(undefined);
   readonly arrayLength = input<number>(undefined);
   public readonly deleteCtrl = output<IDeleteEventObj>();
@@ -35,7 +36,7 @@ export class BooleanControlConfigComponent implements OnInit {
   }
 
   public deleteControl() {
-    const delEvent: IDeleteEventObj = {ctrlIndex: this.controlIndex(), pathID: this.ctrlFormGroup().get('pathID').value};
+    const delEvent: IDeleteEventObj = {ctrlIndex: this.controlIndex(), pathID: this.ctrlFormGroup().controls.pathID.value ?? ''};
     this.deleteCtrl.emit(delEvent);
   }
 

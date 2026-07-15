@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal, DestroyRef } from '@angular/core';
-import { UntypedFormGroup, UntypedFormControl, FormControl, Validators, UntypedFormBuilder, UntypedFormArray, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { UntypedFormGroup, UntypedFormControl, FormControl, FormGroup, Validators, UntypedFormBuilder, UntypedFormArray, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -15,7 +15,7 @@ import { DisplayChartOptionsComponent } from '../display-chart-options/display-c
 import { DatasetChartOptionsComponent } from '../dataset-chart-options/dataset-chart-options.component';
 import { IUnitGroup, UnitsService } from '../../core/services/units.service';
 import { AppService } from '../../core/services/app-service';
-import type { ElectricalTrackedDevice, IDynamicControl, IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+import type { ElectricalTrackedDevice, IDynamicControl, IDynamicControlGroup, IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { PathsOptionsComponent } from '../paths-options/paths-options.component';
 import { IDeleteEventObj } from '../boolean-control-config/boolean-control-config.component';
 import { DisplayDatetimeComponent } from '../display-datetime/display-datetime.component';
@@ -26,6 +26,11 @@ import { SolarChargerSetupComponent } from '../solar-charger-setup/solar-charger
 import { ElectricalFamilySetupComponent } from '../electrical-family-setup/electrical-family-setup.component';
 import { VideoCameraSetupComponent } from '../video-camera-setup/video-camera-setup.component';
 import { MatTabsModule } from '@angular/material/tabs';
+
+/** Typed reactive-form control map for an array-mode {@link IWidgetPath}: one control per field. */
+type IWidgetPathControls = {
+  [K in keyof IWidgetPath]: FormControl<IWidgetPath[K] | null>;
+};
 
 @Component({
   selector: 'modal-widget-config',
@@ -202,39 +207,30 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return groups;
   }
 
-  private generatePathArray(pathKey: string, formData: IWidgetPath): UntypedFormGroup {
+  private generatePathArray(pathKey: string, formData: IWidgetPath): FormGroup<IWidgetPathControls> {
     // use addControl for formGroup and addControl for formControl
     const fg = new UntypedFormGroup({});
-    Object.keys(formData).forEach(key => {
+    (Object.keys(formData) as (keyof IWidgetPath)[]).forEach(key => {
       fg.addControl(key, this.generatePathFields(key, formData[key]));
     });
-    return fg;
+    return fg as FormGroup<IWidgetPathControls>;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private generatePathFields(key: string, value: any): UntypedFormControl {
-    let ctrl: UntypedFormControl = null;
-
+  private generatePathFields(key: keyof IWidgetPath, value: IWidgetPath[keyof IWidgetPath]): FormControl<IWidgetPath[keyof IWidgetPath] | null> {
     switch (key) {
-      case "path": ctrl = new UntypedFormControl(value);
-        break;
+      case "path": return new FormControl(value);
 
-      case "source": ctrl = new UntypedFormControl(value, Validators.required);
-        break;
+      case "source": return new FormControl(value, Validators.required);
 
-      case "sampleTime": ctrl = new UntypedFormControl(value, Validators.required);
-        break;
+      case "sampleTime": return new FormControl(value, Validators.required);
 
-      default: ctrl = new UntypedFormControl(value);
-        break;
+      default: return new FormControl(value);
     }
-    return ctrl;
   }
 
-  private generateCtrlArray(formData: IDynamicControl): UntypedFormGroup {
-    const fg = this.fb.group(formData);
-    const ctrlLabel = fg.get('ctrlLabel');
-    ctrlLabel.addValidators(Validators.required);
+  private generateCtrlArray(formData: IDynamicControl): FormGroup<IDynamicControlGroup> {
+    const fg = this.fb.group(formData) as FormGroup<IDynamicControlGroup>;
+    fg.controls.ctrlLabel.addValidators(Validators.required);
     return fg;
   }
 
