@@ -63,7 +63,16 @@ export class ReloadService {
     if ((window as any).__KIP_TEST__) {
       return;
     }
-    location.replace('./');
+    location.replace(this.reloadTarget());
+  }
+
+  /**
+   * Reload target preserving the pre-hash query string (`window.location.search`) so boot-latched
+   * flags like `?embed`/`?profile` survive a Retry-reload, while dropping the hash — a reload lands
+   * on the app root, not a deep-linked page.
+   */
+  private reloadTarget(): string {
+    return './' + window.location.search;
   }
 
   private showUnreachableToast(): void {

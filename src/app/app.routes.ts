@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { DashboardComponent } from './core/components/dashboard/dashboard.component';
+import { embedBlockedGuard } from './core/guards/embed-route.guard';
 
 export const routes: Routes = [
   {
@@ -28,16 +29,19 @@ export const routes: Routes = [
   },
   {
     path: 'settings',
+    canActivate: [embedBlockedGuard],
     loadComponent: () => import('./core/components/settings/settings.component').then(m => m.SettingsComponent),
     title: 'KIP - Settings'
   },
   {
     path: 'options',
+    canActivate: [embedBlockedGuard],
     loadComponent: () => import('./core/components/options/tabs/tabs.component').then(m => m.TabsComponent),
     title: 'Skip - Settings'
   },
   {
     path: 'remote',
+    canActivate: [embedBlockedGuard],
     loadComponent: () => import('./core/components/remote-control/remote-control.component').then(m => m.RemoteControlComponent),
     title: 'Skip - Remote Control'
   },
