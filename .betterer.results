@@ -173,12 +173,12 @@ exports[`strictNullChecks`] = {
       [50, 57, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
       [51, 57, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"]
     ],
-    "src/app/widgets/svg-zone-states/svg-zone-states.component.ts:1762718998": [
-      [17, 41, 4, "No overload matches this call.\\n  Overload 1 of 5, \'(initialValue: IDynamicControl, opts?: InputOptionsWithoutTransform<IDynamicControl> | undefined): InputSignal<...>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'IDynamicControl\'.\\n  Overload 2 of 5, \'(initialValue: undefined, opts: InputOptionsWithoutTransform<IDynamicControl>): InputSignal<IDynamicControl | undefined>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'undefined\'.", "2087897566"],
-      [18, 33, 4, "Argument of type \'null\' is not assignable to parameter of type \'ITheme\'.", "2087897566"],
+    "src/app/widgets/svg-zone-states/svg-zone-states.component.ts:489168871": [
+      [16, 41, 4, "No overload matches this call.\\n  Overload 1 of 5, \'(initialValue: IDynamicControl, opts?: InputOptionsWithoutTransform<IDynamicControl> | undefined): InputSignal<...>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'IDynamicControl\'.\\n  Overload 2 of 5, \'(initialValue: undefined, opts: InputOptionsWithoutTransform<IDynamicControl>): InputSignal<IDynamicControl | undefined>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'undefined\'.", "2087897566"],
+      [17, 33, 4, "Argument of type \'null\' is not assignable to parameter of type \'ITheme\'.", "2087897566"],
+      [21, 41, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"],
       [22, 41, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"],
-      [23, 41, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"],
-      [24, 42, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"]
+      [23, 42, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"]
     ],
     "src/app/widgets/widget-ais-radar/dialog-ais-target/dialog-ais-target.component.ts:3744867362": [
       [49, 11, 38, "Object is possibly \'null\'.", "3959613788"],
@@ -199,9 +199,9 @@ exports[`strictNullChecks`] = {
       [1358, 21, 11, "\'b.longitude\' is possibly \'undefined\'.", "3370058570"],
       [1358, 35, 11, "\'a.longitude\' is possibly \'undefined\'.", "2985066057"]
     ],
-    "src/app/widgets/widget-boolean-switch/widget-boolean-switch.component.ts:46644229": [
-      [76, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
-      [99, 10, 12, "Object is possibly \'null\'.", "4261782498"]
+    "src/app/widgets/widget-boolean-switch/widget-boolean-switch.component.ts:800795185": [
+      [71, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
+      [94, 10, 12, "Object is possibly \'null\'.", "4261782498"]
     ],
     "src/app/widgets/widget-datetime/widget-datetime.component.ts:3033260432": [
       [60, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'string\'.", "2620553983"],
@@ -272,8 +272,8 @@ exports[`strictNullChecks`] = {
       [212, 73, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"],
       [213, 74, 9, "\'cfg.paths\' is possibly \'undefined\'.", "4139429943"]
     ],
-    "src/app/widgets/widget-zones-state-panel/widget-zones-state-panel.component.ts:2501103102": [
-      [78, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
+    "src/app/widgets/widget-zones-state-panel/widget-zones-state-panel.component.ts:1602708938": [
+      [73, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
     ],
     "src/default-config/config.blank.const.ts:2019243563": [
       [31, 2, 12, "Type \'null\' is not assignable to type \'string\'.", "3195809883"]

@@ -19,6 +19,12 @@ export enum ControlType {
   indicator = 2,
 }
 
+/** Pixel dimensions of a widget's rendering area. */
+export interface IDimensions {
+  height: number;
+  width: number;
+}
+
 /**
  * Allowed path types for Signal K data paths.
  * - 'number'

@@ -3,7 +3,7 @@ import { Subscription } from 'rxjs';
 import { SignalkRequestsService } from '../../core/services/signalk-requests.service';
 import { ITheme } from '../../core/services/app-service';
 import { ToastService } from '../../core/services/toast.service';
-import { IWidgetSvcConfig, IDynamicControl, IWidgetPath } from '../../core/interfaces/widgets-interface';
+import { IWidgetSvcConfig, IDynamicControl, IWidgetPath, IDimensions } from '../../core/interfaces/widgets-interface';
 import { SvgBooleanLightComponent } from '../svg-boolean-light/svg-boolean-light.component';
 import { SvgBooleanButtonComponent } from '../svg-boolean-button/svg-boolean-button.component';
 import { SvgBooleanSwitchComponent } from '../svg-boolean-switch/svg-boolean-switch.component';
@@ -13,11 +13,6 @@ import { getColors } from '../../core/utils/themeColors.utils';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { KipResizeObserverDirective } from '../../core/directives/kip-resize-observer.directive';
-
-export interface IDimensions {
-  height: number,
-  width: number
-}
 
 @Component({
   selector: 'widget-boolean-switch',

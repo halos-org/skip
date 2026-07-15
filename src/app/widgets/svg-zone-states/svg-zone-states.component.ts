@@ -1,8 +1,7 @@
 import { Component, computed, effect, input, output, signal, untracked } from '@angular/core';
 import { ChangeDetectionStrategy } from '@angular/core';
-import type { IDynamicControl } from '../../core/interfaces/widgets-interface';
+import type { IDynamicControl, IDimensions } from '../../core/interfaces/widgets-interface';
 import type { ITheme } from '../../core/services/app-service';
-import { IDimensions } from '../widget-zones-state-panel/widget-zones-state-panel.component';
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { getColors } from "../../core/utils/themeColors.utils";
 
