@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { UnitsService } from './../../core/services/units.service';
 import { Component, OnInit, input, inject, signal, computed, DestroyRef } from '@angular/core';
-import { AbstractControl, ReactiveFormsModule, UntypedFormControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { DataService } from '../../core/services/data.service';
@@ -46,13 +46,13 @@ function pathRequiredOrValidMatch(getPaths: () => IPathMetaData[]): ValidatorFn 
   styleUrl: './dataset-chart-options.component.scss'
 })
 export class DatasetChartOptionsComponent implements OnInit {
-  public convertUnitTo = input.required<UntypedFormControl>();
-  public datachartAngleRange = input<UntypedFormControl | undefined>(undefined);
-  public filterSelfPaths = input.required<UntypedFormControl>()
-  public datachartPath = input.required<UntypedFormControl>()
-  public datachartSource = input.required<UntypedFormControl>()
-  public timeScale = input.required<UntypedFormControl>();
-  public period = input.required<UntypedFormControl>()
+  public convertUnitTo = input.required<FormControl<string | null>>();
+  public datachartAngleRange = input<FormControl<'signed' | 'direction' | null> | undefined>(undefined);
+  public filterSelfPaths = input.required<FormControl<boolean>>()
+  public datachartPath = input.required<FormControl<string | null>>()
+  public datachartSource = input.required<FormControl<string | null>>()
+  public timeScale = input.required<FormControl<string>>();
+  public period = input.required<FormControl<number>>()
 
   private readonly data = inject(DataService);
   private readonly units = inject(UnitsService);
@@ -78,10 +78,11 @@ export class DatasetChartOptionsComponent implements OnInit {
     });
 
     this.datachartPath().setValidators([pathRequiredOrValidMatch(() => this.getPaths())]);
-    if (this.datachartPath()?.value) {
-      const pathObject = this.data.getPathObject(this.datachartPath().value);
+    const currentPath = this.datachartPath()?.value;
+    if (currentPath) {
+      const pathObject = this.data.getPathObject(currentPath);
       this.setPathSources(pathObject);
-      this.unitList.set(this.units.getConversionsForPath(this.datachartPath().value));
+      this.unitList.set(this.units.getConversionsForPath(currentPath));
     }
     this.setInitFormState();
   }
