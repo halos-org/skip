@@ -20,7 +20,7 @@ vi.mock('chart.js', () => {
     Chart: MockChart,
     registerables: [],
     TimeScale: {}, LinearScale: {}, LineController: {}, PointElement: {},
-    LineElement: {}, Filler: {}, Title: {}, SubTitle: {}
+    LineElement: {}, Filler: {}, Legend: {}, Tooltip: {}, Title: {}, SubTitle: {}
   };
 });
 vi.mock('chartjs-plugin-annotation', () => ({ default: {} }));
