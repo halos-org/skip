@@ -91,6 +91,12 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     });
 
     effect(() => {
+      // Embed is strictly read-only: never run the config migration (it writes every user slot and
+      // reloads the app), nor surface the manual upgrade-instructions dialog. Defer both to a
+      // full-app session.
+      if (this.embed()) {
+        return;
+      }
       if (this.settings.configUpgrade()) {
         const liveVersion = this.settings.getConfigVersion();
 
@@ -159,7 +165,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
     effect(() => {
       const issue = this.bootstrapIssue();
-      if (issue.reason !== 'missing-shared-config' || this.missingConfigPromptShown) {
+      // Under embed the create-config prompt is suppressed: its 'Create' action writes a default
+      // config (settings.resetSettings()), which read-only embed must never offer. Embed renders the
+      // degraded/empty state instead.
+      if (issue.reason !== 'missing-shared-config' || this.missingConfigPromptShown || this.embed()) {
         return;
       }
 

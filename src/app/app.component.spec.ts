@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { signal } from '@angular/core';
 import { AppComponent } from './app.component';
@@ -10,6 +10,8 @@ import { uiEventService } from './core/services/uiEvent.service';
 import { AppService } from './core/services/app-service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
 import { EmbedModeService } from './core/services/embed-mode.service';
+import { SettingsService } from './core/services/settings.service';
+import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
 import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
@@ -373,5 +375,94 @@ describe('AppComponent — embed mode chrome', () => {
   it('mounts the toolbar on a visible dashboard when not embedded', async () => {
     const fixture = await render(false);
     expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).not.toBeNull();
+  });
+});
+
+// Self-contained: exercises the two constructor effects that must stand down under embed — the
+// automatic v11/v12 config migration (writes every user slot + reloadApp), and the
+// missing-shared-config 'Create' prompt (its action calls settings.resetSettings, a write). Wires the
+// real root SettingsService / ConfigurationUpgradeService (spied) like the chrome suite, plus a
+// toggleable EmbedModeService. (#216 E6)
+describe('AppComponent — embed read-only invariants (#216 E6)', () => {
+  async function render(opts: { embed: boolean; configUpgrade?: boolean; configVersion?: number }) {
+    const bootstrapIssue$ = new BehaviorSubject<{ reason: string; sharedConfigName?: string }>({ reason: 'none' });
+    const appNetworkInitServiceStub = {
+      bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
+      bootstrapIssue$,
+    };
+    const dashboard = {
+      isDashboardStatic: signal(true),
+      activeDashboard: signal<number | null>(null),
+      dashboards: signal<unknown[]>([]),
+      navigateToNextDashboard: vi.fn(),
+      navigateToPreviousDashboard: vi.fn(),
+      setStaticDashboard: vi.fn(),
+      widgetAction$: new Subject(),
+    };
+    const uiEvent = {
+      isDragging: signal(false),
+      addHotkeyListener: vi.fn(),
+      removeHotkeyListener: vi.fn(),
+      toggleFullScreen: vi.fn(),
+    };
+    const toast = { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) };
+
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        { provide: AppNetworkInitService, useValue: appNetworkInitServiceStub },
+        { provide: DashboardService, useValue: dashboard },
+        { provide: uiEventService, useValue: uiEvent },
+        { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ToastService, useValue: toast },
+        { provide: ReloadService, useValue: { reload: vi.fn() } },
+        { provide: EmbedModeService, useValue: { embed: () => opts.embed, profile: () => null } },
+      ],
+    });
+    TestBed.overrideComponent(ToolbarComponent, { set: { template: '<span class="stub-toolbar"></span>', imports: [] } });
+    await TestBed.compileComponents();
+
+    // Drive the constructor effects deterministically through the real root services the component
+    // injects: force an upgradeable version and spy the write actions so nothing actually persists.
+    const settings = TestBed.inject(SettingsService);
+    const upgrade = TestBed.inject(ConfigurationUpgradeService);
+    const runUpgradeSpy = vi.spyOn(upgrade, 'runUpgrade').mockResolvedValue(undefined);
+    vi.spyOn(settings, 'getConfigVersion').mockReturnValue(opts.configVersion);
+    vi.spyOn(settings, 'resetSettings').mockImplementation(() => undefined);
+    settings.configUpgrade.set(opts.configUpgrade ?? false);
+
+    const fixture = TestBed.createComponent(AppComponent);
+    (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
+    fixture.detectChanges();
+    return { toast, runUpgradeSpy, bootstrapIssue$ };
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('does NOT run the config migration under embed even with an upgradeable v11/v12 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: true, configUpgrade: true, configVersion: 11 });
+    expect(runUpgradeSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs the config migration in the full app (not embed) for an upgradeable v11/v12 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 12 });
+    expect(runUpgradeSpy).toHaveBeenCalledWith(12);
+  });
+
+  it('does NOT show the missing-shared-config create prompt under embed', async () => {
+    const { toast, bootstrapIssue$ } = await render({ embed: true });
+    toast.show.mockClear();
+    bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default' });
+    TestBed.tick();
+    expect(toast.show).not.toHaveBeenCalled();
+  });
+
+  it('shows the missing-shared-config create prompt in the full app (not embed)', async () => {
+    const { toast, bootstrapIssue$ } = await render({ embed: false });
+    toast.show.mockClear();
+    bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default' });
+    TestBed.tick();
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no shared configuration'), 0, true, 'warn', 'Create');
   });
 });
