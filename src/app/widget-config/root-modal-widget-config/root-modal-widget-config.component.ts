@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal, DestroyRef } from '@angular/core';
-import { UntypedFormGroup, UntypedFormControl, FormControl, FormGroup, Validators, UntypedFormBuilder, UntypedFormArray, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { AbstractControl, UntypedFormGroup, UntypedFormControl, FormControl, FormGroup, Validators, UntypedFormBuilder, UntypedFormArray, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -86,11 +86,21 @@ export class RootModalWidgetConfigComponent implements OnInit {
     this.colors = this.app.configurableThemeColors;
   }
 
+  /**
+   * Access a formMaster control by an IWidgetSvcConfig key. The `K extends keyof IWidgetSvcConfig`
+   * bound makes renaming a config field a compile error at every call site — the form layer's
+   * compile-time link to the config interface (#25). The value type stays the caller's cast, since
+   * formMaster is an UntypedFormGroup built reflectively.
+   */
+  private configControl<K extends keyof IWidgetSvcConfig>(key: K): AbstractControl | null {
+    return this.formMaster.get(key);
+  }
+
   private setupWindsteerControlState(): void {
-    const compassModeControl = this.formMaster.get('compassModeEnabled') as UntypedFormControl | null;
-    const courseOverGroundControl = this.formMaster.get('courseOverGroundEnable') as UntypedFormControl | null;
-    const waypointEnableControl = this.formMaster.get('waypointEnable') as UntypedFormControl | null;
-    const driftEnableControl = this.formMaster.get('driftEnable') as UntypedFormControl | null;
+    const compassModeControl = this.configControl('compassModeEnabled') as UntypedFormControl | null;
+    const courseOverGroundControl = this.configControl('courseOverGroundEnable') as UntypedFormControl | null;
+    const waypointEnableControl = this.configControl('waypointEnable') as UntypedFormControl | null;
+    const driftEnableControl = this.configControl('driftEnable') as UntypedFormControl | null;
 
     if (!compassModeControl || !courseOverGroundControl || !waypointEnableControl || !driftEnableControl) {
       return;
@@ -240,7 +250,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
 
   public updatePath(ctrlUpdates: IDynamicControl[]): void {
     ctrlUpdates.forEach(ctrl => {
-      const pathsFormArray = this.formMaster.get('paths') as UntypedFormArray;
+      const pathsFormArray = this.configControl('paths') as UntypedFormArray;
 
       pathsFormArray.controls.forEach((fg: UntypedFormGroup) => {
         const pathIDCtrl = fg.get('pathID') as UntypedFormControl;
@@ -254,7 +264,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
   }
 
   public deletePath(e: IDeleteEventObj): void {
-    const pathsFormArray = this.formMaster.get('paths') as UntypedFormArray;
+    const pathsFormArray = this.configControl('paths') as UntypedFormArray;
     let i = 0;
     pathsFormArray.controls.forEach((fg: UntypedFormGroup) => {
       const pathIDCtrl = fg.get('pathID') as UntypedFormControl;
@@ -265,7 +275,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
       }
     });
 
-    const multiCtrlFormArray = this.formMaster.get('multiChildCtrls') as UntypedFormArray;
+    const multiCtrlFormArray = this.configControl('multiChildCtrls') as UntypedFormArray;
     multiCtrlFormArray.removeAt(e.ctrlIndex);
 
     this.delPathEvent = e.pathID;
@@ -275,131 +285,131 @@ export class RootModalWidgetConfigComponent implements OnInit {
   }
 
   get datachartPathControl(): FormControl<string | null> {
-    return this.formMaster.get('datachartPath') as FormControl<string | null>;
+    return this.configControl('datachartPath') as FormControl<string | null>;
   }
 
   get datachartSourceControl(): FormControl<string | null> {
-    return this.formMaster.get('datachartSource') as FormControl<string | null>;
+    return this.configControl('datachartSource') as FormControl<string | null>;
   }
 
   get convertUnitToControl(): FormControl<string | null> {
-    return this.formMaster.get('convertUnitTo') as FormControl<string | null>;
+    return this.configControl('convertUnitTo') as FormControl<string | null>;
   }
 
   get datachartAngleRangeControl(): FormControl<'signed' | 'direction' | null> {
-    return this.formMaster.get('datachartAngleRange') as FormControl<'signed' | 'direction' | null>;
+    return this.configControl('datachartAngleRange') as FormControl<'signed' | 'direction' | null>;
   }
 
   get timeScaleControl(): FormControl<string> {
-    return this.formMaster.get('timeScale') as FormControl<string>;
+    return this.configControl('timeScale') as FormControl<string>;
   }
 
   get periodControl(): FormControl<number> {
-    return this.formMaster.get('period') as FormControl<number>;
+    return this.configControl('period') as FormControl<number>;
   }
 
   get filterSelfPathsToControl(): FormControl<boolean> {
-    return this.formMaster.get('filterSelfPaths') as FormControl<boolean>;
+    return this.configControl('filterSelfPaths') as FormControl<boolean>;
   }
 
   get dataTimeoutToControl(): UntypedFormControl {
-    return this.formMaster.get('dataTimeout') as UntypedFormControl;
+    return this.configControl('dataTimeout') as UntypedFormControl;
   }
 
   get enableTimeoutToControl(): UntypedFormControl {
-    return this.formMaster.get('enableTimeout') as UntypedFormControl;
+    return this.configControl('enableTimeout') as UntypedFormControl;
   }
 
   get dateTimezoneToControl(): FormControl<string> {
-    return this.formMaster.get('dateTimezone') as FormControl<string>;
+    return this.configControl('dateTimezone') as FormControl<string>;
   }
 
   get yScaleSuggestedMaxToControl(): FormControl<number> {
-    return this.formMaster.get('yScaleSuggestedMax') as FormControl<number>;
+    return this.configControl('yScaleSuggestedMax') as FormControl<number>;
   }
 
   get enableMinMaxScaleLimitToControl(): FormControl<boolean> {
-    return this.formMaster.get('enableMinMaxScaleLimit') as FormControl<boolean>;
+    return this.configControl('enableMinMaxScaleLimit') as FormControl<boolean>;
   }
 
   get showDatasetMinimumValueLineToControl(): FormControl<boolean> {
-    return this.formMaster.get('showDatasetMinimumValueLine') as FormControl<boolean>;
+    return this.configControl('showDatasetMinimumValueLine') as FormControl<boolean>;
   }
 
   get showDatasetMaximumValueLineToControl(): FormControl<boolean> {
-    return this.formMaster.get('showDatasetMaximumValueLine') as FormControl<boolean>;
+    return this.configControl('showDatasetMaximumValueLine') as FormControl<boolean>;
   }
 
   get showDatasetAverageValueLineToControl(): FormControl<boolean> {
-    return this.formMaster.get('showDatasetAverageValueLine') as FormControl<boolean>;
+    return this.configControl('showDatasetAverageValueLine') as FormControl<boolean>;
   }
 
   get showDatasetAngleAverageValueLineToControl(): FormControl<boolean> {
-    return this.formMaster.get('showDatasetAngleAverageValueLine') as FormControl<boolean>;
+    return this.configControl('showDatasetAngleAverageValueLine') as FormControl<boolean>;
   }
 
   get startScaleAtZeroToControl(): FormControl<boolean> {
-    return this.formMaster.get('startScaleAtZero') as FormControl<boolean>;
+    return this.configControl('startScaleAtZero') as FormControl<boolean>;
   }
 
   get showTimeScaleToControl(): FormControl<boolean> {
-    return this.formMaster.get('showTimeScale') as FormControl<boolean>;
+    return this.configControl('showTimeScale') as FormControl<boolean>;
   }
 
   get showYScaleToControl(): FormControl<boolean> {
-    return this.formMaster.get('showYScale') as FormControl<boolean>;
+    return this.configControl('showYScale') as FormControl<boolean>;
   }
 
   get yScaleSuggestedMinToControl(): FormControl<number> {
-    return this.formMaster.get('yScaleSuggestedMin') as FormControl<number>;
+    return this.configControl('yScaleSuggestedMin') as FormControl<number>;
   }
 
   get yScaleMinToControl(): FormControl<number> {
-    return this.formMaster.get('yScaleMin') as FormControl<number>;
+    return this.configControl('yScaleMin') as FormControl<number>;
   }
 
   get yScaleMaxToControl(): FormControl<number> {
-    return this.formMaster.get('yScaleMax') as FormControl<number>;
+    return this.configControl('yScaleMax') as FormControl<number>;
   }
 
   get datasetAverageArrayToControl(): FormControl<string> {
-    return this.formMaster.get('datasetAverageArray') as FormControl<string>;
+    return this.configControl('datasetAverageArray') as FormControl<string>;
   }
 
   get trackAgainstAverageToControl(): FormControl<boolean> {
-    return this.formMaster.get('trackAgainstAverage') as FormControl<boolean>;
+    return this.configControl('trackAgainstAverage') as FormControl<boolean>;
   }
 
   get showDataPointsToControl(): FormControl<boolean> {
-    return this.formMaster.get('showDataPoints') as FormControl<boolean>;
+    return this.configControl('showDataPoints') as FormControl<boolean>;
   }
 
   get showAverageDataToControl(): FormControl<boolean> {
-    return this.formMaster.get('showAverageData') as FormControl<boolean>;
+    return this.configControl('showAverageData') as FormControl<boolean>;
   }
 
   get numDecimalToControl(): FormControl<number> {
-    return this.formMaster.get('numDecimal') as FormControl<number>;
+    return this.configControl('numDecimal') as FormControl<number>;
   }
 
   get verticalChartToControl(): FormControl<boolean> {
-    return this.formMaster.get('verticalChart') as FormControl<boolean>;
+    return this.configControl('verticalChart') as FormControl<boolean>;
   }
 
   get inverseYAxisToControl(): FormControl<boolean> {
-    return this.formMaster.get('inverseYAxis') as FormControl<boolean>;
+    return this.configControl('inverseYAxis') as FormControl<boolean>;
   }
 
   get colorToControl(): FormControl<string> {
-    return this.formMaster.get('color') as FormControl<string>;
+    return this.configControl('color') as FormControl<string>;
   }
 
   get dateFormatToControl(): FormControl<string> {
-    return this.formMaster.get('dateFormat') as FormControl<string>;
+    return this.configControl('dateFormat') as FormControl<string>;
   }
 
   get multiChildCtrlsToControl(): UntypedFormArray {
-    return this.formMaster.get('multiChildCtrls') as UntypedFormArray;
+    return this.configControl('multiChildCtrls') as UntypedFormArray;
   }
 
   submitConfig() {
