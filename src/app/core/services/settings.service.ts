@@ -318,6 +318,16 @@ export class SettingsService {
   }
 
   /**
+   * The persisted per-device default profile name (from the always-local connectionConfig), which is
+   * never overwritten by an ephemeral URL-selected `?profile` override. Callers deciding whether a
+   * mutation touches the DEVICE default (vs. the merely-active ephemeral slot) must key off this, not
+   * getActiveProfileName().
+   */
+  public getPersistedProfileName(): string {
+    return this.sharedConfigName;
+  }
+
+  /**
    * Points this device at a different profile (named config slot) and reloads so the bootstrap
    * loads it. The active profile is per-device: persisted in the always-local connectionConfig.
    *
@@ -481,7 +491,16 @@ export class SettingsService {
     if ((window as any).__KIP_TEST__) {
       return; // no-op
     }
-    location.replace("./");
+    location.replace(this.reloadTarget());
+  }
+
+  /**
+   * Reload target preserving the pre-hash query string (`window.location.search`) so boot-latched
+   * flags like `?embed`/`?profile` survive every reloadApp() path (profile switch, config reset,
+   * config upgrade), while dropping the hash so a reload lands on the app root.
+   */
+  private reloadTarget(): string {
+    return "./" + window.location.search;
   }
 
   // builds config data oject from running data

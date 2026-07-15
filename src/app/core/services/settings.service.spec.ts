@@ -746,4 +746,44 @@ describe('SettingsService — getActiveProfileName ephemeral honesty (#216 E6)',
     const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
     expect(cc.sharedConfigName).toBe('default');
   });
+
+  it('getPersistedProfileName reports the persisted per-device name, never the ephemeral slot', () => {
+    // The rename "is this the device default?" decision keys off this, so it must stay the persisted
+    // localStorage name even while an ephemeral ?profile override is the active bootstrapped slot.
+    const service = createService({ sharedConfigName: 'default' });
+    const storage = TestBed.inject(StorageService);
+    bootstrap(storage, 'day');
+    expect(service.getActiveProfileName()).toBe('day');
+    expect(service.getPersistedProfileName()).toBe('default');
+  });
+});
+
+describe('SettingsService — reloadApp target (query-string preservation, #216 E6)', () => {
+  // Exposes the private target computation so its query-preservation can be asserted directly; the
+  // real navigation stays __KIP_TEST__-guarded and never fires here.
+  interface ReloadInternals { reloadTarget(): string }
+
+  beforeEach(() => ensureLocalStorage());
+
+  it('preserves the pre-hash query so ?embed/?profile survive a direct reloadApp() reload', () => {
+    const service = createService({});
+    const original = window.location.search;
+    try {
+      window.location.search = '?embed=1&profile=day';
+      expect((service as unknown as ReloadInternals).reloadTarget()).toBe('./?embed=1&profile=day');
+    } finally {
+      window.location.search = original;
+    }
+  });
+
+  it('is the bare app root when there is no query string', () => {
+    const service = createService({});
+    const original = window.location.search;
+    try {
+      window.location.search = '';
+      expect((service as unknown as ReloadInternals).reloadTarget()).toBe('./');
+    } finally {
+      window.location.search = original;
+    }
+  });
 });

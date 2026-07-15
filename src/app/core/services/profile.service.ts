@@ -139,7 +139,10 @@ export class ProfileService {
         console.warn(`[ProfileService] Old profile slot "${oldName}" may not have been removed; an orphan copy could remain until the next refresh.`);
       }
 
-      if (oldName === this.settings.getActiveProfileName()) {
+      // Repersist + reload ONLY when the renamed slot is the persisted per-device default. Keying off
+      // the ephemeral active name (getActiveProfileName) would write a URL-selected `?profile`
+      // override's name into the persisted device default — the override must stay ephemeral.
+      if (oldName === this.settings.getPersistedProfileName()) {
         this.settings.setActiveProfile(normalized); // persist + reload onto the renamed slot
       } else {
         await this.refresh();
