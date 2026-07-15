@@ -98,6 +98,13 @@ export class DashboardService {
     effect(() => {
       const dashboards = this.dashboards();
 
+      // Embed is strictly read-only: apply the in-memory dashboards (including a seeded
+      // DefaultDashboard for an empty-dashboards profile) but never write them back to the profile
+      // slot — under ?profile=X that slot is the viewer's ephemeral one.
+      if (this._embedMode.embed()) {
+        return;
+      }
+
       untracked(() => {
         this._settings.saveDashboards(dashboards);
       });

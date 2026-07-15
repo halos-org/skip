@@ -12,9 +12,12 @@ import { ChromeVisibilityService } from './core/services/chrome-visibility.servi
 import { EmbedModeService } from './core/services/embed-mode.service';
 import { SettingsService } from './core/services/settings.service';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
+import { StorageService } from './core/services/storage.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
 import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
+import { IConfig } from './core/interfaces/app-settings.interfaces';
+import { LATEST_APP_CONFIG_VERSION } from './core/constants/config-versions.const';
 
 // Access the component's private surface without widening the class API.
 interface AppComponentHotkeyApi {
@@ -464,5 +467,89 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default' });
     TestBed.tick();
     expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no shared configuration'), 0, true, 'warn', 'Create');
+  });
+});
+
+// The whole-boot read-only invariant: an embed boot must issue ZERO server-config writes, even from a
+// config that would normally self-heal. Drives the real root SettingsService + DashboardService +
+// StorageService (only EmbedModeService and the component's UI collaborators are faked), boots a config
+// that triggers BOTH boot-time self-heals (empty dashboards → DefaultDashboard seed + write-back;
+// missing night-mode fields → pushSettings persist-on-missing), and counts patchConfig/setConfig. (#216 E6)
+describe('AppComponent — embed boot performs zero server-config writes (#216 E6)', () => {
+  async function bootAndCountWrites(embed: boolean) {
+    const appNetworkInitServiceStub = {
+      bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
+      bootstrapIssue$: new BehaviorSubject({ reason: 'none' }),
+    };
+    const uiEvent = {
+      isDragging: signal(false),
+      addHotkeyListener: vi.fn(),
+      removeHotkeyListener: vi.fn(),
+      toggleFullScreen: vi.fn(),
+    };
+
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        { provide: AppNetworkInitService, useValue: appNetworkInitServiceStub },
+        { provide: uiEventService, useValue: uiEvent },
+        { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ToastService, useValue: { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) } },
+        { provide: ReloadService, useValue: { reload: vi.fn() } },
+        { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } },
+        // DashboardService, SettingsService, StorageService and ConfigurationUpgradeService are left as
+        // their real root instances so the boot self-heals actually run (or are gated) end to end.
+      ],
+    });
+    TestBed.overrideComponent(ToolbarComponent, { set: { template: '<span class="stub-toolbar"></span>', imports: [] } });
+    await TestBed.compileComponents();
+
+    // Bootstrap a config that would trigger both self-heals: empty dashboards AND missing night-mode
+    // fields. configVersion is the latest so no config-upgrade write path is dragged in.
+    const storage = TestBed.inject(StorageService);
+    storage.bootstrapRemoteContext({
+      sharedConfigName: 'profileA',
+      configFileVersion: 11,
+      initConfig: {
+        app: {
+          configVersion: LATEST_APP_CONFIG_VERSION,
+          unitDefaults: {},
+          notificationConfig: {
+            disableNotifications: false,
+            menuGrouping: true,
+            security: { disableSecurity: false },
+            devices: { disableDevices: false, showNormalState: false, showNominalState: false },
+            sound: { disableSound: false, muteNormal: false, muteNominal: false, muteWarn: false, muteAlert: false, muteAlarm: false, muteEmergency: false },
+          },
+        },
+        theme: null,
+        dashboards: []
+      } as unknown as IConfig
+    });
+    storage.storageServiceReady$.next(true); // saveDashboards gates its write on readiness
+
+    // Installed AFTER bootstrap so only the boot self-heal writes are counted, never the bootstrap.
+    const patchSpy = vi.spyOn(storage, 'patchConfig').mockImplementation(() => undefined);
+    const setSpy = vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
+
+    const fixture = TestBed.createComponent(AppComponent);
+    (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
+    fixture.detectChanges();
+    TestBed.tick();
+    return { patchSpy, setSpy };
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('writes NOTHING to the server config during an embed boot (both self-heals suppressed)', async () => {
+    const { patchSpy, setSpy } = await bootAndCountWrites(true);
+    expect(patchSpy).not.toHaveBeenCalled();
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it('the same boot NOT under embed DOES fire the self-heal writes (the guard is embed-specific)', async () => {
+    const { patchSpy } = await bootAndCountWrites(false);
+    expect(patchSpy).toHaveBeenCalled();
   });
 });

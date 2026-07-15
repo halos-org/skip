@@ -15,6 +15,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { StorageService, TConfigObjectType } from './storage.service';
 import { ReloadService } from './reload.service';
+import { EmbedModeService } from './embed-mode.service';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
 import { REMOTE_CONFIG_FILE_VERSION, LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from '../constants/config-versions.const';
@@ -28,6 +29,7 @@ export class SettingsService {
   private readonly storage = inject(StorageService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly _reload = inject(ReloadService);
+  private readonly embedMode = inject(EmbedModeService);
 
   // Source-of-truth signals for the profile/app-scope settings and the per-device identity.
   private readonly _unitDefaults = signal<IUnitDefaults>({});
@@ -242,7 +244,9 @@ export class SettingsService {
     this._redNightMode.set(app.redNightMode === undefined ? false : app.redNightMode);
     this._nightModeBrightness.set(app.nightModeBrightness === undefined ? 0.2 : app.nightModeBrightness);
 
-    if (app.autoNightMode === undefined || app.redNightMode === undefined || app.nightModeBrightness === undefined) {
+    // Embed is strictly read-only: the in-memory defaults above are applied, but the persist-on-missing
+    // self-heal write is suppressed so a framed read-only boot never PATCHes the profile's app config.
+    if ((app.autoNightMode === undefined || app.redNightMode === undefined || app.nightModeBrightness === undefined) && !this.embedMode.embed()) {
       this.saveAppConfig();
     }
   }
