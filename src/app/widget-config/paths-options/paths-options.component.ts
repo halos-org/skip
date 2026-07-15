@@ -33,9 +33,25 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
   readonly delPathEvent = input<string>(undefined);
   readonly updatePathEvent = input<IDynamicControl[]>(undefined);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected pathsFormGroup!: any;
+  protected pathsFormGroup!: UntypedFormArray | UntypedFormGroup;
   protected multiCTRLArray: IDynamicControl[] = [];
+
+  /** The paths group typed as a FormGroup for the `[formGroup]` container binding and the
+   * Record-shaped (single-path) branch. In the array branch the runtime value is a FormArray;
+   * the cast is compile-time only and leaves the bound value unchanged. */
+  protected get pathsGroup(): UntypedFormGroup {
+    return this.pathsFormGroup as UntypedFormGroup;
+  }
+
+  /** The per-path child FormGroups in the array (multi-control) branch. */
+  protected get pathControlGroups(): UntypedFormGroup[] {
+    return (this.pathsFormGroup as UntypedFormArray).controls as UntypedFormGroup[];
+  }
+
+  /** The child FormGroup for a given control key in the Record (single-path) branch. */
+  protected pathGroupByKey(key: string): UntypedFormGroup {
+    return this.pathsGroup.get(key) as UntypedFormGroup;
+  }
 
   ngOnInit(): void {
     if (this.isArray()) {
@@ -47,6 +63,9 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
   }
 
   public addPath(newPath: IAddNewPathObject): void {
+    if (!(this.pathsFormGroup instanceof UntypedFormArray)) {
+      return;
+    }
     this.pathsFormGroup.push(
       this.fb.group({
         description: [newPath.path.description],
