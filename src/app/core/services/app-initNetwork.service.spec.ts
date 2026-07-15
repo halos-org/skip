@@ -134,8 +134,8 @@ describe('AppNetworkInitService', () => {
     function setConnConfig(cfg: Partial<IConnectionConfig>): void {
         (service as unknown as { config: Partial<IConnectionConfig> }).config = cfg;
     }
-    function migrate(remoteConfig: IConfig | null): void {
-        (service as unknown as { migrateRemoteControlToDevice: (r: IConfig | null) => void }).migrateRemoteControlToDevice(remoteConfig);
+    function migrate(remoteConfig: IConfig | null, ephemeralOverrideActive = false): void {
+        (service as unknown as { migrateRemoteControlToDevice: (r: IConfig | null, e?: boolean) => void }).migrateRemoteControlToDevice(remoteConfig, ephemeralOverrideActive);
     }
     function storedConn(): IConnectionConfig | null {
         const raw = localStorage.getItem('skip.connectionConfig');
@@ -196,6 +196,28 @@ describe('AppNetworkInitService', () => {
             setConnConfig({ ...baseV12, configVersion: 13 });
             migrate({ app: { isRemoteControl: true, instanceName: 'X' } } as unknown as IConfig);
             expect(storedConn()).toBeNull();
+        });
+
+        it('an ephemeral ?profile override never sources the device identity from its slot (#216 E6)', () => {
+            // The ephemeral slot advertises a remote-control identity that must NOT persist; the
+            // device migrates from its OWN legacy local appConfig instead.
+            localStorage.removeItem('skip.connectionConfig');
+            localStorage.setItem('skip.appConfig', JSON.stringify({ isRemoteControl: false, instanceName: 'DeviceOwn' }));
+            setConnConfig({ ...baseV12 });
+            migrate({ app: { isRemoteControl: true, instanceName: 'EphemeralDay' } } as unknown as IConfig, true);
+            expect(storedConn()?.isRemoteControl).toBe(false);
+            expect(storedConn()?.instanceName).toBe('DeviceOwn');
+            expect(storedConn()?.configVersion).toBe(13);
+        });
+
+        it('an ephemeral override with no local appConfig migrates with identity defaults, not the ephemeral slot', () => {
+            localStorage.removeItem('skip.connectionConfig');
+            localStorage.removeItem('skip.appConfig');
+            setConnConfig({ ...baseV12 });
+            migrate({ app: { isRemoteControl: true, instanceName: 'EphemeralDay' } } as unknown as IConfig, true);
+            expect(storedConn()?.isRemoteControl).toBe(false);
+            expect(storedConn()?.instanceName).toBe('');
+            expect(storedConn()?.configVersion).toBe(13);
         });
     });
 
@@ -514,6 +536,34 @@ describe('AppNetworkInitService', () => {
 
             expect(mockStorage.listConfigs).not.toHaveBeenCalled();
             expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
+        });
+
+        it('pre-v13 boot: a valid override never leaks the ephemeral slot identity into the persisted config', async () => {
+            // Pre-v13 connectionConfig so the one-time remote-control migration runs during bootstrap.
+            localStorage.setItem('skip.connectionConfig', JSON.stringify({
+                configVersion: 12, kipUUID: 'test-uuid', signalKUrl: 'http://localhost',
+                proxyEnabled: false, signalKSubscribeAll: false, sharedConfigName: 'default',
+                isRemoteControl: false, instanceName: ''
+            }));
+            localStorage.removeItem('skip.appConfig');
+            loginAs();
+            mockEmbed.profile.mockReturnValue('day');
+            mockStorage.listConfigs.mockResolvedValue([
+                { scope: 'user', name: 'default' },
+                { scope: 'user', name: 'day' }
+            ]);
+            // The ephemeral 'day' slot advertises a remote-control identity that must NOT persist.
+            mockStorage.getConfig.mockResolvedValue({
+                app: { configVersion: 11, isRemoteControl: true, instanceName: 'EphemeralDay' }, theme: null, dashboards: []
+            } as unknown as IConfig);
+
+            await service.initNetworkServices();
+
+            const cc = storedConn();
+            expect(cc?.isRemoteControl).toBe(false);
+            expect(cc?.instanceName).toBe('');
+            expect(cc?.sharedConfigName).toBe('default');
+            expect(cc?.configVersion).toBe(13);
         });
     });
 });

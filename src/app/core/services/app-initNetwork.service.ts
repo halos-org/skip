@@ -151,6 +151,10 @@ export class AppNetworkInitService implements OnDestroy {
       }
 
       let remoteConfig: IConfig | null = null;
+      // True when an ephemeral URL `?profile` override was honored (a valid, existing, different
+      // slot). The remote-control migration must then ignore the loaded (ephemeral) config and take
+      // the device identity from its own persisted source instead.
+      let ephemeralOverrideActive = false;
       if (this.isLoggedIn) {
         // Wait for storage to be fully ready before accessing it
         const storageReady = await this.storage.waitUntilReady();
@@ -160,6 +164,7 @@ export class AppNetworkInitService implements OnDestroy {
           // Ephemeral (URL-selected) profile: loaded for this session only, never persisted. Falls
           // back to the persisted per-device profile when absent/invalid/unknown.
           const effectiveSharedConfigName = await this.resolveEffectiveSharedConfigName();
+          ephemeralOverrideActive = effectiveSharedConfigName !== this.config.sharedConfigName;
           try {
             remoteConfig = await this.storage.getConfig('user', effectiveSharedConfigName, REMOTE_CONFIG_FILE_VERSION);
           } catch (error) {
@@ -198,8 +203,10 @@ export class AppNetworkInitService implements OnDestroy {
       }
 
       // Lift remote-control identity to the per-device connectionConfig (once). Identity comes from
-      // the loaded profile, else the legacy local appConfig blob, else identity defaults.
-      this.migrateRemoteControlToDevice(remoteConfig);
+      // the loaded profile, else the legacy local appConfig blob, else identity defaults. An
+      // ephemeral `?profile` override is excluded as a source — the device must never adopt the
+      // ephemeral slot's identity as its own.
+      this.migrateRemoteControlToDevice(remoteConfig, ephemeralOverrideActive);
 
       this._bootstrapIssue$.next({ reason: 'none' });
 
@@ -352,14 +359,20 @@ export class AppNetworkInitService implements OnDestroy {
    * identity defaults.
    *
    * @param {IConfig | null} remoteConfig The profile loaded this boot, or null when unavailable.
+   * @param {boolean} ephemeralOverrideActive True when the loaded profile is an ephemeral `?profile`
+   *   override rather than the persisted device profile; its identity is ignored as a migration
+   *   source so the ephemeral slot's identity is never persisted as the device's own.
    */
-  private migrateRemoteControlToDevice(remoteConfig: IConfig | null): void {
+  private migrateRemoteControlToDevice(remoteConfig: IConfig | null, ephemeralOverrideActive = false): void {
     if (!this.config || this.config.configVersion >= CONNECTION_CONFIG_VERSION) {
       return;
     }
     // The fields still exist at runtime in pre-migration stored configs, but were removed from IAppConfig.
-    let app: { isRemoteControl?: boolean; instanceName?: string } | null =
-      (remoteConfig?.app as unknown as { isRemoteControl?: boolean; instanceName?: string }) ?? null;
+    // Under an ephemeral override the loaded config is NOT the device's own, so it is skipped as a
+    // source: fall through to the device's legacy local appConfig blob, else identity defaults.
+    let app: { isRemoteControl?: boolean; instanceName?: string } | null = ephemeralOverrideActive
+      ? null
+      : (remoteConfig?.app as unknown as { isRemoteControl?: boolean; instanceName?: string }) ?? null;
     if (!app) {
       try {
         app = JSON.parse(localStorage.getItem(LOCAL_CONFIG_KEYS.appConfig) ?? 'null');
