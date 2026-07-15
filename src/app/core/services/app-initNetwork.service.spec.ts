@@ -12,8 +12,10 @@ import { SignalKDeltaService } from './signalk-delta.service';
 import { DataService } from './data.service';
 import { StorageService } from './storage.service';
 import { InternetReachabilityService } from './internet-reachability.service';
+import { EmbedModeService } from './embed-mode.service';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
 import { DefaultConnectionConfig } from '../../../default-config/config.blank.const';
+import { REMOTE_CONFIG_FILE_VERSION } from '../constants/config-versions.const';
 
 // jsdom has no FontFace; preloadFonts() constructs one during the end-to-end initNetworkServices runs.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,11 +61,17 @@ describe('AppNetworkInitService', () => {
     const mockStorage = {
         waitUntilReady: vi.fn().mockResolvedValue(true),
         getConfig: vi.fn().mockResolvedValue(validRemoteConfig()),
+        listConfigs: vi.fn().mockResolvedValue([]),
         bootstrapRemoteContext: vi.fn()
     };
 
     const mockInternetReachability = {
         start: vi.fn()
+    };
+
+    const mockEmbed = {
+        embed: vi.fn().mockReturnValue(false),
+        profile: vi.fn().mockReturnValue(null as string | null)
     };
 
     beforeEach(() => {
@@ -76,7 +84,10 @@ describe('AppNetworkInitService', () => {
         mockConnectionStateMachine.enableWebSocketMode.mockClear();
         mockConnectionStateMachine.startWebSocketConnection.mockClear();
         mockStorage.getConfig.mockReset().mockResolvedValue(validRemoteConfig());
+        mockStorage.listConfigs.mockReset().mockResolvedValue([]);
         mockStorage.bootstrapRemoteContext.mockClear();
+        mockEmbed.embed.mockClear().mockReturnValue(false);
+        mockEmbed.profile.mockClear().mockReturnValue(null);
         mockAuth.loginStatusValue = null;
         mockAuth.refreshLoginStatus.mockClear();
         mockSsoRedirect.attemptAutoRedirect.mockClear().mockReturnValue('redirected');
@@ -93,7 +104,8 @@ describe('AppNetworkInitService', () => {
                 { provide: SignalKDeltaService, useValue: {} },
                 { provide: DataService, useValue: {} },
                 { provide: StorageService, useValue: mockStorage },
-                { provide: InternetReachabilityService, useValue: mockInternetReachability }
+                { provide: InternetReachabilityService, useValue: mockInternetReachability },
+                { provide: EmbedModeService, useValue: mockEmbed }
             ]
         });
         service = TestBed.inject(AppNetworkInitService);
@@ -421,6 +433,87 @@ describe('AppNetworkInitService', () => {
             await service.initNetworkServices();
 
             expect(mockConnectionStateMachine.startWebSocketConnection).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    // Ephemeral URL-selected profile (#216 E6): a valid `?profile=<name>` loads a different slot for
+    // this session only; it must thread into getConfig + bootstrap but NEVER persist to localStorage.
+    describe('ephemeral URL profile override (#216 E6)', () => {
+        function seedPersistedConnConfig(name: string): void {
+            localStorage.setItem('skip.connectionConfig', JSON.stringify({
+                configVersion: 13,
+                kipUUID: 'test-uuid',
+                signalKUrl: 'http://localhost',
+                proxyEnabled: false,
+                signalKSubscribeAll: false,
+                sharedConfigName: name,
+                isRemoteControl: false,
+                instanceName: ''
+            }));
+        }
+
+        function loginAs(): void {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+        }
+
+        it('threads a valid, existing override into getConfig + bootstrap without persisting it', async () => {
+            seedPersistedConnConfig('default');
+            loginAs();
+            mockEmbed.profile.mockReturnValue('day');
+            mockStorage.listConfigs.mockResolvedValue([
+                { scope: 'user', name: 'default' },
+                { scope: 'user', name: 'day' }
+            ]);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.listConfigs).toHaveBeenCalledWith(REMOTE_CONFIG_FILE_VERSION);
+            expect(mockStorage.getConfig).toHaveBeenCalledWith('user', 'day', REMOTE_CONFIG_FILE_VERSION);
+            expect(mockStorage.bootstrapRemoteContext).toHaveBeenCalledWith(expect.objectContaining({ sharedConfigName: 'day' }));
+            // Ephemerality: the persisted per-device profile in localStorage is UNCHANGED.
+            expect(storedConn()?.sharedConfigName).toBe('default');
+        });
+
+        it('falls back with a warning (not missing-config) when the override is unknown', async () => {
+            seedPersistedConnConfig('default');
+            loginAs();
+            mockEmbed.profile.mockReturnValue('ghost');
+            mockStorage.listConfigs.mockResolvedValue([{ scope: 'user', name: 'default' }]);
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.getConfig).toHaveBeenCalledWith('user', 'default', REMOTE_CONFIG_FILE_VERSION);
+            expect(latestIssue().reason).toBe('none');
+            expect(warn).toHaveBeenCalled();
+            expect(storedConn()?.sharedConfigName).toBe('default');
+            warn.mockRestore();
+        });
+
+        it('rejects a malformed override on charset, without listing or persisting', async () => {
+            seedPersistedConnConfig('default');
+            loginAs();
+            mockEmbed.profile.mockReturnValue('../etc/passwd');
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.listConfigs).not.toHaveBeenCalled();
+            expect(mockStorage.getConfig).toHaveBeenCalledWith('user', 'default', REMOTE_CONFIG_FILE_VERSION);
+            expect(warn).toHaveBeenCalled();
+            expect(storedConn()?.sharedConfigName).toBe('default');
+            warn.mockRestore();
+        });
+
+        it('no override: the persisted default still drives the 404 missing-shared-config recovery', async () => {
+            seedPersistedConnConfig('default');
+            loginAs();
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.listConfigs).not.toHaveBeenCalled();
+            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
         });
     });
 });

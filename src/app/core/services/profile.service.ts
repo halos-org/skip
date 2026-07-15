@@ -16,8 +16,9 @@ export interface IProfileSummary {
 /** Reserved fallback profile name: a fresh device boots into it and it must always be available. */
 const RESERVED_DEFAULT = 'default';
 /** Profile names are URL path segments AND JSON-Patch keys; '.' truncates and '/' splits on the
- * Signal K server, so only an allow-list charset is safe. */
-const PROFILE_NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
+ * Signal K server, so only an allow-list charset is safe. Exported so the ephemeral `?profile`
+ * bootstrap override validates against the same charset. */
+export const PROFILE_NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
 const MAX_NAME_LENGTH = 64;
 const PROFILE_SCOPE = 'user';
 

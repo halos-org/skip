@@ -19,6 +19,8 @@ import { SignalKDeltaService } from './signalk-delta.service';
 import { IStorageRemoteBootstrapContext, StorageService } from './storage.service';
 import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { InternetReachabilityService } from './internet-reachability.service';
+import { EmbedModeService } from './embed-mode.service';
+import { PROFILE_NAME_PATTERN } from './profile.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
 import { REMOTE_CONFIG_FILE_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
 
@@ -48,6 +50,9 @@ export class AppNetworkInitService implements OnDestroy {
   private readonly data = inject(DataService); // Init to get data before app starts
   private readonly storage = inject(StorageService); // Init to get data before app starts
   private readonly internetReachability = inject(InternetReachabilityService);
+  // Injected to force construction of the boot-latched embed/profile flag reader as part of the
+  // first blocking initializer, and to resolve the ephemeral `?profile` override below.
+  private readonly embedMode = inject(EmbedModeService);
   private readonly _bootstrapStatus$ = new BehaviorSubject<TBootstrapStatus>('starting');
   private readonly _bootstrapIssue$ = new BehaviorSubject<IBootstrapIssue>({ reason: 'none' });
 
@@ -152,8 +157,11 @@ export class AppNetworkInitService implements OnDestroy {
         if (!storageReady) {
           throw new Error('[AppInit Network Service] StorageService did not become ready in time. Cannot bootstrap remote configuration.');
         } else {
+          // Ephemeral (URL-selected) profile: loaded for this session only, never persisted. Falls
+          // back to the persisted per-device profile when absent/invalid/unknown.
+          const effectiveSharedConfigName = await this.resolveEffectiveSharedConfigName();
           try {
-            remoteConfig = await this.storage.getConfig('user', this.config.sharedConfigName, REMOTE_CONFIG_FILE_VERSION);
+            remoteConfig = await this.storage.getConfig('user', effectiveSharedConfigName, REMOTE_CONFIG_FILE_VERSION);
           } catch (error) {
             // Only a 404 from the config fetch itself means "no shared configuration"; 404s from
             // earlier bootstrap steps (e.g. /signalk/ discovery) must not offer config recovery.
@@ -181,7 +189,7 @@ export class AppNetworkInitService implements OnDestroy {
             return;
           }
           const bootstrapContext: IStorageRemoteBootstrapContext = {
-            sharedConfigName: this.config.sharedConfigName,
+            sharedConfigName: effectiveSharedConfigName,
             configFileVersion: REMOTE_CONFIG_FILE_VERSION,
             initConfig: remoteConfig
           };
@@ -243,6 +251,36 @@ export class AppNetworkInitService implements OnDestroy {
         console.log("[AppInit Network Service] Starting WebSocket connection after initialization");
         this.connectionStateMachine.startWebSocketConnection();
       }
+    }
+  }
+
+  /**
+   * Resolves the config slot to load this boot. Honors an ephemeral `?profile=<name>` URL override —
+   * validated against the profile-name charset and confirmed present in the user scope — without ever
+   * writing it back to `this.config`/localStorage, so the URL-selected profile lives only for this
+   * session. Falls back to the persisted per-device profile when no override is requested, the name
+   * is malformed, the slot does not exist, or the listing fails.
+   */
+  private async resolveEffectiveSharedConfigName(): Promise<string> {
+    const requested = this.embedMode.profile();
+    const persisted = this.config.sharedConfigName;
+    if (!requested) {
+      return persisted;
+    }
+    if (!PROFILE_NAME_PATTERN.test(requested)) {
+      console.warn(`[AppInit Network Service] Ignoring malformed ?profile override '${requested}'; using persisted profile '${persisted}'.`);
+      return persisted;
+    }
+    try {
+      const configs = await this.storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+      if (configs.some(c => c.scope === 'user' && c.name === requested)) {
+        return requested;
+      }
+      console.warn(`[AppInit Network Service] Requested ?profile '${requested}' does not exist in the user scope; using persisted profile '${persisted}'.`);
+      return persisted;
+    } catch (error) {
+      console.warn(`[AppInit Network Service] Could not verify ?profile '${requested}'; using persisted profile '${persisted}'.`, error);
+      return persisted;
     }
   }
 

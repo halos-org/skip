@@ -310,7 +310,11 @@ export class SettingsService {
 
   // --- Active profile (named config slot) ---
   public getActiveProfileName(): string {
-    return this.sharedConfigName;
+    // During an ephemeral (URL-selected) session the slot actually loaded this boot lives on
+    // StorageService, and may differ from the persisted per-device name. Report the live slot when
+    // the remote context is bootstrapped so active-profile reads are honest, without persisting the
+    // ephemeral choice (saveConnectionConfigToLocalStorage still serializes this.sharedConfigName).
+    return this.storage.isRemoteContextBootstrapped() ? this.storage.sharedConfigName : this.sharedConfigName;
   }
 
   /**
