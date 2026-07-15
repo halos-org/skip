@@ -19,7 +19,7 @@
     } @else if (error()) {
       <p class="history-message error">503: {{ error() }}</p>
     } @else if (hasNoData()) {
-      <p class="history-message">No historical data is available for this widget. If you are not using the built-in KIP History API provider, validate your plugin configuration supports the widget's path and try again.</p>
+      <p class="history-message">No historical data is available for this widget. Historical data comes from an external Signal K history provider (such as signalk-to-influxdb2 or signalk-parquet) — make sure one is installed and configured to support the widget's path, then try again.</p>
     } @else {
       <div class="chart-wrapper">
         <canvas #historyCanvas></canvas>
