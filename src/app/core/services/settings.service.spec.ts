@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsService } from './settings.service';
 import { StorageService } from './storage.service';
+import { ReloadService } from './reload.service';
 import { ensureLocalStorage } from '../../../test-helpers/local-storage.test-helper';
 import { DefaultAppConfig, DefaultConnectionConfig, DefaultThemeConfig } from '../../../default-config/config.blank.const';
 import { IAppConfig, IConfig, IConnectionConfig, INotificationConfig, IThemeConfig } from '../interfaces/app-settings.interfaces';
@@ -132,8 +133,12 @@ function createService(opts?: SeedOpts): SettingsService {
     seedConfig(opts);
   }
   // Provide both services in the module so transitive deps resolve to the global stubs
-  // (AuthenticationService / SignalKConnectionService) rather than the real root services.
-  TestBed.configureTestingModule({ providers: [SettingsService, StorageService] });
+  // (AuthenticationService / SignalKConnectionService) rather than the real root services. The
+  // ReloadService fake keeps the reconfigure/reset reload seam from firing a real reachability
+  // probe (network fetch) during these tests; tests that care spy on its reload().
+  TestBed.configureTestingModule({
+    providers: [SettingsService, StorageService, { provide: ReloadService, useValue: { reload: () => Promise.resolve() } }]
+  });
   return TestBed.inject(SettingsService);
 }
 
@@ -554,7 +559,7 @@ describe('SettingsService — resetSettings (characterization)', () => {
     const storage = TestBed.inject(StorageService);
     storage.storageServiceReady$.next(true);
     const setSpy = vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
-    vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
+    vi.spyOn(TestBed.inject(ReloadService), 'reload');
 
     service.resetSettings();
 
@@ -575,7 +580,7 @@ describe('SettingsService — resetSettings (characterization)', () => {
     vi.spyOn(storage, 'setConfig').mockReturnValue(
       new Promise((resolve) => { resolveSave = resolve; })
     );
-    const reloadSpy = vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
+    const reloadSpy = vi.spyOn(TestBed.inject(ReloadService), 'reload');
 
     service.resetSettings();
     await Promise.resolve();
@@ -594,7 +599,7 @@ describe('SettingsService — resetSettings (characterization)', () => {
     const storage = TestBed.inject(StorageService);
     storage.storageServiceReady$.next(true);
     vi.spyOn(storage, 'setConfig').mockRejectedValue(new Error('network down'));
-    const reloadSpy = vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
+    const reloadSpy = vi.spyOn(TestBed.inject(ReloadService), 'reload');
     const snack = TestBed.inject(MatSnackBar);
     const snackSpy = vi.spyOn(snack, 'open').mockImplementation(() => undefined as never);
 
@@ -613,7 +618,7 @@ describe('SettingsService — resetSettings (characterization)', () => {
     const storage = TestBed.inject(StorageService);
     storage.storageServiceReady$.next(false);
     const setSpy = vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
-    const reloadSpy = vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
+    const reloadSpy = vi.spyOn(TestBed.inject(ReloadService), 'reload');
     const snack = TestBed.inject(MatSnackBar);
     const snackSpy = vi.spyOn(snack, 'open').mockImplementation(() => undefined as never);
 
@@ -642,7 +647,7 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
     const storage = TestBed.inject(StorageService);
     storage.storageServiceReady$.next(true);
     vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
-    vi.spyOn(service, 'reloadApp').mockImplementation(() => undefined);
+    vi.spyOn(TestBed.inject(ReloadService), 'reload');
 
     service.resetSettings();
 

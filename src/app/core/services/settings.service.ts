@@ -14,6 +14,7 @@ import { DefaultNotificationConfig } from '../../../default-config/config.blank.
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { StorageService, TConfigObjectType } from './storage.service';
+import { ReloadService } from './reload.service';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
 import { REMOTE_CONFIG_FILE_VERSION, LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from '../constants/config-versions.const';
@@ -26,6 +27,7 @@ const defaultTheme = '';
 export class SettingsService {
   private readonly storage = inject(StorageService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly _reload = inject(ReloadService);
 
   // Source-of-truth signals for the profile/app-scope settings and the per-device identity.
   private readonly _unitDefaults = signal<IUnitDefaults>({});
@@ -154,7 +156,7 @@ export class SettingsService {
 
   public resetConnection() {
     localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.getDefaultConnectionConfig()));
-    this.reloadApp();
+    void this._reload.reload();
   }
 
   private checkConfigUpgradeRequired(isLocalStorageConfig: boolean, storageVersion?: number): void {
@@ -321,7 +323,7 @@ export class SettingsService {
     this.sharedConfigName = name;
     this.storage.sharedConfigName = name; // keep the storage write-path slot name coherent
     this.saveConnectionConfigToLocalStorage();
-    this.reloadApp();
+    void this._reload.reload();
   }
 
   public get KipUUID(): string {
@@ -453,7 +455,7 @@ export class SettingsService {
     this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
       .then(() => {
         console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
-        this.reloadApp();
+        void this._reload.reload();
       })
       .catch(error => {
         console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);

@@ -21,6 +21,7 @@ import { NotificationsService } from './core/services/notifications.service';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { RemoteDashboardsService } from './core/services/remote-dashboards.service';
 import { ToastService } from './core/services/toast.service';
+import { ReloadService } from './core/services/reload.service';
 import { AppNetworkInitService, IBootstrapIssue } from './core/services/app-initNetwork.service';
 import { SsoRedirectService } from './core/services/sso-redirect.service';
 import { NotificationOverlayService } from './core/services/notification-overlay.service';
@@ -47,6 +48,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly _dashboard = inject(DashboardService);
   private readonly _remoteControl = inject(RemoteDashboardsService);
   private readonly toast = inject(ToastService);
+  private readonly _reload = inject(ReloadService);
   private readonly _notifications = inject(NotificationsService);
   private readonly _uiEvent = inject(uiEventService);
   private readonly _app = inject(AppService);
@@ -190,7 +192,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     });
 
     // Bootstrap could not reach or load from the Signal K server: keep the user in place (no
-    // redirect to the legacy connectivity page, #190) and offer a persistent Retry that reloads.
+    // redirect to the legacy connectivity page, #190) and offer a persistent Retry. The reload is
+    // reachability-gated so retrying against a still-down server keeps the degraded shell instead
+    // of navigating into the browser's error page (#272).
     effect(() => {
       const issue = this.bootstrapIssue();
       if ((issue.reason !== 'network-unreachable' && issue.reason !== 'unknown') || this.connectionErrorPromptShown) {
@@ -203,7 +207,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       const ref = this.toast.show(message, 0, true, 'warn', 'Retry');
       ref.onAction()
         .pipe(takeUntilDestroyed(this._destroyRef))
-        .subscribe(() => this.settings.reloadApp());
+        .subscribe(() => { void this._reload.reload(); });
     });
   }
 
