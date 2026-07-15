@@ -10,7 +10,7 @@ import { uiEventService } from './core/services/uiEvent.service';
 import { AppService } from './core/services/app-service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
 import { ToastService } from './core/services/toast.service';
-import { SettingsService } from './core/services/settings.service';
+import { ReloadService } from './core/services/reload.service';
 
 // Access the component's private surface without widening the class API.
 interface AppComponentHotkeyApi {
@@ -52,6 +52,7 @@ describe('AppComponent', () => {
     pulsePeek: ReturnType<typeof vi.fn>;
   };
   let toast: { show: ReturnType<typeof vi.fn> };
+  let reloadService: { reload: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     dashboard = {
@@ -72,6 +73,7 @@ describe('AppComponent', () => {
     appService = { toggleNightMode: vi.fn() };
     chrome = { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() };
     toast = { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) };
+    reloadService = { reload: vi.fn() };
     appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'none' });
     appNetworkInitServiceStub.bootstrapStatus$.next('ready');
 
@@ -84,6 +86,7 @@ describe('AppComponent', () => {
         { provide: AppService, useValue: appService },
         { provide: ChromeVisibilityService, useValue: chrome },
         { provide: ToastService, useValue: toast },
+        { provide: ReloadService, useValue: reloadService },
       ],
     }).compileComponents();
   });
@@ -124,16 +127,15 @@ describe('AppComponent', () => {
       expect(toast.show).not.toHaveBeenCalledWith(expect.any(String), 0, true, 'warn', 'Retry');
     });
 
-    it('reloads the app via the settings seam when Retry is invoked', () => {
+    it('routes Retry through the reachability-gated reload seam', () => {
       const action$ = new Subject<void>();
       toast.show.mockReturnValue({ onAction: () => action$ });
-      const reloadSpy = vi.spyOn(TestBed.inject(SettingsService), 'reloadApp').mockImplementation(() => undefined);
       create();
       appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'network-unreachable' });
       TestBed.tick();
       action$.next();
 
-      expect(reloadSpy).toHaveBeenCalledTimes(1);
+      expect(reloadService.reload).toHaveBeenCalledTimes(1);
     });
   });
 
