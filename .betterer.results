@@ -138,7 +138,7 @@ exports[`strictNullChecks`] = {
       [85, 26, 49, "Object is possibly \'null\'.", "3725617003"],
       [89, 26, 49, "Object is possibly \'null\'.", "3725617003"]
     ],
-    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:2322637437": [
+    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:3462626181": [
       [85, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"]
     ],
     "src/app/widget-config/solar-charger-setup/solar-charger-setup.component.ts:3993417046": [
