@@ -124,14 +124,6 @@ export interface SolarOptionConfig {
   arrayRatedPowerW: number | null;
 }
 
-export interface SolarWidgetConfig {
-  trackedDevices?: ElectricalTrackedDevice[];
-  groups?: ElectricalGroupConfig[];
-  optionsById?: Record<string, SolarOptionConfig>;
-  banks?: ElectricalGroupConfig[];
-  cardMode?: ElectricalCardModeConfig;
-}
-
 
 
 /** How the Video widget obtains its picture. */

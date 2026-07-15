@@ -186,10 +186,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
           groups.addControl(key, this.generateFormGroups(value, key));
         }
 
-        if (parent === RootModalWidgetConfigComponent.KEY_PATHS) {
-          groups.addControl(key, this.generateFormGroups(value, key));
-        }
-
       } else {
         // Handle Primitives - property values
         if (parent === RootModalWidgetConfigComponent.KEY_CONVERT_UNIT_TO) {
