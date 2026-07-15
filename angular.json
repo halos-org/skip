@@ -109,7 +109,9 @@
           "options": {
             "lintFilePatterns": [
               "src/**/*.ts",
-              "src/**/*.html"
+              "src/**/*.html",
+              "plugin/**/*.ts",
+              "plugin/**/*.js"
             ]
           }
         }
