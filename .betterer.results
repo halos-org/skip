@@ -102,11 +102,10 @@ exports[`strictNullChecks`] = {
       [72, 6, 5, "Type \'number | null\' is not assignable to type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "173263814"],
       [78, 6, 5, "Type \'number | null\' is not assignable to type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "183473191"]
     ],
-    "src/app/widget-config/boolean-control-config/boolean-control-config.component.ts:3033536446": [
-      [25, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
-      [26, 39, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
-      [33, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
-      [37, 79, 34, "Object is possibly \'null\'.", "3704244789"]
+    "src/app/widget-config/boolean-control-config/boolean-control-config.component.ts:37806614": [
+      [26, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
+      [27, 39, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
+      [34, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"]
     ],
     "src/app/widget-config/boolean-multicontrol-options/boolean-multicontrol-options.component.ts:1795746450": [
       [35, 9, 14, "Type \'null\' is not assignable to type \'UntypedFormGroup\'.", "3522031013"],
@@ -139,10 +138,8 @@ exports[`strictNullChecks`] = {
       [85, 26, 49, "Object is possibly \'null\'.", "3725617003"],
       [89, 26, 49, "Object is possibly \'null\'.", "3725617003"]
     ],
-    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:1740588238": [
-      [80, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
-      [215, 8, 4, "Type \'null\' is not assignable to type \'UntypedFormControl\'.", "2087777580"],
-      [236, 4, 9, "\'ctrlLabel\' is possibly \'null\'.", "2892925034"]
+    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:393658683": [
+      [85, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"]
     ],
     "src/app/widget-config/solar-charger-setup/solar-charger-setup.component.ts:3993417046": [
       [47, 48, 28, "Object is possibly \'undefined\'.", "758680035"],
