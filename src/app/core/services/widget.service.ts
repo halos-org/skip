@@ -699,6 +699,17 @@ export class WidgetService {
   }
 
   /**
+   * Returns a widget type's human-readable name from the registry, or undefined when the
+   * type/selector is not a registered widget (e.g. structural containers like the group widget).
+   *
+   * @param selector Dashboard widget type / selector (e.g. `widget-numeric`).
+   * @returns The registered widget name (e.g. `Numeric`), or undefined if unknown.
+   */
+  public getWidgetName(selector: string): string | undefined {
+    return this._widgetDefinition.find(w => w.selector === selector)?.name;
+  }
+
+  /**
    * Returns the list of widget definitions, each enriched with plugin dependency status.
    *
    * For each widget, this method:

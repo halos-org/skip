@@ -5,6 +5,7 @@ import { GestureDirective } from "../../directives/gesture.directive";
 import { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../directives/widget-runtime.directive';
 import { DialogService } from '../../services/dialog.service';
+import { WidgetService } from '../../services/widget.service';
 import { ActionMenuComponent } from '../action-menu/action-menu.component';
 import { WIDGET_ACTIONS } from '../action-menu/widget-actions';
 import { cloneDeep } from 'lodash-es';
@@ -25,6 +26,7 @@ export class GroupWidgetComponent extends BaseWidget implements OnInit {
   @Input({ required: true }) protected widgetProperties!: IWidget;
   protected readonly dashboard = inject(DashboardService);
   private readonly _dialog = inject(DialogService);
+  private readonly _widgetService = inject(WidgetService);
   protected readonly runtime = inject(WidgetRuntimeDirective);
   private readonly _actionMenu = viewChild.required(ActionMenuComponent);
   protected readonly widgetActions = WIDGET_ACTIONS;
@@ -81,9 +83,10 @@ export class GroupWidgetComponent extends BaseWidget implements OnInit {
 
       this._optionsOpen = true;
 
+      const widgetName = this._widgetService.getWidgetName(this.widgetProperties.type);
       this._dialog.openWidgetOptions({
-        title: 'Widget Options',
-        config: cloneDeep(this.runtime.options()),
+        title: 'Widget Settings',
+        config: { ...cloneDeep(this.runtime.options()), widgetName },
         confirmBtnText: 'Save',
         cancelBtnText: 'Cancel'
       }).afterClosed().subscribe(result => {

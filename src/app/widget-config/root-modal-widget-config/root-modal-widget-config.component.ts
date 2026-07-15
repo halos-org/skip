@@ -47,9 +47,11 @@ export class RootModalWidgetConfigComponent implements OnInit {
   private units = inject(UnitsService);
   private app = inject(AppService);
   private readonly destroyRef = inject(DestroyRef);
-  protected widgetConfig = inject<IWidgetSvcConfig>(MAT_DIALOG_DATA);
+  protected widgetConfig = inject<IWidgetSvcConfig & { widgetName?: string }>(MAT_DIALOG_DATA);
 
-  public titleDialog = "Widget Options";
+  public titleDialog = this.widgetConfig?.widgetName
+    ? `${this.widgetConfig.widgetName} — Widget Settings`
+    : "Widget Settings";
   public formMaster: UntypedFormGroup;
   public unitList: { default?: string, conversions?: IUnitGroup[] } = {};
   public isPathArray = false;
@@ -67,7 +69,10 @@ export class RootModalWidgetConfigComponent implements OnInit {
       return;
     }
     this.unitList = this.units.getConversionsForPath(''); // array of Group or Groups: "angle", "speed", etc...
-    this.formMaster = this.generateFormGroups(this.widgetConfig);
+    // widgetName is a dialog-title hint carried on the data payload, not a persisted config field.
+    const formConfig = { ...this.widgetConfig };
+    delete formConfig.widgetName;
+    this.formMaster = this.generateFormGroups(formConfig);
     this.setupWindsteerControlState();
     this.formMaster.statusChanges
       .pipe(takeUntilDestroyed(this.destroyRef))

@@ -62,9 +62,6 @@ exports[`strictNullChecks`] = {
     "src/app/core/components/data-inspector/data-inspector.component.ts:2942185648": [
       [71, 4, 20, "Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'Signal<BreakpointState>\'.\\n  Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'() => BreakpointState\'.\\n    Type \'BreakpointState | undefined\' is not assignable to type \'BreakpointState\'.\\n      Type \'undefined\' is not assignable to type \'BreakpointState\'.", "1507091964"]
     ],
-    "src/app/core/components/group-widget/group-widget.component.ts:2421937404": [
-      [85, 8, 6, "Type \'IWidgetSvcConfig | undefined\' is not assignable to type \'object\'.\\n  Type \'undefined\' is not assignable to type \'object\'.", "1544266319"]
-    ],
     "src/app/core/components/options/notifications/notifications.component.ts:3253454142": [
       [41, 4, 20, "Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'Signal<BreakpointState>\'.\\n  Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'() => BreakpointState\'.\\n    Type \'BreakpointState | undefined\' is not assignable to type \'BreakpointState\'.\\n      Type \'undefined\' is not assignable to type \'BreakpointState\'.", "1507091964"],
       [47, 4, 24, "Object is possibly \'undefined\'.", "2222700196"],
@@ -87,7 +84,7 @@ exports[`strictNullChecks`] = {
     "src/app/core/components/widget-embedded/widget-embedded.component.ts:3928020917": [
       [114, 4, 13, "Type \'Type<WidgetViewComponentBase> | undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.\\n  Type \'undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.", "2689238020"]
     ],
-    "src/app/core/components/widget-host2/widget-host2.component.ts:4025766549": [
+    "src/app/core/components/widget-host2/widget-host2.component.ts:4255652117": [
       [134, 4, 13, "Type \'Type<WidgetViewComponentBase> | undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.\\n  Type \'undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.", "2689238020"],
       [250, 32, 9, "Type \'null\' cannot be used as an index type.", "2171020380"]
     ],
@@ -142,10 +139,10 @@ exports[`strictNullChecks`] = {
       [66, 26, 49, "Object is possibly \'null\'.", "3725617003"],
       [70, 26, 49, "Object is possibly \'null\'.", "3725617003"]
     ],
-    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:513393189": [
-      [75, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
-      [210, 8, 4, "Type \'null\' is not assignable to type \'UntypedFormControl\'.", "2087777580"],
-      [231, 4, 9, "\'ctrlLabel\' is possibly \'null\'.", "2892925034"]
+    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:104802355": [
+      [80, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"],
+      [215, 8, 4, "Type \'null\' is not assignable to type \'UntypedFormControl\'.", "2087777580"],
+      [236, 4, 9, "\'ctrlLabel\' is possibly \'null\'.", "2892925034"]
     ],
     "src/app/widget-config/solar-charger-setup/solar-charger-setup.component.ts:3993417046": [
       [47, 48, 28, "Object is possibly \'undefined\'.", "758680035"],
