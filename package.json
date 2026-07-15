@@ -69,7 +69,7 @@
     "snc": "tsc -p tsconfig.strict.json",
     "betterer": "betterer --tsconfig tsconfig.betterer.json",
     "betterer:ci": "betterer ci --tsconfig tsconfig.betterer.json",
-    "ci": "npm run lint && npm run betterer:ci && npm run test:headless && npm run test:plugin",
+    "ci": "npm run lint && npm run betterer:ci && npm run test:headless && npm run test:plugin && npm run test:mcp-schema",
     "prepublishOnly": "npm run build:prod",
     "dev": "ng serve --configuration=dev --serve-path=/@halos-org/skip/",
     "build:dev": "ng build --configuration=dev",
