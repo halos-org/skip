@@ -709,3 +709,81 @@ describe('SettingsService — units/notifications reactive signals', () => {
     expect(service.notificationConfig()).toEqual(updated);
   });
 });
+
+describe('SettingsService — getActiveProfileName ephemeral honesty (#216 E6)', () => {
+  beforeEach(() => ensureLocalStorage());
+
+  function bootstrap(storage: StorageService, name: string): void {
+    storage.bootstrapRemoteContext({
+      sharedConfigName: name,
+      configFileVersion: 11,
+      initConfig: { app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig
+    });
+  }
+
+  it('reports the persisted localStorage slot when the remote context is not bootstrapped', () => {
+    const service = createService({ sharedConfigName: 'myboat' });
+    const storage = TestBed.inject(StorageService);
+    expect(storage.isRemoteContextBootstrapped()).toBe(false);
+    expect(service.getActiveProfileName()).toBe('myboat');
+  });
+
+  it('reports the live StorageService slot once bootstrapped (the ephemeral session slot)', () => {
+    const service = createService({ sharedConfigName: 'default' });
+    const storage = TestBed.inject(StorageService);
+    bootstrap(storage, 'day');
+    expect(service.getActiveProfileName()).toBe('day');
+    // The persisted per-device name is never overwritten by the ephemeral read.
+    const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
+    expect(cc.sharedConfigName).toBe('default');
+  });
+
+  it('a connection save serializes the persisted slot, not the ephemeral bootstrapped one', () => {
+    const service = createService({ sharedConfigName: 'default' });
+    const storage = TestBed.inject(StorageService);
+    bootstrap(storage, 'day');
+    service.setInstanceName('Helm'); // triggers saveConnectionConfigToLocalStorage
+    const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
+    expect(cc.sharedConfigName).toBe('default');
+  });
+
+  it('getPersistedProfileName reports the persisted per-device name, never the ephemeral slot', () => {
+    // The rename "is this the device default?" decision keys off this, so it must stay the persisted
+    // localStorage name even while an ephemeral ?profile override is the active bootstrapped slot.
+    const service = createService({ sharedConfigName: 'default' });
+    const storage = TestBed.inject(StorageService);
+    bootstrap(storage, 'day');
+    expect(service.getActiveProfileName()).toBe('day');
+    expect(service.getPersistedProfileName()).toBe('default');
+  });
+});
+
+describe('SettingsService — reloadApp target (query-string preservation, #216 E6)', () => {
+  // Exposes the private target computation so its query-preservation can be asserted directly; the
+  // real navigation stays __KIP_TEST__-guarded and never fires here.
+  interface ReloadInternals { reloadTarget(): string }
+
+  beforeEach(() => ensureLocalStorage());
+
+  it('preserves the pre-hash query so ?embed/?profile survive a direct reloadApp() reload', () => {
+    const service = createService({});
+    const original = window.location.search;
+    try {
+      window.location.search = '?embed=1&profile=day';
+      expect((service as unknown as ReloadInternals).reloadTarget()).toBe('./?embed=1&profile=day');
+    } finally {
+      window.location.search = original;
+    }
+  });
+
+  it('is the bare app root when there is no query string', () => {
+    const service = createService({});
+    const original = window.location.search;
+    try {
+      window.location.search = '';
+      expect((service as unknown as ReloadInternals).reloadTarget()).toBe('./');
+    } finally {
+      window.location.search = original;
+    }
+  });
+});

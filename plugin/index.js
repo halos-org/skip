@@ -12,6 +12,10 @@ const { version } = require('../package.json');
 
 const PLUGIN_ID = 'skip-plotter-panel';
 const SKIP_URL = '/@halos-org/skip/';
+// The panel iframe boots Skip in chromeless embed mode. The flag rides in the pre-hash query string
+// so Skip's in-app (hash) navigation preserves it. No profile is baked in — the panel shows the
+// user's own default profile.
+const SKIP_PANEL_URL = `${SKIP_URL}?embed=1`;
 
 module.exports = function (app) {
   let running = false;
@@ -29,7 +33,7 @@ module.exports = function (app) {
           id: 'skip-panel',
           title: 'Skip',
           type: 'iframe',
-          url: SKIP_URL,
+          url: SKIP_PANEL_URL,
           lifecycle: 'keepAlive'
         }
       ],
@@ -70,7 +74,7 @@ module.exports = function (app) {
         }
       });
       running = true;
-      app.setPluginStatus(`Skip panel registered at ${SKIP_URL}`);
+      app.setPluginStatus(`Skip panel registered at ${SKIP_PANEL_URL}`);
     },
     stop() {
       running = false;

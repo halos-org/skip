@@ -15,6 +15,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { StorageService, TConfigObjectType } from './storage.service';
 import { ReloadService } from './reload.service';
+import { EmbedModeService } from './embed-mode.service';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
 import { REMOTE_CONFIG_FILE_VERSION, LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from '../constants/config-versions.const';
@@ -28,6 +29,7 @@ export class SettingsService {
   private readonly storage = inject(StorageService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly _reload = inject(ReloadService);
+  private readonly embedMode = inject(EmbedModeService);
 
   // Source-of-truth signals for the profile/app-scope settings and the per-device identity.
   private readonly _unitDefaults = signal<IUnitDefaults>({});
@@ -242,7 +244,9 @@ export class SettingsService {
     this._redNightMode.set(app.redNightMode === undefined ? false : app.redNightMode);
     this._nightModeBrightness.set(app.nightModeBrightness === undefined ? 0.2 : app.nightModeBrightness);
 
-    if (app.autoNightMode === undefined || app.redNightMode === undefined || app.nightModeBrightness === undefined) {
+    // Embed is strictly read-only: the in-memory defaults above are applied, but the persist-on-missing
+    // self-heal write is suppressed so a framed read-only boot never PATCHes the profile's app config.
+    if ((app.autoNightMode === undefined || app.redNightMode === undefined || app.nightModeBrightness === undefined) && !this.embedMode.embed()) {
       this.saveAppConfig();
     }
   }
@@ -310,6 +314,20 @@ export class SettingsService {
 
   // --- Active profile (named config slot) ---
   public getActiveProfileName(): string {
+    // During an ephemeral (URL-selected) session the slot actually loaded this boot lives on
+    // StorageService, and may differ from the persisted per-device name. Report the live slot when
+    // the remote context is bootstrapped so active-profile reads are honest, without persisting the
+    // ephemeral choice (saveConnectionConfigToLocalStorage still serializes this.sharedConfigName).
+    return this.storage.isRemoteContextBootstrapped() ? this.storage.sharedConfigName : this.sharedConfigName;
+  }
+
+  /**
+   * The persisted per-device default profile name (from the always-local connectionConfig), which is
+   * never overwritten by an ephemeral URL-selected `?profile` override. Callers deciding whether a
+   * mutation touches the DEVICE default (vs. the merely-active ephemeral slot) must key off this, not
+   * getActiveProfileName().
+   */
+  public getPersistedProfileName(): string {
     return this.sharedConfigName;
   }
 
@@ -477,7 +495,16 @@ export class SettingsService {
     if ((window as any).__KIP_TEST__) {
       return; // no-op
     }
-    location.replace("./");
+    location.replace(this.reloadTarget());
+  }
+
+  /**
+   * Reload target preserving the pre-hash query string (`window.location.search`) so boot-latched
+   * flags like `?embed`/`?profile` survive every reloadApp() path (profile switch, config reset,
+   * config upgrade), while dropping the hash so a reload lands on the app root.
+   */
+  private reloadTarget(): string {
+    return "./" + window.location.search;
   }
 
   // builds config data oject from running data

@@ -7,6 +7,7 @@ import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 import { SettingsService } from './settings.service';
 import { Dashboard, DashboardService, widgetOperation } from './dashboard.service';
+import { EmbedModeService } from './embed-mode.service';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -569,6 +570,44 @@ describe('DashboardService', () => {
       service.notifyLayoutEditCanceled();
       expect(service.layoutEditSaved()).toBe(2);
       expect(service.layoutEditCanceled()).toBe(1);
+    });
+  });
+
+  // Embed mode pins isDashboardStatic true at this single read-only choke point (#216 E6).
+  describe('layout state under embed', () => {
+    function setupEmbed(embed: boolean): DashboardService {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: SettingsService, useValue: makeSettingsMock(seed()) },
+          { provide: Router, useValue: makeRouterStub(null) },
+          { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } }
+        ]
+      });
+      return TestBed.inject(DashboardService);
+    }
+
+    it('makes setStaticDashboard(false) and toggleStaticDashboard() no-ops under embed', () => {
+      const svc = setupEmbed(true);
+      expect(svc.isDashboardStatic()).toBe(true);
+      svc.setStaticDashboard(false);
+      expect(svc.isDashboardStatic()).toBe(true);
+      svc.toggleStaticDashboard();
+      expect(svc.isDashboardStatic()).toBe(true);
+    });
+
+    it('still applies a redundant lock under embed', () => {
+      const svc = setupEmbed(true);
+      svc.setStaticDashboard(true);
+      expect(svc.isDashboardStatic()).toBe(true);
+    });
+
+    it('behaves normally (unlock/toggle work) when not embedded', () => {
+      const svc = setupEmbed(false);
+      svc.setStaticDashboard(false);
+      expect(svc.isDashboardStatic()).toBe(false);
+      svc.toggleStaticDashboard();
+      expect(svc.isDashboardStatic()).toBe(true);
     });
   });
 

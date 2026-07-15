@@ -5,9 +5,11 @@ import { ReloadService } from './reload.service';
 import { ToastService } from './toast.service';
 
 // Exposes the private raw-reload seam so a spec can assert the reload branch was taken without the
-// hard navigation actually running (it is a no-op under __KIP_TEST__ regardless).
+// hard navigation actually running (it is a no-op under __KIP_TEST__ regardless), plus the target
+// computation so its query-preservation can be asserted directly.
 interface ReloadServiceInternals {
   performReload(): void;
+  reloadTarget(): string;
 }
 
 // Drain the microtask queue so the async probe-and-branch chain settles.
@@ -97,6 +99,26 @@ describe('ReloadService', () => {
 
     expect(reloadSpy).not.toHaveBeenCalled();
     expect(toastShow).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloadTarget preserves the pre-hash query so ?embed/?profile survive a Retry-reload (#216 E6)', () => {
+    const original = window.location.search;
+    try {
+      window.location.search = '?embed=1&profile=day';
+      expect((service as unknown as ReloadServiceInternals).reloadTarget()).toBe('./?embed=1&profile=day');
+    } finally {
+      window.location.search = original;
+    }
+  });
+
+  it('reloadTarget is the bare app root when there is no query string', () => {
+    const original = window.location.search;
+    try {
+      window.location.search = '';
+      expect((service as unknown as ReloadServiceInternals).reloadTarget()).toBe('./');
+    } finally {
+      window.location.search = original;
+    }
   });
 
   it('re-runs the gated reload when the Retry toast action fires (unbounded, user-driven retry)', async () => {

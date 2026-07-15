@@ -29,9 +29,10 @@ function makeStorageMock(userNames: string[] = ['default', 'profileA']) {
   };
 }
 
-function makeSettingsMock(active = 'profileA') {
+function makeSettingsMock(active = 'profileA', persisted = active) {
   return {
     getActiveProfileName: vi.fn(() => active),
+    getPersistedProfileName: vi.fn(() => persisted),
     setActiveProfile: vi.fn()
   };
 }
@@ -245,6 +246,18 @@ describe('ProfileService', () => {
       await service.renameProfile('other', 'renamed');
       expect(storage.setConfig).toHaveBeenCalledWith('user', 'renamed', expect.anything());
       expect(storage.removeItem).toHaveBeenCalledWith('user', 'other');
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
+
+    it('renaming the ephemerally-active (?profile override) slot never repersists the device default (#216 E6)', async () => {
+      // Ephemeral override: the active bootstrapped slot is 'day', but the persisted per-device
+      // default is 'default'. Renaming the ephemeral slot must create/delete the storage slots yet
+      // NOT write its name into the persisted default (no setActiveProfile → no persist + reload).
+      setup(makeStorageMock(['default', 'day']), makeSettingsMock('day', 'default'));
+      await service.refresh();
+      await service.renameProfile('day', 'night');
+      expect(storage.setConfig).toHaveBeenCalledWith('user', 'night', expect.anything());
+      expect(storage.removeItem).toHaveBeenCalledWith('user', 'day');
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
     });
 

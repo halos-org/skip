@@ -1,5 +1,5 @@
-import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { signal } from '@angular/core';
 import { AppComponent } from './app.component';
@@ -9,8 +9,15 @@ import { DashboardService } from './core/services/dashboard.service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { AppService } from './core/services/app-service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
+import { EmbedModeService } from './core/services/embed-mode.service';
+import { SettingsService } from './core/services/settings.service';
+import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
+import { StorageService } from './core/services/storage.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
+import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
+import { IConfig } from './core/interfaces/app-settings.interfaces';
+import { LATEST_APP_CONFIG_VERSION } from './core/constants/config-versions.const';
 
 // Access the component's private surface without widening the class API.
 interface AppComponentHotkeyApi {
@@ -311,5 +318,238 @@ describe('AppComponent', () => {
       expect(chrome.hide).not.toHaveBeenCalled();
       expect(chrome.pulsePeek).not.toHaveBeenCalled();
     });
+  });
+});
+
+// Self-contained (no shared beforeEach): the toolbar mount gate depends on the injected
+// EmbedModeService, which the main suite does not stub. Under embed the toolbar is unmounted from
+// the DOM entirely (not CSS-hidden). (#216 E6)
+describe('AppComponent — embed mode chrome', () => {
+  async function render(embed: boolean): Promise<ComponentFixture<AppComponent>> {
+    const appNetworkInitServiceStub = {
+      bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
+      bootstrapIssue$: new BehaviorSubject({ reason: 'none' }),
+    };
+    const dashboard = {
+      isDashboardStatic: signal(true),
+      activeDashboard: signal<number | null>(null),
+      dashboards: signal<unknown[]>([]),
+      navigateToNextDashboard: vi.fn(),
+      navigateToPreviousDashboard: vi.fn(),
+      setStaticDashboard: vi.fn(),
+      widgetAction$: new Subject(),
+    };
+    const uiEvent = {
+      isDragging: signal(false),
+      addHotkeyListener: vi.fn(),
+      removeHotkeyListener: vi.fn(),
+      toggleFullScreen: vi.fn(),
+    };
+
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        { provide: AppNetworkInitService, useValue: appNetworkInitServiceStub },
+        { provide: DashboardService, useValue: dashboard },
+        { provide: uiEventService, useValue: uiEvent },
+        { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ToastService, useValue: { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) } },
+        { provide: ReloadService, useValue: { reload: vi.fn() } },
+        { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } },
+      ],
+    });
+    // Stub the toolbar's template so the mount/unmount gate can be asserted without wiring the
+    // toolbar's own heavy dependency tree; the `app-toolbar` host element still marks its presence.
+    TestBed.overrideComponent(ToolbarComponent, { set: { template: '<span class="stub-toolbar"></span>', imports: [] } });
+    await TestBed.compileComponents();
+
+    const fixture = TestBed.createComponent(AppComponent);
+    (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('unmounts the toolbar from the DOM under embed even on a visible dashboard', async () => {
+    const fixture = await render(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).toBeNull();
+  });
+
+  it('mounts the toolbar on a visible dashboard when not embedded', async () => {
+    const fixture = await render(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).not.toBeNull();
+  });
+});
+
+// Self-contained: exercises the two constructor effects that must stand down under embed — the
+// automatic v11/v12 config migration (writes every user slot + reloadApp), and the
+// missing-shared-config 'Create' prompt (its action calls settings.resetSettings, a write). Wires the
+// real root SettingsService / ConfigurationUpgradeService (spied) like the chrome suite, plus a
+// toggleable EmbedModeService. (#216 E6)
+describe('AppComponent — embed read-only invariants (#216 E6)', () => {
+  async function render(opts: { embed: boolean; configUpgrade?: boolean; configVersion?: number }) {
+    const bootstrapIssue$ = new BehaviorSubject<{ reason: string; sharedConfigName?: string }>({ reason: 'none' });
+    const appNetworkInitServiceStub = {
+      bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
+      bootstrapIssue$,
+    };
+    const dashboard = {
+      isDashboardStatic: signal(true),
+      activeDashboard: signal<number | null>(null),
+      dashboards: signal<unknown[]>([]),
+      navigateToNextDashboard: vi.fn(),
+      navigateToPreviousDashboard: vi.fn(),
+      setStaticDashboard: vi.fn(),
+      widgetAction$: new Subject(),
+    };
+    const uiEvent = {
+      isDragging: signal(false),
+      addHotkeyListener: vi.fn(),
+      removeHotkeyListener: vi.fn(),
+      toggleFullScreen: vi.fn(),
+    };
+    const toast = { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) };
+
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        { provide: AppNetworkInitService, useValue: appNetworkInitServiceStub },
+        { provide: DashboardService, useValue: dashboard },
+        { provide: uiEventService, useValue: uiEvent },
+        { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ToastService, useValue: toast },
+        { provide: ReloadService, useValue: { reload: vi.fn() } },
+        { provide: EmbedModeService, useValue: { embed: () => opts.embed, profile: () => null } },
+      ],
+    });
+    TestBed.overrideComponent(ToolbarComponent, { set: { template: '<span class="stub-toolbar"></span>', imports: [] } });
+    await TestBed.compileComponents();
+
+    // Drive the constructor effects deterministically through the real root services the component
+    // injects: force an upgradeable version and spy the write actions so nothing actually persists.
+    const settings = TestBed.inject(SettingsService);
+    const upgrade = TestBed.inject(ConfigurationUpgradeService);
+    const runUpgradeSpy = vi.spyOn(upgrade, 'runUpgrade').mockResolvedValue(undefined);
+    vi.spyOn(settings, 'getConfigVersion').mockReturnValue(opts.configVersion);
+    vi.spyOn(settings, 'resetSettings').mockImplementation(() => undefined);
+    settings.configUpgrade.set(opts.configUpgrade ?? false);
+
+    const fixture = TestBed.createComponent(AppComponent);
+    (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
+    fixture.detectChanges();
+    return { toast, runUpgradeSpy, bootstrapIssue$ };
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('does NOT run the config migration under embed even with an upgradeable v11/v12 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: true, configUpgrade: true, configVersion: 11 });
+    expect(runUpgradeSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs the config migration in the full app (not embed) for an upgradeable v11/v12 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 12 });
+    expect(runUpgradeSpy).toHaveBeenCalledWith(12);
+  });
+
+  it('does NOT show the missing-shared-config create prompt under embed', async () => {
+    const { toast, bootstrapIssue$ } = await render({ embed: true });
+    toast.show.mockClear();
+    bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default' });
+    TestBed.tick();
+    expect(toast.show).not.toHaveBeenCalled();
+  });
+
+  it('shows the missing-shared-config create prompt in the full app (not embed)', async () => {
+    const { toast, bootstrapIssue$ } = await render({ embed: false });
+    toast.show.mockClear();
+    bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default' });
+    TestBed.tick();
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('no shared configuration'), 0, true, 'warn', 'Create');
+  });
+});
+
+// The whole-boot read-only invariant: an embed boot must issue ZERO server-config writes, even from a
+// config that would normally self-heal. Drives the real root SettingsService + DashboardService +
+// StorageService (only EmbedModeService and the component's UI collaborators are faked), boots a config
+// that triggers BOTH boot-time self-heals (empty dashboards → DefaultDashboard seed + write-back;
+// missing night-mode fields → pushSettings persist-on-missing), and counts patchConfig/setConfig. (#216 E6)
+describe('AppComponent — embed boot performs zero server-config writes (#216 E6)', () => {
+  async function bootAndCountWrites(embed: boolean) {
+    const appNetworkInitServiceStub = {
+      bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
+      bootstrapIssue$: new BehaviorSubject({ reason: 'none' }),
+    };
+    const uiEvent = {
+      isDragging: signal(false),
+      addHotkeyListener: vi.fn(),
+      removeHotkeyListener: vi.fn(),
+      toggleFullScreen: vi.fn(),
+    };
+
+    TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        { provide: AppNetworkInitService, useValue: appNetworkInitServiceStub },
+        { provide: uiEventService, useValue: uiEvent },
+        { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ToastService, useValue: { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) } },
+        { provide: ReloadService, useValue: { reload: vi.fn() } },
+        { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } },
+        // DashboardService, SettingsService, StorageService and ConfigurationUpgradeService are left as
+        // their real root instances so the boot self-heals actually run (or are gated) end to end.
+      ],
+    });
+    TestBed.overrideComponent(ToolbarComponent, { set: { template: '<span class="stub-toolbar"></span>', imports: [] } });
+    await TestBed.compileComponents();
+
+    // Bootstrap a config that would trigger both self-heals: empty dashboards AND missing night-mode
+    // fields. configVersion is the latest so no config-upgrade write path is dragged in.
+    const storage = TestBed.inject(StorageService);
+    storage.bootstrapRemoteContext({
+      sharedConfigName: 'profileA',
+      configFileVersion: 11,
+      initConfig: {
+        app: {
+          configVersion: LATEST_APP_CONFIG_VERSION,
+          unitDefaults: {},
+          notificationConfig: {
+            disableNotifications: false,
+            menuGrouping: true,
+            security: { disableSecurity: false },
+            devices: { disableDevices: false, showNormalState: false, showNominalState: false },
+            sound: { disableSound: false, muteNormal: false, muteNominal: false, muteWarn: false, muteAlert: false, muteAlarm: false, muteEmergency: false },
+          },
+        },
+        theme: null,
+        dashboards: []
+      } as unknown as IConfig
+    });
+    storage.storageServiceReady$.next(true); // saveDashboards gates its write on readiness
+
+    // Installed AFTER bootstrap so only the boot self-heal writes are counted, never the bootstrap.
+    const patchSpy = vi.spyOn(storage, 'patchConfig').mockImplementation(() => undefined);
+    const setSpy = vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
+
+    const fixture = TestBed.createComponent(AppComponent);
+    (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
+    fixture.detectChanges();
+    TestBed.tick();
+    return { patchSpy, setSpy };
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('writes NOTHING to the server config during an embed boot (both self-heals suppressed)', async () => {
+    const { patchSpy, setSpy } = await bootAndCountWrites(true);
+    expect(patchSpy).not.toHaveBeenCalled();
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it('the same boot NOT under embed DOES fire the self-heal writes (the guard is embed-specific)', async () => {
+    const { patchSpy } = await bootAndCountWrites(false);
+    expect(patchSpy).toHaveBeenCalled();
   });
 });

@@ -16,8 +16,9 @@ export interface IProfileSummary {
 /** Reserved fallback profile name: a fresh device boots into it and it must always be available. */
 const RESERVED_DEFAULT = 'default';
 /** Profile names are URL path segments AND JSON-Patch keys; '.' truncates and '/' splits on the
- * Signal K server, so only an allow-list charset is safe. */
-const PROFILE_NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
+ * Signal K server, so only an allow-list charset is safe. Exported so the ephemeral `?profile`
+ * bootstrap override validates against the same charset. */
+export const PROFILE_NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
 const MAX_NAME_LENGTH = 64;
 const PROFILE_SCOPE = 'user';
 
@@ -138,7 +139,10 @@ export class ProfileService {
         console.warn(`[ProfileService] Old profile slot "${oldName}" may not have been removed; an orphan copy could remain until the next refresh.`);
       }
 
-      if (oldName === this.settings.getActiveProfileName()) {
+      // Repersist + reload ONLY when the renamed slot is the persisted per-device default. Keying off
+      // the ephemeral active name (getActiveProfileName) would write a URL-selected `?profile`
+      // override's name into the persisted device default — the override must stay ephemeral.
+      if (oldName === this.settings.getPersistedProfileName()) {
         this.settings.setActiveProfile(normalized); // persist + reload onto the renamed slot
       } else {
         await this.refresh();
