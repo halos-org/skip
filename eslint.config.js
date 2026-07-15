@@ -2,6 +2,7 @@
 const eslint = require("@eslint/js");
 const tseslint = require("typescript-eslint");
 const angular = require("angular-eslint");
+const globals = require("globals");
 
 module.exports = tseslint.config(
   {
@@ -41,5 +42,13 @@ module.exports = tseslint.config(
       ...angular.configs.templateAccessibility,
     ],
     rules: {},
+  },
+  {
+    files: ["plugin/**/*.js"],
+    extends: [eslint.configs.recommended],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: globals.node,
+    },
   }
 );
