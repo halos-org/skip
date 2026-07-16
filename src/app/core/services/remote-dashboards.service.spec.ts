@@ -8,6 +8,7 @@ import { Dashboard, DashboardService } from './dashboard.service';
 import { DataService, IPathUpdate } from './data.service';
 import { SettingsService } from './settings.service';
 import { SignalkRequestsService } from './signalk-requests.service';
+import { EmbedModeService } from './embed-mode.service';
 import { States } from '../interfaces/signalk-interfaces';
 
 const KIP_UUID = 'test-kip-uuid';
@@ -410,6 +411,40 @@ describe('RemoteDashboardsService', () => {
 
       expect(errorSpy).toHaveBeenCalledTimes(3);
       errorSpy.mockRestore();
+    });
+  });
+
+  describe('under embed mode', () => {
+    beforeEach(() => {
+      TestBed.overrideProvider(EmbedModeService, { useValue: { embed: () => true, profile: () => null } });
+    });
+
+    it('publishes no remote-control deltas at all, even with remote control enabled at construction', () => {
+      settings.isRemoteControl.set(true);
+      dashboard.activeDashboard.set(1);
+
+      createService();
+
+      expect(requests.putRequest).not.toHaveBeenCalled();
+    });
+
+    it('does not act as a remote-control target (ignores incoming activeScreen requests)', () => {
+      settings.isRemoteControl.set(true);
+      createService();
+
+      data.push(OWN_ACTIVE_SCREEN_PATH, 2);
+      TestBed.tick();
+
+      expect(dashboard.navigateTo).not.toHaveBeenCalled();
+    });
+
+    it('does not publish when remote control is toggled on during the session', () => {
+      createService();
+      requests.putRequest.mockClear();
+
+      enableRemoteControl();
+
+      expect(requests.putRequest).not.toHaveBeenCalled();
     });
   });
 });

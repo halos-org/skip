@@ -4,6 +4,7 @@ import { DashboardService, Dashboard } from './dashboard.service';
 import { DataService } from './data.service';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { SignalkRequestsService } from './signalk-requests.service';
+import { EmbedModeService } from './embed-mode.service';
 
 /**
  * Lightweight dashboard descriptor shared to remote displays.
@@ -58,6 +59,7 @@ export class RemoteDashboardsService {
   private readonly dashboard = inject(DashboardService);
   private readonly data = inject(DataService);
   private readonly requests = inject(SignalkRequestsService);
+  private readonly embedMode = inject(EmbedModeService);
 
   private readonly KIP_UUID = this.settings.KipUUID;
   private readonly CHANGE_SCREEN_PATH = `self.displays.${this.KIP_UUID}.activeScreen`;
@@ -68,6 +70,13 @@ export class RemoteDashboardsService {
   private previousIsRemoteControl = false;
 
   constructor() {
+    // A chromeless embed panel is strictly read-only and must not advertise itself as a
+    // remote-control target: suppress all remote-control delta publication and the
+    // incoming-command navigation by never wiring the clears or the effects (#306).
+    if (this.embedMode.embed()) {
+      return;
+    }
+
     // Clear all remote paths on service initialization
     this.setActiveDashboardOnRemote(this.KIP_UUID, null);
     this.setScreensOnRemote(this.KIP_UUID, null);
