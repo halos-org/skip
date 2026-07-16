@@ -243,7 +243,10 @@ export interface IWidgetSvcConfig {
   /** Don't apply any background color */
   noBgColor?: boolean;
 
-  /** Enables data stream to emit null values (permitting Widgets to reset) after a given timeout smoothingPeriod. See dataTimeout */
+  /**
+   * Enables data stream to emit null values (permitting Widgets to reset) after a given timeout smoothingPeriod. See dataTimeout.
+   * When several sources feed the same path, a timeout blanks the widget only once every source has gone silent; while any source is still live the reading is kept.
+   */
   enableTimeout?: boolean;
   /** Sets data stream no-data timeout notification in minutes */
   dataTimeout?: number;

@@ -20,6 +20,7 @@ class FakeDataService {
         path: string;
         source: string;
         pathType: string;
+        dataTimeoutMs: number;
     }[] = [];
 
     subscribePath(path: string, source?: string): Observable<IPathUpdate> {
@@ -46,8 +47,8 @@ class FakeDataService {
         return { data$, release };
     }
 
-    timeoutPathObservable(path: string, source: string, pathType: string): void {
-        this.timeoutCalls.push({ path, source, pathType });
+    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
+        this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
     }
 }
 
@@ -411,7 +412,9 @@ describe('WidgetStreamsDirective', () => {
         // Do not emit anything; advance virtual time beyond 20ms to trigger timeout
         await vi.advanceTimersByTimeAsync(30);
         expect(dataSvc.timeoutCalls.length).toBe(1);
-        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'default', pathType: 'string' });
+        // dataTimeout (0.02 s) is threaded through as the ms window; compute it the same way the
+        // directive does so the assertion is exact regardless of float representation.
+        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'default', pathType: 'string', dataTimeoutMs: 0.02 * 1000 });
     });
 
     it('forwards a configured non-default source into timeoutPathObservable', async () => {
@@ -426,7 +429,7 @@ describe('WidgetStreamsDirective', () => {
         // The stream's effective source must reach the reset so a source-bound widget
         // clears its own registration, not the default bucket (#206).
         await vi.advanceTimersByTimeAsync(30);
-        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'n2k-1', pathType: 'string' });
+        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'n2k-1', pathType: 'string', dataTimeoutMs: 0.02 * 1000 });
     });
 
     it('applies convertUnitTo to numeric values (initial + sampled)', async () => {
@@ -657,7 +660,7 @@ describe('WidgetStreamsDirective', () => {
  */
 class TtlFakeDataService {
     subjects = new Map<string, BehaviorSubject<IPathUpdate>>();
-    timeoutCalls: { path: string; source: string; pathType: string }[] = [];
+    timeoutCalls: { path: string; source: string; pathType: string; dataTimeoutMs: number }[] = [];
 
     private keyFor(path: string, source?: string): string {
         return `${path}|${source?.trim() || 'default'}`;
@@ -677,8 +680,8 @@ class TtlFakeDataService {
         return { data$: this.subscribePath(path, source), release: () => undefined };
     }
 
-    timeoutPathObservable(path: string, source: string, pathType: string): void {
-        this.timeoutCalls.push({ path, source, pathType });
+    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
+        this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
         // Mirror the real DataService: a TTL timeout resets the timed-out source's value to null.
         this.subjects.get(this.keyFor(path, source))?.next(
             { data: { value: null, timestamp: null }, state: 'normal' } as IPathUpdate

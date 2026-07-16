@@ -167,6 +167,15 @@ export class DataService implements OnDestroy {
    * before any value registration exists.
    */
   private _pathMetaByPath = new Map<string, BehaviorSubject<ISkMetadata | null>>();
+  /**
+   * Path -> local wall-clock ms of the last delta received for that path. Sibling of
+   * `_pathRegisterByPath`, feeding the timeout subsystem's liveness gate: a cross-clear of a path's
+   * sibling/default registrations only fires once nothing has fed the path within the timing-out
+   * widget's TTL. Recorded from local `Date.now()`, not the SK-reported timestamp, so it measures
+   * locally-elapsed silence and never inherits SK clock skew. Pruned per-context in
+   * {@link removePathsForContext} so it stays bounded under AIS context churn.
+   */
+  private _lastObservedByPath = new Map<string, number>();
 
   constructor() {
     // Emit Delta message update counter every second (RxJS based)
@@ -393,6 +402,11 @@ export class DataService implements OnDestroy {
         this._pendingPathStates.delete(path);
       }
     }
+    for (const path of Array.from(this._lastObservedByPath.keys())) {
+      if (path.startsWith(prefix)) {
+        this._lastObservedByPath.delete(path);
+      }
+    }
     if (removedSkData && this._isSkDataFullTreeActive) {
       this.refreshSkDataCache();
       this.scheduleSkDataFullTreeEmit();
@@ -559,6 +573,11 @@ export class DataService implements OnDestroy {
         sourceValue: dataPath.value,
       };
     }
+
+    // Local receipt clock for the timeout liveness gate: record that *some* source fed this path
+    // just now. Uses Date.now() (not the SK timestamp) so silence is measured against local elapsed
+    // time, matching how the widget-side timeout operator measures its window.
+    this._lastObservedByPath.set(updatePath, Date.now());
 
     // Update path register Subjects with new data
     const pathRegisterItems = this._pathRegisterByPath.get(updatePath) ?? [];
@@ -835,32 +854,83 @@ export class DataService implements OnDestroy {
   }
 
   /**
-   * Set the value of a path to null and state to Normal. This is used to
-   * timeout a path value and reset it to null. This is useful for widgets
-   * that need to know if a path has timed out.
+   * Deep-reset a registration's VALUE by nulling its upstream `_pathData$` BehaviorSubject — never by
+   * writing the derived `pathDataUpdate$` directly. The standing `combineLatest([_pathData$,
+   * _pathState$])` then produces the derived emission itself, pairing the nulled value with whatever
+   * state is current.
    *
-   * Only the registration matching `source` is reset: one source timing out
-   * must not null a sibling widget bound to a different, still-live source of
-   * the same path (e.g. redundant GPS or wind sensors).
+   * Nulling the upstream value (rather than the previous shallow write to the derived subject, which
+   * left `_pathData$` still caching the pre-timeout value) is what prevents resurfacing: a later
+   * `_pathState$` emission from the notification handler now re-pairs `{null, newState}` instead of
+   * `{staleValue, newState}`.
+   *
+   * `_pathState$` is DELIBERATELY left untouched — state is a separate, server-notification-driven
+   * channel and the timeout has no business forcing it to Normal. Clobbering it to Normal would drop
+   * a persistent alarm/zone that is still active on the server: no state-transition notification
+   * would re-arrive to restore it (the notification handler dedupes on transitions and the `_skData`
+   * state is unchanged), so on resume `combineLatest` would re-pair `{value, Normal}` and the alarm
+   * coloring would be lost for the rest of the alarm's life. Leaving state as-is yields
+   * `{null, realState}` on reset and `{value, realState}` on resume, so an active alarm survives a
+   * timeout/resume cycle.
+   */
+  private resetRegistrationValue(registration: IPathRegistration): void {
+    registration._pathData$.next({ value: null, timestamp: null });
+  }
+
+  /**
+   * Reset a path's registrations after a widget's data TTL fired for `source`.
+   *
+   * The timed-out source's own registration is always deep-reset — its value nulled on the upstream
+   * `_pathData$` (see {@link resetRegistrationValue}) so a later notification cannot resurface it; its
+   * state is left at the real server-driven value so a persistent alarm survives.
+   *
+   * The path's OTHER registrations — its sibling sources and the shared `default` bucket — are
+   * cross-cleared only when the path has gone all-silent: nothing has fed it within `dataTimeoutMs`.
+   * While any source is still delivering deltas, its receipt in `_lastObservedByPath` keeps the path
+   * live and the cross-clear is skipped, so a redundant sensor (a second GPS or wind source) is never
+   * blanked by a peer's timeout. The all-silent case is what lets a widget with its own timeout
+   * disabled — which never calls this itself — still clear once every source behind its path has
+   * stopped, instead of holding a frozen, plausible-looking last reading.
+   *
+   * Liveness is per-PATH against the TRIGGERING widget's `dataTimeoutMs`, so on an all-silent path the
+   * strictest-tolerance (shortest-TTL) widget's timeout can cross-clear a longer-tolerance sibling's
+   * value earlier than that sibling's own threshold. This is the intended safety-conscious behavior;
+   * per-source recency is deliberately not used (see the cross-clear site for why it would reintroduce
+   * the frozen-widget bug).
+   *
+   * Only the timing-out TRIGGER's `pathType` is whitelisted; cross-clear targets are reset regardless
+   * of their own type, so a boolean sibling can still be cleared.
    *
    * @param {string} path The Signal K path to timeout
-   * @param {string} source The source whose stream timed out; only its registration is reset
-   * @param {string} pathType The type of the path value (string, Date, number, multiple, etc)
+   * @param {string} source The source whose stream timed out; always deep-reset
+   * @param {string} pathType The type of the timing-out source's value (string, Date, number, multiple, etc)
+   * @param {number} dataTimeoutMs The timing-out widget's TTL window in ms; the path counts as
+   *   all-silent (and its siblings/default get cross-cleared) when nothing has fed it within it.
    * @memberof SignalKDataService
    */
-  public timeoutPathObservable(path: string, source: string, pathType: string): void {
+  public timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
     if (!['string', 'Date', 'number', 'multiple'].includes(pathType)) return;
     const registrations = this._pathRegisterByPath.get(path);
     if (!registrations) return;
-    for (const registration of registrations) {
-      if (registration.source !== source) continue;
-      registration.pathDataUpdate$.next({
-        data: {
-          value: null,
-          timestamp: null
-        },
-        state: States.Normal
-      });
+
+    const direct = registrations.find(registration => registration.source === source);
+    if (direct) {
+      this.resetRegistrationValue(direct);
+    }
+
+    // Liveness is per-PATH, not per-(path, source): the path counts as silent once the
+    // strictest-tolerance (shortest dataTimeout) widget on it times out, which can blank a
+    // longer-tolerance sibling's value earlier than that sibling's own threshold — the intended,
+    // safety-conscious behavior. Per-source recency is deliberately NOT used: the widget timeout
+    // operator is one-shot (it never re-arms), so if a still-fresh sibling source were skipped here,
+    // nothing would re-fire the cross-clear when that source later goes silent, and an
+    // enableTimeout:false widget on it would stay frozen forever (the original #254 bug).
+    const lastObserved = this._lastObservedByPath.get(path);
+    const allSilent = lastObserved === undefined || Date.now() - lastObserved >= dataTimeoutMs;
+    if (!allSilent) return;
+
+    for (const registration of registrations.filter(registration => registration.source !== source)) {
+      this.resetRegistrationValue(registration);
     }
   }
 
