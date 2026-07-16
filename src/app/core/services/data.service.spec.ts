@@ -308,6 +308,20 @@ describe('DataService', () => {
       expect(service.getPathObject(`${shortCtx}.navigation.speedOverGround`)).toBeNull();
       expect(service.getPathObject(`${longCtx}.navigation.speedOverGround`)).not.toBeNull();
     });
+
+    it('prunes the per-path last-observed receipt for a removed foreign context, leaving self intact', () => {
+      seedSog('self', 1.1);
+      seedSog(vesselA, 2.2);
+
+      const lastObserved = (service as unknown as { _lastObservedByPath: Map<string, number> })._lastObservedByPath;
+      expect(lastObserved.has(`${vesselA}.navigation.speedOverGround`)).toBe(true);
+      expect(lastObserved.has('self.navigation.speedOverGround')).toBe(true);
+
+      service.removePathsForContext(vesselA);
+
+      expect(lastObserved.has(`${vesselA}.navigation.speedOverGround`)).toBe(false);
+      expect(lastObserved.has('self.navigation.speedOverGround')).toBe(true);
+    });
   });
 
   describe('getPathMetaObservable (meta decoupled from registrations)', () => {

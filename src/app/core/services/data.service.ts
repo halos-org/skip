@@ -167,6 +167,15 @@ export class DataService implements OnDestroy {
    * before any value registration exists.
    */
   private _pathMetaByPath = new Map<string, BehaviorSubject<ISkMetadata | null>>();
+  /**
+   * Path -> local wall-clock ms of the last delta received for that path. Sibling of
+   * `_pathRegisterByPath`, feeding the timeout subsystem's liveness gate: a cross-clear of a path's
+   * sibling/default registrations only fires once nothing has fed the path within the timing-out
+   * widget's TTL. Recorded from local `Date.now()`, not the SK-reported timestamp, so it measures
+   * locally-elapsed silence and never inherits SK clock skew. Pruned per-context in
+   * {@link removePathsForContext} so it stays bounded under AIS context churn.
+   */
+  private _lastObservedByPath = new Map<string, number>();
 
   constructor() {
     // Emit Delta message update counter every second (RxJS based)
@@ -393,6 +402,11 @@ export class DataService implements OnDestroy {
         this._pendingPathStates.delete(path);
       }
     }
+    for (const path of Array.from(this._lastObservedByPath.keys())) {
+      if (path.startsWith(prefix)) {
+        this._lastObservedByPath.delete(path);
+      }
+    }
     if (removedSkData && this._isSkDataFullTreeActive) {
       this.refreshSkDataCache();
       this.scheduleSkDataFullTreeEmit();
@@ -559,6 +573,11 @@ export class DataService implements OnDestroy {
         sourceValue: dataPath.value,
       };
     }
+
+    // Local receipt clock for the timeout liveness gate: record that *some* source fed this path
+    // just now. Uses Date.now() (not the SK timestamp) so silence is measured against local elapsed
+    // time, matching how the widget-side timeout operator measures its window.
+    this._lastObservedByPath.set(updatePath, Date.now());
 
     // Update path register Subjects with new data
     const pathRegisterItems = this._pathRegisterByPath.get(updatePath) ?? [];
