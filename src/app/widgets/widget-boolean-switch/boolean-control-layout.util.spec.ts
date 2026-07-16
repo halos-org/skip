@@ -46,4 +46,45 @@ describe('boolean-control-layout util', () => {
     expect(doubled.switchStrokeWidth).toBe(3);
     expect(doubled.lightStrokeWidth).toBe(6);
   });
+
+  it('keeps every geometry field finite and non-negative for degenerate dimensions', () => {
+    const cases: [number, number][] = [[0, 0], [-100, 35], [180, -50], [-10, -10]];
+    for (const [width, height] of cases) {
+      for (const type of ['1', '2', '3']) {
+        const layout = getBooleanControlLayout(type, width, height) as unknown as Record<string, number>;
+        for (const value of Object.values(layout)) {
+          expect(Number.isFinite(value)).toBe(true);
+          expect(value).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+  });
+
+  it('returns 0 for an empty control set', () => {
+    expect(measureBooleanControlsHeight(320, 200, [], measureTextWidth)).toBe(0);
+  });
+
+  it('terminates with a finite height of at least 1 for a label that cannot fit', () => {
+    const height = measureBooleanControlsHeight(
+      20,
+      200,
+      [{ type: '1', ctrlLabel: 'A label far wider than a twenty pixel panel can ever hold' }],
+      measureTextWidth,
+    );
+
+    expect(Number.isFinite(height)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns a finite, non-negative height when the panel height is zero', () => {
+    const height = measureBooleanControlsHeight(
+      320,
+      0,
+      [{ type: '1', ctrlLabel: 'Port' }],
+      measureTextWidth,
+    );
+
+    expect(Number.isFinite(height)).toBe(true);
+    expect(height).toBeGreaterThanOrEqual(0);
+  });
 });

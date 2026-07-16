@@ -29,18 +29,19 @@ export interface BooleanControlLayout {
   buttonRadius: number;
 }
 
-function scaleValue(height: number): number {
+function scaleFactor(height: number): number {
   return Math.max(height, 1) / BOOLEAN_CONTROL_BASE_HEIGHT;
 }
 
 export function getBooleanControlLayout(type: string, width: number, height: number): BooleanControlLayout {
   const safeWidth = Math.max(width, 0);
-  const scale = scaleValue(height);
+  const scale = scaleFactor(height);
   const shapeLaneWidth = type === '2' ? 0 : 48 * scale;
   const rightPadding = type === '2' ? 12 * scale : 6 * scale;
   const labelX = type === '2' ? 12 * scale : shapeLaneWidth;
   const labelWidth = Math.max(0, safeWidth - labelX - rightPadding);
 
+  // Coordinates are the original 180x35 artwork geometry; every value scales by height/35 (see BOOLEAN_CONTROL_BASE_HEIGHT).
   return {
     labelX,
     labelWidth,
