@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { IMeta, IPathValueData, IPathMetaData } from '../interfaces/app-interfaces';
-import { ISignalKDataValueUpdate, States } from '../interfaces/signalk-interfaces';
+import { ISignalKDataValueUpdate, ISkMetadata, States } from '../interfaces/signalk-interfaces';
 import { DataService, IPathUpdate, IPathUpdateWithPath } from './data.service';
 import { SignalKDeltaService } from './signalk-delta.service';
 
@@ -239,6 +239,69 @@ describe('DataService', () => {
 
       expect(service.getPathObject(`${shortCtx}.navigation.speedOverGround`)).toBeNull();
       expect(service.getPathObject(`${longCtx}.navigation.speedOverGround`)).not.toBeNull();
+    });
+  });
+
+  describe('getPathMetaObservable (meta decoupled from registrations)', () => {
+    const PATH = 'self.electrical.batteries.10.voltage';
+
+    function pushMeta(context: string, path: string, meta: ISkMetadata): void {
+      metadataUpdates$.next({ context, path, meta });
+    }
+
+    it('keeps the shared meta stream live when a sibling source registration is released', () => {
+      // Two sources registered for the same path: releasing one must not complete the path's meta.
+      service.subscribePath(PATH, 'default');
+      service.subscribePath(PATH, 'gps-2');
+
+      let latestMeta: ISkMetadata | null | undefined;
+      let completed = false;
+      service.getPathMetaObservable(PATH).subscribe({
+        next: m => (latestMeta = m),
+        complete: () => (completed = true),
+      });
+
+      service.unsubscribePath(PATH, 'default');
+
+      pushMeta('self', 'electrical.batteries.10.voltage', { description: 'Voltage', units: 'V', properties: {} });
+
+      expect(completed).toBe(false);
+      expect(latestMeta?.units).toBe('V');
+    });
+
+    it('emits to a subscriber that observed meta before any path registration (no dead of(null))', () => {
+      const PATH2 = 'self.environment.outside.temperature';
+      const metas: (ISkMetadata | null)[] = [];
+      // Subscribe BEFORE any subscribePath — the pre-decoupling code returned a dead of(null) here.
+      service.getPathMetaObservable(PATH2).subscribe(m => metas.push(m));
+      expect(metas).toEqual([null]); // seeded null from the BehaviorSubject
+
+      pushMeta('self', 'environment.outside.temperature', { description: 'Temp', units: 'K', properties: {} });
+
+      // The later delta reaches the same live subscriber, proving it is not a completed of(null).
+      expect(metas.length).toBe(2);
+      expect(metas[1]?.units).toBe('K');
+    });
+
+    it('prunes the decoupled meta subject for a removed foreign context, leaving self untouched', () => {
+      const vessel = 'vessels.urn:mrn:imo:mmsi:100000001';
+      const foreignPath = `${vessel}.navigation.speedOverGround`;
+      const selfPath = 'self.navigation.speedOverGround';
+
+      service.getPathMetaObservable(foreignPath).subscribe();
+      service.getPathMetaObservable(selfPath).subscribe();
+
+      const metaMap = (service as unknown as { _pathMetaByPath: Map<string, unknown> })._pathMetaByPath;
+      expect(metaMap.has(foreignPath)).toBe(true);
+      expect(metaMap.has(selfPath)).toBe(true);
+
+      service.removePathsForContext(vessel);
+      expect(metaMap.has(foreignPath)).toBe(false);
+      expect(metaMap.has(selfPath)).toBe(true);
+
+      // The self context is a no-op, its meta subject survives.
+      service.removePathsForContext('self');
+      expect(metaMap.has(selfPath)).toBe(true);
     });
   });
 
