@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, DestroyRef } from '@angular/core';
+import { Component, computed, effect, inject, signal, DestroyRef, OnDestroy } from '@angular/core';
 import { PageHeaderComponent } from '../page-header/page-header.component';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
@@ -19,7 +19,7 @@ import { SignalkRequestsService } from '../../services/signalk-requests.service'
   templateUrl: './remote-control.component.html',
   styleUrl: './remote-control.component.scss'
 })
-export class RemoteControlComponent {
+export class RemoteControlComponent implements OnDestroy {
   private readonly COMMAND_REQUEST_ACTIVE_SCREEN_PATH = 'self.kip.remote.requestActiveScreen';
 
   private readonly _settings = inject(SettingsService);
@@ -35,6 +35,8 @@ export class RemoteControlComponent {
   private readonly displaysMap = signal<Record<string, IKipDisplayInfo>>({});
   private selectedDisplaySub: Subscription | null = null;
   private selectedScreenIndexSub: Subscription | null = null;
+  private selectedDisplayRelease: (() => void) | null = null;
+  private selectedScreenIndexRelease: (() => void) | null = null;
 
   protected readonly displays = computed<IKipDisplayInfo[]>(() => {
     const items = Object.values(this.displaysMap());
@@ -117,6 +119,12 @@ export class RemoteControlComponent {
     this.selectedDisplaySub = null;
     this.selectedScreenIndexSub?.unsubscribe();
     this.selectedScreenIndexSub = null;
+    // Release the previously-acquired registrations before rebinding to the new display, so a user
+    // cycling through remote displays does not pin one (path, source) registration per selection.
+    this.selectedDisplayRelease?.();
+    this.selectedDisplayRelease = null;
+    this.selectedScreenIndexRelease?.();
+    this.selectedScreenIndexRelease = null;
 
     if (!displayId) {
       this.screensLoading.set(false);
@@ -127,7 +135,9 @@ export class RemoteControlComponent {
 
     this.screensLoading.set(true);
 
-    this.selectedDisplaySub = this._data.subscribePath(`self.displays.${displayId}`, 'default')
+    const displayHandle = this._data.acquirePath(`self.displays.${displayId}`, 'default');
+    this.selectedDisplayRelease = displayHandle.release;
+    this.selectedDisplaySub = displayHandle.data$
       .pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe(update => {
         this.screensLoading.set(false);
@@ -171,7 +181,9 @@ export class RemoteControlComponent {
         }
       });
 
-    this.selectedScreenIndexSub = this._data.subscribePath(`self.displays.${displayId}.screenIndex`, 'default')
+    const screenIndexHandle = this._data.acquirePath(`self.displays.${displayId}.screenIndex`, 'default');
+    this.selectedScreenIndexRelease = screenIndexHandle.release;
+    this.selectedScreenIndexSub = screenIndexHandle.data$
       .pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe(update => {
         const nextValue = update.data.value;
@@ -208,5 +220,10 @@ export class RemoteControlComponent {
       console.error('Failed to set active screen: request was not accepted');
       this.activeScreenIdx.set(previous);
     }
+  }
+
+  ngOnDestroy(): void {
+    this.selectedDisplayRelease?.();
+    this.selectedScreenIndexRelease?.();
   }
 }
