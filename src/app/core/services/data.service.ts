@@ -876,25 +876,44 @@ export class DataService implements OnDestroy {
   }
 
   /**
-   * Set the value of a path to null and state to Normal. This is used to
-   * timeout a path value and reset it to null. This is useful for widgets
-   * that need to know if a path has timed out.
+   * Reset a path's registrations after a widget's data TTL fired for `source`.
    *
-   * Only the registration matching `source` is reset: one source timing out
-   * must not null a sibling widget bound to a different, still-live source of
-   * the same path (e.g. redundant GPS or wind sensors).
+   * The timed-out source's own registration is always deep-reset — its value nulled on the upstream
+   * subjects (see {@link resetRegistrationValue}) so a later notification cannot resurface it.
+   *
+   * The path's OTHER registrations — its sibling sources and the shared `default` bucket — are
+   * cross-cleared only when the path has gone all-silent: nothing has fed it within `dataTimeoutMs`.
+   * While any source is still delivering deltas, its receipt in `_lastObservedByPath` keeps the path
+   * live and the cross-clear is skipped, so a redundant sensor (a second GPS or wind source) is never
+   * blanked by a peer's timeout. The all-silent case is what lets a widget with its own timeout
+   * disabled — which never calls this itself — still clear once every source behind its path has
+   * stopped, instead of holding a frozen, plausible-looking last reading.
+   *
+   * Only the timing-out TRIGGER's `pathType` is whitelisted; cross-clear targets are reset regardless
+   * of their own type, so a boolean sibling can still be cleared.
    *
    * @param {string} path The Signal K path to timeout
-   * @param {string} source The source whose stream timed out; only its registration is reset
-   * @param {string} pathType The type of the path value (string, Date, number, multiple, etc)
+   * @param {string} source The source whose stream timed out; always deep-reset
+   * @param {string} pathType The type of the timing-out source's value (string, Date, number, multiple, etc)
+   * @param {number} dataTimeoutMs The timing-out widget's TTL window in ms; the path counts as
+   *   all-silent (and its siblings/default get cross-cleared) when nothing has fed it within it.
    * @memberof SignalKDataService
    */
-  public timeoutPathObservable(path: string, source: string, pathType: string): void {
+  public timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
     if (!['string', 'Date', 'number', 'multiple'].includes(pathType)) return;
     const registrations = this._pathRegisterByPath.get(path);
     if (!registrations) return;
-    for (const registration of registrations) {
-      if (registration.source !== source) continue;
+
+    const direct = registrations.find(registration => registration.source === source);
+    if (direct) {
+      this.resetRegistrationValue(direct);
+    }
+
+    const lastObserved = this._lastObservedByPath.get(path);
+    const allSilent = lastObserved === undefined || Date.now() - lastObserved >= dataTimeoutMs;
+    if (!allSilent) return;
+
+    for (const registration of registrations.filter(registration => registration.source !== source)) {
       this.resetRegistrationValue(registration);
     }
   }

@@ -177,7 +177,7 @@ export class WidgetStreamsDirective implements OnDestroy {
           each: dataTimeout,
           with: () => throwError(() => {
             console.log(timeoutErrorMsg + normalizedPath);
-            this.dataService.timeoutPathObservable(normalizedPath, effectiveSource, pathType);
+            this.dataService.timeoutPathObservable(normalizedPath, effectiveSource, pathType, dataTimeout);
           })
         }),
         retryWhen(error => error.pipe(

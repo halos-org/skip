@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IMeta, IPathValueData, IPathMetaData } from '../interfaces/app-interfaces';
 import { ISignalKDataValueUpdate, ISkMetadata, States } from '../interfaces/signalk-interfaces';
 import { DataService, IPathUpdate, IPathUpdateWithPath } from './data.service';
@@ -36,6 +36,11 @@ describe('DataService', () => {
     });
 
     service = TestBed.inject(DataService);
+  });
+
+  afterEach(() => {
+    // Recency-dependent timeout tests fake the clock; always restore so real-time tests are unaffected.
+    vi.useRealTimers();
   });
 
   it('should be created', () => {
@@ -626,7 +631,7 @@ describe('DataService', () => {
     });
     expect(latest!.data.value).toBe(5.5);
 
-    service.timeoutPathObservable('self.environment.wind.speedApparent', 'default', 'number');
+    service.timeoutPathObservable('self.environment.wind.speedApparent', 'default', 'number', 5000);
 
     expect(latest!.data.value).toBeNull();
     expect(latest!.data.timestamp).toBeNull();
@@ -648,7 +653,7 @@ describe('DataService', () => {
     });
     expect(latest!.data.value).toBe(5.5);
 
-    service.timeoutPathObservable('self.environment.wind.speedApparent', 'default', 'number');
+    service.timeoutPathObservable('self.environment.wind.speedApparent', 'default', 'number', 5000);
     expect(latest!.data.value).toBeNull();
 
     // A later notification re-pushes state onto every registration of the path. A shallow reset
@@ -702,8 +707,9 @@ describe('DataService', () => {
     expect(latestDefault!.data.value).toBe(13.0);
 
     // Only test-source-a's stream timed out; its live siblings (test-source-b and
-    // the default bucket, still fed by test-source-b) must be left untouched.
-    service.timeoutPathObservable('self.electrical.batteries.10.voltage', 'test-source-a', 'number');
+    // the default bucket, still fed by test-source-b) must be left untouched. The path was fed
+    // moments ago (real clock), so the liveness gate treats it as live and skips the cross-clear.
+    service.timeoutPathObservable('self.electrical.batteries.10.voltage', 'test-source-a', 'number', 5000);
 
     expect(latestSourceA!.data.value).toBeNull();
     expect(latestSourceA!.state).toBe(States.Normal);
@@ -718,10 +724,132 @@ describe('DataService', () => {
       .subscribe(update => updates.push(update));
 
     const countBefore = updates.length;
-    service.timeoutPathObservable('self.navigation.position', 'default', 'object');
+    service.timeoutPathObservable('self.navigation.position', 'default', 'object', 5000);
 
     expect(updates.length).toBe(countBefore);
     expect(updates.every(update => update !== undefined)).toBe(true);
+  });
+
+  describe('timeout liveness-gated cross-clear (#254)', () => {
+    const VOLTAGE = 'self.electrical.batteries.10.voltage';
+    const TTL_MS = 5000;
+
+    function feed(source: string, value: number | boolean): void {
+      dataPathUpdates$.next({
+        context: 'self',
+        path: 'electrical.batteries.10.voltage',
+        source,
+        timestamp: '2026-01-01T00:00:01.000Z',
+        value,
+      });
+    }
+
+    it('skips the sibling cross-clear while a source fed the path within the TTL window (preserves #252)', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+
+      let latestDefault: IPathUpdate | undefined;
+      let latestA: IPathUpdate | undefined;
+      let latestB: IPathUpdate | undefined;
+      service.subscribePath(VOLTAGE, 'default').subscribe(u => (latestDefault = u));
+      service.subscribePath(VOLTAGE, 'source-a').subscribe(u => (latestA = u));
+      service.subscribePath(VOLTAGE, 'source-b').subscribe(u => (latestB = u));
+
+      feed('source-a', 12.5);
+      feed('source-b', 13.0);
+      expect(latestA!.data.value).toBe(12.5);
+      expect(latestB!.data.value).toBe(13.0);
+      expect(latestDefault!.data.value).toBe(13.0);
+
+      // source-b fed the path 4.999 s ago — still inside the 5 s window, so the path is "live".
+      vi.setSystemTime(TTL_MS - 1);
+      service.timeoutPathObservable(VOLTAGE, 'source-a', 'number', TTL_MS);
+
+      // Only the timed-out source is reset; the live sibling and the default bucket are untouched.
+      expect(latestA!.data.value).toBeNull();
+      expect(latestB!.data.value).toBe(13.0);
+      expect(latestDefault!.data.value).toBe(13.0);
+    });
+
+    it('cross-clears sibling sources and the default bucket once the path has gone all-silent', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+
+      let latestDefault: IPathUpdate | undefined;
+      let latestA: IPathUpdate | undefined;
+      let latestB: IPathUpdate | undefined;
+      service.subscribePath(VOLTAGE, 'default').subscribe(u => (latestDefault = u));
+      service.subscribePath(VOLTAGE, 'source-a').subscribe(u => (latestA = u));
+      service.subscribePath(VOLTAGE, 'source-b').subscribe(u => (latestB = u));
+
+      feed('source-a', 12.5);
+      feed('source-b', 13.0);
+
+      // Nothing has fed the path for the full TTL window: every source is silent.
+      vi.setSystemTime(TTL_MS);
+      service.timeoutPathObservable(VOLTAGE, 'source-a', 'number', TTL_MS);
+
+      expect(latestA!.data.value).toBeNull();
+      expect(latestB!.data.value).toBeNull();
+      expect(latestDefault!.data.value).toBeNull();
+    });
+
+    it('cross-clears an enableTimeout:false sibling (which never times out itself) when the path is all-silent', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+
+      // A widget-boolean-switch / autopilot ships enableTimeout:false and reads the shared default
+      // bucket, so it never calls timeoutPathObservable. A sensor widget on a specific source of the
+      // same path does have a TTL. When that source times out all-silent, the frozen switch reading
+      // (a plausible-but-stale hazard) must still be cleared.
+      let latestSwitch: IPathUpdate | undefined;
+      let latestSensor: IPathUpdate | undefined;
+      service.subscribePath(VOLTAGE, 'default').subscribe(u => (latestSwitch = u));
+      service.subscribePath(VOLTAGE, 'sensor-a').subscribe(u => (latestSensor = u));
+
+      feed('sensor-a', true);
+      expect(latestSwitch!.data.value).toBe(true);
+      expect(latestSensor!.data.value).toBe(true);
+
+      vi.setSystemTime(TTL_MS);
+      // The sensor's whitelisted pathType ('number') admits the call; the target switch registration
+      // is reached and reset regardless of its own (boolean) value type.
+      service.timeoutPathObservable(VOLTAGE, 'sensor-a', 'number', TTL_MS);
+
+      expect(latestSensor!.data.value).toBeNull();
+      expect(latestSwitch!.data.value).toBeNull();
+    });
+
+    it('keeps a cross-cleared sibling cleared when a later notification changes the path state', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+
+      let latestDefault: IPathUpdate | undefined;
+      service.subscribePath(VOLTAGE, 'default').subscribe(u => (latestDefault = u));
+      service.subscribePath(VOLTAGE, 'source-a').subscribe();
+
+      feed('source-a', 13.0);
+      expect(latestDefault!.data.value).toBe(13.0);
+
+      vi.setSystemTime(TTL_MS);
+      service.timeoutPathObservable(VOLTAGE, 'source-a', 'number', TTL_MS);
+      expect(latestDefault!.data.value).toBeNull();
+
+      // The deep upstream reset must survive a later notification state change on the path: the
+      // state advances but the cross-cleared value must not resurface.
+      notificationUpdates$.next({
+        path: 'notifications.electrical.batteries.10.voltage',
+        value: {
+          method: ['visual'],
+          state: States.Alarm,
+          message: 'Low voltage',
+          timestamp: '2026-01-01T00:00:03.000Z',
+        },
+      });
+
+      expect(latestDefault!.data.value).toBeNull();
+      expect(latestDefault!.state).toBe(States.Alarm);
+    });
   });
 
   it('derives path type from meta units when meta precedes the value', () => {
