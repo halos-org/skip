@@ -36,8 +36,15 @@ import { UnitsService } from '../../core/services/units.service';
 import { CanvasService } from '../../core/services/canvas.service';
 import type { ITheme } from '../../core/services/app-service';
 import type { IDatasetServiceDatapoint } from '../../core/interfaces/dataset.interfaces';
+import type { IPathArray } from '../../core/interfaces/widgets-interface';
 
 const themeMock = new Proxy({}, { get: () => '#000000' }) as unknown as ITheme;
+
+// The merged config the widget runtime hands the component always carries the record-form `paths`
+// (from DEFAULT_CONFIG or a user override). The runtime directive is mocked here, so the spec has to
+// supply that record explicitly — a bare `{ timeScale, color }` would gate out both series.
+const cloneDefaultPaths = (): IPathArray =>
+  structuredClone(WidgetWindTrendsChartComponent.DEFAULT_CONFIG.paths) as IPathArray;
 
 describe('WidgetWindTrendsChartComponent', () => {
   let fixture: ComponentFixture<WidgetWindTrendsChartComponent>;
@@ -48,8 +55,8 @@ describe('WidgetWindTrendsChartComponent', () => {
   const canvasMock = { registerCanvas: vi.fn(), releaseCanvas: vi.fn(), unregisterCanvas: vi.fn() };
   const breakpointMock = { observe: vi.fn().mockReturnValue(of({ matches: false, breakpoints: {} })) };
 
-  const setup = async (timeScale = 'Last 30 Minutes'): Promise<void> => {
-    runtimeMock.options.mockReturnValue({ timeScale, color: 'contrast' });
+  const setup = async (timeScale = 'Last 30 Minutes', paths: IPathArray = cloneDefaultPaths()): Promise<void> => {
+    runtimeMock.options.mockReturnValue({ timeScale, color: 'contrast', paths });
 
     await TestBed.configureTestingModule({
       imports: [WidgetWindTrendsChartComponent],
@@ -69,6 +76,13 @@ describe('WidgetWindTrendsChartComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
+  };
+
+  // The "Data acquisition…" overlay's readiness gate is internal to the chart plugin; isChartReady is
+  // its testable seam. Reads the component's live chart (both share the same datasets reference).
+  const readiness = (): boolean => {
+    const probe = fixture.componentInstance as unknown as { chart: unknown; isChartReady(chart: unknown): boolean };
+    return probe.isChartReady(probe.chart);
   };
 
   beforeEach(() => {
@@ -124,5 +138,130 @@ describe('WidgetWindTrendsChartComponent', () => {
       { timestamp: 2000, data: { value: 350, sma: 340, lastAverage: 345, lastMinimum: 10, lastMaximum: 350 } }
     ];
     expect(() => { dir.next(batch); spd.next(batch); }).not.toThrow();
+  });
+
+  it('opens the History streams on the user-configured direction and speed paths', async () => {
+    const paths = cloneDefaultPaths();
+    paths.trueWindDirection.path = 'self.environment.wind.directionMagnetic';
+    paths.trueWindDirection.source = 'vane1';
+    paths.trueWindSpeed.path = 'self.navigation.speedOverGround';
+    paths.trueWindSpeed.source = 'gps2';
+
+    await setup('Last 30 Minutes', paths);
+
+    expect(historyMock.getBackfillThenLive).toHaveBeenCalledTimes(2);
+    const calls = historyMock.getBackfillThenLive.mock.calls.map(c => ({ path: c[0].path, source: c[0].source }));
+    expect(calls).toContainEqual({ path: 'self.environment.wind.directionMagnetic', source: 'vane1' });
+    expect(calls).toContainEqual({ path: 'self.navigation.speedOverGround', source: 'gps2' });
+  });
+
+  it('opens the direction stream only when the speed slot path is cleared', async () => {
+    const paths = cloneDefaultPaths();
+    paths.trueWindSpeed.path = null;
+
+    await setup('Last 30 Minutes', paths);
+
+    expect(historyMock.getBackfillThenLive).toHaveBeenCalledTimes(1);
+    expect(historyMock.getBackfillThenLive.mock.calls[0][0].path).toBe('self.environment.wind.directionTrue');
+  });
+
+  it('opens the speed stream only when the direction slot path is cleared, and renders it', async () => {
+    const spd = new Subject();
+    historyMock.getBackfillThenLive.mockReturnValueOnce(spd);
+    const paths = cloneDefaultPaths();
+    paths.trueWindDirection.path = null;
+
+    await setup('Last 30 Minutes', paths);
+
+    expect(historyMock.getBackfillThenLive).toHaveBeenCalledTimes(1);
+    expect(historyMock.getBackfillThenLive.mock.calls[0][0].path).toBe('self.environment.wind.speedTrue');
+
+    const batch: IDatasetServiceDatapoint[] = [
+      { timestamp: 1000, data: { value: 5, sma: 5, lastAverage: 5, lastMinimum: 5, lastMaximum: 5 } },
+      { timestamp: 2000, data: { value: 7, sma: 6, lastAverage: 6, lastMinimum: 5, lastMaximum: 7 } }
+    ];
+    expect(() => spd.next(batch)).not.toThrow();
+  });
+
+  it('rebuilds the streams when a slot path changes after the initial render', async () => {
+    await setup('Last 30 Minutes');
+    expect(historyMock.getBackfillThenLive).toHaveBeenCalledTimes(2);
+
+    const nextPaths = cloneDefaultPaths();
+    nextPaths.trueWindSpeed.path = 'self.navigation.speedOverGround';
+    runtimeMock.options.mockReturnValue({ timeScale: 'Last 30 Minutes', color: 'contrast', paths: nextPaths });
+
+    // The runtime directive is a plain mock (options() is not a signal), so drive the rebuild effect
+    // by changing a tracked input (theme); in the real app the merged-config signal re-fires directly.
+    const nextTheme = new Proxy({}, { get: () => '#111111' }) as unknown as ITheme;
+    fixture.componentRef.setInput('theme', nextTheme);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const streamedPaths = historyMock.getBackfillThenLive.mock.calls.map(c => c[0].path);
+    expect(streamedPaths).toContain('self.navigation.speedOverGround');
+    expect(historyMock.getBackfillThenLive.mock.calls.length).toBeGreaterThan(2);
+  });
+
+  it('clears the loading overlay once the only active series (direction) has data', async () => {
+    const dir = new Subject();
+    historyMock.getBackfillThenLive.mockReturnValueOnce(dir);
+    const paths = cloneDefaultPaths();
+    paths.trueWindSpeed.path = '';
+    await setup('Last 30 Minutes', paths);
+
+    expect(readiness()).toBe(false);
+    dir.next([
+      { timestamp: 1000, data: { value: 10, sma: 10, lastAverage: 10, lastMinimum: 10, lastMaximum: 10 } },
+      { timestamp: 2000, data: { value: 20, sma: 15, lastAverage: 15, lastMinimum: 10, lastMaximum: 20 } }
+    ]);
+    expect(readiness()).toBe(true);
+  });
+
+  it('clears the loading overlay once the only active series (speed) has data', async () => {
+    const spd = new Subject();
+    historyMock.getBackfillThenLive.mockReturnValueOnce(spd);
+    const paths = cloneDefaultPaths();
+    paths.trueWindDirection.path = '';
+    await setup('Last 30 Minutes', paths);
+
+    expect(readiness()).toBe(false);
+    spd.next([
+      { timestamp: 1000, data: { value: 5, sma: 5, lastAverage: 5, lastMinimum: 5, lastMaximum: 5 } },
+      { timestamp: 2000, data: { value: 7, sma: 6, lastAverage: 6, lastMinimum: 5, lastMaximum: 7 } }
+    ]);
+    expect(readiness()).toBe(true);
+  });
+
+  it('keeps the loading overlay when both slots are cleared (nothing configured)', async () => {
+    const paths = cloneDefaultPaths();
+    paths.trueWindDirection.path = '';
+    paths.trueWindSpeed.path = '';
+    await setup('Last 30 Minutes', paths);
+
+    expect(historyMock.getBackfillThenLive).not.toHaveBeenCalled();
+    expect(readiness()).toBe(false);
+  });
+
+  it('keeps the loading overlay until both configured series have data', async () => {
+    const dir = new Subject();
+    const spd = new Subject();
+    historyMock.getBackfillThenLive
+      .mockReturnValueOnce(dir)
+      .mockReturnValueOnce(spd);
+    await setup('Last 30 Minutes');
+
+    dir.next([
+      { timestamp: 1000, data: { value: 10, sma: 10, lastAverage: 10, lastMinimum: 10, lastMaximum: 10 } },
+      { timestamp: 2000, data: { value: 20, sma: 15, lastAverage: 15, lastMinimum: 10, lastMaximum: 20 } }
+    ]);
+    expect(readiness()).toBe(false);
+
+    spd.next([
+      { timestamp: 1000, data: { value: 5, sma: 5, lastAverage: 5, lastMinimum: 5, lastMaximum: 5 } },
+      { timestamp: 2000, data: { value: 7, sma: 6, lastAverage: 6, lastMinimum: 5, lastMaximum: 7 } }
+    ]);
+    expect(readiness()).toBe(true);
   });
 });

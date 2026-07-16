@@ -3,12 +3,43 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardHistorySeriesSyncService } from './dashboard-history-series-sync.service';
 import { IKipSeriesDefinition } from '../contracts/kip-series-contract';
-import { IWidget } from '../interfaces/widgets-interface';
+import { IWidget, IWidgetPath, IWidgetSvcConfig } from '../interfaces/widgets-interface';
 import { WidgetService } from './widget.service';
 
 function seriesIds(series: IKipSeriesDefinition[]): string[] {
     return series.map(item => item.seriesId).sort();
 }
+
+// Mirrors the two configurable slots the widget's DEFAULT_CONFIG ships. resolveWidgetConfig merges
+// these into a windtrends widget config that lacks its own paths, so the default mapping still
+// resolves the shipped TWD/TWS paths.
+const WIND_DIRECTION_SLOT: IWidgetPath = {
+    description: 'True Wind Direction',
+    path: 'self.environment.wind.directionTrue',
+    source: 'default',
+    pathType: 'number',
+    isPathConfigurable: true,
+    pathRequired: false,
+    sampleTime: 1000,
+};
+const WIND_SPEED_SLOT: IWidgetPath = {
+    description: 'True Wind Speed',
+    path: 'self.environment.wind.speedTrue',
+    source: 'default',
+    pathType: 'number',
+    isPathConfigurable: true,
+    pathRequired: false,
+    sampleTime: 1000,
+};
+const WINDTRENDS_DEFAULT_CONFIG: IWidgetSvcConfig = {
+    filterSelfPaths: true,
+    color: 'contrast',
+    timeScale: 'Last 30 Minutes',
+    paths: {
+        trueWindDirection: WIND_DIRECTION_SLOT,
+        trueWindSpeed: WIND_SPEED_SLOT,
+    },
+};
 
 describe('DashboardHistorySeriesSyncService', () => {
     let widgetServiceMock: {
@@ -17,7 +48,9 @@ describe('DashboardHistorySeriesSyncService', () => {
 
     beforeEach(() => {
         widgetServiceMock = {
-            getDefaultConfig: vi.fn().mockReturnValue(undefined)
+            getDefaultConfig: vi.fn().mockImplementation((selector: string) =>
+                selector === 'widget-windtrends-chart' ? structuredClone(WINDTRENDS_DEFAULT_CONFIG) : undefined
+            )
         };
 
         TestBed.configureTestingModule({
@@ -69,6 +102,47 @@ describe('DashboardHistorySeriesSyncService', () => {
         const windByPath = Object.fromEntries(windSeries.map(s => [s.seriesId, s.path]));
         expect(windByPath['widget-wind-1:wind-direction']).toBe('self.environment.wind.directionTrue');
         expect(windByPath['widget-wind-1:wind-speed']).toBe('self.environment.wind.speedTrue');
+    });
+
+    it('maps the wind trends speed series from a configured slot path and source', () => {
+        const service = TestBed.inject(DashboardHistorySeriesSyncService);
+        const widget: IWidget = {
+            uuid: 'widget-wind-cfg',
+            type: 'widget-windtrends-chart',
+            config: {
+                timeScale: 'Last 30 Minutes',
+                paths: {
+                    trueWindDirection: { ...WIND_DIRECTION_SLOT },
+                    trueWindSpeed: { ...WIND_SPEED_SLOT, path: 'self.navigation.speedOverGround', source: 'gps1' },
+                },
+            },
+        };
+
+        const series = service.resolveSeriesForWidget(widget);
+        const byId = Object.fromEntries(series.map(s => [s.seriesId, s]));
+        expect(byId['widget-wind-cfg:wind-speed']).toMatchObject({
+            path: 'self.navigation.speedOverGround',
+            source: 'gps1',
+        });
+        expect(byId['widget-wind-cfg:wind-direction'].path).toBe('self.environment.wind.directionTrue');
+    });
+
+    it('omits the wind trends speed series when its slot path is cleared', () => {
+        const service = TestBed.inject(DashboardHistorySeriesSyncService);
+        const widget: IWidget = {
+            uuid: 'widget-wind-nil',
+            type: 'widget-windtrends-chart',
+            config: {
+                timeScale: 'Last 30 Minutes',
+                paths: {
+                    trueWindDirection: { ...WIND_DIRECTION_SLOT },
+                    trueWindSpeed: { ...WIND_SPEED_SLOT, path: null },
+                },
+            },
+        };
+
+        const series = service.resolveSeriesForWidget(widget);
+        expect(series.map(s => s.seriesId)).toEqual(['widget-wind-nil:wind-direction']);
     });
 
     it('resolves widget-bms as an unexpanded battery template series (the dialog expands concretes)', () => {
