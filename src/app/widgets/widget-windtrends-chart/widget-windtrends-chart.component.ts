@@ -1,7 +1,7 @@
 import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, Signal, ChangeDetectionStrategy } from '@angular/core';
 import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+import { IWidgetSvcConfig, IWidgetPath } from '../../core/interfaces/widgets-interface';
 import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
 import { IDatasetServiceDatapoint } from '../../core/interfaces/dataset.interfaces';
 import { resolveWindowMs, deriveDataSourceInfo, IChartDataSourceInfo } from '../../core/utils/chart-window.util';
@@ -18,10 +18,8 @@ import { registerChartComponents } from '../../core/utils/chart-registration.uti
 
 registerChartComponents();
 
-/** Windtrends plots two fixed wind paths (direction + speed) over the widget's configured window. */
+/** Rolling-window period (in the widget's time-scale units) the trend backfill/live streams span. */
 const WINDTRENDS_PERIOD = 30;
-const WINDTRENDS_TWD_PATH = 'self.environment.wind.directionTrue';
-const WINDTRENDS_TWS_PATH = 'self.environment.wind.speedTrue';
 
 interface IChartColors {
   valueLine: string | null,
@@ -55,7 +53,38 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     filterSelfPaths: true,
     color: 'contrast',
-    timeScale: 'Last 30 Minutes'
+    timeScale: 'Last 30 Minutes',
+    // The axes are fixed to degrees (TWD) / knots (TWS) and the widget hardcodes those conversions,
+    // so the slots hide the unit-filter and Format dropdowns (showPathSkUnitsFilter/showConvertUnitTo
+    // false) — a picker there would be inert and misleading; only path and source are configurable.
+    paths: {
+      trueWindDirection: {
+        description: 'True Wind Direction',
+        path: 'self.environment.wind.directionTrue',
+        source: 'default',
+        pathType: 'number',
+        isPathConfigurable: true,
+        pathRequired: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad',
+        convertUnitTo: 'deg',
+        showConvertUnitTo: false,
+        sampleTime: 1000
+      },
+      trueWindSpeed: {
+        description: 'True Wind Speed',
+        path: 'self.environment.wind.speedTrue',
+        source: 'default',
+        pathType: 'number',
+        isPathConfigurable: true,
+        pathRequired: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s',
+        convertUnitTo: 'knots',
+        showConvertUnitTo: false,
+        sampleTime: 1000
+      }
+    }
   };
   private readonly ngZone = inject(NgZone);
   private readonly historyStream = inject(HistoryChartStreamService);
@@ -89,6 +118,12 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   /** Pending coalesced chart recompute+repaint frame id (one per animation frame across both streams). */
   private _chartUpdateRafId: number | null = null;
   private timeScale: TimeScaleFormat | null = null;
+  /** Signature of the last inputs a full rebuild was performed for (see computeRebuildSignature). */
+  private previousRebuildSignature: string | undefined = undefined;
+  /** Whether each series has a configured (non-empty) path, i.e. is expected to stream. Set by
+   * startStreaming and read by the overlay-readiness gate so a cleared slot is not awaited forever. */
+  private dirSeriesActive = false;
+  private spdSeriesActive = false;
   private dataSourceInfo: IChartDataSourceInfo | null = null;
   private xCenter: number | null = null;
   private xStep: number | null = null;
@@ -145,9 +180,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       const optScales = chart.options?.scales as Record<string, { min?: number; max?: number }> | undefined;
 
       // Loading overlay flag; do not skip drawings so all lines are visible on load
-      const dirVals = chart.data?.datasets?.[0]?.data as (IDataSetRow[] | undefined);
-      const spdVals = chart.data?.datasets?.[5]?.data as (IDataSetRow[] | undefined);
-      const ready = (dirVals?.length ?? 0) >= 2 && (spdVals?.length ?? 0) >= 2;
+      const ready = this.isChartReady(chart);
 
       const drawForAxis = (axisKey: 'x' | 'xSpeed', format: (v: number) => string) => {
         const scale = scaleMap?.[axisKey] as (Scale | undefined);
@@ -324,15 +357,15 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       });
     });
 
-    // Config lifecycle (timeScale or color): recreate datasets when timeScale changes
+    // Config lifecycle: rebuild the streams + datasets when the time scale or either series'
+    // path/source changes; a color-only edit leaves the signature unchanged and just refreshes options.
     effect(() => {
       const cfg = this.runtime?.options();
       if (!cfg) return;
-      const needsRebuild = this.timeScale !== cfg.timeScale;
-      if (needsRebuild) {
+      const signature = this.computeRebuildSignature(cfg);
+      if (signature !== this.previousRebuildSignature) {
         this.startWidget();
       } else if (this.chart) {
-        // color-only change already handled above, but ensure labels updated
         this.setChartOptions();
       }
     });
@@ -344,6 +377,9 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     if (!widgetDataChartRef) return;
     const cfg = this.runtime?.options();
     if (!cfg || !cfg.timeScale) return;
+    // Commit the signature only once the canvas is ready and the build proceeds, so a pre-canvas
+    // effect run cannot mark it seen and suppress the real first build.
+    this.previousRebuildSignature = this.computeRebuildSignature(cfg);
     const timeScale = cfg.timeScale as TimeScaleFormat;
     this.timeScale = timeScale;
     this.dataSourceInfo = deriveDataSourceInfo(resolveWindowMs(timeScale, WINDTRENDS_PERIOD));
@@ -716,49 +752,92 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     this.setDatasetsColors();
   }
 
+  /** Read a single configurable path slot from the merged config, tolerating the array path form. */
+  private windPathSlot(cfg: IWidgetSvcConfig | undefined, slot: string): IWidgetPath | undefined {
+    const paths = cfg?.paths;
+    if (!paths || Array.isArray(paths)) return undefined;
+    return paths[slot];
+  }
+
+  /** Signature over the inputs that require a full stream/dataset rebuild (time scale + both series). */
+  private computeRebuildSignature(cfg: IWidgetSvcConfig): string {
+    const dir = this.windPathSlot(cfg, 'trueWindDirection');
+    const spd = this.windPathSlot(cfg, 'trueWindSpeed');
+    return [cfg.timeScale, dir?.path, dir?.source, spd?.path, spd?.source].join('|');
+  }
+
+  /**
+   * Whether the loading overlay can clear: every *configured* series must have enough points. A
+   * cleared slot (per-series stream gating) is not awaited — otherwise its empty datasets would hold
+   * the overlay up forever. With no series configured at all, stay in the acquiring state.
+   */
+  private isChartReady(chart: Chart): boolean {
+    const dirVals = chart.data?.datasets?.[0]?.data as (IDataSetRow[] | undefined);
+    const spdVals = chart.data?.datasets?.[5]?.data as (IDataSetRow[] | undefined);
+    const dirReady = !this.dirSeriesActive || (dirVals?.length ?? 0) >= 2;
+    const spdReady = !this.spdSeriesActive || (spdVals?.length ?? 0) >= 2;
+    return (this.dirSeriesActive || this.spdSeriesActive) && dirReady && spdReady;
+  }
+
   private startStreaming(): void {
     this._dsDirectionSub?.unsubscribe();
     this._dsSpeedSub?.unsubscribe();
+    this._dsDirectionSub = null;
+    this._dsSpeedSub = null;
 
     const timeScale = this.timeScale;
     const info = this.dataSourceInfo;
-    if (!timeScale || !info) return;
+    const cfg = this.runtime?.options();
+    if (!timeScale || !info || !cfg) return;
     const baseParams = {
-      source: 'default',
       windowMs: resolveWindowMs(timeScale, WINDTRENDS_PERIOD),
       sampleTime: info.sampleTime,
       maxDataPoints: info.maxDataPoints,
       smoothingPeriod: info.smoothingPeriod
     };
-    // TWD is a direction path; the History engine auto-resolves its circular domain from the unit.
-    const twdParams: IHistoryChartStreamParams = { ...baseParams, path: WINDTRENDS_TWD_PATH };
-    const twsParams: IHistoryChartStreamParams = { ...baseParams, path: WINDTRENDS_TWS_PATH };
 
-    this._dsDirectionSub = this.historyStream.getBackfillThenLive(twdParams).subscribe(emission => {
-      if (isHistoryUnavailable(emission)) return;
-      if (Array.isArray(emission)) {
-        this.pushRowsToDatasets(emission);
-      } else {
-        this.pushRowsToDatasets([emission]);
-        if (this.chart.data.datasets[0].data.length > info.maxDataPoints) {
-          for (let i = 0; i <= 4; i++) this.chart.data.datasets[i].data.shift();
-        }
-      }
-      this.scheduleChartUpdate();
-    });
+    // Each series subscribes independently on its own configured path. pathRequired is false, so a
+    // user can clear one slot; gating per series keeps the other one rendering rather than tearing
+    // down the whole chart. Source falls back to the SK default when the slot leaves it unset.
+    const dir = this.windPathSlot(cfg, 'trueWindDirection');
+    const dirPath = dir?.path;
+    const spd = this.windPathSlot(cfg, 'trueWindSpeed');
+    const spdPath = spd?.path;
+    this.dirSeriesActive = !!dirPath;
+    this.spdSeriesActive = !!spdPath;
 
-    this._dsSpeedSub = this.historyStream.getBackfillThenLive(twsParams).subscribe(emission => {
-      if (isHistoryUnavailable(emission)) return;
-      if (Array.isArray(emission)) {
-        this.pushRowsToSpeedDatasets(emission);
-      } else {
-        this.pushRowsToSpeedDatasets([emission]);
-        if (this.chart.data.datasets[5].data.length > info.maxDataPoints) {
-          for (let i = 5; i <= 9; i++) this.chart.data.datasets[i].data.shift();
+    if (dirPath) {
+      // TWD is a direction path; the History engine auto-resolves its circular domain from the unit.
+      const twdParams: IHistoryChartStreamParams = { ...baseParams, path: dirPath, source: dir?.source ?? 'default' };
+      this._dsDirectionSub = this.historyStream.getBackfillThenLive(twdParams).subscribe(emission => {
+        if (isHistoryUnavailable(emission)) return;
+        if (Array.isArray(emission)) {
+          this.pushRowsToDatasets(emission);
+        } else {
+          this.pushRowsToDatasets([emission]);
+          if (this.chart.data.datasets[0].data.length > info.maxDataPoints) {
+            for (let i = 0; i <= 4; i++) this.chart.data.datasets[i].data.shift();
+          }
         }
-      }
-      this.scheduleChartUpdate();
-    });
+        this.scheduleChartUpdate();
+      });
+    }
+
+    if (spdPath) {
+      const twsParams: IHistoryChartStreamParams = { ...baseParams, path: spdPath, source: spd?.source ?? 'default' };
+      this._dsSpeedSub = this.historyStream.getBackfillThenLive(twsParams).subscribe(emission => {
+        if (isHistoryUnavailable(emission)) return;
+        if (Array.isArray(emission)) {
+          this.pushRowsToSpeedDatasets(emission);
+        } else {
+          this.pushRowsToSpeedDatasets([emission]);
+          if (this.chart.data.datasets[5].data.length > info.maxDataPoints) {
+            for (let i = 5; i <= 9; i++) this.chart.data.datasets[i].data.shift();
+          }
+        }
+        this.scheduleChartUpdate();
+      });
+    }
   }
 
   private unwrapAngles(degrees: (number | null)[]): (number | null)[] {
@@ -953,10 +1032,12 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       this.xStepSpeed = spStep;
     }
 
-    // Fixed, non-scrolling y-axis window (relative age)
+    // Fixed, non-scrolling y-axis window (relative age). Gate on either series so a cleared
+    // direction slot still lets the speed series recompute its age-based y positions.
     const windowMs = this.getWindowMs(this.timeScale);
-    const data0 = this.chart.data.datasets[0].data as (IDataSetRow[]);
-    if (data0.length > 0) {
+    const dirData = this.chart.data.datasets[0].data as (IDataSetRow[]);
+    const speedData = this.chart.data.datasets[5].data as (IDataSetRow[]);
+    if (dirData.length > 0 || speedData.length > 0) {
       const nowTs = Date.now();
       // Recompute y for all datasets as age (ms) relative to now
       this.chart.data.datasets.forEach(ds => {

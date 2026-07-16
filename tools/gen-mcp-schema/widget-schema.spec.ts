@@ -23,8 +23,20 @@ describe('extractWidgetSchemas', () => {
     expect(bySelector('widget-boolean-switch')?.bindingKind).toBe('paths-array');
     expect(bySelector('widget-zones-state-panel')?.bindingKind).toBe('paths-array');
     expect(bySelector('widget-data-chart')?.bindingKind).toBe('datachart');
-    expect(bySelector('widget-windtrends-chart')?.bindingKind).toBe('none');
+    expect(bySelector('widget-windtrends-chart')?.bindingKind).toBe('paths-record');
     expect(bySelector('widget-bms')?.bindingKind).toBe('none');
+  });
+
+  it('captures the windtrends configurable wind slots', () => {
+    const slots = bySelector('widget-windtrends-chart')?.pathSlots ?? [];
+    expect(slots.map((s) => s.slot)).toEqual(['trueWindDirection', 'trueWindSpeed']);
+    expect(slots.find((s) => s.slot === 'trueWindSpeed')).toMatchObject({
+      defaultPath: 'self.environment.wind.speedTrue',
+      expectedSkUnit: 'm/s',
+      defaultConvertUnitTo: 'knots',
+      isPathConfigurable: true,
+      pathRequired: false,
+    });
   });
 
   it('extracts path slots for a record-bound widget (numeric)', () => {

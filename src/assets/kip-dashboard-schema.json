@@ -3009,12 +3009,40 @@
       "selector": "widget-wind-steer"
     },
     {
-      "bindingKind": "none",
+      "bindingKind": "paths-record",
       "category": "Racing",
       "componentClassName": "WidgetWindTrendsChartComponent",
       "defaultConfig": {
         "color": "contrast",
         "filterSelfPaths": true,
+        "paths": {
+          "trueWindDirection": {
+            "convertUnitTo": "deg",
+            "description": "True Wind Direction",
+            "isPathConfigurable": true,
+            "path": "self.environment.wind.directionTrue",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "rad",
+            "pathType": "number",
+            "sampleTime": 1000,
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
+          "trueWindSpeed": {
+            "convertUnitTo": "knots",
+            "description": "True Wind Speed",
+            "isPathConfigurable": true,
+            "path": "self.environment.wind.speedTrue",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "m/s",
+            "pathType": "number",
+            "sampleTime": 1000,
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          }
+        },
         "timeScale": "Last 30 Minutes"
       },
       "defaultHeight": 8,
@@ -3024,7 +3052,32 @@
       "minHeight": 6,
       "minWidth": 8,
       "name": "Wind Trends",
-      "pathSlots": [],
+      "pathSlots": [
+        {
+          "defaultConvertUnitTo": "deg",
+          "defaultPath": "self.environment.wind.directionTrue",
+          "description": "True Wind Direction",
+          "expectedSkUnit": "rad",
+          "isPathConfigurable": true,
+          "pathRequired": false,
+          "pathType": "number",
+          "sampleTime": 1000,
+          "slot": "trueWindDirection",
+          "source": "default"
+        },
+        {
+          "defaultConvertUnitTo": "knots",
+          "defaultPath": "self.environment.wind.speedTrue",
+          "description": "True Wind Speed",
+          "expectedSkUnit": "m/s",
+          "isPathConfigurable": true,
+          "pathRequired": false,
+          "pathType": "number",
+          "sampleTime": 1000,
+          "slot": "trueWindSpeed",
+          "source": "default"
+        }
+      ],
       "requiredPlugins": [],
       "selector": "widget-windtrends-chart"
     },
