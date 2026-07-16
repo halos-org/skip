@@ -160,6 +160,16 @@ export function localStorageBundle({ origin, subscribeAll }) {
   return { 'skip.connectionConfig': JSON.stringify(cc) };
 }
 
+/**
+ * Playwright addInitScript body: sets the boot-time test flag, then seeds the
+ * localStorageBundle() keys before the app script runs. Pass the object from
+ * localStorageBundle().
+ */
+export function initScriptContent(bundle) {
+  return `window.__KIP_TEST__=true;` +
+    Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('');
+}
+
 /** Full IConfig document the mock serves from applicationData/user/skip/<ver>/default. */
 export function serverConfigDocument({ dashboards, app = appConfig() }) {
   return { app, theme: { themeName: '' }, dashboards };

@@ -18,7 +18,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
-import { appConfig, booleanControlWidget, localStorageBundle } from './lib/kip-config.mjs';
+import { appConfig, booleanControlWidget, localStorageBundle, initScriptContent } from './lib/kip-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -154,7 +154,7 @@ const outDir = join(HERE, 'results', 'shots', 'boolean');
 await mkdir(outDir, { recursive: true });
 
 const bundle = localStorageBundle({ origin: server.origin, subscribeAll: false });
-const initScript = { content: `window.__KIP_TEST__=true;` + Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('') };
+const initScript = { content: initScriptContent(bundle) };
 
 // --- day / default dark theme: full matrix ---
 server.setConfigDocument({ app: appConfig(), theme: { themeName: '' }, dashboards: dashboardsFor(scenarios) });
