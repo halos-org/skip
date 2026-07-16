@@ -38,8 +38,8 @@
       xmlns="http://www.w3.org/1999/xhtml"
       [style.color]="isPressed ? labelColorEnabled : labelColorDisabled"
       [style.fontSize.px]="layout.labelFontSize"
-      style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:Roboto,sans-serif;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:clip;">
-      {{ data()?.ctrlLabel }}
+      style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:Roboto,sans-serif;font-weight:700;line-height:1;overflow:hidden;">
+      <span style="min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">{{ data()?.ctrlLabel }}</span>
     </div>
   </foreignObject>
 </svg>
