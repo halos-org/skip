@@ -1,6 +1,6 @@
 import { Injectable, inject, DestroyRef } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
-import { firstValueFrom, timeout } from 'rxjs';
+import { firstValueFrom, fromEvent, takeUntil, timeout } from 'rxjs';
 
 /** A backfill request that hangs past this is treated as a transient failure, not left to spin forever. */
 const HISTORY_VALUES_TIMEOUT_MS = 30_000;
@@ -207,6 +207,9 @@ export class HistoryApiClientService {
    *   - from, to, duration: define the time range
    *   - resolution: optional downsampling window
    *   - context: optional Signal K context (defaults to 'vessels.self')
+   * @param {AbortSignal} [signal] - Aborts the in-flight request, cancelling the underlying HTTP GET so
+   *   a caller that has abandoned the fetch (e.g. a reconnect re-backfill past its hold cap) does not
+   *   leave it running until the 30s timeout.
    *
    * @returns {Promise<IHistoryValuesResponse | null>} The history response, or `null` when the server
    *   has no history provider (no service URL, or a 404/501 response).
@@ -228,7 +231,7 @@ export class HistoryApiClientService {
    *
    * @memberof HistoryApiClientService
    */
-  public async getValues(params: IHistoryValuesQueryParams): Promise<IHistoryValuesResponse | null> {
+  public async getValues(params: IHistoryValuesQueryParams, signal?: AbortSignal): Promise<IHistoryValuesResponse | null> {
     try {
       if (!this.historyServiceUrl) {
         console.warn('[HistoryApiClientService] No HTTP service URL available');
@@ -259,15 +262,23 @@ export class HistoryApiClientService {
       const fullUrl = `${historyUrl}?${httpParams.toString()}`;
       console.log(`[HistoryApiClientService] GET ${fullUrl}`);
 
+      const request$ = this.http.get<IHistoryValuesResponse>(historyUrl, { params: httpParams }).pipe(
+        timeout(HISTORY_VALUES_TIMEOUT_MS)
+      );
       const response = await firstValueFrom(
-        this.http.get<IHistoryValuesResponse>(historyUrl, { params: httpParams }).pipe(
-          timeout(HISTORY_VALUES_TIMEOUT_MS)
-        )
+        // An abort unsubscribes the request, which cancels the underlying HTTP GET instead of leaving it
+        // to run until the timeout.
+        signal ? request$.pipe(takeUntil(fromEvent(signal, 'abort'))) : request$
       );
 
       console.log(`[HistoryApiClientService] History fetch successful, received ${response.data?.length ?? 0} data points`);
       return response;
     } catch (error) {
+      if (signal?.aborted) {
+        // Cancelled by the caller, not a server/network failure: surface a benign request error the
+        // caller already discards, without logging it as a failure.
+        throw new HistoryRequestError(0, error);
+      }
       const status = error instanceof HttpErrorResponse ? error.status : 0;
       // 404 / 501: the server has no history provider (plugin/API missing) — a stable "unavailable",
       // reported as null so trend charts degrade to a clean empty state.

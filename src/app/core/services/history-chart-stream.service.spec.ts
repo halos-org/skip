@@ -859,6 +859,78 @@ describe('HistoryChartStreamService', () => {
       }
     });
 
+    it('bounds the coalesced-chain hold to one budget under sustained flapping (no N×cap stacking)', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' }); // seam 1_000_000
+
+        // Reconnect while the provider hangs (never resolves) — run 1 of the coalesced chain.
+        history.getValues.mockReturnValue(new Promise<never>(() => { /* hangs */ }));
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_040_000);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(history.getValues.mock.calls.length).toBe(2); // one initial backfill + one run-1 fetch
+
+        // A second drop/reconnect lands WHILE run 1 hangs: coalesced (reconnectPending). Without a shared
+        // budget this would earn the coalesced re-run a fresh RECONNECT_HOLD_MS and hold the tail 2× the cap.
+        state$.next(ConnectionState.Disconnected);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(history.getValues.mock.calls.length).toBe(2); // coalesced, no run-2 fetch yet
+
+        // Just past ONE RECONNECT_HOLD_MS (3000ms): the shared budget is spent, so the chain stops and the
+        // honest gap is drawn now rather than re-running for a second 3s window.
+        await vi.advanceTimersByTimeAsync(3_100);
+        const gaps = emissions.filter(
+          e => !Array.isArray(e) && !('unavailable' in e) && Number.isNaN((e as IDatasetServiceDatapoint).data.value)
+        );
+        expect(gaps.length).toBe(1);
+        // The coalesced re-run never issued a fetch — the spent budget pre-empted it.
+        expect(history.getValues.mock.calls.length).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('aborts the abandoned re-backfill fetch when the hold cap fires', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      try {
+        history.getValues.mockResolvedValue({ context: 'vessels.self', range: { to: new Date(1_000_000).toISOString() }, values: [], data: [] });
+        mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+        const emissions: (IDatasetServiceDatapoint | IDatasetServiceDatapoint[] | { unavailable: true })[] = [];
+        make().getBackfillThenLive(PARAMS).subscribe(e => emissions.push(e));
+        await vi.advanceTimersByTimeAsync(0);
+        path$.next({ data: { value: 5, timestamp: new Date(1_000_000) }, state: 'normal' });
+
+        // Reconnect while the provider hangs; the fetch is threaded an AbortSignal (2nd getValues arg).
+        history.getValues.mockReturnValueOnce(new Promise<never>(() => { /* hangs */ }));
+        state$.next(ConnectionState.Disconnected);
+        vi.setSystemTime(1_040_000);
+        state$.next(ConnectionState.Connected);
+        await vi.advanceTimersByTimeAsync(0);
+
+        const lastCall = history.getValues.mock.calls[history.getValues.mock.calls.length - 1];
+        const signal = lastCall[1] as AbortSignal | undefined;
+        expect(signal).toBeInstanceOf(AbortSignal);
+        expect(signal?.aborted).toBe(false); // still within the hold — not yet abandoned
+
+        // Past the hold cap (RECONNECT_HOLD_MS = 3000ms): the abandoned fetch is aborted rather than left
+        // to self-terminate at the 30s HTTP timeout and stack on the struggling provider.
+        await vi.advanceTimersByTimeAsync(3_100);
+        expect(signal?.aborted).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('advances the seam past a drawn gap so a lagging provider cannot backfill behind it', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(1_000_000);

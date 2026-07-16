@@ -91,6 +91,10 @@ interface IStreamCtx {
   seeded: boolean;
   /** Set on teardown so an in-flight async re-backfill does not emit after disposal. */
   disposed: boolean;
+  /** Wall-clock deadline shared by every run in one coalesced re-backfill chain, so back-to-back re-runs
+   * cannot each earn a fresh {@link RECONNECT_HOLD_MS} and stack the live-tail hold to N× the cap. Null
+   * between chains; armed by the first run and cleared when the chain ends. */
+  holdDeadline: number | null;
 }
 
 /**
@@ -115,7 +119,7 @@ export class HistoryChartStreamService {
   public getBackfillThenLive(params: IHistoryChartStreamParams): Observable<StreamEmission> {
     return new Observable<StreamEmission>(subscriber => {
       const domain = resolveAngleDomain(params.path, this.data.getPathUnitType(params.path), params.angleDomainOverride);
-      const ctx: IStreamCtx = { lastEmittedTs: null, connected: true, backfillInFlight: false, reconnectPending: false, sourceIntervalMs: null, resetCadenceBaseline: false, seeded: false, disposed: false };
+      const ctx: IStreamCtx = { lastEmittedTs: null, connected: true, backfillInFlight: false, reconnectPending: false, sourceIntervalMs: null, resetCadenceBaseline: false, seeded: false, disposed: false, holdDeadline: null };
       const buffer: number[] = [];
       let liveSub: Subscription | null = null;
       let reconnectSub: Subscription | null = null;
@@ -298,7 +302,7 @@ export class HistoryChartStreamService {
     return { sub, release: handle.release };
   }
 
-  private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain, fromMs: number = Date.now() - params.windowMs): Promise<{ points: IDatasetServiceDatapoint[]; offsetMs: number } | null> {
+  private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain, fromMs: number = Date.now() - params.windowMs, signal?: AbortSignal): Promise<{ points: IDatasetServiceDatapoint[]; offsetMs: number } | null> {
     const normalizedPath = params.path.replace(/^(vessels\.)?self\./, '');
     // Only the raw per-bucket value is fetched; the SMA overlay is derived client-side below so it
     // uses the same circular-aware smoothing as the live tail (#162).
@@ -309,7 +313,7 @@ export class HistoryChartStreamService {
       paths,
       from: new Date(fromMs).toISOString(),
       resolution: resolutionSeconds
-    });
+    }, signal);
     if (!response) {
       return null;
     }
@@ -346,9 +350,11 @@ export class HistoryChartStreamService {
    * Re-fetch the interval missed during a WS drop and emit it as a batch so the live tail's gap is
    * filled (#85). Covers only [max(seam - skew margin, now - windowMs), now] and drops points at or
    * before the seam, so the batch appends cleanly and in order against the buffered/live points. The
-   * live tail is held only until the fetch resolves or {@link RECONNECT_HOLD_MS} elapses (whichever comes
-   * first), so a slow provider cannot freeze the chart; if the re-backfill delivers nothing (empty, error,
-   * or hold-timeout), {@link emitReconnectGap} breaks the trace so the live tail does not interpolate.
+   * live tail is held only until the fetch resolves or the coalesced chain's shared {@link RECONNECT_HOLD_MS}
+   * budget elapses (whichever comes first), so a slow provider cannot freeze the chart even under sustained
+   * WS flapping; when the budget wins, the abandoned fetch's HTTP request is aborted so stale GETs do not
+   * stack on the struggling provider. If the re-backfill delivers nothing (empty, error, or hold-timeout),
+   * {@link emitReconnectGap} breaks the trace so the live tail does not interpolate.
    */
   private async reBackfill(
     params: IHistoryChartStreamParams,
@@ -366,20 +372,31 @@ export class HistoryChartStreamService {
     }
     ctx.backfillInFlight = true;
     ctx.reconnectPending = false;
+    // Arm the coalesced chain's shared hold budget on its first run; every coalesced re-run then races the
+    // REMAINING budget, so a storm of re-runs holds the live tail for one RECONNECT_HOLD_MS total rather
+    // than a fresh cap each.
+    if (ctx.holdDeadline === null) ctx.holdDeadline = Date.now() + RECONNECT_HOLD_MS;
     const seam = ctx.lastEmittedTs;
     let delivered = false;
     let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    const controller = new AbortController();
     try {
       const earliest = Date.now() - params.windowMs;
       const fromMs = seam !== null ? Math.max(seam - RECONNECT_FROM_SKEW_MARGIN_MS, earliest) : earliest;
-      const fetchPromise = this.fetchBackfill(params, domain, fromMs);
-      // If the hold cap wins the race we abandon this fetch; swallow its late rejection so it does not
+      const fetchPromise = this.fetchBackfill(params, domain, fromMs, controller.signal);
+      // If the hold budget wins the race we abandon this fetch; swallow its late rejection so it does not
       // surface as an unhandled rejection.
       fetchPromise.catch(() => undefined);
+      const remainingHoldMs = Math.max(0, ctx.holdDeadline - Date.now());
       const outcome = await Promise.race([
         fetchPromise,
-        new Promise<typeof HOLD_TIMEOUT>(resolve => { holdTimer = setTimeout(() => resolve(HOLD_TIMEOUT), RECONNECT_HOLD_MS); })
+        new Promise<typeof HOLD_TIMEOUT>(resolve => { holdTimer = setTimeout(() => resolve(HOLD_TIMEOUT), remainingHoldMs); })
       ]);
+      if (outcome === HOLD_TIMEOUT || ctx.disposed) {
+        // The chain's hold budget elapsed (or the stream was torn down): abort the abandoned fetch so its
+        // HTTP GET is cancelled now rather than left to self-terminate at the 30s timeout and stack.
+        controller.abort();
+      }
       if (ctx.disposed) return;
       // outcome === HOLD_TIMEOUT: the provider is too slow — stop holding the live tail and fall through
       // to the honest gap below rather than freeze the chart for up to the 30s HTTP timeout.
@@ -406,11 +423,16 @@ export class HistoryChartStreamService {
       if (holdTimer !== null) clearTimeout(holdTimer);
       ctx.backfillInFlight = false;
       if (!ctx.disposed) {
-        if (ctx.reconnectPending && ctx.connected) {
-          // A reconnect landed mid-fetch; run it now from the current seam and defer the gap decision to it.
+        const budgetSpent = ctx.holdDeadline !== null && Date.now() >= ctx.holdDeadline;
+        if (ctx.reconnectPending && ctx.connected && !budgetSpent) {
+          // A reconnect landed mid-fetch and the shared budget is not yet spent; run it now from the
+          // current seam under the same deadline and defer the gap decision to it.
           void this.reBackfill(params, domain, buffer, subscriber, ctx);
-        } else if (!delivered) {
-          this.emitReconnectGap(subscriber, ctx);
+        } else {
+          // The chain ends here (delivered, budget spent, or nothing pending): re-arm a fresh budget on the
+          // next reconnect, and break the trace honestly if this run drew nothing.
+          ctx.holdDeadline = null;
+          if (!delivered) this.emitReconnectGap(subscriber, ctx);
         }
       }
     }
