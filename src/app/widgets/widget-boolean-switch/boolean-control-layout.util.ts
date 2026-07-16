@@ -3,6 +3,19 @@ import type { IDynamicControl } from '../../core/interfaces/widgets-interface';
 export const BOOLEAN_CONTROL_BASE_HEIGHT = 35;
 export const BOOLEAN_CONTROL_BASE_FONT_SIZE = 14;
 
+// Minimum per-control height. A long label must never shrink the shared control
+// height below a tappable target (#318) — controls stay this tall and the label
+// ellipsizes instead. Only sacrificed when the panel itself can't fit one control
+// this tall (many controls in a short tile), or when raising the height would
+// starve the label lane on a narrow tile (see MIN_BOOLEAN_LABEL_WIDTH).
+export const MIN_BOOLEAN_CONTROL_HEIGHT = 44;
+
+// Minimum label lane to preserve. The switch/light shape lane is height-scaled,
+// so raising the height widens the shape and eats horizontal label room. On a
+// narrow tile the floor would clamp the label lane to zero and hide the label
+// entirely; back off from the floor to keep at least this much lane for it.
+export const MIN_BOOLEAN_LABEL_WIDTH = 24;
+
 export interface BooleanControlLayout {
   labelX: number;
   labelWidth: number;
@@ -100,5 +113,27 @@ export function measureBooleanControlsHeight(
     high = mid - 1;
   }
 
-  return Math.min(best, maxByPanel);
+  // Floor the shared height at a tappable minimum: a label too long to fit is
+  // ellipsized (see the SVG templates) rather than collapsing every control.
+  // Never exceed what the panel can fit, so a short/crowded tile still degrades
+  // to the largest height it allows.
+  // Start at the tappable floor, then back off toward `best` (where every label
+  // fully fits) one step at a time while any *labeled* control's height-scaled
+  // shape lane would starve its label lane below a legible minimum. The height-
+  // scaled shape lane means a taller control leaves less room for its label, so a
+  // narrow tile trades a little height for a visible label; a roomy tile keeps the
+  // full floor and ellipsizes. Backing off is monotonic in the tile dimensions
+  // (no all-or-nothing jump), and an empty/whitespace label is skipped — there is
+  // nothing to keep legible, so it never forces a control below the floor.
+  let height = Math.min(maxByPanel, Math.max(best, MIN_BOOLEAN_CONTROL_HEIGHT));
+  while (
+    height > best &&
+    controls.some(ctrl =>
+      (ctrl.ctrlLabel ?? '').trim() !== '' &&
+      getBooleanControlLayout(ctrl.type, panelWidth, height).labelWidth < MIN_BOOLEAN_LABEL_WIDTH)
+  ) {
+    height--;
+  }
+
+  return height;
 }
