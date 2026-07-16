@@ -10,6 +10,8 @@ export class CanvasService {
   public debug = false;
   public scaleFactor = window.devicePixelRatio || 1;
   private fontsReadyPromise: Promise<void>;
+  /** Lazy shared offscreen context backing measureTextWidth. */
+  private textMeasureCtx: CanvasRenderingContext2D | null = null;
   private sharedResizeObserver: ResizeObserver | null = null;
   private observedCanvases = new Map<HTMLCanvasElement, { autoRelease?: boolean }>();
   private dprMediaQuery: MediaQueryList | null = null;
@@ -46,6 +48,31 @@ export class CanvasService {
   private areFontsLoaded(): boolean {
     const fonts = this.getDocumentFonts();
     return !fonts || fonts.status === 'loaded';
+  }
+
+  /**
+   * Resolves once web fonts have settled (or immediately when unavailable). Callers
+   * that lay out against measured text width should re-measure on resolution: a cold
+   * boot measures against fallback-font metrics until the web font loads.
+   */
+  public whenFontsReady(): Promise<void> {
+    return this.fontsReadyPromise;
+  }
+
+  /**
+   * Measures rendered text width for a full CSS font shorthand (e.g. '700 14px Roboto')
+   * against a shared offscreen context. Metrics reflect the loaded web font only once
+   * whenFontsReady() has resolved. Returns 0 when no canvas context is available.
+   */
+  public measureTextWidth(text: string, font: string): number {
+    if (!this.textMeasureCtx) {
+      this.textMeasureCtx = typeof document !== 'undefined'
+        ? document.createElement('canvas').getContext('2d')
+        : null;
+    }
+    if (!this.textMeasureCtx) return 0;
+    this.textMeasureCtx.font = font;
+    return this.textMeasureCtx.measureText(text).width;
   }
 
   /**
