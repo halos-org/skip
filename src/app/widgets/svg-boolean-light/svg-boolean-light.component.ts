@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy } from '@angular/core';
 import type { IDynamicControl, IDimensions } from '../../core/interfaces/widgets-interface';
 import type { ITheme } from '../../core/services/app-service';
 import { BooleanControlLayout, getBooleanControlLayout } from '../widget-boolean-switch/boolean-control-layout.util';
+import { getBooleanControlColors } from '../widget-boolean-switch/boolean-control-colors.util';
 
 
 
@@ -65,52 +66,9 @@ export class SvgBooleanLightComponent implements DoCheck {
   private getColors(color: string): void {
     const theme = this.theme();
     if (!theme) return;
-    switch (color) {
-      case "contrast":
-        this.offColor = theme.contrastDimmer;
-        this.labelColor = theme.contrastDim;
-        this.valueColor = theme.contrast;
-        break;
-      case "blue":
-        this.offColor = theme.blueDimmer;
-        this.labelColor = theme.blueDim;
-        this.valueColor = theme.blue;
-        break;
-      case "green":
-        this.offColor = theme.greenDimmer;
-        this.labelColor = theme.greenDim;
-        this.valueColor = theme.green;
-        break;
-      case "pink":
-        this.offColor = theme.pinkDimmer;
-        this.labelColor = theme.pinkDim;
-        this.valueColor = theme.pink;
-        break;
-      case "orange":
-        this.offColor = theme.orangeDimmer;
-        this.labelColor = theme.orangeDim;
-        this.valueColor = theme.orange;
-        break;
-      case "purple":
-        this.offColor = theme.purpleDimmer;
-        this.labelColor = theme.purpleDim;
-        this.valueColor = theme.purple;
-        break;
-      case "grey":
-        this.offColor = theme.greyDimmer;
-        this.labelColor = theme.greyDim;
-        this.valueColor = theme.grey;
-        break;
-      case "yellow":
-        this.offColor = theme.yellowDimmer;
-        this.labelColor = theme.yellowDim;
-        this.valueColor = theme.yellow;
-        break;
-      default:
-        this.offColor = theme.contrastDimmer;
-        this.labelColor = theme.contrastDim;
-        this.valueColor = theme.contrast;
-        break;
-    }
+    const colors = getBooleanControlColors(theme, color);
+    this.offColor = colors.offColor;
+    this.labelColor = colors.labelColor;
+    this.valueColor = colors.valueColor;
   }
 }
