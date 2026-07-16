@@ -633,6 +633,42 @@ describe('DataService', () => {
     expect(latest!.state).toBe(States.Normal);
   });
 
+  it('keeps a timed-out value cleared when a later notification changes its state (no resurface)', () => {
+    let latest: IPathUpdate | undefined;
+    service
+      .subscribePath('self.environment.wind.speedApparent', 'default')
+      .subscribe(update => (latest = update));
+
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'environment.wind.speedApparent',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: 5.5,
+    });
+    expect(latest!.data.value).toBe(5.5);
+
+    service.timeoutPathObservable('self.environment.wind.speedApparent', 'default', 'number');
+    expect(latest!.data.value).toBeNull();
+
+    // A later notification re-pushes state onto every registration of the path. A shallow reset
+    // leaves the upstream value subject caching 5.5, so combineLatest re-pairs it with the new state
+    // and resurfaces the stale reading. The deep reset nulled that upstream value, so the reading
+    // stays cleared and only the state advances.
+    notificationUpdates$.next({
+      path: 'notifications.environment.wind.speedApparent',
+      value: {
+        method: ['visual'],
+        state: States.Warn,
+        message: 'Apparent wind warning',
+        timestamp: '2026-01-01T00:00:02.000Z',
+      },
+    });
+
+    expect(latest!.data.value).toBeNull();
+    expect(latest!.state).toBe(States.Warn);
+  });
+
   it('resets only the timed-out source registration, leaving sibling sources live', () => {
     let latestDefault: IPathUpdate | undefined;
     let latestSourceA: IPathUpdate | undefined;

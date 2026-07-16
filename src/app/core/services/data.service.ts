@@ -854,6 +854,28 @@ export class DataService implements OnDestroy {
   }
 
   /**
+   * Deep-reset a single registration's value to cleared/Normal by pushing onto its two UPSTREAM
+   * BehaviorSubjects, never by writing the derived `pathDataUpdate$` directly. The standing
+   * `combineLatest([_pathData$, _pathState$])` then produces the derived emission itself.
+   *
+   * Order is load-bearing: null the data FIRST, then re-assert Normal state. Writing the derived
+   * subject alone (the previous shallow reset) left `_pathData$` still caching the pre-timeout value,
+   * so a later `_pathState$` emission from the notification handler would re-pair that stale value
+   * via combineLatest and resurface it on a blanked widget. Nulling `_pathData$` makes the cache
+   * genuinely null, so any subsequent state emission re-pairs a null value and the reading stays
+   * cleared. Nulling data before state keeps the transient intermediate emission `{null, staleState}`
+   * (a blank widget with a briefly-wrong badge — safe) rather than `{staleValue, Normal}` (the exact
+   * resurrection being prevented).
+   *
+   * This produces TWO synchronous combineLatest emissions per reset (was one); the final value is
+   * identical.
+   */
+  private resetRegistrationValue(registration: IPathRegistration): void {
+    registration._pathData$.next({ value: null, timestamp: null });
+    registration._pathState$.next(States.Normal);
+  }
+
+  /**
    * Set the value of a path to null and state to Normal. This is used to
    * timeout a path value and reset it to null. This is useful for widgets
    * that need to know if a path has timed out.
@@ -873,13 +895,7 @@ export class DataService implements OnDestroy {
     if (!registrations) return;
     for (const registration of registrations) {
       if (registration.source !== source) continue;
-      registration.pathDataUpdate$.next({
-        data: {
-          value: null,
-          timestamp: null
-        },
-        state: States.Normal
-      });
+      this.resetRegistrationValue(registration);
     }
   }
 
