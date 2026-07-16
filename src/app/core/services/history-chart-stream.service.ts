@@ -393,8 +393,10 @@ export class HistoryChartStreamService {
         new Promise<typeof HOLD_TIMEOUT>(resolve => { holdTimer = setTimeout(() => resolve(HOLD_TIMEOUT), remainingHoldMs); })
       ]);
       if (outcome === HOLD_TIMEOUT || ctx.disposed) {
-        // The chain's hold budget elapsed (or the stream was torn down): abort the abandoned fetch so its
-        // HTTP GET is cancelled now rather than left to self-terminate at the 30s timeout and stack.
+        // The chain's hold budget elapsed, or the stream was torn down: abort the abandoned fetch so its
+        // HTTP GET is cancelled rather than left to self-terminate at the 30s timeout and stack. On
+        // teardown this fires at the next race resolution (bounded by the remaining hold budget), not the
+        // instant of disposal — harmless, since the disposed guard below blocks any post-dispose emission.
         controller.abort();
       }
       if (ctx.disposed) return;
