@@ -84,6 +84,14 @@ reusing a label for a different build.
 visual before/after; `verify-click.mjs` checks radar hit-testing (overlapping
 targets under view rotation) end-to-end.
 
+`shot-boolean.mjs` renders the boolean-switch (Switch Panel) widget across a
+control-count × label-length × tile-size matrix (day + light themes), writes
+`results/shots/boolean/<name>.png` per tile, and prints per-control shared height
+with a 44px tap-target flag — the #318 long-label panel-shrink probe. It boot-asserts
+that each tile rendered its seeded control count (exits non-zero otherwise). Invoke
+with `CHROME_BIN=/usr/bin/chromium node shot-boolean.mjs --public ../public` after a
+`../public` build.
+
 ## Interpreting the numbers
 
 | Question | Metric | Caveat |
