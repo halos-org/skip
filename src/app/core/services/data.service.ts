@@ -241,6 +241,15 @@ export class DataService implements OnDestroy {
     this._isReset.next(true);
   }
 
+  /**
+   * Subscribe to a `(path, source)` stream, sharing one registration across co-subscribers and
+   * bumping its refCount. Callers must balance every call with an {@link unsubscribePath}.
+   *
+   * Churning and lifecycle-scoped consumers (widgets, per-selection rebinds, chart streams) should
+   * prefer {@link acquirePath}, whose idempotent, forgery-proof release closure makes balanced
+   * teardown far harder to get wrong than a raw `unsubscribePath(path, source)` call. App-lifetime
+   * singletons that subscribe once and never release may call this directly.
+   */
   public subscribePath(path: string, source: string): Observable<IPathUpdate> {
     const registrations = this._pathRegisterByPath.get(path);
     const matching = registrations?.find(item => item.path === path && item.source === source);
@@ -334,6 +343,29 @@ export class DataService implements OnDestroy {
     if (registrations.length === 0) {
       this._pathRegisterByPath.delete(path);
     }
+  }
+
+  /**
+   * Acquire a disposable handle to a `(path, source)` stream. `data$` is the very same shared
+   * Observable {@link subscribePath} returns; `release` is an idempotent teardown that decrements the
+   * shared registration exactly once no matter how many times it is called, and is forgery-proof —
+   * the caller never passes a path/source into it, so it can only release the registration it took.
+   * This makes balanced acquire/release the default for churning and lifecycle-scoped consumers.
+   *
+   * @param {string} path The Signal K path
+   * @param {string} source The source to read from ('default' for the server-priority value)
+   * @returns The shared stream plus a one-shot release closure.
+   * @memberof DataService
+   */
+  public acquirePath(path: string, source: string): { data$: Observable<IPathUpdate>; release: () => void } {
+    const data$ = this.subscribePath(path, source);
+    let released = false;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      this.unsubscribePath(path, source);
+    };
+    return { data$, release };
   }
 
   /**
