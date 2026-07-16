@@ -4,7 +4,7 @@ import type { IDynamicControl, IWidgetPath } from '../../core/interfaces/widgets
 import { ObjectKeysPipe } from '../../core/pipes/object-keys.pipe';
 import { PathControlConfigComponent } from '../path-control-config/path-control-config.component';
 import { MatInput } from '@angular/material/input';
-import { MatFormField, MatLabel, MatSuffix } from '@angular/material/form-field';
+import { MatFormField, MatLabel, MatSuffix, MatHint } from '@angular/material/form-field';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { IAddNewPathObject } from '../boolean-multicontrol-options/boolean-multicontrol-options.component';
 
@@ -18,7 +18,7 @@ export interface IAddNewPath {
     selector: 'paths-options',
     templateUrl: './paths-options.component.html',
     styleUrls: ['./paths-options.component.scss'],
-    imports: [MatCheckbox, FormsModule, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSuffix, PathControlConfigComponent, ObjectKeysPipe]
+    imports: [MatCheckbox, FormsModule, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSuffix, MatHint, PathControlConfigComponent, ObjectKeysPipe]
 })
 export class PathsOptionsComponent implements OnInit, OnChanges {
   private rootFormGroup = inject(FormGroupDirective);

@@ -12,6 +12,7 @@
       min="2"
       required>
     <span matTextSuffix>Seconds</span>
+    <mat-hint>When data stops arriving for this long, the widget clears its reading instead of holding the last value. For a path shared by several sources, it clears only once every source has gone quiet.</mat-hint>
   </mat-form-field>
 </div>
 <ng-container [formGroup]="pathsGroup">

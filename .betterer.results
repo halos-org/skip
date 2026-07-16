@@ -130,7 +130,7 @@ exports[`strictNullChecks`] = {
       [119, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
       [120, 4, 20, "Object is possibly \'undefined\'.", "2522653710"]
     ],
-    "src/app/widget-config/paths-options/paths-options.component.ts:3797853945": [
+    "src/app/widget-config/paths-options/paths-options.component.ts:2311600985": [
       [31, 51, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'IAddNewPathObject\'.", "2620553983"],
       [32, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'string\'.", "2620553983"],
       [33, 54, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'IDynamicControl[]\'.", "2620553983"],
