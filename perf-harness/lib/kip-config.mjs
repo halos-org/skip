@@ -102,8 +102,10 @@ export function aisRadarWidget() {
  * shape: multiChildCtrls holds the IDynamicControl list, paths holds one
  * IWidgetPath per control keyed by a matching pathID. Each control:
  *   { label, type ('1' switch | '2' button | '3' light), color, value, isNumeric, path }
- * Controls render from multiChildCtrls regardless of live data; paths only feed
- * value streaming (left un-streamed here for deterministic on/off states).
+ * Controls render from multiChildCtrls regardless of live data. Each path carries
+ * suppressBootstrapNull so the widget keeps the control's configured on/off value
+ * instead of being clobbered by DataService's synchronous bootstrap null (nothing
+ * streams these paths here, so without it every control would render OFF).
  */
 export function booleanControlWidget({ controls, w = 4, h = 6, displayName = 'Switch Panel', showLabel = true, color = 'contrast' } = {}) {
   const uuid = uid('bool');
@@ -118,6 +120,7 @@ export function booleanControlWidget({ controls, w = 4, h = 6, displayName = 'Sw
     paths.push({
       description: c.label, path: c.path ?? `self.electrical.switches.bank.0.${i}.state`,
       source: 'default', pathType: 'boolean', isPathConfigurable: true, sampleTime: 500, pathID,
+      suppressBootstrapNull: true,
     });
   });
   return (x, y) => node(w, h, x, y, {

@@ -70,9 +70,11 @@ const scenarios = [
   { name: 'c4-mixed-repro-large', ...LARGE, controls: [sw(LONG, { color: 'green' }), lt('Aux', { value: true, color: 'blue' }), btn('Bilge', { color: 'orange' }), sw('Deck', { color: 'purple' })] },
 ];
 
-// Second theme axis: config-driven light theme (faithful, colors recompute at boot).
-// Night mode is a runtime brightness/sepia filter, not an appConfig field, and is
-// geometrically inert -- see report notes.
+// Second theme axis: config-driven light theme (colors recompute at boot). NOTE the
+// #318 shared-height geometry is a pure function of tile/label/font with NO theme
+// input, so these rows verify color/contrast only -- not an independent geometric
+// result. (Night mode is a runtime brightness/sepia CSS filter, not an appConfig
+// field, and is likewise geometrically inert.)
 const lightScenarios = [
   { name: 'c3-mixed-repro-narrow-light', ...NARROW, controls: [sw(LONG, { color: 'green' }), lt('Aux', { value: true, color: 'blue' }), btn('Bilge', { color: 'orange' })] },
   { name: 'c3-mixed-repro-large-light', ...LARGE, controls: [sw(LONG, { color: 'green' }), lt('Aux', { value: true, color: 'blue' }), btn('Bilge', { color: 'orange' })] },
@@ -88,13 +90,16 @@ function dashboardsFor(list) {
   }));
 }
 
-const MIN_TAP = 44; // px accessibility floor (iOS 44 / Material 48)
+const MIN_TAP = 44;   // px accessibility floor (iOS 44 / Material 48)
+const SLIVER_PX = 8;  // below this a control is a near-invisible sliver, not a usable target
 
 async function measure(page) {
   return page.evaluate(() => {
     const w = document.querySelector('widget-boolean-switch');
     if (!w) return { ok: false };
     const wr = w.getBoundingClientRect();
+    // Selectors mirror widget-boolean-switch.component.html (.svg-widget class,
+    // app-svg-boolean-{switch,button,light} hosts); a template rename breaks these.
     const svgs = [...w.querySelectorAll('.svg-widget svg')].map((s) => {
       const r = s.getBoundingClientRect();
       return {
@@ -116,14 +121,27 @@ async function runTheme({ ctx, url, list, dir }) {
     await page.goto(`${url}#/page/${i}`, { waitUntil: 'load', timeout: 30000 });
     await page.waitForSelector('widget-boolean-switch', { timeout: 20000 });
     await page.waitForSelector('.svg-widget svg', { timeout: 20000 });
+    await page.evaluate(() => document.fonts.ready.then(() => true)); // labels are canvas-measured; wait for the real font, not a fallback
     await page.waitForTimeout(700); // let ResizeObserver + measure effect settle
     const m = await measure(page);
     const out = join(dir, `${s.name}.png`);
     await page.locator('widget-boolean-switch').screenshot({ path: out });
-    const h = m.ok ? m.svgs[0]?.hAttr ?? 0 : 0;
+    // All controls share one ctrlDimensions, so svgs[0] height IS the shared height.
+    const h = m.ok ? Number(m.svgs[0]?.hAttr) : NaN;
     const painted = m.ok ? Math.round((m.svgs.reduce((a, x) => a + x.rectH, 0))) : 0;
-    const flag = !m.ok ? 'NO-WIDGET' : (h < 8 ? 'SLIVER' : h < MIN_TAP ? 'sub-tap' : 'ok');
-    rows.push({ name: s.name, tile: m.ok ? `${m.widget.w}x${m.widget.h}` : '-', ctrls: m.ok ? m.count : 0, ctrlH: h, paintedSum: painted, flag });
+    const expected = s.controls.length;
+    // Boot integrity: the seeded controls must actually render and yield a measurable
+    // shared height. A count mismatch means a silent defaults/empty render (schema
+    // drift), not a widget bug -- that fails the run. SLIVER/sub-tap are the real
+    // findings the tool exists to surface, so they stay flags, not failures.
+    const bad = !m.ok || m.count !== expected || !Number.isFinite(h) || h <= 0;
+    const flag = !m.ok ? 'NO-WIDGET'
+      : m.count !== expected ? `COUNT ${m.count}/${expected}`
+      : !Number.isFinite(h) || h <= 0 ? 'BAD-H'
+      : h < SLIVER_PX ? 'SLIVER'
+      : h < MIN_TAP ? 'sub-tap'
+      : 'ok';
+    rows.push({ name: s.name, tile: m.ok ? `${m.widget.w}x${m.widget.h}` : '-', ctrls: m.ok ? m.count : 0, ctrlH: Number.isFinite(h) ? h : 0, paintedSum: painted, flag, bad });
     console.log(`[shot] ${out}`);
     await page.close();
   }
@@ -167,3 +185,12 @@ for (const r of all) {
 
 await browser.close();
 await server.stop();
+
+// Boot-integrity assert (mirrors run.mjs): a tile that didn't render its seeded
+// control count, or yielded an unmeasurable height, means the run measured the wrong
+// thing -- fail loudly rather than leave a plausible-but-wrong screenshot to eyeball.
+const failed = all.filter((r) => r.bad);
+if (failed.length) {
+  console.error(`\nboot check failed: ${failed.length} tile(s) rendered wrong -> ${failed.map((r) => `${r.name}[${r.flag}]`).join(', ')}`);
+  process.exit(1);
+}
