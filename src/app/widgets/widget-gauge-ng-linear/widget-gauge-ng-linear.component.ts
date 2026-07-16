@@ -10,7 +10,7 @@ import { ChangeDetectionStrategy } from '@angular/core';
 import { LinearGaugeOptions, LinearGauge, GaugesModule } from '@godind/ng-canvas-gauges';
 import { IWidgetSvcConfig, IDataHighlight } from '../../core/interfaces/widgets-interface';
 import { adjustLinearScaleAndMajorTicks, IScale } from '../../core/utils/dataScales.util';
-import { gaugeAnimationDurationMs } from '../../core/utils/gauge-animation.util';
+import { gaugeAnimationDurationMs, gaugeAnimationOptions } from '../../core/utils/gauge-animation.util';
 import { getHighlights } from '../../core/utils/zones-highlight.utils';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { States } from '../../core/interfaces/signalk-interfaces';
@@ -192,7 +192,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
         try {
           requestAnimationFrame(() => {
             this.gaugeBootstrapped.set(true);
-            try { gauge.update({ animation: true, animatedValue: true }); } catch { /* ignore */ }
+            try { gauge.update(gaugeAnimationOptions(true)); } catch { /* ignore */ }
           });
         } catch { /* ignore */ }
       });
@@ -301,7 +301,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     opt.ticksWidth = ticks ? (enableNeedle ? (isVertical ? 15 : 10) : 10) : 0;
     opt.ticksPadding = ticks ? (isVertical ? (enableNeedle ? 0 : 5) : (enableNeedle ? 9 : 8)) : 0;
     opt.tickSide = 'left';
-    opt.animation = this.animationEnabled(); opt.animationRule = 'linear'; opt.animatedValue = this.animationEnabled(); opt.animateOnInit = false; opt.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
+    Object.assign(opt, gaugeAnimationOptions(this.animationEnabled())); opt.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
     opt.highlights = []; opt.highlightsWidth = cfg.gauge?.highlightsWidth;
     // pre-populate highlights if already available
     const h = this.highlights();

@@ -6,7 +6,7 @@
  * instantiated gauge config.
  */
 import { Component, AfterViewInit, ElementRef, effect, viewChild, inject, input, untracked, computed, signal } from '@angular/core';
-import { gaugeAnimationDurationMs } from '../../core/utils/gauge-animation.util';
+import { gaugeAnimationDurationMs, gaugeAnimationOptions } from '../../core/utils/gauge-animation.util';
 import { ChangeDetectionStrategy } from '@angular/core';
 import { GaugesModule, RadialGaugeOptions, RadialGauge } from '@godind/ng-canvas-gauges';
 import { IWidgetSvcConfig, IDataHighlight } from '../../core/interfaces/widgets-interface';
@@ -206,7 +206,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
         try {
           requestAnimationFrame(() => {
             this.gaugeBootstrapped.set(true);
-            try { gauge.update({ animation: true, animatedValue: true }); } catch { /* ignore */ }
+            try { gauge.update(gaugeAnimationOptions(true)); } catch { /* ignore */ }
           });
         } catch { /* ignore */ }
       });
@@ -303,8 +303,8 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     g.fontNumbers = 'Roboto'; g.fontNumbersWeight = 'bold';
     g.valueInt = cfg.numInt ?? 1; g.valueDec = cfg.numDecimal ?? 2; g.majorTicksInt = g.valueInt; g.majorTicksDec = g.valueDec;
     g.highlightsWidth = cfg.gauge?.highlightsWidth;
-    g.animation = this.animationEnabled(); g.animateOnInit = false; g.animatedValue = this.animationEnabled(); g.animationRule = 'linear';
-    const st = cfg.paths?.['gaugePath']?.sampleTime ?? 500; g.animationDuration = gaugeAnimationDurationMs(st);
+    Object.assign(g, gaugeAnimationOptions(this.animationEnabled()));
+    g.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
     g.colorBorderShadow = false; g.colorBorderOuter = theme.cardColor; g.colorBorderOuterEnd = ''; g.colorBorderMiddle = theme.cardColor; g.colorBorderMiddleEnd = '';
     g.colorPlate = g.colorPlateEnd = theme.cardColor; g.colorBar = theme.background;
 

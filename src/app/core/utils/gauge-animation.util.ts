@@ -20,6 +20,9 @@ export function gaugeAnimationDurationMs(sampleTimeMs: number): number {
   return Math.min(GAUGE_ANIMATION_MS, sampleTimeMs);
 }
 
+// These four fields live on the shared `GenericOptions` base that both radial and
+// linear gauge options extend, so the policy applies to every ng-canvas gauge. We
+// Pick from `RadialGaugeOptions` only because the package does not re-export the base.
 type GaugeAnimationOptions = Pick<RadialGaugeOptions, 'animation' | 'animatedValue' | 'animateOnInit' | 'animationRule'>;
 
 /**
