@@ -23,11 +23,11 @@ describe('extractWidgetCatalog', () => {
     expect(numeric?.requiredPlugins).toEqual([]);
   });
 
-  it('excludes the commented-out widgets (alternator, inverter, ac)', () => {
-    const selectors = widgets.map((w) => w.selector);
-    expect(selectors).not.toContain('widget-alternator');
-    expect(selectors).not.toContain('widget-inverter');
-    expect(selectors).not.toContain('widget-ac');
+  it('includes the live electrical widgets (alternator, inverter, ac)', () => {
+    for (const selector of ['widget-alternator', 'widget-inverter', 'widget-ac']) {
+      const widget = widgets.find((w) => w.selector === selector);
+      expect(widget, selector).toBeDefined();
+    }
   });
 
   it('captures the four required plugins for Freeboard-SK', () => {

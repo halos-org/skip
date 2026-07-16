@@ -8,8 +8,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import {
+  collectModuleConstants,
   findArrayLiteral,
-  findImportModuleSpecifier,
+  findLazyLoadedModuleSpecifier,
   findPropertyInitializer,
   findStaticPropertyInitializer,
   getObjectProperties,
@@ -40,6 +41,7 @@ const UNITS_SERVICE = 'src/app/core/services/units.service.ts';
 const DASHBOARD_COMPONENT = 'src/app/core/components/dashboard/dashboard.component.ts';
 const ICONS_SVG = 'src/assets/svg/icons.svg';
 const M3_DARK = 'src/themes/_m3dark.scss';
+const CONFIG_VERSIONS_CONST = 'src/app/core/constants/config-versions.const.ts';
 
 // KIP applies themes as body CSS classes; the default (dark) theme is the empty
 // string. There is no single source literal to read, so these are listed here and
@@ -47,10 +49,6 @@ const M3_DARK = 'src/themes/_m3dark.scss';
 const THEME_NAMES: readonly string[] = ['', 'light-theme', 'night-theme'];
 
 const SCHEMA_VERSION = 1;
-// Two distinct KIP version numbers (see storage.service.ts):
-// the applicationData file version in the URL, and app.configVersion in the body.
-const CONFIG_FILE_VERSION = 11;
-const CONFIG_VERSION = 12;
 
 /**
  * Extracts KIP's widget catalog (`_widgetDefinition`) from widget.service.ts.
@@ -87,17 +85,28 @@ export function extractWidgetSchemas(opts: GenerateOptions): WidgetSchemaEntry[]
   const catalog = extractCatalogFromSource(serviceSource, serviceFile);
 
   return catalog.map((entry) => {
-    const moduleSpecifier = findImportModuleSpecifier(serviceSource, entry.componentClassName);
+    const moduleSpecifier = findLazyLoadedModuleSpecifier(serviceSource, entry.componentClassName);
     const componentFile = path.resolve(serviceDir, `${moduleSpecifier}.ts`);
+    const componentSource = parseSourceFile(componentFile);
     const initializer = findStaticPropertyInitializer(
-      parseSourceFile(componentFile),
+      componentSource,
       entry.componentClassName,
       'DEFAULT_CONFIG',
     );
     if (!ts.isObjectLiteralExpression(initializer)) {
       throw new Error(`DEFAULT_CONFIG of ${entry.componentClassName} is not an object literal`);
     }
-    const defaultConfig = literalToValue(initializer) as Record<string, unknown>;
+    const resolveConst = collectModuleConstants(componentSource);
+    let defaultConfig: Record<string, unknown>;
+    try {
+      defaultConfig = literalToValue(initializer, resolveConst) as Record<string, unknown>;
+    } catch (cause) {
+      throw new Error(
+        `Cannot read DEFAULT_CONFIG of ${entry.componentClassName} (${componentFile}): ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`,
+      );
+    }
     const bindingKind = deriveBindingKind(defaultConfig);
     const pathSlots = bindingKind === 'paths-record' ? extractPathSlots(defaultConfig) : [];
     return { ...entry, bindingKind, defaultConfig, pathSlots };
@@ -254,16 +263,41 @@ function booleanProp(props: Map<string, ts.Expression>, key: string, file: strin
  * artifact only changes when KIP source changes.
  */
 export function buildSchema(opts: GenerateOptions): KipDashboardSchema {
+  const versions = readConfigVersions(opts.projectRoot);
   return {
     meta: {
       schemaVersion: SCHEMA_VERSION,
       kipVersion: readKipVersion(opts.projectRoot),
-      configFileVersion: CONFIG_FILE_VERSION,
-      configVersion: CONFIG_VERSION,
+      configFileVersion: versions.fileVersion,
+      configVersion: versions.appVersion,
     },
     widgets: extractWidgetSchemas(opts),
     designSystem: extractDesignSystem(opts),
   };
+}
+
+/**
+ * Reads the current config version numbers from their single definition site
+ * (config-versions.const.ts) so the artifact can never drift from the app:
+ * configFileVersion = REMOTE_CONFIG_FILE_VERSION (the applicationData URL
+ * segment), configVersion = LATEST_APP_CONFIG_VERSION (app.configVersion in the
+ * config body).
+ */
+function readConfigVersions(root: string): { fileVersion: number; appVersion: number } {
+  const file = path.join(root, CONFIG_VERSIONS_CONST);
+  const source = parseSourceFile(file);
+  return {
+    fileVersion: requireNumberConstant(source, 'REMOTE_CONFIG_FILE_VERSION', file),
+    appVersion: requireNumberConstant(source, 'LATEST_APP_CONFIG_VERSION', file),
+  };
+}
+
+function requireNumberConstant(source: ts.SourceFile, name: string, file: string): number {
+  const value = literalToValue(findPropertyInitializer(source, name));
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new Error(`Expected numeric "${name}" in ${file}, got ${describe(value)}`);
+  }
+  return value;
 }
 
 function readKipVersion(root: string): string {

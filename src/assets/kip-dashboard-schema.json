@@ -548,6 +548,29 @@
   "widgets": [
     {
       "bindingKind": "none",
+      "category": "Gauge",
+      "componentClassName": "WidgetAcComponent",
+      "defaultConfig": {
+        "ac": {
+          "optionsById": {},
+          "trackedDevices": []
+        },
+        "color": "contrast",
+        "ignoreZones": false
+      },
+      "defaultHeight": 6,
+      "defaultWidth": 6,
+      "description": "Monitor AC bus and line-level loads with real-time voltage, current, frequency, and power metrics.",
+      "icon": "acMonitor",
+      "minHeight": 2,
+      "minWidth": 2,
+      "name": "AC Monitor",
+      "pathSlots": [],
+      "requiredPlugins": [],
+      "selector": "widget-ac"
+    },
+    {
+      "bindingKind": "none",
       "category": "Component",
       "componentClassName": "WidgetAisRadarComponent",
       "defaultConfig": {
@@ -594,12 +617,35 @@
     },
     {
       "bindingKind": "none",
+      "category": "Gauge",
+      "componentClassName": "WidgetAlternatorComponent",
+      "defaultConfig": {
+        "alternator": {
+          "optionsById": {},
+          "trackedDevices": []
+        },
+        "color": "contrast",
+        "ignoreZones": false
+      },
+      "defaultHeight": 6,
+      "defaultWidth": 6,
+      "description": "Monitor alternator output and charging performance with voltage, current, power, revolutions and temperature metrics.",
+      "icon": "alternator",
+      "minHeight": 2,
+      "minWidth": 2,
+      "name": "Alternator",
+      "pathSlots": [],
+      "requiredPlugins": [],
+      "selector": "widget-alternator"
+    },
+    {
+      "bindingKind": "none",
       "category": "Component",
       "componentClassName": "WidgetAnchorAlarmComponent",
       "defaultConfig": {},
       "defaultHeight": 14,
       "defaultWidth": 6,
-      "description": "Monitors your anchor position and triggers an alarm if you drift outside a configured radius (anchor drag). Set the anchor point, watch radius, and alarm behavior (sound/notification) in the widget config. Requires internet connectivity to view map.",
+      "description": "Classic anchor monitoring focused on reliable server-side drift detection: configurable alarm radius, automatic radius calculation from rode/depth, intelligent anchor-position detection, position history, multiple warning/alarm types, GPS bow-offset compensation, plus REST API and Signal K PUT integration.",
       "icon": "anchorWatch",
       "minHeight": 8,
       "minWidth": 6,
@@ -1011,6 +1057,7 @@
       "defaultConfig": {
         "color": "contrast",
         "convertUnitTo": null,
+        "datachartAngleRange": null,
         "datachartPath": null,
         "datachartSource": null,
         "datasetAverageArray": "sma",
@@ -1032,19 +1079,15 @@
         "startScaleAtZero": false,
         "timeScale": "minute",
         "trackAgainstAverage": false,
-        "verticalChart": false,
-        "yScaleMax": null,
-        "yScaleMin": null,
-        "yScaleSuggestedMax": null,
-        "yScaleSuggestedMin": null
+        "verticalChart": false
       },
       "defaultHeight": 6,
       "defaultWidth": 6,
-      "description": "Visualizes data on a real-time chart with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the KIP Dataset to be configured.",
+      "description": "Visualizes data on a real-time plot with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the KIP Dataset to be configured.",
       "icon": "datachartWidget",
       "minHeight": 3,
       "minWidth": 2,
-      "name": "Realtime Data Chart",
+      "name": "Realtime Data Plot",
       "pathSlots": [],
       "requiredPlugins": [],
       "selector": "widget-data-chart"
@@ -1428,6 +1471,24 @@
       "selector": "widget-heel-gauge"
     },
     {
+      "bindingKind": "none",
+      "category": "Component",
+      "componentClassName": "WidgetHoekensAnchorAlarmComponent",
+      "defaultConfig": {},
+      "defaultHeight": 14,
+      "defaultWidth": 6,
+      "description": "Map-first anchor alarm experience for Signal K with advanced watch-zone tools (circle, sector, polygon), interactive setup, tracks/fleet overlays, scope calculator, and optional engine-start auto-silence for practical onboard use.",
+      "icon": "anchorWatch",
+      "minHeight": 8,
+      "minWidth": 6,
+      "name": "Hoeken's Anchor Alarm",
+      "pathSlots": [],
+      "requiredPlugins": [
+        "hoekens-anchor-alarm"
+      ],
+      "selector": "widget-hoekens-anchor-alarm"
+    },
+    {
       "bindingKind": "paths-record",
       "category": "Gauge",
       "componentClassName": "WidgetHorizonComponent",
@@ -1525,6 +1586,29 @@
       "pathSlots": [],
       "requiredPlugins": [],
       "selector": "widget-iframe"
+    },
+    {
+      "bindingKind": "none",
+      "category": "Gauge",
+      "componentClassName": "WidgetInverterComponent",
+      "defaultConfig": {
+        "color": "contrast",
+        "ignoreZones": false,
+        "inverter": {
+          "optionsById": {},
+          "trackedDevices": []
+        }
+      },
+      "defaultHeight": 6,
+      "defaultWidth": 6,
+      "description": "Monitor inverter input and output with AC voltage, current, power, and temperature metrics. Track real-time inverter state and mode. Manage multiple linked inverter units with grouped device configuration.",
+      "icon": "inverter",
+      "minHeight": 2,
+      "minWidth": 2,
+      "name": "Inverter",
+      "pathSlots": [],
+      "requiredPlugins": [],
+      "selector": "widget-inverter"
     },
     {
       "bindingKind": "none",
@@ -1637,7 +1721,7 @@
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
-      "description": "Displays numeric data in a clear and concise format, with options to show minimum and/or maximum recorded values. Includes an optional background minichart for quick visual trend insights.",
+      "description": "Displays numeric data in a clear and concise format, with options to show minimum and/or maximum recorded values. Includes an optional background mini plot for quick visual trend insights.",
       "icon": "numericWidget",
       "minHeight": 2,
       "minWidth": 1,
@@ -1987,7 +2071,7 @@
       },
       "defaultHeight": 4,
       "defaultWidth": 4,
-      "description": "An advanced racing countdown timer that indicates OCS (On Course Side) status. Set the start line, choose or adjust the duration, or specify the exact start time. Automatically switches to the target dashboard at the start unless over early.",
+      "description": "An advanced racing countdown timer that indicates OCS (On Course Side) status. Set the start line, choose or adjust the duration, or specify the exact start time. Automatically switches to the target page at the start unless over early.",
       "icon": "racertimerWidget",
       "minHeight": 4,
       "minWidth": 4,
@@ -2528,7 +2612,6 @@
         "filterSelfPaths": true,
         "paths": {
           "gaugePath": {
-            "convertUnitTo": null,
             "description": "PUT Supported Numeric Path. IMPORTANT: Format must be set to (base)",
             "isPathConfigurable": true,
             "path": null,
@@ -2634,6 +2717,38 @@
       ],
       "requiredPlugins": [],
       "selector": "widget-text"
+    },
+    {
+      "bindingKind": "none",
+      "category": "Component",
+      "componentClassName": "WidgetVideoComponent",
+      "defaultConfig": {
+        "video": {
+          "autoplay": false,
+          "loop": false,
+          "muted": true,
+          "objectFit": "contain",
+          "preset": "balanced",
+          "snapshot": {
+            "defaultDestination": "download",
+            "embedLocation": true,
+            "embedTelemetry": true
+          },
+          "sourceKind": "url",
+          "transport": "auto",
+          "url": null
+        }
+      },
+      "defaultHeight": 6,
+      "defaultWidth": 8,
+      "description": "Play video from a URL with built-in player controls. IP-camera streaming, ONVIF pan/tilt/zoom and snapshots are added in later updates.",
+      "icon": "videoWidget",
+      "minHeight": 2,
+      "minWidth": 2,
+      "name": "Video",
+      "pathSlots": [],
+      "requiredPlugins": [],
+      "selector": "widget-video"
     },
     {
       "bindingKind": "paths-record",
