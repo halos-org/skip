@@ -208,7 +208,7 @@ function extractColorHex(root: string): Map<string, string> {
 function extractColors(root: string): DesignSystem['colors'] {
   const file = path.join(root, APP_SERVICE);
   const raw = literalToValue(findArrayLiteral(parseSourceFile(file), 'configurableThemeColors'));
-  const list = raw as Array<{ value: unknown; label: unknown }>;
+  const list = raw as { value: unknown; label: unknown }[];
   const hexByToken = extractColorHex(root);
   return list.map((c) => {
     const value = String(c.value);
@@ -223,7 +223,7 @@ function extractColors(root: string): DesignSystem['colors'] {
 function extractUnitGroups(root: string): DesignSystem['unitGroups'] {
   const file = path.join(root, UNITS_SERVICE);
   const raw = literalToValue(findArrayLiteral(parseSourceFile(file), '_conversionList'));
-  const list = raw as Array<{ group: unknown; units: Array<{ measure: unknown; description: unknown }> }>;
+  const list = raw as { group: unknown; units: { measure: unknown; description: unknown }[] }[];
   return list.map((g) => ({
     group: String(g.group),
     measures: g.units.map((u) => ({ measure: String(u.measure), description: String(u.description) })),
