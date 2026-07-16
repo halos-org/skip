@@ -97,6 +97,39 @@ export function aisRadarWidget() {
   });
 }
 
+/**
+ * Switch-panel (widget-boolean-switch) factory. Mirrors the persisted config
+ * shape: multiChildCtrls holds the IDynamicControl list, paths holds one
+ * IWidgetPath per control keyed by a matching pathID. Each control:
+ *   { label, type ('1' switch | '2' button | '3' light), color, value, isNumeric, path }
+ * Controls render from multiChildCtrls regardless of live data; paths only feed
+ * value streaming (left un-streamed here for deterministic on/off states).
+ */
+export function booleanControlWidget({ controls, w = 4, h = 6, displayName = 'Switch Panel', showLabel = true, color = 'contrast' } = {}) {
+  const uuid = uid('bool');
+  const multiChildCtrls = [];
+  const paths = [];
+  controls.forEach((c, i) => {
+    const pathID = `bctrl-${String(++seq).padStart(4, '0')}`;
+    multiChildCtrls.push({
+      ctrlLabel: c.label, type: c.type ?? '1', pathID,
+      value: c.value ?? false, color: c.color ?? color, isNumeric: c.isNumeric ?? false,
+    });
+    paths.push({
+      description: c.label, path: c.path ?? `self.electrical.switches.bank.0.${i}.state`,
+      source: 'default', pathType: 'boolean', isPathConfigurable: true, sampleTime: 500, pathID,
+    });
+  });
+  return (x, y) => node(w, h, x, y, {
+    type: 'widget-boolean-switch', uuid,
+    config: {
+      displayName, showLabel, filterSelfPaths: true, paths,
+      enableTimeout: false, dataTimeout: 5, color, zonesOnlyPaths: false,
+      putEnable: true, putMomentary: false, multiChildCtrls,
+    },
+  });
+}
+
 /** Lay out widget factories in a grid and wrap them in one dashboard. */
 export function buildDashboards(factories, cols = 12) {
   let x = 0, y = 0, rowH = 0;
