@@ -131,7 +131,6 @@ export class DashboardHistorySeriesSyncService {
       ownerWidgetUuid: widgetUuid,
       ownerWidgetSelector: widgetType,
       context: null,
-      source: 'default',
       timeScale: this.normalizeString(cfg?.timeScale),
       period: 30,
       retentionDurationMs: null,
@@ -139,20 +138,46 @@ export class DashboardHistorySeriesSyncService {
       enabled: true,
     };
 
-    return [
-      {
+    // Read the same configurable slots the widget consumes. resolveWidgetConfig already merged the
+    // widget's default paths, so cfg carries either the shipped defaults or the user's overrides.
+    // A slot whose path was cleared (pathRequired is false) contributes no series, mirroring the
+    // widget's per-series gating and mapDataChartWidget's null-path omission.
+    const dir = this.resolveWindTrendsSlot(cfg, 'trueWindDirection');
+    const spd = this.resolveWindTrendsSlot(cfg, 'trueWindSpeed');
+    const series: IKipConcreteSeriesDefinition[] = [];
+
+    const dirPath = this.normalizeString(dir?.path);
+    if (dirPath) {
+      series.push({
         ...shared,
         seriesId: `${widgetUuid}:wind-direction`,
         datasetUuid: `${widgetUuid}-twd`,
-        path: 'self.environment.wind.directionTrue',
-      },
-      {
+        path: dirPath,
+        source: this.normalizeString(dir?.source) ?? 'default',
+      });
+    }
+
+    const spdPath = this.normalizeString(spd?.path);
+    if (spdPath) {
+      series.push({
         ...shared,
         seriesId: `${widgetUuid}:wind-speed`,
         datasetUuid: `${widgetUuid}-tws`,
-        path: 'self.environment.wind.speedTrue',
-      }
-    ];
+        path: spdPath,
+        source: this.normalizeString(spd?.source) ?? 'default',
+      });
+    }
+
+    return series;
+  }
+
+  /** Read a single configurable path slot from a widget config, tolerating the array path form. */
+  private resolveWindTrendsSlot(cfg: IWidgetSvcConfig | undefined, slot: string): IWidgetPath | undefined {
+    const paths = cfg?.paths;
+    if (!paths || Array.isArray(paths)) {
+      return undefined;
+    }
+    return paths[slot];
   }
 
   private mapElectricalTemplateWidget(
