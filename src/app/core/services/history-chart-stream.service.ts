@@ -119,6 +119,9 @@ export class HistoryChartStreamService {
       const buffer: number[] = [];
       let liveSub: Subscription | null = null;
       let reconnectSub: Subscription | null = null;
+      // Release for the live tail's shared path registration; set atomically with the acquire inside
+      // startLive. Stays null if disposed before the backfill settles (startLive never runs).
+      let releaseLive: (() => void) | null = null;
 
       // Track the delta stream's connection and re-backfill on reconnect (#85). A WS drop/reconnect
       // resumes the live tail but never re-fetches the interval that elapsed during the drop, leaving a
@@ -140,7 +143,9 @@ export class HistoryChartStreamService {
           }
           if (!ctx.seeded || sawDisconnected) void this.reBackfill(params, domain, buffer, subscriber, ctx);
         });
-        liveSub = this.startLive(params, domain, buffer, offsetMs, newestBackfillTs, subscriber, ctx);
+        const live = this.startLive(params, domain, buffer, offsetMs, newestBackfillTs, subscriber, ctx);
+        liveSub = live.sub;
+        releaseLive = live.release;
       };
 
       this.fetchBackfill(params, domain)
@@ -183,6 +188,10 @@ export class HistoryChartStreamService {
         ctx.disposed = true;
         liveSub?.unsubscribe();
         reconnectSub?.unsubscribe();
+        // Release the shared path registration after the live subscriptions that used it are torn
+        // down. No-op when disposed before the backfill settled (releaseLive still null → nothing was
+        // acquired); the ctx.disposed guards in the backfill handlers block a late acquisition.
+        releaseLive?.();
       };
     });
   }
@@ -195,10 +204,12 @@ export class HistoryChartStreamService {
     newestBackfillTs: number | null,
     subscriber: { next: (v: StreamEmission) => void },
     ctx: IStreamCtx
-  ): Subscription {
+  ): { sub: Subscription; release: () => void } {
     // One shared upstream so the freshness tracker, the immediate first value and the resampler all
-    // draw from a single path subscription.
-    const path$ = this.data.subscribePath(params.path, params.source).pipe(
+    // draw from a single path registration; its release is returned so getBackfillThenLive's teardown
+    // frees it once the live subscriptions below are gone.
+    const handle = this.data.acquirePath(params.path, params.source);
+    const path$ = handle.data$.pipe(
       filter(u => u?.data?.value !== null && u?.data?.value !== undefined),
       shareReplay({ bufferSize: 1, refCount: true })
     );
@@ -283,7 +294,7 @@ export class HistoryChartStreamService {
       const stats = computeWindowStats(buffer, params.smoothingPeriod, domain);
       subscriber.next({ timestamp: now, data: { ...stats } });
     }));
-    return sub;
+    return { sub, release: handle.release };
   }
 
   private async fetchBackfill(params: IHistoryChartStreamParams, domain: ChartStatsDomain, fromMs: number = Date.now() - params.windowMs): Promise<{ points: IDatasetServiceDatapoint[]; offsetMs: number } | null> {
