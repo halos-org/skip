@@ -189,8 +189,9 @@ export class HistoryChartStreamService {
         liveSub?.unsubscribe();
         reconnectSub?.unsubscribe();
         // Release the shared path registration after the live subscriptions that used it are torn
-        // down. No-op when disposed before the backfill settled (releaseLive still null → nothing was
-        // acquired); the ctx.disposed guards in the backfill handlers block a late acquisition.
+        // down. Balanced two ways: when disposed before the backfill settled, startLive never ran, so
+        // releaseLive is still null and this is a no-op; and the release closure is idempotent, so any
+        // redundant call is harmless.
         releaseLive?.();
       };
     });

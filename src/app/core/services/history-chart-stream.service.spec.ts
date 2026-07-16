@@ -23,7 +23,7 @@ describe('HistoryChartStreamService', () => {
   const history = { getValues: vi.fn() };
   const mapper = { mapValuesToChartDatapoints: vi.fn() };
   const releasePath = vi.fn();
-  const data = { subscribePath: vi.fn(), acquirePath: vi.fn(), getPathUnitType: vi.fn() };
+  const data = { acquirePath: vi.fn(), getPathUnitType: vi.fn() };
 
   function make(): HistoryChartStreamService {
     TestBed.configureTestingModule({
@@ -46,7 +46,6 @@ describe('HistoryChartStreamService', () => {
     history.getValues.mockReset();
     mapper.mapValuesToChartDatapoints.mockReset().mockReturnValue([]);
     releasePath.mockReset();
-    data.subscribePath.mockReset().mockReturnValue(path$);
     // The service consumes acquirePath now; data$ is the same subject the tests push into.
     data.acquirePath.mockReset().mockReturnValue({ data$: path$, release: releasePath });
     data.getPathUnitType.mockReset().mockReturnValue(null); // scalar unless a test overrides

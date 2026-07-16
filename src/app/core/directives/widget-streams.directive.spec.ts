@@ -101,6 +101,33 @@ function makeCfg(opts: {
     };
 }
 
+/** Build a config holding several distinct path bases so the multi-base release paths can be exercised. */
+function makeMultiCfg(entries: { key: string; path: string }[]): IWidgetSvcConfig {
+    const paths: Record<string, IWidgetPath> = {};
+    for (const e of entries) {
+        paths[e.key] = {
+            description: 'Test path',
+            path: e.path,
+            pathID: `id-${e.key}`,
+            source: null,
+            pathType: 'string',
+            suppressBootstrapNull: false,
+            isPathConfigurable: true,
+            showPathSkUnitsFilter: false,
+            pathSkUnitsFilter: null,
+            convertUnitTo: undefined as unknown as string,
+            sampleTime: 1000,
+            supportsPut: false
+        };
+    }
+    return { ...makeCfg(), paths };
+}
+
+/** Read the directive's private held-handle map size to assert releaseAllBases emptied it. */
+function heldBaseCount(directive: WidgetStreamsDirective): number {
+    return (directive as unknown as { baseReleases: Map<string, unknown> }).baseReleases.size;
+}
+
 describe('WidgetStreamsDirective', () => {
     let directive: WidgetStreamsDirective;
     let dataSvc: FakeDataService;
@@ -582,6 +609,44 @@ describe('WidgetStreamsDirective', () => {
 
         directive.ngOnDestroy();
         expect(dataSvc.releases).toEqual([{ path: 'env.destroy', source: 'default' }]);
+    });
+
+    it('does NOT release or re-acquire the base on a timeout-setting change (rootChanged rebuild)', () => {
+        directive.setStreamsConfig(makeCfg({ path: 'env.root', source: null, pathType: 'string', sampleTime: 50, enableTimeout: false, dataTimeout: 5 }));
+        directive.observe('p', () => { });
+        expect(dataSvc.calls.length).toBe(1);
+
+        // A dataTimeout change flips the ROOT signature, taking the distinct rootChanged branch that
+        // force-rebuilds every path's pipeline even though the per-path signature is unchanged. baseKey
+        // (path+source) is still identical, so the base must be neither released nor re-acquired.
+        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.root', source: null, pathType: 'string', sampleTime: 50, enableTimeout: false, dataTimeout: 7 }));
+        expect(dataSvc.calls.length).toBe(1);
+        expect(dataSvc.releases).toEqual([]);
+    });
+
+    it('releases every held base (not just one) in the bulk config-reset branch', () => {
+        directive.setStreamsConfig(makeMultiCfg([{ key: 'a', path: 'env.a' }, { key: 'b', path: 'env.b' }]));
+        directive.observe('a', () => { });
+        directive.observe('b', () => { });
+        expect(dataSvc.calls.length).toBe(2);
+        expect(heldBaseCount(directive)).toBe(2);
+
+        directive.applyStreamsConfigDiff(undefined);
+
+        expect(dataSvc.releases.map(r => r.path).sort()).toEqual(['env.a', 'env.b']);
+        expect(heldBaseCount(directive)).toBe(0);
+    });
+
+    it('releases every held base (not just one) on destroy', () => {
+        directive.setStreamsConfig(makeMultiCfg([{ key: 'a', path: 'env.a' }, { key: 'b', path: 'env.b' }]));
+        directive.observe('a', () => { });
+        directive.observe('b', () => { });
+        expect(heldBaseCount(directive)).toBe(2);
+
+        directive.ngOnDestroy();
+
+        expect(dataSvc.releases.map(r => r.path).sort()).toEqual(['env.a', 'env.b']);
+        expect(heldBaseCount(directive)).toBe(0);
     });
 });
 
