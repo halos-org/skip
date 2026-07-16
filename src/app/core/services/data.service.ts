@@ -1,5 +1,5 @@
 import { DestroyRef, inject, Injectable, OnDestroy } from '@angular/core';
-import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, of, interval, filter, Subscription } from 'rxjs';
+import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, interval, filter, Subscription } from 'rxjs';
 import { ISkPathData, IPathValueData, IPathMetaData, IMeta, IPathUpdateEvent } from "../interfaces/app-interfaces";
 import { ISignalKDataValueUpdate, ISkMetadata, ISignalKNotification, States, TState } from '../interfaces/signalk-interfaces'
 import { SignalKDeltaService } from './signalk-delta.service';
@@ -90,7 +90,6 @@ const buildPathData = (value: unknown, rawTimestamp: string | number | Date | nu
  * @property {BehaviorSubject<IPathData>} _pathData$ - A BehaviorSubject of the private path value.
  * @property {BehaviorSubject<TState>} _pathState$ - A BehaviorSubject of the private path data state property.
  * @property {BehaviorSubject<IPathUpdate>} pathDataUpdate$ - A BehaviorSubject that contains path value and value state.
- * @property {BehaviorSubject<ISkMetadata | null>} pathMeta$ - A BehaviorSubject containing available meta or null.
  * @property {Subscription} combinedSub - The internal combineLatest subscription feeding pathDataUpdate$, torn down on release.
  *
  * @interface IPathRegistration
@@ -102,7 +101,6 @@ interface IPathRegistration {
   _pathData$: BehaviorSubject<IPathData>;
   _pathState$: BehaviorSubject<TState>;
   pathDataUpdate$: BehaviorSubject<IPathUpdate>;
-  pathMeta$: BehaviorSubject<ISkMetadata | null>;
   combinedSub?: Subscription;
 }
 
@@ -162,6 +160,13 @@ export class DataService implements OnDestroy {
   private _skDataIndexByPath = new Map<string, number>();
   /** Path -> registrations index for fast lookups during updates. */
   private _pathRegisterByPath = new Map<string, IPathRegistration[]>();
+  /**
+   * Path -> shared meta subject, kept as a sibling of `_pathRegisterByPath` rather than inside a
+   * registration. Meta is per-path, not per-source, so decoupling it means releasing one source's
+   * registration can never complete a still-live path's meta stream, and a consumer can observe meta
+   * before any value registration exists.
+   */
+  private _pathMetaByPath = new Map<string, BehaviorSubject<ISkMetadata | null>>();
 
   constructor() {
     // Emit Delta message update counter every second (RxJS based)
@@ -236,6 +241,15 @@ export class DataService implements OnDestroy {
     this._isReset.next(true);
   }
 
+  /**
+   * Subscribe to a `(path, source)` stream, sharing one registration across co-subscribers and
+   * bumping its refCount. Callers must balance every call with an {@link unsubscribePath}.
+   *
+   * Churning and lifecycle-scoped consumers (widgets, per-selection rebinds, chart streams) should
+   * prefer {@link acquirePath}, whose idempotent, forgery-proof release closure makes balanced
+   * teardown far harder to get wrong than a raw `unsubscribePath(path, source)` call. App-lifetime
+   * singletons that subscribe once and never release may call this directly.
+   */
   public subscribePath(path: string, source: string): Observable<IPathUpdate> {
     const registrations = this._pathRegisterByPath.get(path);
     const matching = registrations?.find(item => item.path === path && item.source === source);
@@ -255,7 +269,6 @@ export class DataService implements OnDestroy {
       },
       state: state
     };
-    let metaUpdate: ISkMetadata | null = null;
 
     const dataPath = this._skData.get(path);
 
@@ -273,7 +286,6 @@ export class DataService implements OnDestroy {
       };
 
       state = dataPath.state || state;
-      metaUpdate = dataPath.meta || null;
     }
 
     const newPathSubject: IPathRegistration = {
@@ -282,8 +294,7 @@ export class DataService implements OnDestroy {
       refCount: 1,
       _pathData$: new BehaviorSubject<IPathData>(pathUpdate.data),
       _pathState$: new BehaviorSubject<TState>(pathUpdate.state),
-      pathDataUpdate$: new BehaviorSubject<IPathUpdate>(pathUpdate),
-      pathMeta$: new BehaviorSubject<ISkMetadata | null>(metaUpdate ? cloneDeep(metaUpdate) : null)
+      pathDataUpdate$: new BehaviorSubject<IPathUpdate>(pathUpdate)
     };
 
     const combined$ = combineLatest([newPathSubject._pathData$, newPathSubject._pathState$]).pipe(
@@ -327,12 +338,34 @@ export class DataService implements OnDestroy {
     registration._pathData$.complete();
     registration._pathState$.complete();
     registration.pathDataUpdate$.complete();
-    registration.pathMeta$.complete();
 
     registrations.splice(pathIndex, 1);
     if (registrations.length === 0) {
       this._pathRegisterByPath.delete(path);
     }
+  }
+
+  /**
+   * Acquire a disposable handle to a `(path, source)` stream. `data$` is the very same shared
+   * Observable {@link subscribePath} returns; `release` is an idempotent teardown that decrements the
+   * shared registration exactly once no matter how many times it is called, and is forgery-proof —
+   * the caller never passes a path/source into it, so it can only release the registration it took.
+   * This makes balanced acquire/release the default for churning and lifecycle-scoped consumers.
+   *
+   * @param {string} path The Signal K path
+   * @param {string} source The source to read from ('default' for the server-priority value)
+   * @returns The shared stream plus a one-shot release closure.
+   * @memberof DataService
+   */
+  public acquirePath(path: string, source: string): { data$: Observable<IPathUpdate>; release: () => void } {
+    const data$ = this.subscribePath(path, source);
+    let released = false;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      this.unsubscribePath(path, source);
+    };
+    return { data$, release };
   }
 
   /**
@@ -376,6 +409,15 @@ export class DataService implements OnDestroy {
       this._dataServiceMeta = Array.from(this._dataServiceMetaByPath.values());
       if (this._isSkMetaFullTreeActive) {
         this._dataServiceMetaSubject$.next(this._dataServiceMeta);
+      }
+    }
+
+    // Prune the decoupled per-path meta subjects. Delete-only (no .complete()): this method leaves
+    // active registrations alive by contract, so a widget still bound to the context simply stops
+    // receiving meta rather than having its stream torn down.
+    for (const path of Array.from(this._pathMetaByPath.keys())) {
+      if (path.startsWith(prefix)) {
+        this._pathMetaByPath.delete(path);
       }
     }
   }
@@ -584,13 +626,10 @@ export class DataService implements OnDestroy {
         pathObject.meta = merge({}, pathObject.meta, meta.meta);
       }
 
-      const entries = this._pathRegisterByPath.get(metaPath);
-      if (entries?.length) {
-        for (const entry of entries) {
-          // Emit a snapshot to guarantee a new reference for downstream consumers.
-          entry.pathMeta$.next(pathObject.meta ? cloneDeep(pathObject.meta) : null);
-        }
-      }
+      // Emit a snapshot (new reference) to the path's shared meta subject if one has been observed.
+      // A plain get() — not get-or-create — so a meta delta for an un-queried path does not grow the
+      // map. Meta is per-path, so a single subject serves every source's consumers.
+      this._pathMetaByPath.get(metaPath)?.next(cloneDeep(pathObject.meta) ?? null);
 
       // If full meta tree is active, push the full tree
       if (this._isSkMetaFullTreeActive) {
@@ -834,16 +873,30 @@ export class DataService implements OnDestroy {
   }
 
   /**
-   * Returns an Observable that emits metadata updates for a registered Signal K path.
+   * Returns an Observable that emits metadata updates for a Signal K path.
    *
    * Notes:
-   * - The path must already be registered via {@link subscribePath}; otherwise this returns an Observable that emits `null`.
-   * - If multiple registrations exist for the same path (e.g. different sources), this returns the first match by path.
-   * - Registrations are app-lifetime, so the returned Observable stays live for the session and does not complete on its own.
+   * - Meta is per-path (not per-source): the returned subject is shared across every source's
+   *   consumers, and releasing one source's value registration does not complete it.
+   * - Does not require a prior {@link subscribePath}: the subject is created on demand, seeded from
+   *   any cached meta, and stays live for the session (it does not complete on its own).
    */
   public getPathMetaObservable(path: string): Observable<ISkMetadata | null> {
-    const registration = this._pathRegisterByPath.get(path)?.[0];
-    return registration?.pathMeta$.asObservable() || of(null);
+    return this.getOrCreatePathMeta(path).asObservable();
+  }
+
+  /**
+   * Returns the shared meta subject for a path, creating and storing it (seeded from any cached
+   * meta) on first request. Only observation grows the map; incoming meta deltas use a plain get()
+   * so un-queried paths never allocate a subject.
+   */
+  private getOrCreatePathMeta(path: string): BehaviorSubject<ISkMetadata | null> {
+    let subject = this._pathMetaByPath.get(path);
+    if (!subject) {
+      subject = new BehaviorSubject<ISkMetadata | null>(cloneDeep(this._skData.get(path)?.meta) ?? null);
+      this._pathMetaByPath.set(path, subject);
+    }
+    return subject;
   }
 
   /**

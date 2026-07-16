@@ -72,7 +72,9 @@ describe('AisProcessingService applyAisUpdate dispatch', () => {
       // Every prefix subscription shares the same stream; the merged pipeline
       // forwards anything we push. The self-nav stream also reads this but our
       // test paths only match AIS contexts, so they're routed correctly.
-      subscribePathTree: () => stream$.asObservable()
+      subscribePathTree: () => stream$.asObservable(),
+      // removeTrack prunes the DataService cache for the evicted context.
+      removePathsForContext: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -206,6 +208,7 @@ describe('AisProcessingService target eviction (bounds unbounded growth)', () =>
     stream$.next({ path: fullPath, update: { data: { value, timestamp: new Date(tsMs) }, state: 'normal' } } as IPathUpdateWithPath);
     vi.advanceTimersByTime(300);
   }
+  let removePathsForContext: ReturnType<typeof vi.fn>;
   const internals = () => service as unknown as {
     tracks: Map<string, unknown>;
     contextIndex: Map<string, string>;
@@ -217,8 +220,9 @@ describe('AisProcessingService target eviction (bounds unbounded growth)', () =>
   beforeEach(() => {
     vi.useFakeTimers();
     stream$ = new Subject<IPathUpdateWithPath>();
+    removePathsForContext = vi.fn();
     TestBed.configureTestingModule({
-      providers: [AisProcessingService, { provide: DataService, useValue: { subscribePathTree: () => stream$.asObservable() } as Partial<DataService> }]
+      providers: [AisProcessingService, { provide: DataService, useValue: { subscribePathTree: () => stream$.asObservable(), removePathsForContext } as Partial<DataService> }]
     });
     service = TestBed.inject(AisProcessingService);
   });
@@ -324,6 +328,29 @@ describe('AisProcessingService target eviction (bounds unbounded growth)', () =>
       }
     }
   });
+
+  it('prunes the DataService cache for the context on an explicit status:"remove"', () => {
+    const ctx = 'vessels.urn:mrn:imo:mmsi:400000001';
+    push(`${ctx}.navigation.position.latitude`, 10);
+    push(`${ctx}.sensors.ais.status`, 'remove');
+    expect(removePathsForContext).toHaveBeenCalledWith(ctx);
+  });
+
+  it('prunes the DataService cache for the context evicted by the cap', () => {
+    internals().maxTargets = 1;
+    const oldCtx = 'vessels.urn:mrn:imo:mmsi:400000002';
+    const newCtx = 'vessels.urn:mrn:imo:mmsi:400000003';
+    pushAt(`${oldCtx}.navigation.position.latitude`, 10, EVENT_TS + 1000);
+    pushAt(`${newCtx}.navigation.position.latitude`, 11, EVENT_TS + 2000);
+    expect(removePathsForContext).toHaveBeenCalledWith(oldCtx);
+  });
+
+  it('prunes the DataService cache for the context evicted by the TTL sweep', () => {
+    const ctx = 'vessels.urn:mrn:imo:mmsi:400000004';
+    pushAt(`${ctx}.navigation.position.latitude`, 12, EVENT_TS);
+    internals().evictStaleTracks(EVENT_TS + 11 * 60 * 1000);
+    expect(removePathsForContext).toHaveBeenCalledWith(ctx);
+  });
 });
 
 /**
@@ -345,7 +372,7 @@ describe('AisProcessingService own-ship throttling', () => {
     vi.useFakeTimers();
     stream$ = new Subject<IPathUpdateWithPath>();
     TestBed.configureTestingModule({
-      providers: [AisProcessingService, { provide: DataService, useValue: { subscribePathTree: () => stream$.asObservable() } as Partial<DataService> }]
+      providers: [AisProcessingService, { provide: DataService, useValue: { subscribePathTree: () => stream$.asObservable(), removePathsForContext: vi.fn() } as Partial<DataService> }]
     });
     service = TestBed.inject(AisProcessingService);
   });

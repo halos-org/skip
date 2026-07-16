@@ -635,6 +635,10 @@ export class AisProcessingService {
     for (const [context, id] of this.contextIndex.entries()) {
       if (id === track.id) this.contextIndex.delete(context);
     }
+    // Single funnel for all three eviction reasons (status:'remove', cap, TTL sweep): free the
+    // DataService per-path cache/meta for this vessel context too, so evicting a target releases the
+    // memory its paths held rather than leaving orphaned entries to grow unbounded.
+    this.data.removePathsForContext(track.context);
     if (AIS_DEBUG) {
       console.debug('[AIS] removed', { id: track.id, mmsi: track.mmsi, status: track.ais.status });
     }

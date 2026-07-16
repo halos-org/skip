@@ -22,7 +22,8 @@ describe('HistoryChartStreamService', () => {
   let state$: BehaviorSubject<ConnectionState>;
   const history = { getValues: vi.fn() };
   const mapper = { mapValuesToChartDatapoints: vi.fn() };
-  const data = { subscribePath: vi.fn(), getPathUnitType: vi.fn() };
+  const releasePath = vi.fn();
+  const data = { acquirePath: vi.fn(), getPathUnitType: vi.fn() };
 
   function make(): HistoryChartStreamService {
     TestBed.configureTestingModule({
@@ -44,7 +45,9 @@ describe('HistoryChartStreamService', () => {
     state$ = new BehaviorSubject<ConnectionState>(ConnectionState.Connected);
     history.getValues.mockReset();
     mapper.mapValuesToChartDatapoints.mockReset().mockReturnValue([]);
-    data.subscribePath.mockReset().mockReturnValue(path$);
+    releasePath.mockReset();
+    // The service consumes acquirePath now; data$ is the same subject the tests push into.
+    data.acquirePath.mockReset().mockReturnValue({ data$: path$, release: releasePath });
     data.getPathUnitType.mockReset().mockReturnValue(null); // scalar unless a test overrides
   });
 
@@ -290,7 +293,7 @@ describe('HistoryChartStreamService', () => {
 
     // The transient failure must NOT surface HISTORY_UNAVAILABLE; the live tail is subscribed instead.
     expect(emissions.some(e => !Array.isArray(e) && 'unavailable' in e)).toBe(false);
-    expect(data.subscribePath).toHaveBeenCalled();
+    expect(data.acquirePath).toHaveBeenCalled();
 
     // A live delta still renders, so the chart keeps working through the blip.
     const before = Date.now();
@@ -339,7 +342,7 @@ describe('HistoryChartStreamService', () => {
     history.getValues.mockRejectedValue(new Error('boom'));
     const first = await firstValueFrom(make().getBackfillThenLive(PARAMS));
     expect(isHistoryUnavailable(first)).toBe(true);
-    expect(data.subscribePath).not.toHaveBeenCalled();
+    expect(data.acquirePath).not.toHaveBeenCalled();
   });
 
   it('unsubscribing tears down the live delta subscription', async () => {
@@ -367,7 +370,32 @@ describe('HistoryChartStreamService', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(emissions.length).toBe(0); // the disposed guard prevents the batch
-    expect(data.subscribePath).not.toHaveBeenCalled();
+    expect(data.acquirePath).not.toHaveBeenCalled();
+  });
+
+  it('releases the live path handle when the stream is torn down after backfill', async () => {
+    history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+    mapper.mapValuesToChartDatapoints.mockReturnValue([]);
+    const sub = make().getBackfillThenLive(PARAMS).subscribe();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(data.acquirePath).toHaveBeenCalledTimes(1);
+    expect(releasePath).not.toHaveBeenCalled();
+
+    sub.unsubscribe();
+    expect(releasePath).toHaveBeenCalledTimes(1);
+  });
+
+  it('neither acquires nor releases the path when disposed before the backfill resolves', async () => {
+    history.getValues.mockResolvedValue({ context: 'vessels.self', range: {}, values: [], data: [] });
+    mapper.mapValuesToChartDatapoints.mockReturnValue([{ timestamp: 1000, data: { value: 1 } }]);
+    const sub = make().getBackfillThenLive(PARAMS).subscribe();
+    sub.unsubscribe(); // before the backfill promise settles
+    await Promise.resolve();
+    await Promise.resolve();
+    // startLive never ran → nothing acquired, so releaseLive stays null and the teardown is a no-op.
+    expect(data.acquirePath).not.toHaveBeenCalled();
+    expect(releasePath).not.toHaveBeenCalled();
   });
 
   it('resolves a radian path with no override to a circular domain — live stats wrap correctly (#6)', async () => {

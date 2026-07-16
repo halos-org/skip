@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { IMeta, IPathValueData, IPathMetaData } from '../interfaces/app-interfaces';
-import { ISignalKDataValueUpdate, States } from '../interfaces/signalk-interfaces';
+import { ISignalKDataValueUpdate, ISkMetadata, States } from '../interfaces/signalk-interfaces';
 import { DataService, IPathUpdate, IPathUpdateWithPath } from './data.service';
 import { SignalKDeltaService } from './signalk-delta.service';
 
@@ -153,6 +153,74 @@ describe('DataService', () => {
     });
   });
 
+  describe('acquirePath (disposable handle)', () => {
+    const PATH = 'self.navigation.speedOverGround';
+
+    it('shares the same stream subscribePath returns and refcounts co-acquirers', () => {
+      // data$ IS the shared subject subscribePath hands out (acquirePath composes subscribePath).
+      const shared$ = service.subscribePath(PATH, 'default'); // refCount 1
+      const a = service.acquirePath(PATH, 'default');         // refCount 2
+      expect(a.data$).toBe(shared$);
+      service.unsubscribePath(PATH, 'default');               // balance the bare subscribePath → refCount 1
+
+      let completed = false;
+      a.data$.subscribe({ complete: () => (completed = true) });
+      const b = service.acquirePath(PATH, 'default');         // refCount 2
+      expect(b.data$).toBe(a.data$);
+
+      a.release();                                            // refCount 1
+      expect(completed).toBe(false); // b still holds it
+      b.release();                                            // refCount 0 → teardown
+      expect(completed).toBe(true);
+    });
+
+    it('release is idempotent: extra calls do not tear down a co-acquirer still holding the path', () => {
+      let firstCompleted = false;
+      let secondCompleted = false;
+      const first = service.acquirePath(PATH, 'default');
+      const second = service.acquirePath(PATH, 'default');
+      first.data$.subscribe({ complete: () => (firstCompleted = true) });
+      second.data$.subscribe({ complete: () => (secondCompleted = true) });
+
+      first.release();
+      first.release();
+      first.release(); // 2nd/3rd calls are no-ops
+      expect(firstCompleted).toBe(false);
+      expect(secondCompleted).toBe(false);
+
+      // The surviving co-acquirer's stream stays live and still delivers values.
+      let latest: IPathUpdate | undefined;
+      second.data$.subscribe(update => (latest = update));
+      dataPathUpdates$.next({
+        context: 'self',
+        path: 'navigation.speedOverGround',
+        source: 'gps',
+        timestamp: '2026-01-01T00:00:01.000Z',
+        value: 4.4,
+      });
+      expect(latest!.data.value).toBe(4.4);
+
+      // A balanced release finally tears it down.
+      second.release();
+      expect(secondCompleted).toBe(true);
+    });
+
+    it('a handle cannot decrement a registration below its own single acquire', () => {
+      // Two independent acquisitions of the SAME (path, source): refCount == 2.
+      const doomed = service.acquirePath(PATH, 'default');
+      const survivor = service.acquirePath(PATH, 'default');
+      let survivorCompleted = false;
+      survivor.data$.subscribe({ complete: () => (survivorCompleted = true) });
+
+      // Over-calling release cannot decrement more than the one acquire this handle made.
+      doomed.release();
+      doomed.release();
+      doomed.release();
+
+      expect(survivorCompleted).toBe(false); // the survivor's acquire is intact
+    });
+  });
+
   describe('removePathsForContext', () => {
     const vesselA = 'vessels.urn:mrn:imo:mmsi:100000001';
     const vesselB = 'vessels.urn:mrn:imo:mmsi:100000002';
@@ -239,6 +307,69 @@ describe('DataService', () => {
 
       expect(service.getPathObject(`${shortCtx}.navigation.speedOverGround`)).toBeNull();
       expect(service.getPathObject(`${longCtx}.navigation.speedOverGround`)).not.toBeNull();
+    });
+  });
+
+  describe('getPathMetaObservable (meta decoupled from registrations)', () => {
+    const PATH = 'self.electrical.batteries.10.voltage';
+
+    function pushMeta(context: string, path: string, meta: ISkMetadata): void {
+      metadataUpdates$.next({ context, path, meta });
+    }
+
+    it('keeps the shared meta stream live when a sibling source registration is released', () => {
+      // Two sources registered for the same path: releasing one must not complete the path's meta.
+      service.subscribePath(PATH, 'default');
+      service.subscribePath(PATH, 'gps-2');
+
+      let latestMeta: ISkMetadata | null | undefined;
+      let completed = false;
+      service.getPathMetaObservable(PATH).subscribe({
+        next: m => (latestMeta = m),
+        complete: () => (completed = true),
+      });
+
+      service.unsubscribePath(PATH, 'default');
+
+      pushMeta('self', 'electrical.batteries.10.voltage', { description: 'Voltage', units: 'V', properties: {} });
+
+      expect(completed).toBe(false);
+      expect(latestMeta?.units).toBe('V');
+    });
+
+    it('emits to a subscriber that observed meta before any path registration (no dead of(null))', () => {
+      const PATH2 = 'self.environment.outside.temperature';
+      const metas: (ISkMetadata | null)[] = [];
+      // Subscribe BEFORE any subscribePath — the pre-decoupling code returned a dead of(null) here.
+      service.getPathMetaObservable(PATH2).subscribe(m => metas.push(m));
+      expect(metas).toEqual([null]); // seeded null from the BehaviorSubject
+
+      pushMeta('self', 'environment.outside.temperature', { description: 'Temp', units: 'K', properties: {} });
+
+      // The later delta reaches the same live subscriber, proving it is not a completed of(null).
+      expect(metas.length).toBe(2);
+      expect(metas[1]?.units).toBe('K');
+    });
+
+    it('prunes the decoupled meta subject for a removed foreign context, leaving self untouched', () => {
+      const vessel = 'vessels.urn:mrn:imo:mmsi:100000001';
+      const foreignPath = `${vessel}.navigation.speedOverGround`;
+      const selfPath = 'self.navigation.speedOverGround';
+
+      service.getPathMetaObservable(foreignPath).subscribe();
+      service.getPathMetaObservable(selfPath).subscribe();
+
+      const metaMap = (service as unknown as { _pathMetaByPath: Map<string, unknown> })._pathMetaByPath;
+      expect(metaMap.has(foreignPath)).toBe(true);
+      expect(metaMap.has(selfPath)).toBe(true);
+
+      service.removePathsForContext(vessel);
+      expect(metaMap.has(foreignPath)).toBe(false);
+      expect(metaMap.has(selfPath)).toBe(true);
+
+      // The self context is a no-op, its meta subject survives.
+      service.removePathsForContext('self');
+      expect(metaMap.has(selfPath)).toBe(true);
     });
   });
 
