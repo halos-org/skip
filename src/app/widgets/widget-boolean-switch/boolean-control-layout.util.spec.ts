@@ -36,4 +36,14 @@ describe('boolean-control-layout util', () => {
 
     expect(buttonLayout.labelWidth).toBeGreaterThan(switchLayout.labelWidth);
   });
+
+  it('scales the OFF-state stroke widths with height', () => {
+    const base = getBooleanControlLayout('1', 220, 35);
+    expect(base.switchStrokeWidth).toBe(1.5);
+    expect(base.lightStrokeWidth).toBe(3);
+
+    const doubled = getBooleanControlLayout('3', 220, 70);
+    expect(doubled.switchStrokeWidth).toBe(3);
+    expect(doubled.lightStrokeWidth).toBe(6);
+  });
 });
