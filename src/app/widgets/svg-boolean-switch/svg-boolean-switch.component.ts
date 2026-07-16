@@ -2,6 +2,7 @@ import { Component, DoCheck, input, output, ChangeDetectionStrategy } from '@ang
 import type { IDynamicControl, IDimensions } from '../../core/interfaces/widgets-interface';
 import type { ITheme } from '../../core/services/app-service';
 import { createSwipeGuard } from '../../core/utils/pointer-swipe-guard.util';
+import { BooleanControlLayout, getBooleanControlLayout } from '../widget-boolean-switch/boolean-control-layout.util';
 
 @Component({
     selector: 'app-svg-boolean-switch',
@@ -15,13 +16,11 @@ export class SvgBooleanSwitchComponent implements DoCheck {
   readonly dimensions = input.required<IDimensions>();
   readonly toggleClick = output<IDynamicControl>();
 
-  private toggleOff = "0 35 180 35";
-  private toggleOn = "0 0 180 35";
   private ctrlState: boolean | null = null;
   private oldTheme: ITheme | null = null;
   private readonly swipeGuard = createSwipeGuard();
 
-  public viewBox: string = this.toggleOff;
+  public offColor: string | null = null;
   public labelColor: string | null = null;
   public valueColor: string | null = null;
   private ctrlColor = '';
@@ -33,7 +32,6 @@ export class SvgBooleanSwitchComponent implements DoCheck {
     if (!data) return;
     if (data.value != this.ctrlState) {
       this.ctrlState = data.value;
-      this.viewBox = data.value ? this.toggleOn : this.toggleOff;
     }
     if(data.color != this.ctrlColor) {
       this.ctrlColor = data.color;
@@ -64,6 +62,19 @@ export class SvgBooleanSwitchComponent implements DoCheck {
     this.swipeGuard.onPointerCancel(event);
   }
 
+  public get layout(): BooleanControlLayout {
+    const dimensions = this.dimensions();
+    return getBooleanControlLayout('1', dimensions.width, dimensions.height);
+  }
+
+  public get isEnabled(): boolean {
+    return Boolean(this.ctrlState);
+  }
+
+  public get nextState(): boolean {
+    return !this.isEnabled;
+  }
+
   public toggle(state: boolean): void {
     const data = this.data();
     if (!data) return;
@@ -76,38 +87,47 @@ export class SvgBooleanSwitchComponent implements DoCheck {
     if (!theme) return;
     switch (color) {
       case "contrast":
+        this.offColor = theme.contrastDimmer;
         this.labelColor = theme.contrastDim;
         this.valueColor = theme.contrast;
         break;
       case "blue":
+        this.offColor = theme.blueDimmer;
         this.labelColor = theme.blueDim;
         this.valueColor = theme.blue;
         break;
       case "green":
+        this.offColor = theme.greenDimmer;
         this.labelColor = theme.greenDim;
         this.valueColor = theme.green;
         break;
       case "pink":
+        this.offColor = theme.pinkDimmer;
         this.labelColor = theme.pinkDim;
         this.valueColor = theme.pink;
         break;
       case "orange":
+        this.offColor = theme.orangeDimmer;
         this.labelColor = theme.orangeDim;
         this.valueColor = theme.orange;
         break;
       case "purple":
+        this.offColor = theme.purpleDimmer;
         this.labelColor = theme.purpleDim;
         this.valueColor = theme.purple;
         break;
       case "grey":
+        this.offColor = theme.greyDimmer;
         this.labelColor = theme.greyDim;
         this.valueColor = theme.grey;
         break;
       case "yellow":
+        this.offColor = theme.yellowDimmer;
         this.labelColor = theme.yellowDim;
         this.valueColor = theme.yellow;
         break;
       default:
+        this.offColor = theme.contrastDimmer;
         this.labelColor = theme.contrastDim;
         this.valueColor = theme.contrast;
         break;

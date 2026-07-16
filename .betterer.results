@@ -193,9 +193,9 @@ exports[`strictNullChecks`] = {
       [1358, 21, 11, "\'b.longitude\' is possibly \'undefined\'.", "3370058570"],
       [1358, 35, 11, "\'a.longitude\' is possibly \'undefined\'.", "2985066057"]
     ],
-    "src/app/widgets/widget-boolean-switch/widget-boolean-switch.component.ts:800795185": [
-      [71, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
-      [94, 10, 12, "Object is possibly \'null\'.", "4261782498"]
+    "src/app/widgets/widget-boolean-switch/widget-boolean-switch.component.ts:1261729337": [
+      [77, 38, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
+      [100, 10, 12, "Object is possibly \'null\'.", "4261782498"]
     ],
     "src/app/widgets/widget-datetime/widget-datetime.component.ts:3033260432": [
       [60, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'string\'.", "2620553983"],
