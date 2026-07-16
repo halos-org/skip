@@ -6,7 +6,7 @@
  * instantiated gauge config.
  */
 import { Component, AfterViewInit, ElementRef, effect, viewChild, input, inject, untracked, computed, signal } from '@angular/core';
-import { gaugeAnimationDurationMs } from '../../core/utils/gauge-animation.util';
+import { gaugeAnimationDurationMs, gaugeAnimationOptions } from '../../core/utils/gauge-animation.util';
 import { ChangeDetectionStrategy } from '@angular/core';
 
 import { GaugesModule, RadialGaugeOptions, RadialGauge } from '@godind/ng-canvas-gauges';
@@ -170,9 +170,9 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       });
     });
 
-    // Enable animatedValue transition only after the gauge canvas is first mounted.
-    // buildGaugeOptions starts with animatedValue=false so the initial @if render
-    // places the needle at the real value without any sweep animation.
+    // Enable the needle animation only after the gauge canvas is first mounted, so
+    // the initial @if render places the needle at the real value without a sweep.
+    // The value box tween (animatedValue) stays off on every path — see #222.
     effect(() => {
       const gauge = this.ngGauge();
       if (!gauge || this.gaugeBootstrapped()) return;
@@ -180,7 +180,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
         try {
           requestAnimationFrame(() => {
             this.gaugeBootstrapped.set(true);
-            try { gauge.update({ animation: true, animatedValue: true }); } catch { /* ignore */ }
+            try { gauge.update(gaugeAnimationOptions(true)); } catch { /* ignore */ }
           });
         } catch { /* ignore */ }
       });
@@ -233,7 +233,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
     else {
       g.animationTarget = this.ANIMATION_TARGET_NEEDLE; g.useMinPath = true;
     }
-    g.animateOnInit = false; g.animation = this.animationEnabled(); g.animatedValue = this.animationEnabled(); g.animationRule = 'linear'; g.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
+    Object.assign(g, gaugeAnimationOptions(this.animationEnabled())); g.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
     // Colors (RGBA unsupported -> convert)
     const palette = getColors(cfg.color, theme);
     const dim = rgbaToHex(palette.dim);

@@ -213,7 +213,7 @@ exports[`strictNullChecks`] = {
       [44, 9, 9, "Type \'null\' is not assignable to type \'string\'.", "2966443234"],
       [148, 40, 27, "Object is possibly \'undefined\'.", "3506675417"]
     ],
-    "src/app/widgets/widget-gauge-ng-compass/widget-gauge-ng-compass.component.ts:3154966941": [
+    "src/app/widgets/widget-gauge-ng-compass/widget-gauge-ng-compass.component.ts:716655136": [
       [237, 30, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"]
     ],
     "src/app/widgets/widget-iframe/widget-iframe.component.ts:2602616758": [
