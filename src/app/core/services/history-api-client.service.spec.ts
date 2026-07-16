@@ -305,6 +305,24 @@ describe('HistoryApiClientService', () => {
     await expect(promise).rejects.toMatchObject({ name: 'HistoryRequestError', status: 0 });
   });
 
+  it('cancels the in-flight HTTP request when the abort signal fires', async () => {
+    connectionStub.serverServiceEndpoint$.next(CONNECTED_ENDPOINT);
+    const controller = new AbortController();
+
+    const promise = service.getValues({ paths: 'navigation.speedThroughWater:avg', resolution: 1 }, controller.signal);
+    await new Promise(resolve => setTimeout(resolve));
+
+    const req = httpMock.expectOne(request => request.url === VALUES_URL);
+    expect(req.cancelled).toBe(false);
+
+    controller.abort();
+
+    // Aborting unsubscribes the request (cancelling the underlying GET) and settles the promise as a
+    // benign request error, rather than leaving the request to hang until the 30s timeout.
+    await expect(promise).rejects.toBeInstanceOf(HistoryRequestError);
+    expect(req.cancelled).toBe(true);
+  });
+
   it('should return null when history paths endpoint returns 500', async () => {
     connectionStub.serverServiceEndpoint$.next({
       state: EndpointStatus.Connected,
