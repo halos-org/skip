@@ -1,4 +1,4 @@
-import { Directive, DestroyRef, inject, signal } from '@angular/core';
+import { Directive, DestroyRef, OnDestroy, inject, signal } from '@angular/core';
 import { DataService, IPathUpdate } from '../services/data.service';
 import { UnitsService } from '../services/units.service';
 import { IWidgetSvcConfig } from '../interfaces/widgets-interface';
@@ -31,7 +31,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
  * - Config changes automatically trigger diff-based subscription updates
  * - All subscriptions auto-cleanup on directive destroy
  */
-export class WidgetStreamsDirective {
+export class WidgetStreamsDirective implements OnDestroy {
   private _streamsConfig = signal<IWidgetSvcConfig | undefined>(undefined);
   private readonly dataService = inject(DataService);
   private readonly unitsService = inject(UnitsService);
@@ -43,6 +43,9 @@ export class WidgetStreamsDirective {
   private subscriptions = new Map<string, { sub: Subscription; signature: string }>();
   // Track identity of the cached base observable (path + normalized source) per path key
   private baseSignatures = new Map<string, string>();
+  // Release handle for each acquired base, held 1:1 with the baseSignatures keyset so every base
+  // registration is released exactly when its cached base is dropped (and all of them on destroy).
+  private baseReleases = new Map<string, () => void>();
   // Root-level signature (timeout settings) to detect when all paths need pipeline rebuild
   private reset$ = new Subject<void>();
   private rootSignature: string | undefined;
@@ -83,6 +86,18 @@ export class WidgetStreamsDirective {
     if (!this.streams) this.streams = new Map<string, Observable<IPathUpdate>>();
   }
 
+  /** Release and forget the base registration held for a path key (idempotent, safe when absent). */
+  private releaseBase(pathName: string): void {
+    this.baseReleases.get(pathName)?.();
+    this.baseReleases.delete(pathName);
+  }
+
+  /** Release every held base registration (used on config reset and directive destroy). */
+  private releaseAllBases(): void {
+    this.baseReleases.forEach(release => release());
+    this.baseReleases.clear();
+  }
+
   /** Create (or reuse) base observable, assemble pipeline, and subscribe with diff-aware replacement. */
   private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; sampleTime?: number; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }): void {
     const normalizedPath = this.normalizePath(pathCfg.path);
@@ -91,6 +106,7 @@ export class WidgetStreamsDirective {
       if (existing) existing.sub.unsubscribe();
       this.subscriptions.delete(pathName);
       this.streams?.delete(pathName);
+      this.releaseBase(pathName);
       this.baseSignatures.delete(pathName);
       return;
     }
@@ -101,7 +117,13 @@ export class WidgetStreamsDirective {
     const effectiveSource = pathCfg.source?.trim() || 'default';
     const currentBaseKey = this.baseSignatures.get(pathName);
     if (!this.streams!.has(pathName) || currentBaseKey !== baseKey) {
-      this.streams!.set(pathName, this.dataService.subscribePath(normalizedPath, effectiveSource));
+      // Base identity (path+source) changed: release the old registration before overwriting so the
+      // superseded (path, source) is not leaked. Never reached on a sampleTime/unit/timeout change —
+      // those keep baseKey identical and only rebuild the RxJS pipeline downstream.
+      this.releaseBase(pathName);
+      const handle = this.dataService.acquirePath(normalizedPath, effectiveSource);
+      this.streams!.set(pathName, handle.data$);
+      this.baseReleases.set(pathName, handle.release);
       this.baseSignatures.set(pathName, baseKey);
     }
     const base$ = this.streams!.get(pathName)!;
@@ -247,6 +269,7 @@ export class WidgetStreamsDirective {
       // All removed
       this.subscriptions.forEach(s => s.sub.unsubscribe());
       this.subscriptions.clear();
+      this.releaseAllBases();
       this.streams = undefined;
       this.baseSignatures.clear();
       this.registrations = [];
@@ -260,6 +283,7 @@ export class WidgetStreamsDirective {
       if (existing) existing.sub.unsubscribe();
       this.subscriptions.delete(r);
       this.streams?.delete(r);
+      this.releaseBase(r);
       this.baseSignatures.delete(r);
       this.registrations = this.registrations.filter(x => x.pathName !== r);
     }
@@ -272,6 +296,7 @@ export class WidgetStreamsDirective {
         if (existing) existing.sub.unsubscribe();
         this.subscriptions.delete(p);
         this.streams?.delete(p);
+        this.releaseBase(p);
         this.baseSignatures.delete(p);
         continue;
       }
@@ -353,6 +378,7 @@ export class WidgetStreamsDirective {
         existing.sub.unsubscribe();
         this.subscriptions.delete(pathName);
         this.streams?.delete(pathName);
+        this.releaseBase(pathName);
         this.baseSignatures.delete(pathName);
       }
       return;
@@ -367,6 +393,7 @@ export class WidgetStreamsDirective {
         existing.sub.unsubscribe();
         this.subscriptions.delete(pathName);
         this.streams?.delete(pathName);
+        this.releaseBase(pathName);
         this.baseSignatures.delete(pathName);
       }
       this.registrations = this.registrations.filter(r => r.pathName !== pathName);
@@ -380,5 +407,14 @@ export class WidgetStreamsDirective {
     if (existing && existing.signature === sig && prevReg === next) return;
 
     this.buildAndSubscribe(pathName, next, cfg, normalizedCfg);
+  }
+
+  /**
+   * Release every base registration this directive acquired. The RxJS subscriptions self-clean via
+   * takeUntilDestroyed, but the DataService registrations do not — without this, a destroyed widget
+   * leaves its (path, source) registrations pinned forever (the primary current leak vector).
+   */
+  ngOnDestroy(): void {
+    this.releaseAllBases();
   }
 }

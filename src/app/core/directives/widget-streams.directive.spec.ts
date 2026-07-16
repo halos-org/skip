@@ -11,6 +11,10 @@ class FakeDataService {
         path: string;
         source: string;
     }[] = [];
+    releases: {
+        path: string;
+        source: string;
+    }[] = [];
     subjects = new Map<string, Subject<IPathUpdate>>();
     timeoutCalls: {
         path: string;
@@ -26,6 +30,20 @@ class FakeDataService {
             this.subjects.set(key, new Subject<IPathUpdate>());
         }
         return this.subjects.get(key)!.asObservable();
+    }
+
+    // Mirrors the real DataService: acquirePath composes subscribePath (so `calls` still records the
+    // base acquisition) and hands back an idempotent release that records the balanced teardown.
+    acquirePath(path: string, source?: string): { data$: Observable<IPathUpdate>; release: () => void } {
+        const src = (source?.trim() || 'default');
+        const data$ = this.subscribePath(path, src);
+        let released = false;
+        const release = () => {
+            if (released) return;
+            released = true;
+            this.releases.push({ path, source: src });
+        };
+        return { data$, release };
     }
 
     timeoutPathObservable(path: string, source: string, pathType: string): void {
@@ -493,6 +511,78 @@ describe('WidgetStreamsDirective', () => {
         await vi.advanceTimersByTimeAsync(35);
         expect(hits).toEqual(['A', 'C', 'D', 'E', 'F']);
     });
+
+    it('releases the old base exactly once when the source rebinds', () => {
+        const cfg1 = makeCfg({ path: 'env.rebind', source: null, pathType: 'string', sampleTime: 50 });
+        directive.setStreamsConfig(cfg1);
+        directive.observe('p', () => { });
+        expect(dataSvc.calls).toEqual([{ path: 'env.rebind', source: 'default' }]);
+        expect(dataSvc.releases).toEqual([]);
+
+        const cfg2 = makeCfg({ path: 'env.rebind', source: 'n2k', pathType: 'string', sampleTime: 50 });
+        directive.applyStreamsConfigDiff(cfg2);
+
+        // The old (default) base is released once; the new (n2k) base is acquired.
+        expect(dataSvc.releases).toEqual([{ path: 'env.rebind', source: 'default' }]);
+        expect(dataSvc.calls).toEqual([
+            { path: 'env.rebind', source: 'default' },
+            { path: 'env.rebind', source: 'n2k' }
+        ]);
+    });
+
+    it('does NOT release or re-acquire the base on a sampleTime or convertUnitTo change (the trap)', () => {
+        const cfg1 = makeCfg({ path: 'env.trap', source: null, pathType: 'number', sampleTime: 100 });
+        directive.setStreamsConfig(cfg1);
+        directive.observe('p', () => { });
+        expect(dataSvc.calls.length).toBe(1);
+
+        // Same base identity (path+source): pipeline rebuilds, but releasing here would over-release
+        // a live registration, so the base must be neither released nor re-acquired.
+        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.trap', source: null, pathType: 'number', sampleTime: 30 }));
+        expect(dataSvc.calls.length).toBe(1);
+        expect(dataSvc.releases).toEqual([]);
+
+        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.trap', source: null, pathType: 'number', sampleTime: 30, convertUnitTo: 'x10' }));
+        expect(dataSvc.calls.length).toBe(1);
+        expect(dataSvc.releases).toEqual([]);
+    });
+
+    it('releases the base when its path key is removed from the config', () => {
+        directive.setStreamsConfig(makeCfg({ key: 'p', path: 'env.keep', source: null }));
+        directive.observe('p', () => { });
+        expect(dataSvc.calls.length).toBe(1);
+
+        // New config drops key 'p' entirely (replaced by 'q').
+        directive.applyStreamsConfigDiff(makeCfg({ key: 'q', path: 'env.other', source: null }));
+        expect(dataSvc.releases).toEqual([{ path: 'env.keep', source: 'default' }]);
+    });
+
+    it('releases the base when the path becomes empty', () => {
+        directive.setStreamsConfig(makeCfg({ path: 'env.clean', source: null }));
+        directive.observe('p', () => { });
+        expect(dataSvc.calls.length).toBe(1);
+
+        directive.applyStreamsConfigDiff(makeCfg({ path: '' as string, source: null }));
+        expect(dataSvc.releases).toEqual([{ path: 'env.clean', source: 'default' }]);
+    });
+
+    it('releases all held bases in the bulk config-reset branch', () => {
+        directive.setStreamsConfig(makeCfg({ path: 'env.reset', source: null }));
+        directive.observe('p', () => { });
+        expect(dataSvc.calls.length).toBe(1);
+
+        directive.applyStreamsConfigDiff(undefined);
+        expect(dataSvc.releases).toEqual([{ path: 'env.reset', source: 'default' }]);
+    });
+
+    it('releases all held bases on destroy (the primary current leak vector)', () => {
+        directive.setStreamsConfig(makeCfg({ path: 'env.destroy', source: null }));
+        directive.observe('p', () => { });
+        expect(dataSvc.releases).toEqual([]);
+
+        directive.ngOnDestroy();
+        expect(dataSvc.releases).toEqual([{ path: 'env.destroy', source: 'default' }]);
+    });
 });
 
 /**
@@ -516,6 +606,10 @@ class TtlFakeDataService {
             ));
         }
         return this.subjects.get(key)!.asObservable();
+    }
+
+    acquirePath(path: string, source?: string): { data$: Observable<IPathUpdate>; release: () => void } {
+        return { data$: this.subscribePath(path, source), release: () => undefined };
     }
 
     timeoutPathObservable(path: string, source: string, pathType: string): void {
