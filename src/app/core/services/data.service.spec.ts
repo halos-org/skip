@@ -674,6 +674,50 @@ describe('DataService', () => {
     expect(latest!.state).toBe(States.Warn);
   });
 
+  it('leaves a persistent alarm state intact across a timeout then resume (does not clobber to Normal)', () => {
+    const PATH = 'self.electrical.batteries.10.voltage';
+    let latest: IPathUpdate | undefined;
+    service.subscribePath(PATH, 'default').subscribe(update => (latest = update));
+
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'electrical.batteries.10.voltage',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: 12.0,
+    });
+    // The server raises an alarm on the low voltage.
+    notificationUpdates$.next({
+      path: 'notifications.electrical.batteries.10.voltage',
+      value: {
+        method: ['visual'],
+        state: States.Alarm,
+        message: 'Low voltage',
+        timestamp: '2026-01-01T00:00:02.000Z',
+      },
+    });
+    expect(latest!.data.value).toBe(12.0);
+    expect(latest!.state).toBe(States.Alarm);
+
+    // The data stream times out. The value blanks, but the alarm is still active on the server, so
+    // the reset must not force the state back to Normal.
+    service.timeoutPathObservable(PATH, 'default', 'number', 5000);
+    expect(latest!.data.value).toBeNull();
+    expect(latest!.state).toBe(States.Alarm);
+
+    // Data resumes still-low: a value delta arrives, but the alarm never cleared so no new state
+    // transition notification fires. The alarm coloring must survive rather than reverting to Normal.
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'electrical.batteries.10.voltage',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:03.000Z',
+      value: 11.5,
+    });
+    expect(latest!.data.value).toBe(11.5);
+    expect(latest!.state).toBe(States.Alarm);
+  });
+
   it('resets only the timed-out source registration, leaving sibling sources live', () => {
     let latestDefault: IPathUpdate | undefined;
     let latestSourceA: IPathUpdate | undefined;
@@ -849,6 +893,27 @@ describe('DataService', () => {
 
       expect(latestDefault!.data.value).toBeNull();
       expect(latestDefault!.state).toBe(States.Alarm);
+    });
+
+    it('treats a path with no recency receipt as all-silent (undefined disjunct of the liveness gate)', () => {
+      let latestDefault: IPathUpdate | undefined;
+      let latestA: IPathUpdate | undefined;
+      service.subscribePath(VOLTAGE, 'default').subscribe(u => (latestDefault = u));
+      service.subscribePath(VOLTAGE, 'source-a').subscribe(u => (latestA = u));
+
+      feed('source-a', 13.0);
+      expect(latestDefault!.data.value).toBe(13.0);
+
+      // Simulate a path that holds a value but has no recency receipt (never fed this session, or the
+      // receipt was pruned): the gate must fall to its `lastObserved === undefined` disjunct and treat
+      // the path as silent so the cross-clear still fires.
+      const lastObserved = (service as unknown as { _lastObservedByPath: Map<string, number> })._lastObservedByPath;
+      lastObserved.delete(VOLTAGE);
+
+      service.timeoutPathObservable(VOLTAGE, 'source-a', 'number', 5000);
+
+      expect(latestA!.data.value).toBeNull();
+      expect(latestDefault!.data.value).toBeNull();
     });
   });
 

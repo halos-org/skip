@@ -854,32 +854,35 @@ export class DataService implements OnDestroy {
   }
 
   /**
-   * Deep-reset a single registration's value to cleared/Normal by pushing onto its two UPSTREAM
-   * BehaviorSubjects, never by writing the derived `pathDataUpdate$` directly. The standing
-   * `combineLatest([_pathData$, _pathState$])` then produces the derived emission itself.
+   * Deep-reset a registration's VALUE by nulling its upstream `_pathData$` BehaviorSubject — never by
+   * writing the derived `pathDataUpdate$` directly. The standing `combineLatest([_pathData$,
+   * _pathState$])` then produces the derived emission itself, pairing the nulled value with whatever
+   * state is current.
    *
-   * Order is load-bearing: null the data FIRST, then re-assert Normal state. Writing the derived
-   * subject alone (the previous shallow reset) left `_pathData$` still caching the pre-timeout value,
-   * so a later `_pathState$` emission from the notification handler would re-pair that stale value
-   * via combineLatest and resurface it on a blanked widget. Nulling `_pathData$` makes the cache
-   * genuinely null, so any subsequent state emission re-pairs a null value and the reading stays
-   * cleared. Nulling data before state keeps the transient intermediate emission `{null, staleState}`
-   * (a blank widget with a briefly-wrong badge — safe) rather than `{staleValue, Normal}` (the exact
-   * resurrection being prevented).
+   * Nulling the upstream value (rather than the previous shallow write to the derived subject, which
+   * left `_pathData$` still caching the pre-timeout value) is what prevents resurfacing: a later
+   * `_pathState$` emission from the notification handler now re-pairs `{null, newState}` instead of
+   * `{staleValue, newState}`.
    *
-   * This produces TWO synchronous combineLatest emissions per reset (was one); the final value is
-   * identical.
+   * `_pathState$` is DELIBERATELY left untouched — state is a separate, server-notification-driven
+   * channel and the timeout has no business forcing it to Normal. Clobbering it to Normal would drop
+   * a persistent alarm/zone that is still active on the server: no state-transition notification
+   * would re-arrive to restore it (the notification handler dedupes on transitions and the `_skData`
+   * state is unchanged), so on resume `combineLatest` would re-pair `{value, Normal}` and the alarm
+   * coloring would be lost for the rest of the alarm's life. Leaving state as-is yields
+   * `{null, realState}` on reset and `{value, realState}` on resume, so an active alarm survives a
+   * timeout/resume cycle.
    */
   private resetRegistrationValue(registration: IPathRegistration): void {
     registration._pathData$.next({ value: null, timestamp: null });
-    registration._pathState$.next(States.Normal);
   }
 
   /**
    * Reset a path's registrations after a widget's data TTL fired for `source`.
    *
    * The timed-out source's own registration is always deep-reset — its value nulled on the upstream
-   * subjects (see {@link resetRegistrationValue}) so a later notification cannot resurface it.
+   * `_pathData$` (see {@link resetRegistrationValue}) so a later notification cannot resurface it; its
+   * state is left at the real server-driven value so a persistent alarm survives.
    *
    * The path's OTHER registrations — its sibling sources and the shared `default` bucket — are
    * cross-cleared only when the path has gone all-silent: nothing has fed it within `dataTimeoutMs`.
@@ -888,6 +891,12 @@ export class DataService implements OnDestroy {
    * blanked by a peer's timeout. The all-silent case is what lets a widget with its own timeout
    * disabled — which never calls this itself — still clear once every source behind its path has
    * stopped, instead of holding a frozen, plausible-looking last reading.
+   *
+   * Liveness is per-PATH against the TRIGGERING widget's `dataTimeoutMs`, so on an all-silent path the
+   * strictest-tolerance (shortest-TTL) widget's timeout can cross-clear a longer-tolerance sibling's
+   * value earlier than that sibling's own threshold. This is the intended safety-conscious behavior;
+   * per-source recency is deliberately not used (see the cross-clear site for why it would reintroduce
+   * the frozen-widget bug).
    *
    * Only the timing-out TRIGGER's `pathType` is whitelisted; cross-clear targets are reset regardless
    * of their own type, so a boolean sibling can still be cleared.
@@ -909,6 +918,13 @@ export class DataService implements OnDestroy {
       this.resetRegistrationValue(direct);
     }
 
+    // Liveness is per-PATH, not per-(path, source): the path counts as silent once the
+    // strictest-tolerance (shortest dataTimeout) widget on it times out, which can blank a
+    // longer-tolerance sibling's value earlier than that sibling's own threshold — the intended,
+    // safety-conscious behavior. Per-source recency is deliberately NOT used: the widget timeout
+    // operator is one-shot (it never re-arms), so if a still-fresh sibling source were skipped here,
+    // nothing would re-fire the cross-clear when that source later goes silent, and an
+    // enableTimeout:false widget on it would stay frozen forever (the original #254 bug).
     const lastObserved = this._lastObservedByPath.get(path);
     const allSilent = lastObserved === undefined || Date.now() - lastObserved >= dataTimeoutMs;
     if (!allSilent) return;
