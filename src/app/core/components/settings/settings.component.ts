@@ -19,8 +19,8 @@ export class SettingsComponent {
   private readonly _router = inject(Router);
   protected readonly app = inject(AppService);
   private readonly _responsive = inject(BreakpointObserver);
-  private readonly _isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait));
-  private readonly _isPhoneLandscape = toSignal(this._responsive.observe(Breakpoints.HandsetLandscape));
+  private readonly _isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait), { requireSync: true });
+  private readonly _isPhoneLandscape = toSignal(this._responsive.observe(Breakpoints.HandsetLandscape), { requireSync: true });
   protected isPhonePortrait = computed(() => this._isPhonePortrait().matches);
   protected isPhoneLandscape = computed(() => this._isPhoneLandscape().matches);
 

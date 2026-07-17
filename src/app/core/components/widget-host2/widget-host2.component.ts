@@ -76,7 +76,7 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   // instead of a silent blank tile.
   protected readonly loadFailed = signal(false);
   private childRef: ComponentRef<WidgetViewComponentBase> | null = null;
-  private compType: Type<WidgetViewComponentBase>
+  private compType: Type<WidgetViewComponentBase> | undefined
   private _hasInitialized = false;
   private _destroyed = false;
   private readonly openOverlays = new Set<TOverlayGate>();
@@ -248,7 +248,7 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
     try {
       const dashboards = this.dashboard.dashboards();
       const activeIdx = this.dashboard.activeDashboard();
-      const dash = dashboards?.[activeIdx];
+      const dash = activeIdx == null ? undefined : dashboards?.[activeIdx];
       type NodeWithConfig = NgGridStackWidget & {
         input?: { widgetProperties?: { config?: IWidgetSvcConfig } };
         widgetProperties?: { config?: IWidgetSvcConfig };

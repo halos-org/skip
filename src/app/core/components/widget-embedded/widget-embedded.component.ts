@@ -88,7 +88,7 @@ export class WidgetEmbeddedComponent implements OnInit, OnDestroy {
   // True when the widget's lazy chunk could not be resolved, so the template shows a retry affordance.
   protected readonly loadFailed = signal(false);
   private childRef: ComponentRef<WidgetViewComponentBase>;
-  private compType: Type<WidgetViewComponentBase>
+  private compType: Type<WidgetViewComponentBase> | undefined
   private _destroyed = false;
 
   constructor() {

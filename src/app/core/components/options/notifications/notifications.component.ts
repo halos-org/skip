@@ -32,14 +32,14 @@ export class SettingsNotificationsComponent {
   private settings = inject(SettingsService);
   private _responsive = inject(BreakpointObserver);
   protected isPhonePortrait: Signal<BreakpointState>;
-  readonly notificationsForm = viewChild<NgForm>('notificationsForm');
-  readonly statePanel = viewChild<MatExpansionPanel>('statePanel');
-  readonly soundPanel = viewChild<MatExpansionPanel>('soundPanel');
+  readonly notificationsForm = viewChild.required<NgForm>('notificationsForm');
+  readonly statePanel = viewChild.required<MatExpansionPanel>('statePanel');
+  readonly soundPanel = viewChild.required<MatExpansionPanel>('soundPanel');
   public notificationConfig: INotificationConfig;
   public notificationDisabledExpandPanel = false;
 
   constructor() {
-    this.isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait));
+    this.isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait), { requireSync: true });
     this.notificationConfig = cloneDeep(this.settings.getNotificationConfig());
   }
 

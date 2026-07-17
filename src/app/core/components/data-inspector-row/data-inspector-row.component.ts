@@ -1,7 +1,7 @@
 import { Component, OnInit, ViewEncapsulation, input, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { MatDialog, MatDialogRef, MAT_DIALOG_DATA, MatDialogTitle, MatDialogContent, MatDialogActions, MatDialogClose } from '@angular/material/dialog';
 
-import { UnitsService } from '../../services/units.service';
+import { UnitsService, IConversionPathList } from '../../services/units.service';
 import { MatCell } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatOptgroup, MatOption } from '@angular/material/core';
@@ -23,17 +23,18 @@ export class DataInspectorRowComponent implements OnInit {
   private _dialog = inject(MatDialog);
   private readonly cdr = inject(ChangeDetectorRef);
   readonly path = input.required<string>();
-  readonly source = input<string>(undefined);
+  readonly source = input<string | undefined>(undefined);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly pathValue = input<any>(undefined);
   readonly type = input.required<string>();
 
-  units = null;
+  units: IConversionPathList | null = null;
   selectedUnit = "unitless"
 
   ngOnInit() {
-    this.units = this._units.getConversionsForPath(this.path());
-    this.selectedUnit = this.units.base;
+    const conversions = this._units.getConversionsForPath(this.path());
+    this.units = conversions;
+    this.selectedUnit = conversions.base;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
