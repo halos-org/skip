@@ -33,9 +33,9 @@ export class BooleanMultiControlOptionsComponent implements OnInit, OnDestroy {
   public readonly addPath = output<IAddNewPathObject>();
   public readonly updatePath = output<IDynamicControl[]>();
   public readonly delPath = output<IDeleteEventObj>();
-  public multiFormGroup: UntypedFormGroup = null;
+  public multiFormGroup: UntypedFormGroup | null = null;
   public arrayLength = 0;
-  private multiCtrlArraySubscription: Subscription = null;
+  private multiCtrlArraySubscription: Subscription | null = null;
 
   ngOnInit(): void {
     this.arrayLength = this.multiCtrlArray().length;

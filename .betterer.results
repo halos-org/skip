@@ -8,31 +8,6 @@ exports[`strictNullChecks`] = {
     "src/app/app.component.ts:3236769020": [
       [123, 19, 25, "Object is possibly \'undefined\'.", "255143637"]
     ],
-    "src/app/widget-config/boolean-control-config/boolean-control-config.component.ts:37806614": [
-      [26, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
-      [27, 39, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
-      [34, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"]
-    ],
-    "src/app/widget-config/boolean-multicontrol-options/boolean-multicontrol-options.component.ts:1795746450": [
-      [35, 9, 14, "Type \'null\' is not assignable to type \'UntypedFormGroup\'.", "3522031013"],
-      [37, 10, 26, "Type \'null\' is not assignable to type \'Subscription\'.", "273497119"]
-    ],
-    "src/app/widget-config/dataset-chart-options/dataset-chart-options.component.ts:155376543": [
-      [83, 26, 10, "Argument of type \'ISkPathData | null\' is not assignable to parameter of type \'ISkPathData\'.\\n  Type \'null\' is not assignable to type \'ISkPathData\'.", "384538813"]
-    ],
-    "src/app/widget-config/display-datetime/display-datetime.component.ts:2719976956": [
-      [45, 51, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'FormControl<string>\'.", "2620553983"],
-      [46, 53, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'FormControl<string>\'.", "2620553983"],
-      [49, 10, 22, "Type \'null\' is not assignable to type \'Subscription\'.", "29842089"]
-    ],
-    "src/app/widget-config/paths-options/paths-options.component.ts:2311600985": [
-      [31, 51, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'IAddNewPathObject\'.", "2620553983"],
-      [32, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'string\'.", "2620553983"],
-      [33, 54, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'IDynamicControl[]\'.", "2620553983"],
-      [58, 28, 49, "Object is possibly \'null\'.", "3725617003"],
-      [85, 26, 49, "Object is possibly \'null\'.", "3725617003"],
-      [89, 26, 49, "Object is possibly \'null\'.", "3725617003"]
-    ],
     "src/app/widgets/svg-zone-states/svg-zone-states.component.ts:489168871": [
       [16, 41, 4, "No overload matches this call.\\n  Overload 1 of 5, \'(initialValue: IDynamicControl, opts?: InputOptionsWithoutTransform<IDynamicControl> | undefined): InputSignal<...>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'IDynamicControl\'.\\n  Overload 2 of 5, \'(initialValue: undefined, opts: InputOptionsWithoutTransform<IDynamicControl>): InputSignal<IDynamicControl | undefined>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'undefined\'.", "2087897566"],
       [17, 33, 4, "Argument of type \'null\' is not assignable to parameter of type \'ITheme\'.", "2087897566"],
