@@ -34,14 +34,14 @@ export class SvgRacesteerComponent implements OnDestroy {
   protected readonly VMG = input.required<number>();
   protected readonly sailSetupEnabled = input.required<boolean>();
   protected readonly driftEnabled = input.required<boolean>();
-  protected readonly driftSet = input<number>(undefined);
-  protected readonly driftFlow = input<number>(undefined);
+  protected readonly driftSet = input<number | undefined>(undefined);
+  protected readonly driftFlow = input<number | undefined>(undefined);
   protected readonly waypointEnabled = input.required<boolean>();
-  protected readonly waypointAngle = input<number>(undefined);
-  protected readonly vmgToWaypoint = input<number>(undefined);
-  protected readonly trueWindMinHistoric = input<number>(undefined);
-  protected readonly trueWindMidHistoric = input<number>(undefined);
-  protected readonly trueWindMaxHistoric = input<number>(undefined);
+  protected readonly waypointAngle = input<number | undefined>(undefined);
+  protected readonly vmgToWaypoint = input<number | undefined>(undefined);
+  protected readonly trueWindMinHistoric = input<number | undefined>(undefined);
+  protected readonly trueWindMidHistoric = input<number | undefined>(undefined);
+  protected readonly trueWindMaxHistoric = input<number | undefined>(undefined);
   protected readonly gradianColor = input.required<{ start: string; stop: string }>();
 
   protected compass: ISVGRotationObject = { oldValue: 0, newValue: 0 };

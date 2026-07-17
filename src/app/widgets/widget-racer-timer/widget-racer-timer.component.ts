@@ -94,7 +94,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
       const theme = this.theme();
       if (!cfg || !theme) return;
       untracked(() => {
-        const palette = getColors(cfg.color, theme);
+        const palette = getColors(cfg.color ?? 'contrast', theme);
         this.labelColor.set(palette.dim);
         this.valueColor = palette.color;
         this.valueStateColor = palette.color;
@@ -115,7 +115,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
         this.updateValueColor();
         this.draw();
         if (this.shouldBeep(lastTts, this.ttsValue)) this.beepForValue(this.ttsValue!);
-        if (cfg.nextDashboard >= 0 && lastTts === 1 && this.ttsValue === 0 && (!this.dtsValue || this.dtsValue >= 0)) {
+        if (cfg.nextDashboard != null && cfg.nextDashboard >= 0 && lastTts === 1 && this.ttsValue === 0 && (!this.dtsValue || this.dtsValue >= 0)) {
           // Navigation handled externally (legacy used router) – could inject Router if needed
         }
       }));
@@ -252,7 +252,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
     } else if (this.mode() === 1 && this.isStartTimerRunning()) this.mode.set(2);
   }
 
-  private toHHMMSS(totalSeconds: number): string {
+  private toHHMMSS(totalSeconds: number | null): string {
     if (totalSeconds == null || isNaN(totalSeconds)) return '-:--';
     const negative = totalSeconds < 0;
     if (negative) totalSeconds = -totalSeconds;

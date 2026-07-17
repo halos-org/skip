@@ -72,7 +72,7 @@ export class WidgetBooleanSwitchComponent implements OnDestroy {
       const cfg = this.runtime?.options();
       if (!theme || !cfg) return;
       untracked(() => {
-        this.labelColor.set(getColors(cfg.color, theme).dim);
+        this.labelColor.set(getColors(cfg.color ?? 'contrast', theme).dim);
       });
     });
 
@@ -85,7 +85,8 @@ export class WidgetBooleanSwitchComponent implements OnDestroy {
         this.switchControls.set(controls);
         this.updateCtrlDimensions();
         // Register path observers for each control (idempotent via directive)
-        if (!this.streams) return;
+        const streams = this.streams;
+        if (!streams) return;
         controls.forEach(ctrl => {
           const pathsArr = cfg.paths as IWidgetPath[] | undefined;
           if (!pathsArr?.length) return;
@@ -95,7 +96,7 @@ export class WidgetBooleanSwitchComponent implements OnDestroy {
           if (!pathEntry?.path) return; // guard empty path
           // NOTE: WidgetStreamsDirective.observe expects the logical key of cfg.paths.
           // Since cfg.paths is an array here, keys are '0', '1', ... Use the index as string.
-          this.streams.observe(String(idx), pkt => {
+          streams.observe(String(idx), pkt => {
             // packet shape: pkt.data.value
             const val = pkt?.data?.value;
             const nextVal = ctrl.isNumeric

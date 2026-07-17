@@ -43,14 +43,14 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
 
   private canvasMainRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
   private canvasElement: HTMLCanvasElement;
-  private canvasCtx: CanvasRenderingContext2D;
+  private canvasCtx: CanvasRenderingContext2D | null;
   private titleBitmap: HTMLCanvasElement | null = null;
   private titleBitmapText: string | null = null;
   private cssWidth = 0;
   private cssHeight = 0;
   private dataValue: string | null = null;
-  protected labelColor = signal<string>(undefined);
-  private valueColor: string = undefined;
+  protected labelColor = signal<string>('');
+  private valueColor: string | undefined = undefined;
   private isDestroyed = false; // guard against callbacks after destroyed
   private streamRegistered = false;
 
@@ -119,9 +119,10 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
 
   private setColors(): void {
     const cfg = this.runtime?.options();
-    if (!cfg) return;
-    this.labelColor.set(getColors(cfg.color, this.theme()).dim);
-    this.valueColor = getColors(cfg.color, this.theme()).color;
+    const theme = this.theme();
+    if (!cfg || !theme) return;
+    this.labelColor.set(getColors(cfg.color ?? 'contrast', theme).dim);
+    this.valueColor = getColors(cfg.color ?? 'contrast', theme).color;
   }
 
   // Runtime config updates are handled by Host2; effects above re-run on changes.
@@ -139,6 +140,7 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
     if (!this.canvasCtx) return;
     const titleHeight = Math.floor(this.cssHeight * 0.1);
     const cfg = this.runtime.options();
+    if (!cfg) return;
     const bgText = cfg.displayName + '|' + this.labelColor();
 
     if (!this.titleBitmap ||
@@ -146,7 +148,7 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
         this.titleBitmap.height !== this.canvasElement.height ||
         this.titleBitmapText !== bgText) {
       this.titleBitmap = this.canvas.createTitleBitmap(
-        cfg.displayName,
+        cfg.displayName ?? 'Gauge Label',
         this.labelColor(),
         'normal',
         this.cssWidth,

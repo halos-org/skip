@@ -51,8 +51,8 @@ export class WidgetLabelComponent implements AfterViewInit, OnDestroy {
       const theme = this.theme();
       if (!cfg || !theme) return;
       untracked(() => {
-        this.fgColor.set(this.mapColor(cfg.color, theme));
-        this.bgColor.set(this.mapColor(cfg.bgColor ?? 'grey', theme));
+        this.fgColor.set(this.mapColor(cfg.color ?? 'contrast', theme));
+        this.bgColor.set(this.mapColor(cfg.bgColor ?? 'contrast', theme));
         this.draw();
       });
     });

@@ -71,7 +71,7 @@ export class WidgetZonesStatePanelComponent {
       const cfg = this.runtime?.options();
       if (!theme || !cfg) return;
       untracked(() => {
-        this.labelColor.set(getColors(cfg.color, theme).dim);
+        this.labelColor.set(getColors(cfg.color ?? 'contrast', theme).dim);
       });
     });
 

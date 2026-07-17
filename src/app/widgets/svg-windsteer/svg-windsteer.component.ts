@@ -26,7 +26,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   protected readonly compassHeading = input.required<number>();
   protected readonly compassModeEnabled = input.required<boolean>();
-  protected readonly courseOverGroundAngle = input<number>(undefined);
+  protected readonly courseOverGroundAngle = input<number | undefined>(undefined);
   protected readonly courseOverGroundEnabled = input.required<boolean>();
   protected readonly trueWindAngle = input.required<number>();
   protected readonly trueWindActive = input<boolean>(false);
@@ -38,18 +38,18 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly awsEnabled = input.required<boolean>();
   protected readonly appWindSpeed = input.required<number>();
   protected readonly appWindSpeedUnit = input.required<string>();
-  protected readonly laylineAngle = input<number>(undefined);
+  protected readonly laylineAngle = input<number | undefined>(undefined);
   protected readonly closeHauledLineEnabled = input.required<boolean>();
   protected readonly sailSetupEnabled = input.required<boolean>();
   protected readonly windSectorEnabled = input.required<boolean>();
   protected readonly driftEnabled = input.required<boolean>();
-  protected readonly driftSet = input<number>(undefined);
-  protected readonly driftFlow = input<number>(undefined);
-  protected readonly waypointAngle = input<number>(undefined);
+  protected readonly driftSet = input<number | undefined>(undefined);
+  protected readonly driftFlow = input<number | undefined>(undefined);
+  protected readonly waypointAngle = input<number | undefined>(undefined);
   protected readonly waypointEnabled = input.required<boolean>();
-  protected readonly trueWindMinHistoric = input<number>(undefined);
-  protected readonly trueWindMidHistoric = input<number>(undefined);
-  protected readonly trueWindMaxHistoric = input<number>(undefined);
+  protected readonly trueWindMinHistoric = input<number | undefined>(undefined);
+  protected readonly trueWindMidHistoric = input<number | undefined>(undefined);
+  protected readonly trueWindMaxHistoric = input<number | undefined>(undefined);
 
   protected compass: ISVGRotationObject = { oldValue: 0, newValue: 0 };
   protected twa: ISVGRotationObject = { oldValue: 0, newValue: 0 };
@@ -385,11 +385,14 @@ export class SvgWindsteerComponent implements OnDestroy {
   private windSectorsInitialized = false;
 
   private updateWindSectors(animate = true) {
+    const min = this.trueWindMinHistoric();
+    const mid = this.trueWindMidHistoric();
+    const max = this.trueWindMaxHistoric();
     if (
       !this.windSectorEnabled() ||
-      this.trueWindMinHistoric() == null ||
-      this.trueWindMidHistoric() == null ||
-      this.trueWindMaxHistoric() == null
+      min == null ||
+      mid == null ||
+      max == null
     ) {
       // No sector data (e.g. true wind absent): cancel any in-flight sector animation and clear
       // the paths, mirroring the disable branch, so a running frame can't overwrite the cleared
@@ -404,16 +407,8 @@ export class SvgWindsteerComponent implements OnDestroy {
       return;
     }
 
-    const portNew = {
-      min: this.trueWindMinHistoric(),
-      mid: this.trueWindMidHistoric(),
-      max: this.trueWindMaxHistoric()
-    };
-    const stbdNew = {
-      min: this.trueWindMinHistoric(),
-      mid: this.trueWindMidHistoric(),
-      max: this.trueWindMaxHistoric()
-    };
+    const portNew = { min, mid, max };
+    const stbdNew = { min, mid, max };
 
     if (!this.windSectorsInitialized) {
       this.windSectorsInitialized = true;
