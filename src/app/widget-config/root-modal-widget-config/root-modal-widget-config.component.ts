@@ -63,7 +63,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
   public addPathEvent: IAddNewPathObject;
   public delPathEvent: string;
   public updatePathEvent: IDynamicControl[];
-  public colors = [];
+  public colors: { label: string; value: string }[] = [];
   protected readonly saveDisabled = signal(true);
 
   ngOnInit() {

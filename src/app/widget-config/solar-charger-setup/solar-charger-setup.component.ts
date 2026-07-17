@@ -45,7 +45,7 @@ export class SolarChargerSetupComponent implements OnInit, OnDestroy {
   protected readonly discoveredSolarIds = signal<string[]>([]);
   protected readonly discoveredTrackedDevices = signal<ElectricalTrackedDevice[]>([]);
   protected readonly selectedTrackedDeviceIds = signal<string[]>([]);
-  protected readonly hasGroups = computed(() => this.groupsFormArray?.length > 0);
+  protected readonly hasGroups = computed(() => (this.groupsFormArray?.length ?? 0) > 0);
   protected readonly supportsGroups = computed(() => !!this.groupsFormArray);
   protected readonly optionIds = computed(() => {
     const selected = this.selectedTrackedDeviceIds();
@@ -142,6 +142,10 @@ export class SolarChargerSetupComponent implements OnInit, OnDestroy {
   }
 
   protected addGroup(): void {
+    const groupsFormArray = this.groupsFormArray;
+    if (!groupsFormArray) {
+      return;
+    }
     const next: ElectricalGroupConfig = {
       id: `solar-bank-${Date.now()}`,
       name: 'New Group',
@@ -149,13 +153,17 @@ export class SolarChargerSetupComponent implements OnInit, OnDestroy {
       connectionMode: 'parallel'
     };
 
-    this.groupsFormArray.push(this.createGroup(next));
-    this.groupsFormArray.markAsDirty();
+    groupsFormArray.push(this.createGroup(next));
+    groupsFormArray.markAsDirty();
   }
 
   protected removeGroup(index: number): void {
-    this.groupsFormArray.removeAt(index);
-    this.groupsFormArray.markAsDirty();
+    const groupsFormArray = this.groupsFormArray;
+    if (!groupsFormArray) {
+      return;
+    }
+    groupsFormArray.removeAt(index);
+    groupsFormArray.markAsDirty();
   }
 
   private createGroup(group: ElectricalGroupConfig): UntypedFormGroup {
