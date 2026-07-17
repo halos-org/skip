@@ -15,8 +15,7 @@ exports[`strictNullChecks`] = {
     ],
     "src/app/widget-config/boolean-multicontrol-options/boolean-multicontrol-options.component.ts:1795746450": [
       [35, 9, 14, "Type \'null\' is not assignable to type \'UntypedFormGroup\'.", "3522031013"],
-      [37, 10, 26, "Type \'null\' is not assignable to type \'Subscription\'.", "273497119"],
-      [79, 8, 13, "Type \'null\' is not assignable to type \'string | undefined\'.", "2466344431"]
+      [37, 10, 26, "Type \'null\' is not assignable to type \'Subscription\'.", "273497119"]
     ],
     "src/app/widget-config/dataset-chart-options/dataset-chart-options.component.ts:155376543": [
       [83, 26, 10, "Argument of type \'ISkPathData | null\' is not assignable to parameter of type \'ISkPathData\'.\\n  Type \'null\' is not assignable to type \'ISkPathData\'.", "384538813"]
@@ -55,15 +54,10 @@ exports[`strictNullChecks`] = {
       [1358, 21, 11, "\'b.longitude\' is possibly \'undefined\'.", "3370058570"],
       [1358, 35, 11, "\'a.longitude\' is possibly \'undefined\'.", "2985066057"]
     ],
-    "src/app/widgets/widget-iframe/widget-iframe.component.ts:2602616758": [
-      [30, 4, 9, "Type \'null\' is not assignable to type \'string | undefined\'.", "2966443234"]
-    ],
     "src/app/widgets/widget-multi-state-switch/widget-multi-state-switch.component.ts:3679063603": [
-      [50, 4, 5, "Type \'{ controlPath: { description: string; path: null; source: null; pathType: \\"multiple\\"; supportsPut: true; isPathConfigurable: true; pathRequired: true; showPathSkUnitsFilter: false; pathSkUnitsFilter: null; showConvertUnitTo: false; convertUnitTo: null; sampleTime: number; }; }\' is not assignable to type \'IPathArray | IWidgetPath[] | undefined\'.\\n  The types of \'controlPath.convertUnitTo\' are incompatible between these types.\\n    Type \'null\' is not assignable to type \'string | undefined\'.", "187670523"],
       [160, 22, 10, "Object is possibly \'undefined\'.", "3996575854"]
     ],
     "src/app/widgets/widget-racer-line/widget-racer-line.component.ts:1630258628": [
-      [63, 4, 5, "Type \'{ dtsPath: { description: string; path: string; source: string; pathType: \\"number\\"; pathRequired: false; isPathConfigurable: false; convertUnitTo: string; showPathSkUnitsFilter: true; pathSkUnitsFilter: \\"m\\"; sampleTime: number; }; ... 5 more ...; ttbPath: { ...; }; }\' is not assignable to type \'IPathArray | IWidgetPath[] | undefined\'.\\n  The types of \'startLineNamePath.convertUnitTo\' are incompatible between these types.\\n    Type \'null\' is not assignable to type \'string | undefined\'.", "187670523"],
       [176, 10, 13, "Type \'null\' is not assignable to type \'string\'.", "363509612"],
       [189, 34, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
       [340, 4, 6, "Type \'string | null\' is not assignable to type \'string\'.\\n  Type \'null\' is not assignable to type \'string\'.", "2123913871"],
