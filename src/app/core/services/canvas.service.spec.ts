@@ -95,3 +95,30 @@ describe('CanvasService resize handling (freeze-audit)', () => {
     vi.restoreAllMocks();
   });
 });
+
+describe('CanvasService text measurement (#321 font-race)', () => {
+  let service: CanvasService;
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(CanvasService);
+  });
+
+  it('measureTextWidth measures against the shorthand font and scales with text length', () => {
+    // jsdom canvas shim (src/test.ts) reports measureText width = text.length * 8
+    expect(service.measureTextWidth('abc', '700 14px Roboto')).toBe(24);
+    expect(service.measureTextWidth('abcdef', '700 14px Roboto')).toBe(48);
+  });
+
+  it('measureTextWidth lazily creates and reuses a single offscreen context', () => {
+    const createSpy = vi.spyOn(document, 'createElement');
+    service.measureTextWidth('a', '14px Roboto');
+    service.measureTextWidth('bb', '14px Roboto');
+    const canvasCreations = createSpy.mock.calls.filter(([tag]) => tag === 'canvas').length;
+    expect(canvasCreations).toBe(1); // created once on first use, reused thereafter
+    createSpy.mockRestore();
+  });
+
+  it('whenFontsReady resolves', async () => {
+    await expect(service.whenFontsReady()).resolves.toBeUndefined();
+  });
+});

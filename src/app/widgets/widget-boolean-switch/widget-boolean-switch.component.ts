@@ -61,12 +61,9 @@ export class WidgetBooleanSwitchComponent implements OnDestroy {
     const cfg = this.runtime?.options();
     return (cfg?.showLabel === false) ? 'widgets-container-no-title' : 'widgets-container';
   });
-  public ctrlDimensions: IDimensions = { width: 0, height: 0 };
+  protected readonly ctrlDimensions = signal<IDimensions>({ width: 0, height: 0 });
   private hostSize: IDimensions = { width: 0, height: 0 };
   private skRequestSub = new Subscription();
-  private readonly measureCtx = typeof document !== 'undefined'
-    ? document.createElement('canvas').getContext('2d')
-    : null;
 
   constructor() {
     // Effect: theme / label color
@@ -115,6 +112,13 @@ export class WidgetBooleanSwitchComponent implements OnDestroy {
         });
       });
     });
+
+    // Label width is canvas-measured; a cold boot measures against fallback-font
+    // metrics until the web font settles, and nothing else re-measures on a static
+    // dashboard — so re-measure once fonts are ready.
+    this.canvas.whenFontsReady()
+      .then(() => this.updateCtrlDimensions())
+      .catch(() => { /* fonts.ready settling failed; keep the fallback-font metrics */ });
   }
 
   onResized(event: ResizeObserverEntry): void {
@@ -131,18 +135,14 @@ export class WidgetBooleanSwitchComponent implements OnDestroy {
     const controls = this.switchControls();
 
     if (!width || !height || !controls.length) {
-      this.ctrlDimensions = { width, height: 0 };
+      this.ctrlDimensions.set({ width, height: 0 });
       return;
     }
 
-    const measuredHeight = this.measureCtx
-      ? measureBooleanControlsHeight(width, height, controls, (text, fontSize) => {
-        this.measureCtx!.font = `700 ${fontSize}px ${this.canvas.DEFAULT_FONT}`;
-        return this.measureCtx!.measureText(text).width;
-      })
-      : Math.max(1, Math.floor(height / controls.length));
+    const measuredHeight = measureBooleanControlsHeight(width, height, controls, (text, fontSize) =>
+      this.canvas.measureTextWidth(text, `700 ${fontSize}px ${this.canvas.DEFAULT_FONT}`));
 
-    this.ctrlDimensions = { width, height: measuredHeight };
+    this.ctrlDimensions.set({ width, height: measuredHeight });
   }
 
   public toggle(ctrl: IDynamicControl): void {

@@ -10,7 +10,7 @@
           <app-svg-boolean-switch class="svg-widget"
             [controlData]="ctrl"
             [theme]="theme()"
-            [dimensions]="ctrlDimensions"
+            [dimensions]="ctrlDimensions()"
             (toggleClick)="toggle($event)">
           </app-svg-boolean-switch>
         }
@@ -18,7 +18,7 @@
           <app-svg-boolean-button class="svg-widget"
             [controlData]="ctrl"
             [theme]="theme()"
-            [dimensions]="ctrlDimensions"
+            [dimensions]="ctrlDimensions()"
             (toggleClick)="toggle($event)">
           </app-svg-boolean-button>
         }
@@ -26,7 +26,7 @@
           <app-svg-boolean-light class="svg-widget"
             [controlData]="ctrl"
             [theme]="theme()"
-            [dimensions]="ctrlDimensions"
+            [dimensions]="ctrlDimensions()"
             (toggleClick)="toggle($event)">
           </app-svg-boolean-light>
         }
