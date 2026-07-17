@@ -93,15 +93,6 @@ exports[`strictNullChecks`] = {
       [54, 4, 14, "Type \'null\' is not assignable to type \'CanvasRenderingContext2D\'.", "912271434"],
       [55, 4, 18, "Type \'null\' is not assignable to type \'HTMLCanvasElement\'.", "1193423419"]
     ],
-    "src/app/core/utils/dataScales.util.ts:2208923770": [
-      [54, 6, 12, "Type \'null\' is not assignable to type \'number\'.", "2083421902"]
-    ],
-    "src/app/core/utils/zones-highlight.utils.ts:1634660371": [
-      [42, 8, 5, "Type \'null\' is not assignable to type \'number\'.", "173263814"],
-      [43, 8, 5, "Type \'null\' is not assignable to type \'number\'.", "183473191"],
-      [72, 6, 5, "Type \'number | null\' is not assignable to type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "173263814"],
-      [78, 6, 5, "Type \'number | null\' is not assignable to type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "183473191"]
-    ],
     "src/app/widget-config/boolean-control-config/boolean-control-config.component.ts:37806614": [
       [26, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
       [27, 39, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
