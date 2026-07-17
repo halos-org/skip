@@ -59,12 +59,12 @@ function node(w, h, x, y, widgetProperties) {
   return { x, y, w, h, id, selector: 'widget-host2', input: { widgetProperties } };
 }
 
-export function numericWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', sampleTime = 500, miniChart = false } = {}) {
+export function numericWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', sampleTime = 500, miniChart = false, displayName = 'N' } = {}) {
   const uuid = uid('num');
   return (x, y) => node(4, 6, x, y, {
     type: 'widget-numeric', uuid,
     config: {
-      displayName: 'N', filterSelfPaths: true,
+      displayName, filterSelfPaths: true,
       paths: { numericPath: { description: 'Numeric Data', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit, sampleTime } },
       numDecimal: 1, showMiniChart: miniChart, color: 'blue', enableTimeout: false, dataTimeout: 5, ignoreZones: false,
     },
