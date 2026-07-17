@@ -69,7 +69,7 @@ export class DataInspectorComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    this.isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait));
+    this.isPhonePortrait = toSignal(this._responsive.observe(Breakpoints.HandsetPortrait), { requireSync: true });
 
     effect(() => {
       if (this.isPhonePortrait().matches) {

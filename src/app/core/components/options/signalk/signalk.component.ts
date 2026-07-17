@@ -100,7 +100,7 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   });
 
 
-  private _chart: Chart = null;
+  private _chart: Chart | null = null;
   private textColor: string; // Store the computed text color for chart styling
 
   ngOnInit() {
@@ -109,19 +109,23 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   ngAfterViewInit(): void {
-    this.textColor = window.getComputedStyle(this.activityGraph().nativeElement).color;
+    const canvas = this.activityGraph()?.nativeElement;
+    if (!canvas) return;
+    this.textColor = window.getComputedStyle(canvas).color;
     this._chart?.destroy();
-    this.startChart();
+    this.startChart(canvas);
 
     // Get real-time WebSocket Delta update statistics for chart
     this.DataService.getSignalkDeltaUpdateStatistics().pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe((update: IDeltaUpdate) => {
-      this._chart.data.datasets[0].data.push({ x: update.timestamp, y: update.value });
-      if (this._chart.data.datasets[0].data.length > 10) {
-        this._chart.data.datasets[0].data.shift();
+      const chart = this._chart;
+      if (!chart) return;
+      chart.data.datasets[0].data.push({ x: update.timestamp, y: update.value });
+      if (chart.data.datasets[0].data.length > 10) {
+        chart.data.datasets[0].data.shift();
       }
-      this._chart?.update("none");
+      chart.update("none");
     });
   }
 
@@ -169,8 +173,10 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
    * Initializes the Chart.js line chart for displaying WebSocket delta statistics.
    * Creates a time-series chart showing data update frequency over time.
    */
-  private startChart() {
-    this._chart = new Chart(this.activityGraph().nativeElement.getContext('2d'), {
+  private startChart(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    this._chart = new Chart(ctx, {
       type: 'line',
       data: {
         datasets: [

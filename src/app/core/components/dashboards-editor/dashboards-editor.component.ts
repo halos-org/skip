@@ -92,7 +92,7 @@ export class DashboardsEditorComponent {
     const dashboard = this._dashboard.dashboards()[itemIndex];
     this._dialog.openDashboardPageEditorDialog({
       title: 'Page Options',
-      name: dashboard.name,
+      name: dashboard.name ?? '',
       icon: dashboard.icon || 'dashboard-dashboard',
       confirmBtnText: 'Save',
       cancelBtnText: 'Cancel'
@@ -102,7 +102,7 @@ export class DashboardsEditorComponent {
     });
   }
 
-  private duplicateDashboard(itemIndex: number, currentName: string): void {
+  private duplicateDashboard(itemIndex: number, currentName: string | undefined): void {
     const originalDashboard = this._dashboard.dashboards()[itemIndex];
     this._dialog.openDashboardPageEditorDialog({
       title: 'Duplicate Page',
@@ -138,10 +138,10 @@ export class DashboardsEditorComponent {
       if (currentActive === event.previousIndex) {
         // Active item was moved to new position
         this._dashboard.activeDashboard.set(event.currentIndex);
-      } else if (currentActive > event.previousIndex && currentActive <= event.currentIndex) {
+      } else if (currentActive !== null && currentActive > event.previousIndex && currentActive <= event.currentIndex) {
         // Active item shifted down due to move
         this._dashboard.activeDashboard.set(currentActive - 1);
-      } else if (currentActive < event.previousIndex && currentActive >= event.currentIndex) {
+      } else if (currentActive !== null && currentActive < event.previousIndex && currentActive >= event.currentIndex) {
         // Active item shifted up due to move
         this._dashboard.activeDashboard.set(currentActive + 1);
       }

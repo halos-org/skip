@@ -44,55 +44,6 @@ exports[`strictNullChecks`] = {
       [743, 8, 15, "\'_gridstack.grid\' is possibly \'undefined\'.", "3391422426"],
       [752, 4, 22, "Object is possibly \'undefined\'.", "2187394131"]
     ],
-    "src/app/core/components/dashboards-editor/dashboards-editor.component.ts:976168273": [
-      [80, 39, 40, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "1983996063"],
-      [94, 6, 4, "Type \'string | undefined\' is not assignable to type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "2087876002"],
-      [140, 17, 13, "\'currentActive\' is possibly \'null\'.", "194687392"],
-      [140, 56, 13, "\'currentActive\' is possibly \'null\'.", "194687392"],
-      [142, 44, 13, "\'currentActive\' is possibly \'null\'.", "194687392"],
-      [143, 17, 13, "\'currentActive\' is possibly \'null\'.", "194687392"],
-      [143, 56, 13, "\'currentActive\' is possibly \'null\'.", "194687392"],
-      [145, 44, 13, "\'currentActive\' is possibly \'null\'.", "194687392"]
-    ],
-    "src/app/core/components/data-inspector-row/data-inspector-row.component.ts:3525188709": [
-      [25, 34, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'string\'.", "2620553983"],
-      [34, 4, 10, "Type \'IConversionPathList\' is not assignable to type \'null\'.", "4013178488"],
-      [35, 24, 10, "Object is possibly \'null\'.", "4013178488"]
-    ],
-    "src/app/core/components/data-inspector/data-inspector.component.ts:2942185648": [
-      [71, 4, 20, "Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'Signal<BreakpointState>\'.\\n  Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'() => BreakpointState\'.\\n    Type \'BreakpointState | undefined\' is not assignable to type \'BreakpointState\'.\\n      Type \'undefined\' is not assignable to type \'BreakpointState\'.", "1507091964"]
-    ],
-    "src/app/core/components/options/notifications/notifications.component.ts:3253454142": [
-      [41, 4, 20, "Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'Signal<BreakpointState>\'.\\n  Type \'Signal<BreakpointState | undefined>\' is not assignable to type \'() => BreakpointState\'.\\n    Type \'BreakpointState | undefined\' is not assignable to type \'BreakpointState\'.\\n      Type \'undefined\' is not assignable to type \'BreakpointState\'.", "1507091964"],
-      [47, 4, 24, "Object is possibly \'undefined\'.", "2222700196"],
-      [54, 6, 17, "Object is possibly \'undefined\'.", "2944426029"],
-      [55, 6, 17, "Object is possibly \'undefined\'.", "27783321"]
-    ],
-    "src/app/core/components/options/signalk/signalk.component.ts:2801402843": [
-      [102, 10, 6, "Type \'null\' is not assignable to type \'Chart<keyof ChartTypeRegistry, (number | [number, number] | Point | BubbleDataPoint | null)[], unknown>\'.", "3491622934"],
-      [111, 45, 20, "Object is possibly \'undefined\'.", "235433357"],
-      [172, 28, 20, "Object is possibly \'undefined\'.", "235433357"],
-      [172, 28, 51, "Argument of type \'CanvasRenderingContext2D | null\' is not assignable to parameter of type \'ChartItem\'.\\n  Type \'null\' is not assignable to type \'ChartItem\'.", "38422540"]
-    ],
-    "src/app/core/components/options/units/units.component.ts:2220224509": [
-      [36, 19, 4, "Argument of type \'IUnit\' is not assignable to parameter of type \'never\'.", "2087995779"]
-    ],
-    "src/app/core/components/settings/settings.component.ts:794917258": [
-      [23, 45, 23, "Object is possibly \'undefined\'.", "214257314"],
-      [24, 46, 24, "Object is possibly \'undefined\'.", "3441589046"]
-    ],
-    "src/app/core/components/widget-embedded/widget-embedded.component.ts:3928020917": [
-      [114, 4, 13, "Type \'Type<WidgetViewComponentBase> | undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.\\n  Type \'undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.", "2689238020"]
-    ],
-    "src/app/core/components/widget-host2/widget-host2.component.ts:4255652117": [
-      [134, 4, 13, "Type \'Type<WidgetViewComponentBase> | undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.\\n  Type \'undefined\' is not assignable to type \'Type<WidgetViewComponentBase>\'.", "2689238020"],
-      [250, 32, 9, "Type \'null\' cannot be used as an index type.", "2171020380"]
-    ],
-    "src/app/core/components/widget-title/widget-title.component.ts:2551944470": [
-      [25, 4, 14, "Type \'CanvasRenderingContext2D | null\' is not assignable to type \'CanvasRenderingContext2D\'.\\n  Type \'null\' is not assignable to type \'CanvasRenderingContext2D\'.", "912271434"],
-      [54, 4, 14, "Type \'null\' is not assignable to type \'CanvasRenderingContext2D\'.", "912271434"],
-      [55, 4, 18, "Type \'null\' is not assignable to type \'HTMLCanvasElement\'.", "1193423419"]
-    ],
     "src/app/widget-config/boolean-control-config/boolean-control-config.component.ts:37806614": [
       [26, 40, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
       [27, 39, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
