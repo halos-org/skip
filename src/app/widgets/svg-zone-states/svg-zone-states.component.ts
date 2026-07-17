@@ -14,14 +14,14 @@ import { getColors } from "../../core/utils/themeColors.utils";
 })
 export class SvgZoneStatesComponent {
   // eslint-disable-next-line @angular-eslint/no-input-rename
-  readonly data = input<IDynamicControl>(null, { alias: "controlData" });
-  readonly theme = input<ITheme>(null);
+  readonly data = input.required<IDynamicControl>({ alias: "controlData" });
+  readonly theme = input.required<ITheme | null>();
   readonly dimensions = input.required<IDimensions>();
   readonly toggleClick = output<IDynamicControl>();
 
-  public ctrlLabelColor = signal<string>(null);
-  public ctrlStateColor = signal<string>(null);
-  public messageTxtColor = signal<string>(null);
+  public ctrlLabelColor = signal<string | null>(null);
+  public ctrlStateColor = signal<string | null>(null);
+  public messageTxtColor = signal<string | null>(null);
 
   protected shouldEmergencyBlink = computed(() => {
     const s = (this.data()?.notificationState ?? '').toLowerCase();
@@ -37,6 +37,7 @@ export class SvgZoneStatesComponent {
     effect(() => {
       const data = this.data();
       const theme = this.theme();
+      if (!theme) return;
 
       untracked(() => {
         switch (data.notificationState) {

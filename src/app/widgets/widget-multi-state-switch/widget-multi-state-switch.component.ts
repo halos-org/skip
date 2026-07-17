@@ -158,7 +158,7 @@ export class WidgetMultiStateSwitchComponent {
   constructor() {
     effect(() => {
       const theme = this.theme();
-      const wdColor = this.cfg().color;
+      const wdColor = this.cfg()?.color;
       if (!theme || !wdColor) return;
       untracked(() => {
         //getColors(cfg.color ?? 'contrast', theme);

@@ -8,29 +8,6 @@ exports[`strictNullChecks`] = {
     "src/app/app.component.ts:3236769020": [
       [123, 19, 25, "Object is possibly \'undefined\'.", "255143637"]
     ],
-    "src/app/widgets/svg-zone-states/svg-zone-states.component.ts:489168871": [
-      [16, 41, 4, "No overload matches this call.\\n  Overload 1 of 5, \'(initialValue: IDynamicControl, opts?: InputOptionsWithoutTransform<IDynamicControl> | undefined): InputSignal<...>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'IDynamicControl\'.\\n  Overload 2 of 5, \'(initialValue: undefined, opts: InputOptionsWithoutTransform<IDynamicControl>): InputSignal<IDynamicControl | undefined>\', gave the following error.\\n    Argument of type \'null\' is not assignable to parameter of type \'undefined\'.", "2087897566"],
-      [17, 33, 4, "Argument of type \'null\' is not assignable to parameter of type \'ITheme\'.", "2087897566"],
-      [21, 41, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"],
-      [22, 41, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"],
-      [23, 42, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"]
-    ],
-    "src/app/widgets/widget-multi-state-switch/widget-multi-state-switch.component.ts:3679063603": [
-      [160, 22, 10, "Object is possibly \'undefined\'.", "3996575854"]
-    ],
-    "src/app/widgets/widget-racer-line/widget-racer-line.component.ts:1630258628": [
-      [176, 10, 13, "Type \'null\' is not assignable to type \'string\'.", "363509612"],
-      [189, 34, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
-      [340, 4, 6, "Type \'string | null\' is not assignable to type \'string\'.\\n  Type \'null\' is not assignable to type \'string\'.", "2123913871"],
-      [344, 4, 6, "Type \'string | null\' is not assignable to type \'string\'.\\n  Type \'null\' is not assignable to type \'string\'.", "2123913871"],
-      [488, 25, 13, "Argument of type \'number | null\' is not assignable to parameter of type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "2241094794"],
-      [492, 25, 13, "Argument of type \'number | null\' is not assignable to parameter of type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "2926687684"]
-    ],
-    "src/app/widgets/widget-racesteer/widget-racesteer.component.ts:595381304": [
-      [175, 55, 27, "Argument of type \'number | undefined\' is not assignable to parameter of type \'number\'.\\n  Type \'undefined\' is not assignable to type \'number\'.", "1820305006"],
-      [215, 29, 1, "Argument of type \'number | null\' is not assignable to parameter of type \'number\'.\\n  Type \'null\' is not assignable to type \'number\'.", "177619"],
-      [336, 100, 27, "Argument of type \'number | undefined\' is not assignable to parameter of type \'number\'.\\n  Type \'undefined\' is not assignable to type \'number\'.", "1820305006"]
-    ],
     "src/default-config/config.blank.const.ts:2019243563": [
       [31, 2, 12, "Type \'null\' is not assignable to type \'string\'.", "3195809883"]
     ]

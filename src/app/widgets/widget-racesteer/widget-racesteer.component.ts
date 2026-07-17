@@ -76,7 +76,7 @@ export class WidgetRacesteerComponent implements OnDestroy {
   protected readonly vmgToWaypoint = signal<number | null>(null);
   protected readonly tackTrue = signal(0);
   protected readonly polarSpeedRatio = signal(0);
-  protected readonly targetAngle = signal(0);
+  protected readonly targetAngle = signal<number | null>(0);
   protected readonly optimalWindAngle = signal(0);
   protected readonly targetVMG = signal(0);
   protected readonly VMG = signal(0);
@@ -173,7 +173,7 @@ export class WidgetRacesteerComponent implements OnDestroy {
         if (cfg.windSectorEnable) {
           const heading = this.currentHeading();
           const relative360 = this.addHeading(heading, raw == null ? 0 : raw);
-          this.addHistoricalWindDirection(relative360, cfg.windSectorWindowSeconds);
+          this.addHistoricalWindDirection(relative360, cfg.windSectorWindowSeconds ?? 5);
         }
       }));
     });
@@ -334,7 +334,7 @@ export class WidgetRacesteerComponent implements OnDestroy {
       if (!cfg) return;
       if (cfg.windSectorEnable) {
         if (!this.windSectorSub) {
-          untracked(() => this.windSectorSub = interval(500).subscribe(() => this.historicalCleanup(cfg.windSectorWindowSeconds)));
+          untracked(() => this.windSectorSub = interval(500).subscribe(() => this.historicalCleanup(cfg.windSectorWindowSeconds ?? 5)));
         }
       } else {
         this.windSectorSub?.unsubscribe();
