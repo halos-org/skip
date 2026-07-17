@@ -43,11 +43,11 @@ export const getDynamicTimeZones = (): ITzDefinition[] => {
 })
 export class DisplayDatetimeComponent implements OnInit {
   private readonly _destroyRef = inject(DestroyRef);
-  readonly dateFormat = input<FormControl<string>>(undefined);
-  readonly dateTimezone = input<FormControl<string>>(undefined);
+  readonly dateFormat = input.required<FormControl<string>>();
+  readonly dateTimezone = input.required<FormControl<string>>();
   private tz: ITzDefinition[] = [];
   public filteredTZ: Observable<ITzDefinition[]>;
-  private filteredTZSubscription: Subscription = null;
+  private filteredTZSubscription: Subscription | null = null;
 
   constructor() { }
 

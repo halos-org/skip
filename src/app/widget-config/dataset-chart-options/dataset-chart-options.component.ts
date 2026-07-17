@@ -81,7 +81,9 @@ export class DatasetChartOptionsComponent implements OnInit {
     const currentPath = this.datachartPath()?.value;
     if (currentPath) {
       const pathObject = this.data.getPathObject(currentPath);
-      this.setPathSources(pathObject);
+      if (pathObject) {
+        this.setPathSources(pathObject);
+      }
       this.unitList.set(this.units.getConversionsForPath(currentPath));
     }
     this.setInitFormState();

@@ -29,9 +29,9 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
   readonly enableTimeout = input.required<UntypedFormControl>();
   readonly dataTimeout = input.required<UntypedFormControl>();
   readonly filterSelfPaths = input.required<UntypedFormControl>();
-  readonly addPathEvent = input<IAddNewPathObject>(undefined);
-  readonly delPathEvent = input<string>(undefined);
-  readonly updatePathEvent = input<IDynamicControl[]>(undefined);
+  readonly addPathEvent = input<IAddNewPathObject>();
+  readonly delPathEvent = input<string>();
+  readonly updatePathEvent = input<IDynamicControl[]>();
 
   protected pathsFormGroup!: UntypedFormArray | UntypedFormGroup;
   protected multiCTRLArray: IDynamicControl[] = [];
@@ -56,7 +56,7 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
   ngOnInit(): void {
     if (this.isArray()) {
       this.pathsFormGroup = this.rootFormGroup.control.get(this.formGroupName()) as UntypedFormArray;
-      this.multiCTRLArray = this.rootFormGroup.control.get('multiChildCtrls').value;
+      this.multiCTRLArray = this.rootFormGroup.control.get('multiChildCtrls')?.value ?? [];
     } else {
       this.pathsFormGroup = this.rootFormGroup.control.get(this.formGroupName()) as UntypedFormGroup;
     }
@@ -83,11 +83,11 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
       })
     );
     this.pathsFormGroup.updateValueAndValidity();
-    this.multiCTRLArray = this.rootFormGroup.control.get('multiChildCtrls').value;
+    this.multiCTRLArray = this.rootFormGroup.control.get('multiChildCtrls')?.value ?? [];
   }
 
   private delPath(): void {
-    this.multiCTRLArray = this.rootFormGroup.control.get('multiChildCtrls').value;
+    this.multiCTRLArray = this.rootFormGroup.control.get('multiChildCtrls')?.value ?? [];
   }
 
   private updatePath(ctrls: IDynamicControl[]): void {
