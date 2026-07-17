@@ -106,20 +106,10 @@ exports[`strictNullChecks`] = {
     "src/app/widget-config/dataset-chart-options/dataset-chart-options.component.ts:155376543": [
       [83, 26, 10, "Argument of type \'ISkPathData | null\' is not assignable to parameter of type \'ISkPathData\'.\\n  Type \'null\' is not assignable to type \'ISkPathData\'.", "384538813"]
     ],
-    "src/app/widget-config/display-chart-options/display-chart-options.component.ts:2641875525": [
-      [48, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"]
-    ],
     "src/app/widget-config/display-datetime/display-datetime.component.ts:2719976956": [
       [45, 51, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'FormControl<string>\'.", "2620553983"],
       [46, 53, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'FormControl<string>\'.", "2620553983"],
       [49, 10, 22, "Type \'null\' is not assignable to type \'Subscription\'.", "29842089"]
-    ],
-    "src/app/widget-config/electrical-family-setup/electrical-family-setup.component.ts:4115844403": [
-      [60, 48, 28, "Object is possibly \'undefined\'.", "758680035"],
-      [114, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
-      [115, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
-      [119, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
-      [120, 4, 20, "Object is possibly \'undefined\'.", "2522653710"]
     ],
     "src/app/widget-config/paths-options/paths-options.component.ts:2311600985": [
       [31, 51, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'IAddNewPathObject\'.", "2620553983"],
@@ -128,16 +118,6 @@ exports[`strictNullChecks`] = {
       [58, 28, 49, "Object is possibly \'null\'.", "3725617003"],
       [85, 26, 49, "Object is possibly \'null\'.", "3725617003"],
       [89, 26, 49, "Object is possibly \'null\'.", "3725617003"]
-    ],
-    "src/app/widget-config/root-modal-widget-config/root-modal-widget-config.component.ts:3462626181": [
-      [85, 4, 11, "Type \'{ label: string; value: string; }[]\' is not assignable to type \'never[]\'.\\n  Type \'{ label: string; value: string; }\' is not assignable to type \'never\'.", "3027418051"]
-    ],
-    "src/app/widget-config/solar-charger-setup/solar-charger-setup.component.ts:3993417046": [
-      [47, 48, 28, "Object is possibly \'undefined\'.", "758680035"],
-      [151, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
-      [152, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
-      [156, 4, 20, "Object is possibly \'undefined\'.", "2522653710"],
-      [157, 4, 20, "Object is possibly \'undefined\'.", "2522653710"]
     ],
     "src/app/widgets/svg-racesteer/svg-racesteer.component.ts:3776013780": [
       [36, 46, 9, "Argument of type \'undefined\' is not assignable to parameter of type \'number\'.", "2620553983"],
