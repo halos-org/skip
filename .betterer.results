@@ -40,20 +40,6 @@ exports[`strictNullChecks`] = {
       [22, 41, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"],
       [23, 42, 4, "Argument of type \'null\' is not assignable to parameter of type \'string\'.", "2087897566"]
     ],
-    "src/app/widgets/widget-ais-radar/widget-ais-radar.component.ts:3930432924": [
-      [416, 34, 9, "Argument of type \'string | undefined\' is not assignable to parameter of type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "4119212820"],
-      [543, 29, 17, "Object is possibly \'undefined\'.", "671087258"],
-      [738, 49, 14, "Argument of type \'Position | undefined\' is not assignable to parameter of type \'Position\'.\\n  Type \'undefined\' is not assignable to type \'Position\'.", "3448801501"],
-      [739, 56, 14, "Argument of type \'Position | undefined\' is not assignable to parameter of type \'Position\'.\\n  Type \'undefined\' is not assignable to type \'Position\'.", "3448801501"],
-      [762, 8, 6, "Type \'string | undefined\' is not assignable to type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "2141063537"],
-      [774, 8, 6, "Type \'string | undefined\' is not assignable to type \'string\'.\\n  Type \'undefined\' is not assignable to type \'string\'.", "2141063537"],
-      [1355, 17, 10, "\'a.latitude\' is possibly \'undefined\'.", "3625974138"],
-      [1356, 17, 10, "\'b.latitude\' is possibly \'undefined\'.", "3132265881"],
-      [1357, 18, 10, "\'b.latitude\' is possibly \'undefined\'.", "3132265881"],
-      [1357, 31, 10, "\'a.latitude\' is possibly \'undefined\'.", "3625974138"],
-      [1358, 21, 11, "\'b.longitude\' is possibly \'undefined\'.", "3370058570"],
-      [1358, 35, 11, "\'a.longitude\' is possibly \'undefined\'.", "2985066057"]
-    ],
     "src/app/widgets/widget-multi-state-switch/widget-multi-state-switch.component.ts:3679063603": [
       [160, 22, 10, "Object is possibly \'undefined\'.", "3996575854"]
     ],
