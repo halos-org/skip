@@ -8,7 +8,7 @@
  *
  * Three distinct version spaces (all from src/app/core/constants/config-versions.const.ts):
  *  - applicationData URL path segment 11 (REMOTE_CONFIG_FILE_VERSION)
- *  - app.configVersion 12 (LATEST_APP_CONFIG_VERSION)
+ *  - app.configVersion 13 (LATEST_APP_CONFIG_VERSION)
  *  - connectionConfig.configVersion 13 (CONNECTION_CONFIG_VERSION)
  */
 export const SELF_URN = 'vessels.urn:mrn:signalk:uuid:11111111-1111-4111-8111-111111111111';
@@ -30,9 +30,12 @@ const DEFAULT_NOTIF = {
 };
 
 export function appConfig(extra = {}) {
+  // configVersion 13 with no dataSets field: a genuine post-v12->v13 config, so the
+  // boot skips ConfigurationUpgradeService's migration toast/reload (which is what
+  // strips dataSets/datasetUUID/chartEngine) inside the measurement window.
   return {
-    configVersion: 12, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
-    widgetHistoryDisabled: false, dataSets: [], unitDefaults: DEFAULT_UNITS,
+    configVersion: 13, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
+    widgetHistoryDisabled: false, unitDefaults: DEFAULT_UNITS,
     notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'Skip', ...extra,
   };
 }
@@ -155,6 +158,16 @@ export function localStorageBundle({ origin, subscribeAll }) {
   const cc = connectionConfig(subscribeAll);
   cc.signalKUrl = origin;
   return { 'skip.connectionConfig': JSON.stringify(cc) };
+}
+
+/**
+ * Playwright addInitScript body: sets the boot-time test flag, then seeds the
+ * localStorageBundle() keys before the app script runs. Pass the object from
+ * localStorageBundle().
+ */
+export function initScriptContent(bundle) {
+  return `window.__KIP_TEST__=true;` +
+    Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('');
 }
 
 /** Full IConfig document the mock serves from applicationData/user/skip/<ver>/default. */

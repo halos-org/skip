@@ -18,7 +18,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
-import { appConfig, booleanControlWidget, localStorageBundle } from './lib/kip-config.mjs';
+import { appConfig, booleanControlWidget, localStorageBundle, initScriptContent } from './lib/kip-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -154,15 +154,10 @@ const outDir = join(HERE, 'results', 'shots', 'boolean');
 await mkdir(outDir, { recursive: true });
 
 const bundle = localStorageBundle({ origin: server.origin, subscribeAll: false });
-const initScript = { content: `window.__KIP_TEST__=true;` + Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('') };
-
-// Pin to the current app-config schema (LATEST_APP_CONFIG_VERSION=13) so the boot
-// skips ConfigurationUpgradeService's v12->v13 migration toast/reload. That migration
-// only strips dataSets/datasetUUID/chartEngine, none of which touch the boolean widget.
-const appV13 = () => { const a = appConfig({ configVersion: 13 }); delete a.dataSets; return a; };
+const initScript = { content: initScriptContent(bundle) };
 
 // --- day / default dark theme: full matrix ---
-server.setConfigDocument({ app: appV13(), theme: { themeName: '' }, dashboards: dashboardsFor(scenarios) });
+server.setConfigDocument({ app: appConfig(), theme: { themeName: '' }, dashboards: dashboardsFor(scenarios) });
 const dayCtx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2 });
 await dayCtx.addInitScript(initScript);
 const dayRows = await runTheme({ ctx: dayCtx, url: server.appUrl, list: scenarios, dir: outDir });
@@ -170,7 +165,7 @@ await dayCtx.close();
 
 // --- config-driven light theme: key repros ---
 dseq = 0;
-server.setConfigDocument({ app: appV13(), theme: { themeName: 'light-theme' }, dashboards: dashboardsFor(lightScenarios) });
+server.setConfigDocument({ app: appConfig(), theme: { themeName: 'light-theme' }, dashboards: dashboardsFor(lightScenarios) });
 const lightCtx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2 });
 await lightCtx.addInitScript(initScript);
 const lightRows = await runTheme({ ctx: lightCtx, url: server.appUrl, list: lightScenarios, dir: outDir });

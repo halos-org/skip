@@ -19,7 +19,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBranch, WORKTREES } from './lib/build-serve.mjs';
 import { startServer } from './lib/server.mjs';
-import { localStorageBundle, serverConfigDocument } from './lib/kip-config.mjs';
+import { localStorageBundle, serverConfigDocument, initScriptContent } from './lib/kip-config.mjs';
 import { scenarios as ALL } from './scenarios.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -124,9 +124,7 @@ async function main() {
       const dashboards = s.dashboards();
       server.setConfigDocument(serverConfigDocument({ dashboards }));
       const bundle = localStorageBundle({ origin: server.origin, subscribeAll: s.subscribeAll });
-      const injector = `window.__KIP_TEST__ = true;` +
-        Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('');
-      await ctx.addInitScript({ content: injector });
+      await ctx.addInitScript({ content: initScriptContent(bundle) });
       const page = await ctx.newPage();
       const cdp = await ctx.newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
