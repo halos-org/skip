@@ -4,7 +4,7 @@ import { Dashboard } from './../services/dashboard.service';
 export interface IConnectionConfig {
   configVersion: number;
   kipUUID: string;
-  signalKUrl: string;
+  signalKUrl: string | null;
   proxyEnabled: boolean;
   signalKSubscribeAll: boolean;
   sharedConfigName: string;

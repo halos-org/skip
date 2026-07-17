@@ -120,8 +120,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
     effect(() => {
       const msg = this.upgrade.messages();
-      if (this.upgrade.upgrading() && msg.length && this.upgradeMessagesRef()) {
-        const ul = this.upgradeMessagesRef().nativeElement;
+      const messagesEl = this.upgradeMessagesRef();
+      if (this.upgrade.upgrading() && msg.length && messagesEl) {
+        const ul = messagesEl.nativeElement;
         ul.scrollTop = ul.scrollHeight;
       }
     });
