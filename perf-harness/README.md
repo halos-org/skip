@@ -92,6 +92,24 @@ that each tile rendered its seeded control count (exits non-zero otherwise). Inv
 with `CHROME_BIN=/usr/bin/chromium node shot-boolean.mjs --public ../public` after a
 `../public` build.
 
+`shot-embed.mjs` boots Skip with and without the `?embed` pre-hash query flag and
+asserts the #216 chromeless contract: the toolbar (`<app-toolbar>`) is present
+normally but unmounted under embed, while all seeded dashboard widgets still render;
+an unknown `?profile` falls back to the default dashboard. Exits non-zero on any
+failure; writes `results/shots/embed/<label>.png`. It verifies the Skip-side embed
+behavior, not rendering inside the actual Freeboard-SK drawer, and covers only the
+profile-fallback (not positive profile-switching, which needs a second seeded slot).
+
+`shot-units.mjs` renders a numeric widget per `convertUnitTo` across a unit spread
+and screenshots the grid to `results/shots/units/units-grid.png` — the #245 display-
+symbol probe (kn, km/h, °C, gal, gal/min, Ω, …). The unit label is canvas-drawn, so
+the machine step boot-asserts only the tile count; **symbol correctness is a human
+eyeball of the screenshot** (each tile is labelled by its measure key). The symbol
+resolution itself is unit-tested in `units.service.spec.ts`.
+
+Both invoke as `CHROME_BIN=/usr/bin/chromium node <probe> --public ../public` after a
+`../public` build.
+
 ## Interpreting the numbers
 
 | Question | Metric | Caveat |
