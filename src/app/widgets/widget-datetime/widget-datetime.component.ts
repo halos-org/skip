@@ -46,7 +46,7 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
 
   private canvasMainRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
   private canvasElement: HTMLCanvasElement;
-  private canvasCtx: CanvasRenderingContext2D;
+  private canvasCtx: CanvasRenderingContext2D | null;
   private titleBitmap: HTMLCanvasElement | null = null;
   private titleBitmapText: string | null = null;
   private titleBitmapColor: string | null = null;
@@ -58,8 +58,8 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
   protected dataValue = signal<string | null>(null);
   private _timeZoneGTM = "";
   private isDestroyed = false; // guard against callbacks after destroyed
-  protected labelColor = signal<string>(undefined);
-  private valueColor: string = undefined;
+  protected labelColor = signal<string>('');
+  private valueColor: string | undefined = undefined;
   private maxTextWidth = 0;
   private maxTextHeight = 0;
 
@@ -119,7 +119,7 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
     this.drawWidget();
   }
 
-  private getGMTOffset(timeZone: string): string {
+  private getGMTOffset(timeZone: string | undefined): string {
     try {
       if (timeZone === 'System Timezone -') return '';
       const formatter = new Intl.DateTimeFormat('en-US', {
@@ -139,8 +139,8 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
     const cfg = this.runtime.options();
     const theme = this.theme();
     if (!cfg || !theme) return;
-    this.labelColor.set(getColors(cfg.color, theme).dim);
-    this.valueColor = getColors(cfg.color, theme).color;
+    this.labelColor.set(getColors(cfg.color ?? 'contrast', theme).dim);
+    this.valueColor = getColors(cfg.color ?? 'contrast', theme).color;
   }
 
   ngOnDestroy() {
@@ -153,7 +153,10 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
   /*                                  Canvas                                                     */
   /* ******************************************************************************************* */
   private drawWidget(): void {
-    if (!this.canvasCtx) return;
+    const ctx = this.canvasCtx;
+    if (!ctx) return;
+    const cfg = this.runtime.options();
+    if (!cfg) return;
     // Only recreate the title bitmap if the title text, title color, or full canvas size changes.
     // Note: the offscreen bitmap returned by createTitleBitmap is backed by
     // device pixels (width/height === css * devicePixelRatio), so compare
@@ -162,27 +165,27 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
     if (!this.titleBitmap ||
       this.titleBitmap.width !== this.canvasElement.width ||
       this.titleBitmap.height !== this.canvasElement.height ||
-      this.titleBitmapText !== `${this.displayName()}-${this.runtime.options().color}` ||
+      this.titleBitmapText !== `${cfg.displayName}-${cfg.color}` ||
       this.titleBitmapColor !== titleColor
     ) {
       this.titleBitmap = this.canvas.createTitleBitmap(
-        this.displayName(),
+        cfg.displayName ?? 'Time Label',
         titleColor,
         'normal',
         this.cssWidth,
         this.cssHeight
       );
-      this.titleBitmapText = `${this.displayName()}-${this.runtime.options().color}`;
+      this.titleBitmapText = `${cfg.displayName}-${cfg.color}`;
       this.titleBitmapColor = titleColor;
     }
 
-    this.canvas.clearCanvas(this.canvasCtx, this.cssWidth, this.cssHeight);
+    this.canvas.clearCanvas(ctx, this.cssWidth, this.cssHeight);
 
     // Draw the title bitmap at the top. Request an explicit target size in
     // CSS pixels to avoid any ambiguity with device-pixel intrinsic sizes.
     // Ensure canvas is not size 0
     if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
-      this.canvasCtx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
+      ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
     }
 
     let valueText: string;
@@ -192,7 +195,7 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
       valueText = '--';
     } else {
       try {
-        valueText = formatDate(cur, this.dateFormat(), 'en-US', this._timeZoneGTM);
+        valueText = formatDate(cur, cfg.dateFormat ?? 'dd/MM/yyyy HH:mm:ss', 'en-US', this._timeZoneGTM);
       } catch (error) {
         valueText = error;
         console.log('[Date Time Widget]: ' + error);
@@ -200,7 +203,7 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
     }
 
     this.canvas.drawText(
-      this.canvasCtx,
+      ctx,
       valueText,
       Math.floor(this.cssWidth / 2),
       Math.floor(this.cssHeight / 2 * 1.15),

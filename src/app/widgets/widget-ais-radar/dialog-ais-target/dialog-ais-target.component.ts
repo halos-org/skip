@@ -47,12 +47,14 @@ export class DialogAisTargetComponent implements OnInit, OnDestroy {
 
   protected formatDirection(value: number | null | undefined): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return '--';
-    return this.units.convertToUnit('deg', value).toFixed(0);
+    const converted = this.units.convertToUnit('deg', value);
+    return converted === null ? '--' : converted.toFixed(0);
   }
 
   protected formatNauticalMilesWithUnit(value: number | null | undefined): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return '--';
-    return `${this.units.convertToUnit('nm', value).toFixed(1)} nm`;
+    const converted = this.units.convertToUnit('nm', value);
+    return converted === null ? '--' : `${converted.toFixed(1)} nm`;
   }
 
   protected formatAngleWithUnit(value: number | null | undefined): string {
@@ -91,7 +93,8 @@ export class DialogAisTargetComponent implements OnInit, OnDestroy {
 
   protected formatLatLon(value: number | null | undefined, d : "latitudeMin" | "longitudeMin"): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return '--';
-    return this.units.convertToUnit(d, value).toString();
+    const converted = this.units.convertToUnit(d, value);
+    return converted === null ? '--' : converted.toString();
   }
 
   protected formatText(value: string | null | undefined): string {

@@ -210,8 +210,8 @@ export class WidgetWindComponent implements OnDestroy {
       const cfg = this.runtime.options();
       if (!cfg) return;
       untracked(() => {
-        this.appWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths['appWindSpeed'].convertUnitTo));
-        this.trueWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths['trueWindSpeed'].convertUnitTo));
+        this.appWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths?.['appWindSpeed']?.convertUnitTo));
+        this.trueWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths?.['trueWindSpeed']?.convertUnitTo));
         this.registerStreams();
         this.stopWindSectors();
         this.startWindSectors();

@@ -42,7 +42,7 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
 
   private viewReady = false;
   private iframeLoaded = false;
-  public widgetUrl: string = null;
+  public widgetUrl: string;
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {};
 
   constructor() {
@@ -146,7 +146,7 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
   };
 
   private getExpectedIframeOrigin(): string | null {
-    const candidate = this.widgetUrl || this.appSettings.signalkUrl.url;
+    const candidate = this.widgetUrl || this.appSettings.signalkUrl?.url;
     if (!candidate) return null;
     try {
       return new URL(candidate).origin;
