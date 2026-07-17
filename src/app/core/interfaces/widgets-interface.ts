@@ -443,7 +443,7 @@ export interface IWidgetSvcConfig {
   maxValue?: number;
 
  /** Used by IFrame widget: URL lo load in the iframe */
-  widgetUrl?: string;
+  widgetUrl?: string | null;
   /** Used by IFrame widget: allow input on iframe or not */
   allowInput?: boolean;
 
@@ -653,7 +653,7 @@ export interface IWidgetPath {
    * Use 'unitless' for numeric paths with no meta units, or null to list all types of paths (no filter).
    * @see TValidSkUnits
    */
-  pathSkUnitsFilter?: TValidSkUnits;
+  pathSkUnitsFilter?: TValidSkUnits | null;
   /**
    * Show or hide the path form's filter dropdown control bound to
    * pathSkUnitsFilter path property visible in Widget Options UI.
@@ -669,7 +669,7 @@ export interface IWidgetPath {
    *
    * @see units.service unitConversionFunctions()
    */
-  convertUnitTo?: string;
+  convertUnitTo?: string | null;
   /**
    * Show or hide the path form's Format dropdown control bound to convertUnitTo
    * path property in Widget Options UI.
