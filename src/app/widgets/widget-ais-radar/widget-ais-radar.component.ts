@@ -46,7 +46,7 @@ interface RenderTarget {
   x: number;
   y: number;
   heading: number;
-  status: string;
+  status: string | undefined;
   aisClass: string | undefined;
   type: string;
   iconHref: string | null;
@@ -414,7 +414,7 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
     // Rings/labels only change with data (size/range/theme/showSelf), never
     // with rotation — rebuild them only on a data change.
     if (dataChanged) {
-      const ringColor = getColors(cfg.color, theme).dim;
+      const ringColor = getColors(cfg.color ?? 'contrast', theme).dim;
       this.renderRings(ringCount, rangeNm, radius, maxRingRadius, viewRotation, scale, radarCfg.showSelf ?? true, ownShipRotation, ringColor);
     }
 
@@ -467,7 +467,7 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
     ownShipRotation: number,
     ringColor: string
   ): void {
-    if (!this.ringsLayer) return;
+    if (!this.ringsLayer || !this.ownShipLayer) return;
 
     const ringKey = `${rangeNm.toFixed(3)}|${radius.toFixed(3)}|${maxRadius.toFixed(3)}|${ringCount}`;
     if (!this.ringCache || this.ringCache.key !== ringKey) {
@@ -724,7 +724,7 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    const candidates = tracks.filter(track => {
+    const candidates = tracks.filter((track): track is AisTrack & { position: Position } => {
       if (track.ais.status === 'remove') return false;
       if (track.ais.status === 'lost' && !showLost) return false;
       if (track.ais.status === 'unconfirmed' && !showUnconfirmed) return false;
@@ -1158,7 +1158,7 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
     ].join('|');
   }
 
-  private buildClassName(target: { status: string; type: string; aisClass: string | undefined; navState: string | undefined; id: string }): string {
+  private buildClassName(target: { status: string | undefined; type: string; aisClass: string | undefined; navState: string | undefined; id: string }): string {
     const classes = [
       `status-${target.status}`,
       `type-${target.type}`,
@@ -1353,10 +1353,15 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
 
   private distanceNm(a: Position, b: Position): number {
     const R = 6371e3; // meters
-    const phi1 = a.latitude * Math.PI / 180;
-    const phi2 = b.latitude * Math.PI / 180;
-    const dPhi = (b.latitude - a.latitude) * Math.PI / 180;
-    const dLambda = (b.longitude - a.longitude) * Math.PI / 180;
+    const { latitude: lat1, longitude: lon1 } = a;
+    const { latitude: lat2, longitude: lon2 } = b;
+    if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) {
+      return NaN;
+    }
+    const phi1 = lat1 * Math.PI / 180;
+    const phi2 = lat2 * Math.PI / 180;
+    const dPhi = (lat2 - lat1) * Math.PI / 180;
+    const dLambda = (lon2 - lon1) * Math.PI / 180;
 
     const sinDP = Math.sin(dPhi / 2);
     const sinDL = Math.sin(dLambda / 2);
