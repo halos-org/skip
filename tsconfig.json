@@ -16,7 +16,8 @@
     "target": "ES2022",
     "module": "es2020",
     "isolatedModules": false,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "strictNullChecks": true
   },
   "angularCompilerOptions": {
     "preserveWhitespaces": false,

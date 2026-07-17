@@ -21,15 +21,14 @@ Node: the app builds on Node 20+, but only **Node 24 is CI-verified** (`run-test
 
 CI is the standard HaLOS triad: `pr.yml` → shared `pr-checks` (with `skip-lintian`), `main.yml` → shared `build-release` in npm-only mode (`build-deb: false`; cuts a draft stable release), `release.yml` → `npm publish` when that release is published. `VERSION` is the source of truth, synced to `package.json` by `./run bumpversion`. In npm-only mode a `+N`-only merge (no `VERSION` change) cuts a GitHub release that publishes nothing to npm — bump `VERSION` to ship a new version.
 
-## strictNullChecks ratchet (betterer)
+## strictNullChecks (enabled)
 
-`strictNullChecks` is not yet enabled in the app build — the codebase still has hundreds of latent null-safety issues, migrated file-by-file (issue #6). A [betterer](https://phenomnomnominal.github.io/betterer/) ratchet holds the line: the count can only go down.
+`strictNullChecks` is **enabled** for the whole app in `tsconfig.json` (issue #6, closed). The TypeScript compiler and Angular's `strictTemplates` now enforce null-safety across sources, component templates, and specs — a null-safety regression fails the build directly.
 
-- `npm run snc` — `tsc -p tsconfig.strict.json`, lists your remaining `strictNullChecks` errors. `tsconfig.strict.json` is the single source of the strict compiler options and the checked file scope (all `src/**/*.ts`, no specs, no `test.ts`).
-- `npm run betterer` — **regenerates** `.betterer.results` (the committed baseline). Run and commit this whenever you fix a file **or merge/rebase main into your branch**.
-- `npm run betterer:ci` — the ratchet check CI runs (inside `npm run ci` in the `run-tests` action); fails on any new issue.
+- `npm run snc` — the deterministic type-check gate: `tsc -p tsconfig.strict.json` (production `src/**/*.ts`) **and** `tsc --noEmit -p src/tsconfig.spec.json` (specs). Specs are checked here explicitly because the vitest builder's own spec type-checking is cache-sensitive and not reliable in CI.
+- The CI gate is `npm run ci` = `lint` → `snc` → `test:headless` → `test:plugin` → `test:mcp-schema`. `snc` enforces null-safety in production sources and specs; the app/test build (Angular `strictTemplates`) enforces it in component templates. All three surfaces are covered.
 
-The baseline is keyed by file **content hash**, so any content change to a tracked file — a real fix, or just merging main — invalidates its key and makes `betterer:ci` fail with "unexpected changes" until you regenerate. If CI reports the same count but "unexpected changes", that's the tell: run `npm run betterer` and commit the result. The check runs on Node 24; the baseline is Node-portable (Node 20/22/24 produce identical results). `tsconfig.betterer.json` is only the ts-node loader config for `.betterer.ts`, not a check config.
+The former **betterer ratchet** that migrated the codebase to zero file-by-file was retired at the flip; `.betterer.*` and `tsconfig.betterer.json` are gone — do not reintroduce them. The remaining `strict`-family flags (`strictPropertyInitialization`, `strictFunctionTypes`, `noImplicitAny`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, …) are **not** yet enabled; their measured error count is tracked in the rest-of-strict follow-up issue.
 
 ## Performance and freeze measurement (perf-harness/)
 

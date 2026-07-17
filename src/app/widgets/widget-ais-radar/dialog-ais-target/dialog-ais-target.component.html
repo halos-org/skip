@@ -4,9 +4,9 @@
       @switch (target.type) {
         @case ('vessel') {
           @if (isVesselLike(target)) {
-            @let shipType = target.design?.aisShipType?.name ? `${target.design.aisShipType.name}` : ``;
-            @let length = target.design?.length?.overall ? `${target.design.length.overall}m` : `?m`;
-            @let beam = target.design?.beam ? `${target.design.beam}m` : `?m`;
+            @let shipType = target.design?.aisShipType?.name ? `${target.design?.aisShipType?.name}` : ``;
+            @let length = target.design?.length?.overall ? `${target.design?.length?.overall}m` : `?m`;
+            @let beam = target.design?.beam ? `${target.design?.beam}m` : `?m`;
             @let dimensions = length && beam ? `${length} x ${beam}` : ``;
             @if (target.design?.length?.overall || target.design?.beam || shipType) {
               <div class="ais-dialog-item ais-dialog-item-span">
@@ -108,9 +108,9 @@
         }
         @case ('sar') {
           @if (isVesselLike(target)) {
-            @let shipType = target.design?.aisShipType?.name ? `${target.design.aisShipType.name}` : ``;
-            @let length = target.design?.length?.overall ? `${target.design.length.overall}m` : `?m`;
-            @let beam = target.design?.beam ? `${target.design.beam}m` : `?m`;
+            @let shipType = target.design?.aisShipType?.name ? `${target.design?.aisShipType?.name}` : ``;
+            @let length = target.design?.length?.overall ? `${target.design?.length?.overall}m` : `?m`;
+            @let beam = target.design?.beam ? `${target.design?.beam}m` : `?m`;
             @let dimensions = length && beam ? `${length} x ${beam}` : ``;
             @if (target.design?.length?.overall || target.design?.beam || shipType) {
               <div class="ais-dialog-item ais-dialog-item-span">

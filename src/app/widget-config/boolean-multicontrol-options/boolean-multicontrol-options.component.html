@@ -1,4 +1,5 @@
-<div [formGroup]="multiFormGroup">
+@if (multiFormGroup; as fg) {
+<div [formGroup]="fg">
   <div formArrayName="multiCtrlArray">
     @for(ctrl of multiCtrlArray().controls; track ctrl; let i = $index) {
       <boolean-control-config class="full-width"
@@ -15,3 +16,4 @@
     </button>
   </div>
 </div>
+}

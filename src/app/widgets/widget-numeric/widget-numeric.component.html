@@ -1,4 +1,6 @@
 @if (showMiniChart()) {
-  <minichart [theme]="this.theme()" />
+  @if (theme(); as t) {
+    <minichart [theme]="t" />
+  }
 }
 <canvas #canvasMainRef class="numeric-canvas"></canvas>

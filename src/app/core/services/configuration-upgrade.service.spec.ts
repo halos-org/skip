@@ -153,7 +153,7 @@ describe('ConfigurationUpgradeService', () => {
 
         await service.runUpgrade(12);
 
-        const written = mockStorage.setConfig.mock.calls.at(-1)[2];
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
         expect(written.app.configVersion).toBe(13);
         expect('dataSets' in written.app).toBe(false);
         const widgetCfg = written.dashboards[0].configuration[0].input.widgetProperties.config;

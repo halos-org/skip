@@ -23,12 +23,12 @@
     <!-- AP Screen row -->
   <div class="ap-screen">
     <app-svg-autopilot
-      [apMode]="apMode()"
-      [targetPilotHeadingTrue]="runtime.options().autopilot.courseDirectionTrue"
+      [apMode]="apMode() ?? 'off-line'"
+      [targetPilotHeadingTrue]="runtime.options()?.autopilot?.courseDirectionTrue ?? false"
       [autopilotTarget]="autopilotTarget()"
-      [courseXte]="crossTrackError()"
+      [courseXte]="crossTrackError() ?? 0"
       [compassHeading]="heading()"
-      [headingDirectionTrue]="runtime.options().autopilot.headingDirectionTrue"
+      [headingDirectionTrue]="runtime.options()?.autopilot?.headingDirectionTrue ?? false"
       [appWindAngle]="windAngleApparent()"
       [rudderAngle]="rudder()"
     ></app-svg-autopilot>
@@ -153,7 +153,7 @@
   </div>
   <!-- Route Button row -->
   <div [style.display]="routeBtnVisibility() ? 'block' : 'none'">
-    @if (runtime.options().autopilot.apiVersion === 'v2') {
+    @if ((runtime.options()?.autopilot?.apiVersion) === 'v2') {
       <button mat-flat-button [disabled]="apBtnDisabled()" class="ap-btn" [class.ap-btn-active]="dodgeModeActive()" (click)="toggleDodge()">
         <mat-icon class="svg-icon">
           <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" class="svg-element svg-route">

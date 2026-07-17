@@ -184,25 +184,13 @@ function lint {
 }
 
 function snc {
-  #@ List remaining strictNullChecks errors
+  #@ Type-check all sources under strictNullChecks
   #@ Category: Quality
   npm run snc
 }
 
-function betterer {
-  #@ Regenerate the strictNullChecks ratchet baseline (.betterer.results)
-  #@ Category: Quality
-  npm run betterer
-}
-
-function betterer-ci {
-  #@ Enforce the strictNullChecks ratchet (fails on new issues)
-  #@ Category: Quality
-  npm run betterer:ci
-}
-
 function ci {
-  #@ Run all CI checks (lint, betterer:ci, tests)
+  #@ Run all CI checks (lint, snc, tests)
   #@ Category: Quality
   npm run ci
 }

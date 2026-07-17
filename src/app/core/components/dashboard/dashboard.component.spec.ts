@@ -152,7 +152,7 @@ describe('DashboardComponent', () => {
             addWidgetToGrid: (w: unknown, x: number, y: number) => void;
         }).addWidgetToGrid(widget, 1, 1);
 
-        const addedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall[0];
+        const addedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall![0];
         expect(addedWidget.input.widgetProperties.autoOpenOptionsOnCreate).toBe(true);
     });
 
@@ -170,7 +170,7 @@ describe('DashboardComponent', () => {
             addWidgetToGrid: (w: unknown, x: number, y: number) => void;
         }).addWidgetToGrid(widget, 1, 1);
 
-        const addedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall[0];
+        const addedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall![0];
         expect(addedWidget.input.widgetProperties.autoOpenOptionsOnCreate).toBe(true);
     });
 
@@ -194,7 +194,7 @@ describe('DashboardComponent', () => {
             duplicateWidget: (node: unknown) => void;
         }).duplicateWidget(item);
 
-        const duplicatedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall[0];
+        const duplicatedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall![0];
         expect(duplicatedWidget.input.widgetProperties.autoOpenOptionsOnCreate).toBeUndefined();
     });
 
@@ -216,7 +216,7 @@ describe('DashboardComponent', () => {
             pasteCopiedWidget: (x?: number, y?: number) => void;
         }).pasteCopiedWidget(1, 1);
 
-        const pastedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall[0];
+        const pastedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall![0];
         expect(pastedWidget.input.widgetProperties.autoOpenOptionsOnCreate).toBeUndefined();
     });
 
