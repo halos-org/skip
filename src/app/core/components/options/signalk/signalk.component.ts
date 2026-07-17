@@ -143,7 +143,7 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
       console.log('[Settings-SignalK] Validating Signal K server before connecting...');
 
       // Step 1: Validate the URL before proceeding
-      await this.signalKConnectionService.validateSignalKUrl(this.connectionConfig.signalKUrl);
+      await this.signalKConnectionService.validateSignalKUrl(this.connectionConfig.signalKUrl ?? '');
 
       console.log('[Settings-SignalK] Validation successful - proceeding with connection');
 

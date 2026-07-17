@@ -3,13 +3,3 @@
 // If this file contains merge conflicts, use `betterer merge` to automatically resolve them:
 // https://phenomnomnominal.github.io/betterer/docs/results-file/#merge
 //
-exports[`strictNullChecks`] = {
-  value: `{
-    "src/app/app.component.ts:3236769020": [
-      [123, 19, 25, "Object is possibly \'undefined\'.", "255143637"]
-    ],
-    "src/default-config/config.blank.const.ts:2019243563": [
-      [31, 2, 12, "Type \'null\' is not assignable to type \'string\'.", "3195809883"]
-    ]
-  }`
-};

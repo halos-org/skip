@@ -129,7 +129,7 @@ export class SettingsService {
         break;
     }
 
-    this.signalkUrl = {url: config.signalKUrl, new: false};
+    this.signalkUrl = {url: config.signalKUrl ?? '', new: false};
     this.proxyEnabled = config.proxyEnabled;
     this.signalKSubscribeAll = config.signalKSubscribeAll;
     this.sharedConfigName = config.sharedConfigName;
@@ -299,7 +299,7 @@ export class SettingsService {
     this.proxyEnabled = value.proxyEnabled;
     this.signalKSubscribeAll = value.signalKSubscribeAll;
     if (this.signalkUrl) {
-      this.signalkUrl.url = value.signalKUrl;
+      this.signalkUrl.url = value.signalKUrl ?? '';
     }
     this.saveConnectionConfigToLocalStorage();
   }
