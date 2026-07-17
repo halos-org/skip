@@ -174,7 +174,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private maxValueTextHeight = 0;
   private displayLineIndex = 0;
   private lines: string[] = [];
-  private startLineName: string = null;
+  private startLineName: string | null = null;
   protected portBiasValue = signal<string>('');
   protected lineLengthValue = signal<string>('');
   protected stbBiasValue = signal<string>('');
@@ -187,7 +187,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       const theme = this.theme();
       if (!cfg || !theme) return;
       untracked(() => {
-        const palette = getColors(cfg.color, theme);
+        const palette = getColors(cfg.color ?? 'contrast', theme);
         this.labelColor.set(palette.dim);
         this.valueColor = palette.color;
         this.draw();
@@ -337,11 +337,11 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     this.draw();
   }
 
-  public setLineEnd(end: string): string {
+  public setLineEnd(end: string): string | null {
     return this.signalk.putRequest('navigation.racing.setStartLine', {end, position: 'bow'}, this.id());
   }
 
-  public adjustLineEnd(end: string, delta: number, rotateRadians: number): string {
+  public adjustLineEnd(end: string, delta: number, rotateRadians: number): string | null {
     return this.signalk.putRequest('navigation.racing.setStartLine', {end, delta, rotate: rotateRadians || null}, this.id());
   }
 
@@ -472,7 +472,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     return this.dtsValue.toFixed(cfg?.numDecimal ?? 0);
   }
 
-  private toHHMMSS(totalSeconds: number): string {
+  private toHHMMSS(totalSeconds: number | null): string {
     if (totalSeconds == null || isNaN(totalSeconds)) return '-:--';
     const negative = totalSeconds < 0;
     if (negative) totalSeconds = -totalSeconds;
