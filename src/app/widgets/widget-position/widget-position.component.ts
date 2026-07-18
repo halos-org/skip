@@ -56,10 +56,10 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
     paths: {
       longPath: {
         description: 'Longitude',
-        path: 'self.navigation.position.longitude',
+        path: 'self.navigation.position',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         convertUnitTo: 'longitudeMin',
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: null,
@@ -67,10 +67,10 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
       },
       latPath: {
         description: 'Latitude',
-        path: 'self.navigation.position.latitude',
+        path: 'self.navigation.position',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         convertUnitTo: 'latitudeMin',
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: null,
@@ -109,7 +109,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
         else this.longPos = String(val);
         this.calculateFontSizeAndPositions();
         this.draw();
-      }));
+      }, 'longitude'));
     });
 
     // Observe latitude path
@@ -124,7 +124,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
         else this.latPos = String(val);
         this.calculateFontSizeAndPositions();
         this.draw();
-      }));
+      }, 'latitude'));
     });
   }
 

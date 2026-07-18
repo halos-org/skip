@@ -71,16 +71,16 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
 
   // Static Host2 default config (parity with legacy defaultConfig)
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
-    supportAutomaticHistoricalSeries: true,
+    supportAutomaticHistoricalSeries: false,
     displayName: 'Heel',
     filterSelfPaths: true,
     paths: {
       angle: {
-        description: 'Heel / Roll / Other Angle',
-        path: 'self.navigation.attitude.roll',
+        description: 'Heel / Roll Angle',
+        path: 'self.navigation.attitude',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         convertUnitTo: 'deg',
         sampleTime: 1000,
         pathRequired: true
@@ -105,7 +105,8 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
       if (!cfg) return;
       const angleCfg = cfg.paths?.['angle'];
       if (!angleCfg?.path) return; // nothing to observe if path empty
-      // Establish observation outside reactive tracking of angle updates
+      // Establish observation outside reactive tracking of angle updates. The path is the whole
+      // navigation.attitude compound leaf; the widget reads its 'roll' sub-field.
       untracked(() => this.streams.observe('angle', pkt => {
         const raw = (pkt?.data?.value as number | undefined);
         if (raw == null) {
@@ -114,7 +115,7 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
         }
         const inv = cfg.gauge?.invertAngle ? -raw : raw;
         this.angleDeg.set(inv);
-      }));
+      }, 'roll'));
     });
 
     // Theme + color config effect
