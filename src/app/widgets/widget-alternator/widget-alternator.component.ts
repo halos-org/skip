@@ -4,7 +4,7 @@ import { select, type Selection } from 'd3-selection';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import type { ITheme } from '../../core/services/app-service';
-import { States, TState } from '../../core/interfaces/signalk-interfaces';
+import { TState } from '../../core/interfaces/signalk-interfaces';
 import type { ElectricalTrackedDevice, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { UnitsService } from '../../core/services/units.service';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
@@ -21,6 +21,7 @@ import {
 import type { AlternatorDisplayModel, AlternatorSnapshot, AlternatorWidgetConfig, ElectricalCardModeConfig } from './widget-alternator.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
+import { setValue, setMetricValue, toStringValue, resolveMostSevereState } from '../shared/electrical-apply.util';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -151,7 +152,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
     for (const alternator of alternators) {
       const modelKey = alternator.deviceKey ?? alternator.id;
       const showSource = !!alternator.source && duplicateIds.has(alternator.id);
-      const aggregateState = this.resolveMostSevereState(
+      const aggregateState = resolveMostSevereState(
         alternator.powerState ?? null,
         alternator.currentState ?? null,
         alternator.voltageState ?? null,
@@ -161,8 +162,8 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
         alternator.fieldDriveState ?? null,
         alternator.regulatorTemperatureState ?? null
       );
-      const primaryState = this.resolveMostSevereState(alternator.voltageState ?? null, alternator.currentState ?? null);
-      const secondaryState = this.resolveMostSevereState(
+      const primaryState = resolveMostSevereState(alternator.voltageState ?? null, alternator.currentState ?? null);
+      const secondaryState = resolveMostSevereState(
         alternator.powerState ?? null,
         alternator.revolutionsState ?? null,
         alternator.temperatureState ?? null,
@@ -182,7 +183,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
         stateBarColor: resolveZoneAwareColor(aggregateState, widgetColors?.dim ?? 'var(--skip-contrast-color)', theme, ignoreZones),
         titleTextColor: resolveZoneAwareColor(aggregateState, 'var(--skip-contrast-color)', theme, ignoreZones),
         metaTextColor: resolveZoneAwareColor(
-          this.resolveMostSevereState(alternator.chargingModeState ?? null, alternator.fieldDriveState ?? null),
+          resolveMostSevereState(alternator.chargingModeState ?? null, alternator.fieldDriveState ?? null),
           'var(--skip-contrast-dim-color)',
           theme,
           ignoreZones
@@ -448,7 +449,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
           }
 
           if (next.rawPower == null) {
-            next.powerState = this.resolveMostSevereState(next.voltageState ?? null, next.currentState ?? null);
+            next.powerState = resolveMostSevereState(next.voltageState ?? null, next.currentState ?? null);
           }
 
           if (!changed) {
@@ -476,62 +477,35 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
   private applyValue(snapshot: AlternatorSnapshot, key: string, value: unknown, state: TState | null): boolean {
     switch (key) {
       case 'name':
-        return this.setValue(snapshot, 'name', this.toStringValue(value));
+        return setValue(snapshot, 'name', toStringValue(value));
       case 'location':
-        return this.setValue(snapshot, 'location', this.toStringValue(value));
+        return setValue(snapshot, 'location', toStringValue(value));
       case 'associatedBus':
-        return this.setValue(snapshot, 'associatedBus', this.toStringValue(value));
+        return setValue(snapshot, 'associatedBus', toStringValue(value));
       case 'chargingMode':
-        return this.setMetricValue(snapshot, 'chargingMode', 'chargingModeState', this.toStringValue(value), state);
+        return setMetricValue(snapshot, 'chargingMode', 'chargingModeState', toStringValue(value), state);
       case 'voltage':
-        return this.setMetricValue(snapshot, 'voltage', 'voltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'voltage', 'voltageState', this.toNumber(value, 'V'), state);
       case 'current':
-        return this.setMetricValue(snapshot, 'current', 'currentState', this.toNumber(value, 'A'), state);
+        return setMetricValue(snapshot, 'current', 'currentState', this.toNumber(value, 'A'), state);
       case 'power':
       case 'realPower':
-        return this.setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
+        return setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
       case 'temperature':
-        return this.setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
       case 'revolutions':
-        return this.setMetricValue(snapshot, 'revolutions', 'revolutionsState', this.toNumber(value, 'Hz'), state);
+        return setMetricValue(snapshot, 'revolutions', 'revolutionsState', this.toNumber(value, 'Hz'), state);
       case 'fieldDrive':
-        return this.setMetricValue(snapshot, 'fieldDrive', 'fieldDriveState', this.toNumber(value, '%'), state);
+        return setMetricValue(snapshot, 'fieldDrive', 'fieldDriveState', this.toNumber(value, '%'), state);
       case 'regulatorTemperature':
-        return this.setMetricValue(snapshot, 'regulatorTemperature', 'regulatorTemperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+        return setMetricValue(snapshot, 'regulatorTemperature', 'regulatorTemperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
       case 'setpointVoltage':
-        return this.setMetricValue(snapshot, 'setpointVoltage', 'setpointVoltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'setpointVoltage', 'setpointVoltageState', this.toNumber(value, 'V'), state);
       case 'setpointCurrent':
-        return this.setMetricValue(snapshot, 'setpointCurrent', 'setpointCurrentState', this.toNumber(value, 'A'), state);
+        return setMetricValue(snapshot, 'setpointCurrent', 'setpointCurrentState', this.toNumber(value, 'A'), state);
       default:
         return false;
     }
-  }
-
-  private setValue<K extends keyof AlternatorSnapshot>(target: AlternatorSnapshot, key: K, nextValue: AlternatorSnapshot[K]): boolean {
-    if (Object.is(target[key], nextValue)) {
-      return false;
-    }
-
-    target[key] = nextValue;
-    return true;
-  }
-
-  private setMetricValue<K extends keyof AlternatorSnapshot, S extends keyof AlternatorSnapshot>(
-    target: AlternatorSnapshot,
-    key: K,
-    stateKey: S,
-    nextValue: AlternatorSnapshot[K],
-    state: TState | null
-  ): boolean {
-    const valueChanged = !Object.is(target[key], nextValue);
-    const stateChanged = !Object.is(target[stateKey], state);
-    if (!valueChanged && !stateChanged) {
-      return false;
-    }
-
-    target[key] = nextValue;
-    target[stateKey] = state as AlternatorSnapshot[S];
-    return true;
   }
 
   private requestRender(snapshot?: AlternatorRenderSnapshot): void {
@@ -765,18 +739,6 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
     }
 
     return `${value.toFixed(0)} %`;
-  }
-
-  private toStringValue(value: unknown): string | null {
-    return typeof value === 'string' ? value : null;
-  }
-
-  private resolveMostSevereState(...states: (TState | null | undefined)[]): TState | null {
-    if (states.some(state => state === States.Alert)) return States.Alert;
-    if (states.some(state => state === States.Alarm)) return States.Alarm;
-    if (states.some(state => state === States.Warn)) return States.Warn;
-    if (states.some(state => state === States.Normal)) return States.Normal;
-    return null;
   }
 
   private toNumber(value: unknown, unitHint: string): number | null {

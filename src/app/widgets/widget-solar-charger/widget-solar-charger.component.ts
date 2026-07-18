@@ -13,6 +13,7 @@ import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electr
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
+import { setValue } from '../shared/electrical-apply.util';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface SolarRenderSnapshot {
@@ -591,9 +592,9 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
 
   private applyChargerValue(charger: SolarChargerSnapshot, key: string, value: unknown, state: TState | null): boolean {
     switch (key) {
-      case 'name': return this.setValue(charger, 'name', this.toStringValue(value));
-      case 'location': return this.setValue(charger, 'location', this.toStringValue(value));
-      case 'associatedBus': return this.setValue(charger, 'associatedBus', this.toStringValue(value));
+      case 'name': return setValue(charger, 'name', this.toStringValue(value));
+      case 'location': return setValue(charger, 'location', this.toStringValue(value));
+      case 'associatedBus': return setValue(charger, 'associatedBus', this.toStringValue(value));
       case 'voltage': {
         const nextValue = this.toNumber(value, 'V');
         const stateChanged = !Object.is(charger.voltageState ?? null, state ?? null);
@@ -619,12 +620,12 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
         charger.temperatureState = state;
         return true;
       }
-      case 'chargingAlgorithm': return this.setValue(charger, 'chargingAlgorithm', this.toStringValue(value));
-      case 'chargerRole': return this.setValue(charger, 'chargerRole', this.toStringValue(value));
-      case 'chargingMode': return this.setValue(charger, 'chargingMode', this.toStringValue(value));
-      case 'setpointVoltage': return this.setValue(charger, 'setpointVoltage', this.toNumber(value, 'V'));
-      case 'setpointCurrent': return this.setValue(charger, 'setpointCurrent', this.toNumber(value, 'A'));
-      case 'controllerMode': return this.setValue(charger, 'controllerMode', this.toStringValue(value));
+      case 'chargingAlgorithm': return setValue(charger, 'chargingAlgorithm', this.toStringValue(value));
+      case 'chargerRole': return setValue(charger, 'chargerRole', this.toStringValue(value));
+      case 'chargingMode': return setValue(charger, 'chargingMode', this.toStringValue(value));
+      case 'setpointVoltage': return setValue(charger, 'setpointVoltage', this.toNumber(value, 'V'));
+      case 'setpointCurrent': return setValue(charger, 'setpointCurrent', this.toNumber(value, 'A'));
+      case 'controllerMode': return setValue(charger, 'controllerMode', this.toStringValue(value));
       case 'panelVoltage': {
         const nextValue = this.toNumber(value, 'V');
         const stateChanged = !Object.is(charger.panelVoltageState ?? null, state ?? null);
@@ -649,8 +650,8 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
         charger.panelPowerState = state;
         return true;
       }
-      case 'yieldToday': return this.setValue(charger, 'yieldToday', this.toNumber(value, 'kWh'));
-      case 'yieldYesterday': return this.setValue(charger, 'yieldYesterday', this.toNumber(value, 'kWh'));
+      case 'yieldToday': return setValue(charger, 'yieldToday', this.toNumber(value, 'kWh'));
+      case 'yieldYesterday': return setValue(charger, 'yieldYesterday', this.toNumber(value, 'kWh'));
       case 'panelTemperature': {
         const nextValue = this.toNumber(value, this.units.getDefaults().Temperature);
         const stateChanged = !Object.is(charger.panelTemperatureState ?? null, state ?? null);
@@ -662,7 +663,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       case 'load':
       case 'loadState':
       case 'load.state':
-        return this.setValue(charger, 'load', value as string | number | boolean | null);
+        return setValue(charger, 'load', value as string | number | boolean | null);
       case 'loadCurrent': {
         const nextValue = this.toNumber(value, 'A');
         const stateChanged = !Object.is(charger.loadCurrentState ?? null, state ?? null);
@@ -678,13 +679,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
 
   private setPowerPathValue(charger: SolarChargerSnapshot, key: 'rawBatteryPower' | 'rawPanelPower', value: unknown): boolean {
     const parsedValue = this.toNumber(value, 'W');
-    return this.setValue(charger, key, parsedValue);
-  }
-
-  private setValue<K extends keyof SolarChargerSnapshot>(snapshot: SolarChargerSnapshot, key: K, value: SolarChargerSnapshot[K]): boolean {
-    if (Object.is(snapshot[key], value)) return false;
-    snapshot[key] = value;
-    return true;
+    return setValue(charger, key, parsedValue);
   }
 
   private resolvePowerValue(pathPower: number | null | undefined, voltage: number | null | undefined, current: number | null | undefined): number | undefined {

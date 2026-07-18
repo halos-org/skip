@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { select, type Selection } from 'd3-selection';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { States, TState } from '../../core/interfaces/signalk-interfaces';
+import { TState } from '../../core/interfaces/signalk-interfaces';
 import { UnitsService } from '../../core/services/units.service';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
@@ -13,6 +13,7 @@ import type { ITheme } from '../../core/services/app-service';
 import type { ChargerDisplayModel, ChargerSnapshot } from './widget-charger.types';
 import { ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
+import { setValue, setMetricValue, toStringValue, toBoolean, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface ChargerRenderSnapshot {
@@ -397,7 +398,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
           }
 
           if (next.rawPower == null) {
-            next.powerState = this.resolveMostSevereState(next.voltageState ?? null, next.currentState ?? null);
+            next.powerState = resolveMostSevereState(next.voltageState ?? null, next.currentState ?? null);
           }
 
           if (!changed) {
@@ -435,93 +436,62 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
   private applyValue(snapshot: ChargerSnapshot, key: string, value: unknown, state: TState | null): boolean {
     switch (key) {
       case 'name':
-        return this.setValue(snapshot, 'name', this.toStringValue(value));
+        return setValue(snapshot, 'name', toStringValue(value));
       case 'location':
-        return this.setValue(snapshot, 'location', this.toStringValue(value));
+        return setValue(snapshot, 'location', toStringValue(value));
       case 'associatedBus':
-        return this.setValue(snapshot, 'associatedBus', this.toStringValue(value));
+        return setValue(snapshot, 'associatedBus', toStringValue(value));
       case 'state':
-        return this.setMetricValue(snapshot, 'state', 'stateState', this.toStringValue(value), state);
+        return setMetricValue(snapshot, 'state', 'stateState', toStringValue(value), state);
       case 'offReason':
-        return this.setMetricValue(snapshot, 'offReason', 'offReasonState', this.toStringValue(value), state);
+        return setMetricValue(snapshot, 'offReason', 'offReasonState', toStringValue(value), state);
       case 'error':
-        return this.setMetricValue(snapshot, 'error', 'errorState', this.toStringValue(value), state);
+        return setMetricValue(snapshot, 'error', 'errorState', toStringValue(value), state);
       case 'mode':
-        return this.setMetricValue(snapshot, 'mode', 'modeState', this.toStringValue(value), state);
+        return setMetricValue(snapshot, 'mode', 'modeState', toStringValue(value), state);
       case 'modeState':
-        return this.setMetricValue(snapshot, 'mode', 'modeState', this.toStringValue(value), state);
+        return setMetricValue(snapshot, 'mode', 'modeState', toStringValue(value), state);
       case 'modeNumber':
-        return this.setMetricValue(snapshot, 'modeNumber', 'modeNumberState', this.toNumber(value, ''), state);
+        return setMetricValue(snapshot, 'modeNumber', 'modeNumberState', this.toNumber(value, ''), state);
       case 'chargingMode':
-        return this.setMetricValue(snapshot, 'chargingMode', 'chargingModeState', this.toStringValue(value), state);
+        return setMetricValue(snapshot, 'chargingMode', 'chargingModeState', toStringValue(value), state);
       case 'chargingModeNumber':
-        return this.setMetricValue(snapshot, 'chargingModeNumber', 'chargingModeNumberState', this.toNumber(value, ''), state);
+        return setMetricValue(snapshot, 'chargingModeNumber', 'chargingModeNumberState', this.toNumber(value, ''), state);
       case 'output.voltage': {
         const nextVoltage = this.toNumber(value, 'V');
-        const outputChanged = this.setMetricValue(snapshot, 'outputVoltage', 'outputVoltageState', nextVoltage, state);
-        const voltageChanged = this.setMetricValue(snapshot, 'voltage', 'voltageState', nextVoltage, state);
+        const outputChanged = setMetricValue(snapshot, 'outputVoltage', 'outputVoltageState', nextVoltage, state);
+        const voltageChanged = setMetricValue(snapshot, 'voltage', 'voltageState', nextVoltage, state);
         return outputChanged || voltageChanged;
       }
       case 'input.voltage':
-        return this.setMetricValue(snapshot, 'inputVoltage', 'inputVoltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'inputVoltage', 'inputVoltageState', this.toNumber(value, 'V'), state);
       case 'voltage':
-        return this.setMetricValue(snapshot, 'voltage', 'voltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'voltage', 'voltageState', this.toNumber(value, 'V'), state);
       case 'current':
-        return this.setMetricValue(snapshot, 'current', 'currentState', this.toNumber(value, 'A'), state);
+        return setMetricValue(snapshot, 'current', 'currentState', this.toNumber(value, 'A'), state);
       case 'power':
-        return this.setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
+        return setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
       case 'temperature':
-        return this.setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
       case 'leds.absorption':
-        return this.setMetricValue(snapshot, 'ledsAbsorption', 'ledsAbsorptionState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsAbsorption', 'ledsAbsorptionState', toBoolean(value), state);
       case 'leds.bulk':
-        return this.setMetricValue(snapshot, 'ledsBulk', 'ledsBulkState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsBulk', 'ledsBulkState', toBoolean(value), state);
       case 'leds.float':
-        return this.setMetricValue(snapshot, 'ledsFloat', 'ledsFloatState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsFloat', 'ledsFloatState', toBoolean(value), state);
       case 'leds.inverter':
-        return this.setMetricValue(snapshot, 'ledsInverter', 'ledsInverterState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsInverter', 'ledsInverterState', toBoolean(value), state);
       case 'leds.lowBattery':
-        return this.setMetricValue(snapshot, 'ledsLowBattery', 'ledsLowBatteryState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsLowBattery', 'ledsLowBatteryState', toBoolean(value), state);
       case 'leds.mains':
-        return this.setMetricValue(snapshot, 'ledsMains', 'ledsMainsState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsMains', 'ledsMainsState', toBoolean(value), state);
       case 'leds.overload':
-        return this.setMetricValue(snapshot, 'ledsOverload', 'ledsOverloadState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsOverload', 'ledsOverloadState', toBoolean(value), state);
       case 'leds.temperature':
-        return this.setMetricValue(snapshot, 'ledsTemperature', 'ledsTemperatureState', this.toBoolean(value), state);
+        return setMetricValue(snapshot, 'ledsTemperature', 'ledsTemperatureState', toBoolean(value), state);
       default:
         return false;
     }
-  }
-
-  private setValue<K extends keyof ChargerSnapshot>(
-    target: ChargerSnapshot,
-    key: K,
-    nextValue: ChargerSnapshot[K]
-  ): boolean {
-    if (Object.is(target[key], nextValue)) {
-      return false;
-    }
-
-    target[key] = nextValue;
-    return true;
-  }
-
-  private setMetricValue<K extends keyof ChargerSnapshot, S extends keyof ChargerSnapshot>(
-    target: ChargerSnapshot,
-    key: K,
-    stateKey: S,
-    nextValue: ChargerSnapshot[K],
-    state: TState | null
-  ): boolean {
-    const valueChanged = !Object.is(target[key], nextValue);
-    const stateChanged = !Object.is(target[stateKey], state);
-    if (!valueChanged && !stateChanged) {
-      return false;
-    }
-
-    target[key] = nextValue;
-    target[stateKey] = state as ChargerSnapshot[S];
-    return true;
   }
 
   private requestRender(snapshot?: ChargerRenderSnapshot): void {
@@ -864,37 +834,6 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
     }
 
     return `${value.toFixed(0)}`;
-  }
-
-  private toStringValue(value: unknown): string | null {
-    return typeof value === 'string' ? value : null;
-  }
-
-  private toBoolean(value: unknown): boolean | null {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-
-    if (typeof value === 'number') {
-      if (value === 1) return true;
-      if (value === 0) return false;
-    }
-
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase();
-      if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
-      if (normalized === 'false' || normalized === '0' || normalized === 'off') return false;
-    }
-
-    return null;
-  }
-
-  private resolveMostSevereState(...states: (TState | null | undefined)[]): TState | null {
-    if (states.some(state => state === States.Alert)) return States.Alert;
-    if (states.some(state => state === States.Alarm)) return States.Alarm;
-    if (states.some(state => state === States.Warn)) return States.Warn;
-    if (states.some(state => state === States.Normal)) return States.Normal;
-    return null;
   }
 
   private toNumber(value: unknown, unitHint: string): number | null {
