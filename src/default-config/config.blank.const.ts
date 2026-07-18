@@ -28,7 +28,7 @@ export const defaultConfig: IConfig = {
 
 export const DefaultConnectionConfig: Readonly<IConnectionConfig> = {
   "configVersion": CONNECTION_CONFIG_VERSION,
-  "kipUUID": UUID.create(),
+  "skipUUID": UUID.create(),
   "signalKUrl": null, // get's overwritten with host at getDefaultConnectionConfig()
   "proxyEnabled": false,
   "signalKSubscribeAll": false,

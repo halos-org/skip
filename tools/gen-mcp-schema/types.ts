@@ -1,18 +1,18 @@
 /**
- * Types for the generated KIP dashboard schema artifact.
+ * Types for the generated Skip dashboard schema artifact.
  *
- * This artifact is produced by reading KIP's own source (the widget catalog,
+ * This artifact is produced by reading Skip's own source (the widget catalog,
  * each widget's DEFAULT_CONFIG, and the design-system constants) and is consumed
  * by the external kip-mcp-server so an AI can design valid KIP dashboards.
  *
- * Keep this in sync with KIP's interfaces. The generator fails loudly when the
+ * Keep this in sync with Skip's interfaces. The generator fails loudly when the
  * source no longer matches these expectations.
  */
 
 export type WidgetCategory = 'Core' | 'Gauge' | 'Component' | 'Racing';
 
 /**
- * One entry of KIP's widget catalog (`_widgetDefinition` in widget.service.ts).
+ * One entry of Skip's widget catalog (`_widgetDefinition` in widget.service.ts).
  */
 export interface WidgetCatalogEntry {
   /** Human-readable name shown in the widget picker. */
@@ -25,7 +25,7 @@ export interface WidgetCatalogEntry {
   category: WidgetCategory;
   /** Short description of what the widget does. */
   description: string;
-  /** Icon key in KIP's SVG sprite. */
+  /** Icon key in Skip's SVG sprite. */
   icon: string;
   /** Minimum grid width in columns (of 24). */
   minWidth: number;
@@ -56,12 +56,12 @@ export type BindingKind = 'paths-record' | 'paths-array' | 'datachart' | 'none';
 
 /**
  * A single data slot of a `paths-record` widget, derived from one entry of
- * DEFAULT_CONFIG.paths. Fields mirror KIP's IWidgetPath.
+ * DEFAULT_CONFIG.paths. Fields mirror Skip's IWidgetPath.
  */
 export interface PathSlot {
   /** The key under config.paths, e.g. `numericPath` or `headingPath`. */
   slot: string;
-  /** Slot label shown in KIP's options UI. */
+  /** Slot label shown in Skip's options UI. */
   description: string | null;
   /** The default Signal K path baked into DEFAULT_CONFIG (often null). */
   defaultPath: string | null;
@@ -93,7 +93,7 @@ export interface WidgetSchemaEntry extends WidgetCatalogEntry {
   pathSlots: PathSlot[];
 }
 
-/** A named widget colour token (KIP's `configurableThemeColors`). */
+/** A named widget colour token (Skip's `configurableThemeColors`). */
 export interface ColorToken {
   value: string;
   label: string;
@@ -107,7 +107,7 @@ export interface UnitMeasure {
   description: string;
 }
 
-/** A group of related units (KIP's unit conversion list). */
+/** A group of related units (Skip's unit conversion list). */
 export interface UnitGroup {
   group: string;
   measures: UnitMeasure[];
@@ -119,12 +119,12 @@ export interface GridGeometry {
   row: number;
   margin: number;
   float: boolean;
-  /** Row height; KIP computes this at runtime, hence `'auto'`. */
+  /** Row height; Skip computes this at runtime, hence `'auto'`. */
   cellHeight: string;
 }
 
 /**
- * KIP's design system: everything a dashboard designer needs beyond the widgets
+ * Skip's design system: everything a dashboard designer needs beyond the widgets
  * themselves — the grid, colour tokens, theme names, dashboard icons and units.
  *
  * Colour tokens and unit groups keep their authored order (the palette and the
@@ -142,25 +142,25 @@ export interface DesignSystem {
 export interface SchemaMeta {
   /** Version of this artifact's own shape. */
   schemaVersion: number;
-  /** KIP package version the artifact was generated from. */
-  kipVersion: string;
+  /** Skip package version the artifact was generated from. */
+  skipVersion: string;
   /** applicationData file version used in the storage URL (`.../skip/{N}/...`). */
   configFileVersion: number;
-  /** `app.configVersion` value KIP expects in a saved config body. */
+  /** `app.configVersion` value Skip expects in a saved config body. */
   configVersion: number;
 }
 
 /**
  * The complete generated artifact: everything the kip-mcp-server needs to design
- * valid KIP dashboards, read from KIP source and written canonically.
+ * valid Skip dashboards, read from Skip source and written canonically.
  */
-export interface KipDashboardSchema {
+export interface SkipDashboardSchema {
   meta: SchemaMeta;
   widgets: WidgetSchemaEntry[];
   designSystem: DesignSystem;
 }
 
 export interface GenerateOptions {
-  /** Absolute path to the KIP repository root. */
+  /** Absolute path to the Skip repository root. */
   projectRoot: string;
 }

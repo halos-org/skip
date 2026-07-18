@@ -4,7 +4,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { IKipDisplayInfo, IKipDisplayScreen } from '../../interfaces/app-interfaces';
+import { ISkipDisplayInfo, ISkipDisplayScreen } from '../../interfaces/app-interfaces';
 import { SettingsService } from '../../services/settings.service';
 import { TileLargeIconComponent } from '../tile-large-icon/tile-large-icon.component';
 import { MatIconModule } from '@angular/material/icon';
@@ -20,7 +20,7 @@ import { SignalkRequestsService } from '../../services/signalk-requests.service'
   styleUrl: './remote-control.component.scss'
 })
 export class RemoteControlComponent implements OnDestroy {
-  private readonly COMMAND_REQUEST_ACTIVE_SCREEN_PATH = 'self.kip.remote.requestActiveScreen';
+  private readonly COMMAND_REQUEST_ACTIVE_SCREEN_PATH = 'self.skip.remote.requestActiveScreen';
 
   private readonly _settings = inject(SettingsService);
   private readonly _data = inject(DataService);
@@ -28,17 +28,17 @@ export class RemoteControlComponent implements OnDestroy {
   private readonly _destroyRef = inject(DestroyRef);
 
   protected readonly pageTitle = 'Remote Control';
-  private readonly appID = this._settings.KipUUID;
+  private readonly appID = this._settings.SkipUUID;
   private displayId = signal<string | null>(null);
   protected selectedDisplayButtonId = signal<string | null>(null);
   protected readonly screensLoading = signal<boolean>(false);
-  private readonly displaysMap = signal<Record<string, IKipDisplayInfo>>({});
+  private readonly displaysMap = signal<Record<string, ISkipDisplayInfo>>({});
   private selectedDisplaySub: Subscription | null = null;
   private selectedScreenIndexSub: Subscription | null = null;
   private selectedDisplayRelease: (() => void) | null = null;
   private selectedScreenIndexRelease: (() => void) | null = null;
 
-  protected readonly displays = computed<IKipDisplayInfo[]>(() => {
+  protected readonly displays = computed<ISkipDisplayInfo[]>(() => {
     const items = Object.values(this.displaysMap());
     return items
       .filter(display => display.displayId !== this.appID)
@@ -51,7 +51,7 @@ export class RemoteControlComponent implements OnDestroy {
         return a.displayId.localeCompare(b.displayId);
       });
   });
-  protected readonly screens = signal<IKipDisplayScreen>([]);
+  protected readonly screens = signal<ISkipDisplayScreen>([]);
   protected readonly activeScreenIdx = signal<number | null>(null);
 
 

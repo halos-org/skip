@@ -1,12 +1,12 @@
 ---
-title: "feat: Standard Signal K authentication for KIP (cookie-session + OIDC redirect)"
+title: "feat: Standard Signal K authentication for Skip (cookie-session + OIDC redirect)"
 type: feat
 status: active
 date: 2026-06-23
 deepened: 2026-06-24
 ---
 
-# Standard Signal K authentication for KIP
+# Standard Signal K authentication for Skip
 
 > **Plan location note:** This design doc lives on the `feat/signalk-standard-auth` branch (mirroring
 > how `docs/named-configs-plan.md` is kept on `named_configs`). The auth branch bases off `master`
@@ -22,25 +22,25 @@ deepened: 2026-06-24
 
 ## Overview
 
-KIP authenticates with a self-managed login: a modal credential form POSTs username/password to
+Skip authenticates with a self-managed login: a modal credential form POSTs username/password to
 `auth/login`, stores the returned JWT in `localStorage`, and attaches it as an
 `authorization: JWT <token>` header and a WebSocket `&token=` query parameter. It never uses the SK
 session cookie and has no OIDC awareness.
 
-When KIP is served by a Signal K server that uses session/OIDC auth (the HaLOS deployment), this
+When Skip is served by a Signal K server that uses session/OIDC auth (the HaLOS deployment), this
 forces a second SK-local login on top of the SSO the user already completed — and for
 OIDC-provisioned users it is a dead end, because they have no SK-local password to type.
 
-This plan replaces KIP's auth with the SK-documented embedded-webapp pattern, **auto-detected** by
-how KIP is served:
+This plan replaces Skip's auth with the SK-documented embedded-webapp pattern, **auto-detected** by
+how Skip is served:
 
-- **Cookie mode (new, same-origin):** when KIP is served by the SK server (effective request origin
+- **Cookie mode (new, same-origin):** when Skip is served by the SK server (effective request origin
   equals the app origin), send requests with credentials so the httpOnly session cookie
-  authenticates KIP; derive auth state from `/skServer/loginStatus`; when login is needed, redirect
+  authenticates Skip; derive auth state from `/skServer/loginStatus`; when login is needed, redirect
   to the SK-advertised login URL (`oidcLoginUrl` when OIDC is enabled, otherwise the admin login),
   which drives Authelia SSO. Config persists to server `applicationData` (the path profiles use),
   decoupled from the stored `useSharedConfig` flag.
-- **Standalone mode (kept):** when KIP runs cross-origin (a PWA/host pointed at a boat's SK server),
+- **Standalone mode (kept):** when Skip runs cross-origin (a PWA/host pointed at a boat's SK server),
   keep the existing token / device-token model, because cookies cannot flow cross-origin. This
   umbrella covers the two cross-origin sub-modes (user-token and device-token) plus local-only.
 
@@ -56,12 +56,12 @@ otherwise stay paused and rebase on top.
 
 ## Problem Frame
 
-The user hit KIP's "Sign in to Signal K" dialog while already authenticated to HaLOS via Authelia
+The user hit Skip's "Sign in to Signal K" dialog while already authenticated to HaLOS via Authelia
 SSO. Three real defects, in order of severity:
 
 1. **No SSO participation / dead-end login.** The SK server (HaLOS) is itself an OIDC client of
    Authelia. After SSO the browser already holds SK's `JAUTHENTICATION` cookie, same-origin under
-   `:4430` where KIP is served. KIP discards it and demands a separate SK-local login. OIDC users
+   `:4430` where Skip is served. Skip discards it and demands a separate SK-local login. OIDC users
    have no SK-local password (confirmed), so the form cannot be satisfied.
 2. **Plaintext credential storage.** `connectionConfig.loginPassword` is persisted in plaintext and
    re-sent on token renewal.
@@ -69,16 +69,16 @@ SSO. Three real defects, in order of severity:
    string — the exposure surface of SK advisory GHSA-fq56-hvg6-wvm5. The sanctioned pattern is the
    httpOnly session cookie.
 
-"The custom form breaks OIDC" is imprecise: the SK OIDC flow keeps working; KIP refuses to
-participate in it. The fix is "make KIP use the SK session like the SK docs say," not "make KIP
-OIDC-aware" — KIP needs no OIDC code, only cookie + loginStatus + redirect.
+"The custom form breaks OIDC" is imprecise: the SK OIDC flow keeps working; Skip refuses to
+participate in it. The fix is "make Skip use the SK session like the SK docs say," not "make Skip
+OIDC-aware" — Skip needs no OIDC code, only cookie + loginStatus + redirect.
 
 ## Requirements Trace
 
-- **R1.** In cookie mode (same-origin) with an auth-requiring SK server, KIP must not show its own
+- **R1.** In cookie mode (same-origin) with an auth-requiring SK server, Skip must not show its own
   credential form; it authenticates via the SK session cookie.
 - **R2.** Auth state in cookie mode is derived from `/skServer/loginStatus`, not token presence.
-- **R3.** When login is needed in cookie mode, KIP redirects to the SK-advertised login
+- **R3.** When login is needed in cookie mode, Skip redirects to the SK-advertised login
   (`oidcLoginUrl` when `oidcEnabled`, else admin login), participating in SSO; honor `oidcAutoLogin`.
 - **R4.** Cookie-mode REST, WebSocket, and the embedded Freeboard-SK iframe carry the session cookie
   (`withCredentials` / same-origin handshake / origin-correct cookied iframe). No JWT in
@@ -86,7 +86,7 @@ OIDC-aware" — KIP needs no OIDC code, only cookie + loginStatus + redirect.
 - **R5.** Standalone cross-origin mode keeps the existing user-token and device-token login. Mode is
   auto-detected from the effective request origin.
 - **R6.** `loginPassword` is no longer persisted in either mode. Token-mode renewal no longer
-  re-sends stored credentials; on expiry KIP surfaces re-login.
+  re-sends stored credentials; on expiry Skip surfaces re-login.
 - **R7.** Cookie mode auto-engages for a fresh same-origin install of an auth-requiring SK server,
   without the user first enabling shared config.
 - **R8.** Cookie-mode auth must not hide profiles: availability keys off the session signal, not
@@ -107,7 +107,7 @@ OIDC-aware" — KIP needs no OIDC code, only cookie + loginStatus + redirect.
 
 ## Scope Boundaries
 
-- **Not** adding OIDC/OAuth client code to KIP. KIP delegates entirely to the SK server's login.
+- **Not** adding OIDC/OAuth client code to Skip. Skip delegates entirely to the SK server's login.
 - **Not** implementing proxy-layer ForwardAuth (see Alternatives — SK does not trust forwarded
   identity headers).
 - **Not** a user-facing mode toggle, and **not** a passive mode-explainer label. Mode is
@@ -175,7 +175,7 @@ OIDC-aware" — KIP needs no OIDC code, only cookie + loginStatus + redirect.
 ### Verified device + server facts (halosdev.hal, signalk-server v2.27.0)
 
 - KIP is served at `https://halosdev.hal:4430/@mxtommy/kip/`, **same origin** as the SK API at
-  `:4430`. The `/signalk-server/` Traefik path 302-redirects to `:4430`; KIP makes relative calls
+  `:4430`. The `/signalk-server/` Traefik path 302-redirects to `:4430`; Skip makes relative calls
   from `:4430`.
 - `GET /skServer/loginStatus` at `:4430` → 200 JSON: `status:"notLoggedIn"`,
   `authenticationRequired:true`, `oidcEnabled:true`, `oidcAutoLogin:true`,
@@ -275,28 +275,28 @@ Detection is origin-first; the manual flags do not gate cookie mode. `useDeviceT
 
 ```mermaid
 sequenceDiagram
-  participant KIP as KIP (APP_INITIALIZER)
+  participant Skip as Skip (APP_INITIALIZER)
   participant SK as Signal K server (same origin)
   participant IdP as Authelia (OIDC)
 
-  Note over KIP: mode candidate = same effective origin (sync, pre-discovery)
-  KIP->>SK: GET /signalk/ (discovery, withCredentials; unauthenticated, cookie harmless)
-  KIP->>SK: GET /skServer/loginStatus (withCredentials)
+  Note over Skip: mode candidate = same effective origin (sync, pre-discovery)
+  Skip->>SK: GET /signalk/ (discovery, withCredentials; unauthenticated, cookie harmless)
+  Skip->>SK: GET /skServer/loginStatus (withCredentials)
   alt loggedIn (write or read-only per readOnlyAccess)
-    SK-->>KIP: {loggedIn, userLevel, readOnlyAccess}
-    KIP->>KIP: isLoggedIn$=true (no token); isUserSession=true; canWriteUserData=!readOnly; storage ready
-    KIP->>SK: applicationData + WS + iframe (cookie carries auth)
+    SK-->>Skip: {loggedIn, userLevel, readOnlyAccess}
+    Skip->>Skip: isLoggedIn$=true (no token); isUserSession=true; canWriteUserData=!readOnly; storage ready
+    Skip->>SK: applicationData + WS + iframe (cookie carries auth)
   else notLoggedIn AND authenticationRequired
-    SK-->>KIP: {notLoggedIn, oidcEnabled, oidcAutoLogin, oidcLoginUrl}
-    KIP->>KIP: "Signing in via SSO…"; check budget
-    KIP->>SK: redirect to oidcLoginUrl?returnTo=<relative-validated> (budget-guarded)
+    SK-->>Skip: {notLoggedIn, oidcEnabled, oidcAutoLogin, oidcLoginUrl}
+    Skip->>Skip: "Signing in via SSO…"; check budget
+    Skip->>SK: redirect to oidcLoginUrl?returnTo=<relative-validated> (budget-guarded)
     SK->>IdP: auth-code + PKCE
     IdP-->>SK: callback -> sets JAUTHENTICATION cookie
-    SK-->>KIP: redirect back; loginStatus -> loggedIn (budget reset)
+    SK-->>Skip: redirect back; loginStatus -> loggedIn (budget reset)
   else notLoggedIn AND NOT authenticationRequired
-    KIP->>KIP: anonymous read; "Connected (no sign-in required)"; no redirect
+    Skip->>Skip: anonymous read; "Connected (no sign-in required)"; no redirect
   else budget exhausted OR auth declined/cancelled
-    KIP->>KIP: auth-blocked screen (per-cause copy; manual Sign in uses noAutoLogin; Connectivity link)
+    Skip->>Skip: auth-blocked screen (per-cause copy; manual Sign in uses noAutoLogin; Connectivity link)
   end
 ```
 
@@ -327,9 +327,9 @@ sequenceDiagram
   with `withCredentials`; for `proxyEnabled` + cross-origin `signalKUrl`, the discovery GET is cross
   -origin-with-credentials and depends on SK CORS allow-credentials.
 - **OIDC redirect round-trip** — confirm the `returnTo` param name on v2.27.0 and that the callback
-  returns to KIP at `:4430` without a loop.
+  returns to Skip at `:4430` without a loop.
 - **CSRF / SameSite** — record the JAUTHENTICATION SameSite attribute, confirm a cross-site forged
-  write is blocked, and that KIP's writes succeed (R10 gating check).
+  write is blocked, and that Skip's writes succeed (R10 gating check).
 - **`userLevel`/`readOnlyAccess` values** — confirm the exact value set on v2.27.0 that maps to read
   -only so the write-gating is correct.
 - **401 mid-session** — confirm the status/shape SK returns when the cookie expires (401 vs
@@ -555,7 +555,7 @@ improvement with the prerequisite explicitly marked unproven.
 
 **Files:** `docs/signalk-auth-plan.md` (this design doc, on the branch); `CHANGELOG.md` (call out
 password-storage removal **and** that cross-origin token users re-login **on expiry** — the session
-JWT persists across reloads via Option A; there is no `auth/validate` refresh). KIP help content has
+JWT persists across reloads via Option A; there is no `auth/validate` refresh). Skip help content has
 no connection/auth section, so there is nothing relevant to modify there.
 
 **Approach:** the deploy-time acceptance test (build locally, deploy to the device webapp dir; never
@@ -611,7 +611,7 @@ profiles (post-rebase) read/write user scope.
 - **Explicit mode toggle (default on for same-origin).** More upstreamable/legible, but the user chose
   auto-detect, no toggle. If upstream rejects auto-detect, the fallback is the default-on toggle.
 - **Thin redirect-only (keep token machinery).** Risks a JWT-after-cookie-redirect inconsistent state.
-- **Proxy-layer ForwardAuth.** SK does not trust forwarded identity; KIP stays unauthenticated to the
+- **Proxy-layer ForwardAuth.** SK does not trust forwarded identity; Skip stays unauthenticated to the
   API and profiles break.
 - **Keep the custom form, fix only the password.** Does not solve the OIDC dead-end. Password fix kept
   (Unit 1) but insufficient alone.

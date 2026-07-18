@@ -3,7 +3,7 @@ import { Component, OnChanges, SimpleChanges, OnInit, OnDestroy, input, inject, 
 import { CanvasService } from '../../core/services/canvas.service';
 import type { ITheme } from '../../core/services/app-service';
 import { ISkZone, States } from '../../core/interfaces/signalk-interfaces';
-import { KipResizeObserverDirective } from '../../core/directives/kip-resize-observer.directive';
+import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare let steelseries: any; // 3rd party global (loaded from asset in production build)
@@ -65,7 +65,7 @@ export const SteelFrameColors = {
   templateUrl: './gauge-steel.component.html',
   styleUrls: ['./gauge-steel.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [KipResizeObserverDirective]
+  imports: [SkipResizeObserverDirective]
 })
 export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
   private unitsService = inject(UnitsService);

@@ -7,7 +7,7 @@
 .ais-dialog {
 	display: grid;
 	gap: 8px;
-	color: var(--kip-contrast-color);
+	color: var(--skip-contrast-color);
 }
 
 .ais-dialog-grid {
@@ -30,7 +30,7 @@
 
 .ais-dialog-long-value {
   grid-column: span 3;
-	color: var(--kip-contrast-color);
+	color: var(--skip-contrast-color);
 }
 
 .ais-dialog-item {
@@ -53,14 +53,14 @@
 }
 
 .ais-dialog-key {
-	color: var(--kip-contrast-dim-color);
+	color: var(--skip-contrast-dim-color);
 	letter-spacing: 0.04em;
 }
 
 .ais-dialog-value {
-	color: var(--kip-contrast-color);
+	color: var(--skip-contrast-color);
 }
 
 .ais-dialog-empty {
-	color: var(--kip-contrast-color);
+	color: var(--skip-contrast-color);
 }

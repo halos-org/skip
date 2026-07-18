@@ -264,7 +264,7 @@ export class StorageService {
   }
 
   /**
-   * Retrieves server Application Data config lists for Kip in both Global
+   * Retrieves server Application Data config lists for Skip in both Global
    * and User scopes for the current app version.
    *
    * @param {string} [forceConfigFileVersion] Optional parameter. Forces the
@@ -354,7 +354,7 @@ export class StorageService {
   /**
    * Send configuration data to the server's Application Data service
    * with a scope, name and optional file version. The configuration will be saved using the
-   * current Kip configFile Version setting, unless over written, in applicationData subfolder on the server.
+   * current Skip configFile Version setting, unless over written, in applicationData subfolder on the server.
    *
    * @usage If the given ConfigName exists in the provided scope for the same version,
    * the data will be overwritten/replaced, else it will be created on the server.

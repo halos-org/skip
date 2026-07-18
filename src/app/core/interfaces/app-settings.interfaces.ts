@@ -3,7 +3,7 @@ import { Dashboard } from './../services/dashboard.service';
 
 export interface IConnectionConfig {
   configVersion: number;
-  kipUUID: string;
+  skipUUID: string;
   signalKUrl: string | null;
   proxyEnabled: boolean;
   signalKSubscribeAll: boolean;

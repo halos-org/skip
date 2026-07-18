@@ -79,7 +79,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
   });
   protected readonly labelColor = computed(() => {
     const theme = this.theme();
-    return theme ? getColors(this.colorRole(), theme).dim : 'var(--kip-contrast-dim-color)';
+    return theme ? getColors(this.colorRole(), theme).dim : 'var(--skip-contrast-dim-color)';
   });
 
   private readonly svgRef = viewChild.required<ElementRef<SVGSVGElement>>('solarSvg');
@@ -153,7 +153,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       const chargerCurrentState = solar.currentState ?? null;
       const panelPowerColor = resolveZoneAwareColor(
         panelPowerState,
-        widgetColors?.dim ?? 'var(--kip-contrast-dim-color)',
+        widgetColors?.dim ?? 'var(--skip-contrast-dim-color)',
         theme,
         ignoreZones
       );
@@ -164,7 +164,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       );
       const chargerCurrentTextColor = resolveZoneAwareColor(
         chargerCurrentState,
-        'var(--kip-contrast-color)',
+        'var(--skip-contrast-color)',
         theme,
         ignoreZones
       );
@@ -174,7 +174,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       );
       const chargerMetaTextColor = resolveZoneAwareColor(
         chargerMetaState,
-        'var(--kip-contrast-color)',
+        'var(--skip-contrast-color)',
         theme,
         ignoreZones
       );
@@ -185,7 +185,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       );
       const panelValuesTextColor = resolveZoneAwareColor(
         panelValuesState,
-        'var(--kip-contrast-color)',
+        'var(--skip-contrast-color)',
         theme,
         ignoreZones
       );
@@ -196,7 +196,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       );
       const relayValuesTextColor = resolveZoneAwareColor(
         solar.loadCurrentState ?? null,
-        'var(--kip-contrast-color)',
+        'var(--skip-contrast-color)',
         theme,
         ignoreZones
       );
@@ -310,7 +310,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('width', '160%').attr('height', '160%');
     glowFilter.append('feFlood')
       .attr('class', 'solar-panel-glow-flood')
-      .attr('flood-color', 'var(--kip-widget-card-background-color)')
+      .attr('flood-color', 'var(--skip-widget-card-background-color)')
       .attr('flood-opacity', 0.9)
       .attr('result', 'color');
     glowFilter.append('feComposite')
@@ -839,7 +839,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
         .attr('x', layout.titleX)
         .attr('y', layout.titleY)
         .attr('font-size', layout.titleFontSize)
-        .attr('fill', 'var(--kip-contrast-dim-color)')
+        .attr('fill', 'var(--skip-contrast-dim-color)')
         .text(item => snapshot.displayModels[item.key]?.titleText ?? this.displayName(item.model));
     } else {
       merged.select('text.solar-charger-title').text('');
@@ -857,13 +857,13 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
     merged.select('tspan.current-metric-unit')
       .attr('dx', 1)
       .attr('font-size', 12)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .text('A');
 
     merged.select('text.solar-charger')
       .attr('x', 5)
       .attr('y', 40)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .attr('font-size', 8)
       .attr('opacity', 0.8)
       .text(item => item.model.chargerMode);
@@ -880,7 +880,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('x', 5)
       .attr('y', 73)
       .attr('font-size', 10)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .text(item => item.model.relaySectionVisible ? 'Load Output' : '');
 
     merged.select('text.solar-relay-values')
@@ -895,7 +895,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('transform', `translate(${WidgetSolarChargerComponent.SOLAR_PANEL_X}, ${WidgetSolarChargerComponent.SOLAR_PANEL_Y})`);
 
     merged.select('use.solar-panel-bg')
-      .attr('color', 'var(--kip-contrast-dimmer-color)');
+      .attr('color', 'var(--skip-contrast-dimmer-color)');
 
     merged.select('g.solar-panel-progress')
       .each((item, index, nodes) => {
@@ -919,7 +919,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('font-size', layout.primaryFontSize)
       .attr('font-weight', layout.primaryFontWeight)
       .attr('filter', item => item.model.panelPowerGlowEnabled ? `url(#${this.glowFilterId})` : null)
-      .attr('fill', 'var(--kip-contrast-color)');
+      .attr('fill', 'var(--skip-contrast-color)');
 
     merged.select('tspan.solar-panel-power-value')
       .text(item => item.model.panelPowerText);
@@ -928,7 +928,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('dx', item => item.model.panelPowerUnitText ? 1 : 0)
       .attr('font-size', 20)
       .attr('font-weight', 500)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .attr('opacity', item => item.model.panelPowerUnitText ? 1 : 0)
       .text(item => item.model.panelPowerUnitText);
 
@@ -949,7 +949,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('y', 88)
       .attr('text-anchor', 'middle')
       .attr('font-size', 8)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('opacity', 0.8)
       .text('Yield (kWh):');
 
@@ -958,7 +958,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('y', 88)
       .attr('text-anchor', 'start')
       .attr('font-size', 8)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('opacity', 0.8)
       .text(item => item.model.yieldTodayText);
 
@@ -967,7 +967,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       .attr('y', 97.5)
       .attr('text-anchor', 'start')
       .attr('font-size', 8)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('opacity', 0.8)
       .text(item => item.model.yieldYesterdayText);
 
@@ -1074,10 +1074,10 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
   }
 
   private debugSolarLayout(id: string, gaugeProgress: number): void {
-    const debugEnabled = typeof window !== 'undefined' && (window as unknown as { __KIP_DEBUG_SOLAR_LAYOUT?: boolean }).__KIP_DEBUG_SOLAR_LAYOUT === true;
+    const debugEnabled = typeof window !== 'undefined' && (window as unknown as { __SKIP_DEBUG_SOLAR_LAYOUT?: boolean }).__SKIP_DEBUG_SOLAR_LAYOUT === true;
     if (!debugEnabled) return;
 
-    // Optional troubleshooting hook: enable in devtools with window.__KIP_DEBUG_SOLAR_LAYOUT = true
+    // Optional troubleshooting hook: enable in devtools with window.__SKIP_DEBUG_SOLAR_LAYOUT = true
     console.debug('[solar-layout]', {
       id,
       gaugeProgress,

@@ -337,7 +337,7 @@ export class ConfigurationUpgradeService {
       return { config, migrated: false };
     }
     if (version > LATEST_APP_CONFIG_VERSION) {
-      throw new Error(`This configuration is version ${version}, which is newer than this version of KIP supports (version ${LATEST_APP_CONFIG_VERSION}). Update KIP and try again.`);
+      throw new Error(`This configuration is version ${version}, which is newer than this version of Skip supports (version ${LATEST_APP_CONFIG_VERSION}). Update Skip and try again.`);
     }
     if (version < MIN_IMPORTABLE_APP_CONFIG_VERSION) {
       throw new Error(`This configuration is version ${version}, which is too old to import automatically (the minimum is version ${MIN_IMPORTABLE_APP_CONFIG_VERSION}). Load it into an older KIP, export it again, then import it here.`);

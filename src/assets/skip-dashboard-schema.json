@@ -542,8 +542,8 @@
   "meta": {
     "configFileVersion": 11,
     "configVersion": 14,
-    "kipVersion": "4.8.0",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "skipVersion": "4.8.0"
   },
   "widgets": [
     {
@@ -1083,7 +1083,7 @@
       },
       "defaultHeight": 6,
       "defaultWidth": 6,
-      "description": "Visualizes data on a real-time plot with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the KIP Dataset to be configured.",
+      "description": "Visualizes data on a real-time plot with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the Skip Dataset to be configured.",
       "icon": "datachartWidget",
       "minHeight": 3,
       "minWidth": 2,

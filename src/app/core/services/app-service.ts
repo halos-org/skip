@@ -8,7 +8,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import packageInfo from '../../../../package.json';
 
 /**
- * Kip theme hex colors
+ * Skip theme hex colors
  *
  * @export
  * @interface ITheme
@@ -132,7 +132,7 @@ export class AppService {
     this.browserVersion.set(this.getBrowserVersion());
     this.osVersion.set(this.getOSVersion());
 
-    console.log("*********** KIP Version Information ***********");
+    console.log("*********** Skip Version Information ***********");
     console.log(`** App Version: ${this.appVersion()}`);
     console.log(`** Browser Version: ${this.browserVersion()}`);
     console.log(`** OS Version: ${this.osVersion()}`);
@@ -144,38 +144,38 @@ export class AppService {
     const computedStyle = getComputedStyle(root);
     const cssThemeRolesColor: ITheme = {
       background: computedStyle.getPropertyValue('--mat-sys-background').trim(),
-      cardColor: computedStyle.getPropertyValue('--kip-widget-card-background-color').trim(),
-      blue: computedStyle.getPropertyValue('--kip-blue-color').trim(),
-      blueDim: computedStyle.getPropertyValue('--kip-blue-dim-color').trim(),
-      blueDimmer: computedStyle.getPropertyValue('--kip-blue-dimmer-color').trim(),
-      green: computedStyle.getPropertyValue('--kip-green-color').trim(),
-      greenDim: computedStyle.getPropertyValue('--kip-green-dim-color').trim(),
-      greenDimmer: computedStyle.getPropertyValue('--kip-green-dimmer-color').trim(),
-      grey: computedStyle.getPropertyValue('--kip-grey-color').trim(),
-      greyDim: computedStyle.getPropertyValue('--kip-grey-dim-color').trim(),
-      greyDimmer: computedStyle.getPropertyValue('--kip-grey-dimmer-color').trim(),
-      orange: computedStyle.getPropertyValue('--kip-orange-color').trim(),
-      orangeDim: computedStyle.getPropertyValue('--kip-orange-dim-color').trim(),
-      orangeDimmer: computedStyle.getPropertyValue('--kip-orange-dimmer-color').trim(),
-      pink: computedStyle.getPropertyValue('--kip-pink-color').trim(),
-      pinkDim: computedStyle.getPropertyValue('--kip-pink-dim-color').trim(),
-      pinkDimmer: computedStyle.getPropertyValue('--kip-pink-dimmer-color').trim(),
-      purple: computedStyle.getPropertyValue('--kip-purple-color').trim(),
-      purpleDim: computedStyle.getPropertyValue('--kip-purple-dim-color').trim(),
-      purpleDimmer: computedStyle.getPropertyValue('--kip-purple-dimmer-color').trim(),
-      contrast: computedStyle.getPropertyValue('--kip-contrast-color').trim(),
-      contrastDim: computedStyle.getPropertyValue('--kip-contrast-dim-color').trim(),
-      contrastDimmer: computedStyle.getPropertyValue('--kip-contrast-dimmer-color').trim(),
-      yellow: computedStyle.getPropertyValue('--kip-yellow-color').trim(),
-      yellowDim: computedStyle.getPropertyValue('--kip-yellow-dim-color').trim(),
-      yellowDimmer: computedStyle.getPropertyValue('--kip-yellow-dimmer-color').trim(),
-      port: computedStyle.getPropertyValue('--kip-port-color').trim(),
-      starboard: computedStyle.getPropertyValue('--kip-starboard-color').trim(),
-      zoneNominal: computedStyle.getPropertyValue('--kip-zone-nominal-color').trim(),
-      zoneAlert: computedStyle.getPropertyValue('--kip-zone-alert-color').trim(),
-      zoneWarn: computedStyle.getPropertyValue('--kip-zone-warn-color').trim(),
-      zoneAlarm: computedStyle.getPropertyValue('--kip-zone-alarm-color').trim(),
-      zoneEmergency: computedStyle.getPropertyValue('--kip-zone-emergency-color').trim(),
+      cardColor: computedStyle.getPropertyValue('--skip-widget-card-background-color').trim(),
+      blue: computedStyle.getPropertyValue('--skip-blue-color').trim(),
+      blueDim: computedStyle.getPropertyValue('--skip-blue-dim-color').trim(),
+      blueDimmer: computedStyle.getPropertyValue('--skip-blue-dimmer-color').trim(),
+      green: computedStyle.getPropertyValue('--skip-green-color').trim(),
+      greenDim: computedStyle.getPropertyValue('--skip-green-dim-color').trim(),
+      greenDimmer: computedStyle.getPropertyValue('--skip-green-dimmer-color').trim(),
+      grey: computedStyle.getPropertyValue('--skip-grey-color').trim(),
+      greyDim: computedStyle.getPropertyValue('--skip-grey-dim-color').trim(),
+      greyDimmer: computedStyle.getPropertyValue('--skip-grey-dimmer-color').trim(),
+      orange: computedStyle.getPropertyValue('--skip-orange-color').trim(),
+      orangeDim: computedStyle.getPropertyValue('--skip-orange-dim-color').trim(),
+      orangeDimmer: computedStyle.getPropertyValue('--skip-orange-dimmer-color').trim(),
+      pink: computedStyle.getPropertyValue('--skip-pink-color').trim(),
+      pinkDim: computedStyle.getPropertyValue('--skip-pink-dim-color').trim(),
+      pinkDimmer: computedStyle.getPropertyValue('--skip-pink-dimmer-color').trim(),
+      purple: computedStyle.getPropertyValue('--skip-purple-color').trim(),
+      purpleDim: computedStyle.getPropertyValue('--skip-purple-dim-color').trim(),
+      purpleDimmer: computedStyle.getPropertyValue('--skip-purple-dimmer-color').trim(),
+      contrast: computedStyle.getPropertyValue('--skip-contrast-color').trim(),
+      contrastDim: computedStyle.getPropertyValue('--skip-contrast-dim-color').trim(),
+      contrastDimmer: computedStyle.getPropertyValue('--skip-contrast-dimmer-color').trim(),
+      yellow: computedStyle.getPropertyValue('--skip-yellow-color').trim(),
+      yellowDim: computedStyle.getPropertyValue('--skip-yellow-dim-color').trim(),
+      yellowDimmer: computedStyle.getPropertyValue('--skip-yellow-dimmer-color').trim(),
+      port: computedStyle.getPropertyValue('--skip-port-color').trim(),
+      starboard: computedStyle.getPropertyValue('--skip-starboard-color').trim(),
+      zoneNominal: computedStyle.getPropertyValue('--skip-zone-nominal-color').trim(),
+      zoneAlert: computedStyle.getPropertyValue('--skip-zone-alert-color').trim(),
+      zoneWarn: computedStyle.getPropertyValue('--skip-zone-warn-color').trim(),
+      zoneAlarm: computedStyle.getPropertyValue('--skip-zone-alarm-color').trim(),
+      zoneEmergency: computedStyle.getPropertyValue('--skip-zone-emergency-color').trim(),
     };
     this.cssThemeColorRoles$.next(cssThemeRolesColor);
     return cssThemeRolesColor;
@@ -189,11 +189,11 @@ export class AppService {
     const appFilterWrapper = document.body;
 
     // Set the brightness level
-    appFilterWrapper.style.setProperty('--kip-nightModeBrightness', `${brightness}`);
+    appFilterWrapper.style.setProperty('--skip-nightModeBrightness', `${brightness}`);
 
     // Apply sepia and hue-rotate filters if night mode is active
     const additionalFilters = applyNightFilters ? ' sepia(0.5) hue-rotate(-30deg)' : '';
-    appFilterWrapper.style.setProperty('--kip-nightModeFilters', additionalFilters);
+    appFilterWrapper.style.setProperty('--skip-nightModeFilters', additionalFilters);
   }
 
   public toggleNightMode(): void {

@@ -138,7 +138,7 @@ $tertiary-palette: map.merge(map.get($_palettes, tertiary), $_rest);
 $_widget-card-background-color: map.get(map.get($_palettes, primary), 0);
 $_background: map.get(map.get($_palettes, neutral), 10);
 
-$kip-dark-color: (
+$skip-dark-color: (
   blue: #3298ff, blue-dim: #359affc6, blue-dimmer: #063b7178,
   green: #00d000, green-dim: #00d000b6, green-dimmer: #00680078,
   purple: #A020F0, purple-dim: #A020F0b6, purple-dimmer: #4a0f6e78,
@@ -160,51 +160,51 @@ $kip-dark-color: (
 );
 
 // Get App (dark) CSS theming value
-$background: map.get($kip-dark-color, background);
+$background: map.get($skip-dark-color, background);
 
-// Get default (dark) KIP CSS theming value
-$kip-widget-card-background-color: map.get($kip-dark-color, widget-card-background-color);
-$kip-widget-card-border-color: map.get($kip-dark-color, widget-card-border-color);
-$kip-widget-action-button-color: map.get($kip-dark-color, widget-action-button-color);
-$kip-widget-action-button-foreground-color: map.get($kip-dark-color, widget-action-button-foreground-color);
-$kip-widget-action-delete-button-color: map.get($kip-dark-color, widget-action-delete-button-color);
+// Get default (dark) Skip CSS theming value
+$skip-widget-card-background-color: map.get($skip-dark-color, widget-card-background-color);
+$skip-widget-card-border-color: map.get($skip-dark-color, widget-card-border-color);
+$skip-widget-action-button-color: map.get($skip-dark-color, widget-action-button-color);
+$skip-widget-action-button-foreground-color: map.get($skip-dark-color, widget-action-button-foreground-color);
+$skip-widget-action-delete-button-color: map.get($skip-dark-color, widget-action-delete-button-color);
 
-$blue: map.get($kip-dark-color, blue);
-$blueDim: map.get($kip-dark-color, blue-dim);
-$blueDimmer: map.get($kip-dark-color, blue-dimmer);
+$blue: map.get($skip-dark-color, blue);
+$blueDim: map.get($skip-dark-color, blue-dim);
+$blueDimmer: map.get($skip-dark-color, blue-dimmer);
 
-$green: map.get($kip-dark-color, green);
-$greenDim: map.get($kip-dark-color, green-dim);
-$greenDimmer: map.get($kip-dark-color, green-dimmer);
+$green: map.get($skip-dark-color, green);
+$greenDim: map.get($skip-dark-color, green-dim);
+$greenDimmer: map.get($skip-dark-color, green-dimmer);
 
-$purple: map.get($kip-dark-color, purple);
-$purpleDim: map.get($kip-dark-color, purple-dim);
-$purpleDimmer: map.get($kip-dark-color, purple-dimmer);
+$purple: map.get($skip-dark-color, purple);
+$purpleDim: map.get($skip-dark-color, purple-dim);
+$purpleDimmer: map.get($skip-dark-color, purple-dimmer);
 
-$yellow: map.get($kip-dark-color, yellow);
-$yellowDim: map.get($kip-dark-color, yellow-dim);
-$yellowDimmer: map.get($kip-dark-color, yellow-dimmer);
+$yellow: map.get($skip-dark-color, yellow);
+$yellowDim: map.get($skip-dark-color, yellow-dim);
+$yellowDimmer: map.get($skip-dark-color, yellow-dimmer);
 
-$pink: map.get($kip-dark-color, pink);
-$pinkDim: map.get($kip-dark-color, pink-dim);
-$pinkDimmer: map.get($kip-dark-color, pink-dimmer);
+$pink: map.get($skip-dark-color, pink);
+$pinkDim: map.get($skip-dark-color, pink-dim);
+$pinkDimmer: map.get($skip-dark-color, pink-dimmer);
 
-$orange: map.get($kip-dark-color, orange);
-$orangeDim: map.get($kip-dark-color, orange-dim);
-$orangeDimmer: map.get($kip-dark-color, orange-dimmer);
+$orange: map.get($skip-dark-color, orange);
+$orangeDim: map.get($skip-dark-color, orange-dim);
+$orangeDimmer: map.get($skip-dark-color, orange-dimmer);
 
-$contrast: map.get($kip-dark-color, contrast);
-$contrastDim: map.get($kip-dark-color, contrast-dim);
-$contrastDimmer: map.get($kip-dark-color, contrast-dimmer);
+$contrast: map.get($skip-dark-color, contrast);
+$contrastDim: map.get($skip-dark-color, contrast-dim);
+$contrastDimmer: map.get($skip-dark-color, contrast-dimmer);
 
-$grey: map.get($kip-dark-color, grey);
-$greyDim: map.get($kip-dark-color, grey-dim);
-$greyDimmer: map.get($kip-dark-color, grey-dimmer);
+$grey: map.get($skip-dark-color, grey);
+$greyDim: map.get($skip-dark-color, grey-dim);
+$greyDimmer: map.get($skip-dark-color, grey-dimmer);
 
-$port: map.get($kip-dark-color, port);
-$starboard: map.get($kip-dark-color, starboard);
-$zone-nominal: map.get($kip-dark-color, zone-nominal);
-$zone-alert: map.get($kip-dark-color, zone-alert);
-$zone-warn: map.get($kip-dark-color, zone-warn);
-$zone-alarm: map.get($kip-dark-color, zone-alarm);
-$zone-emergency: map.get($kip-dark-color, zone-emergency);
+$port: map.get($skip-dark-color, port);
+$starboard: map.get($skip-dark-color, starboard);
+$zone-nominal: map.get($skip-dark-color, zone-nominal);
+$zone-alert: map.get($skip-dark-color, zone-alert);
+$zone-warn: map.get($skip-dark-color, zone-warn);
+$zone-alarm: map.get($skip-dark-color, zone-alarm);
+$zone-emergency: map.get($skip-dark-color, zone-emergency);

@@ -14,7 +14,7 @@ import {
   standalone: true,
   imports: [ScrollNavDirective],
   template: `<div
-    kipScrollNav
+    skipScrollNav
     [navEnabled]="navEnabled"
     [suspended]="suspended"
     (pageNav)="pageNav.push($event)"
@@ -52,7 +52,7 @@ describe('ScrollNavDirective', () => {
   /** Instantiate the directive (and its wheel listener) once inputs are set. */
   function init(): void {
     fixture.detectChanges();
-    hostEl = fixture.nativeElement.querySelector('[kipScrollNav]') as HTMLElement;
+    hostEl = fixture.nativeElement.querySelector('[skipScrollNav]') as HTMLElement;
   }
 
   it('navigates next on a dominant rightward wheel and blocks browser history', () => {

@@ -30,7 +30,7 @@ export type ChromeIntent = 'reveal' | 'hide';
  * Attached at the shell (not the grid) so reveal works in edit mode, where the
  * grid's gesture recogniser disables swipes.
  */
-@Directive({ selector: '[kipScrollNav]' })
+@Directive({ selector: '[skipScrollNav]' })
 export class ScrollNavDirective {
   /** When false (edit mode), horizontal wheel does not navigate pages. */
   public readonly navEnabled = input(true);

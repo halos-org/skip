@@ -8,7 +8,7 @@ describe('extractWidgetCatalog', () => {
   const widgets = extractWidgetCatalog({ projectRoot });
 
   it('extracts the full active widget catalog', () => {
-    // KIP ships ~32 active widgets; guard against an empty or truncated parse.
+    // Skip ships ~32 active widgets; guard against an empty or truncated parse.
     expect(widgets.length).toBeGreaterThanOrEqual(30);
   });
 

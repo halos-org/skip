@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface v10IConnectionConfig {
   configVersion: number;
-  kipUUID: string;
+  skipUUID: string;
   signalKUrl: string;
   proxyEnabled: boolean;
   useSharedConfig: boolean;

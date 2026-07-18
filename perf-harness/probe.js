@@ -1,5 +1,5 @@
 /*
- * KIP performance probe — injected into the page via Playwright addInitScript
+ * Skip performance probe — injected into the page via Playwright addInitScript
  * BEFORE any app code runs, so identical measurement code is used across every
  * branch/build under test (master, integration/perf-preview, freeze fixes).
  *

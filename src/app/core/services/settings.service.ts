@@ -61,7 +61,7 @@ export class SettingsService {
   private connectionIdentityDirty = false;
   private activeConfig: IConfig = { app: null, theme: null, dashboards: [] };
 
-  private kipUUID = '';
+  private skipUUID = '';
   public signalkUrl: ISignalKUrl | undefined;
   private _dashboards: Dashboard[] = [];
   public configUpgrade = signal<boolean>(false);
@@ -82,7 +82,7 @@ export class SettingsService {
         takeUntilDestroyed()
       )
       .subscribe(() => this.snackBar.open(
-        'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
+        'Problem saving configuration to the server. Resolve this issue before Skip can be used reliably.',
         'Close',
         {
           duration: 0,
@@ -92,7 +92,7 @@ export class SettingsService {
 
     if (!window.localStorage) {
       // REQUIRED BY APP - localStorage support
-      console.error("[AppSettings Service] LocalStorage NOT SUPPORTED by browser\nThis is a requirement to run Kip. See browser documentation to enable this feature.");
+      console.error("[AppSettings Service] LocalStorage NOT SUPPORTED by browser\nThis is a requirement to run Skip. See browser documentation to enable this feature.");
 
     } else {
       this.loadConnectionConfig();
@@ -133,7 +133,7 @@ export class SettingsService {
     this.proxyEnabled = config.proxyEnabled;
     this.signalKSubscribeAll = config.signalKSubscribeAll;
     this.sharedConfigName = config.sharedConfigName;
-    this.kipUUID = config.kipUUID;
+    this.skipUUID = config.skipUUID;
 
     // Idempotent purge: strip legacy credential fields (plaintext password, login name, device-token
     // flag) persisted by an older version. Targeted rewrite preserves all other fields exactly.
@@ -344,8 +344,8 @@ export class SettingsService {
     void this._reload.reload();
   }
 
-  public get KipUUID(): string {
-    return this.kipUUID;
+  public get SkipUUID(): string {
+    return this.skipUUID;
   }
 
   // Themes
@@ -478,7 +478,7 @@ export class SettingsService {
       .catch(error => {
         console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
         this.snackBar.open(
-          'Problem saving configuration to the server. Resolve this issue before KIP can be used reliably.',
+          'Problem saving configuration to the server. Resolve this issue before Skip can be used reliably.',
           'Close',
           {
             duration: 0,
@@ -492,7 +492,7 @@ export class SettingsService {
     console.log("[AppSettings Service] Reload app");
     // Prevent hard navigation in unit tests (breaks Karma)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((window as any).__KIP_TEST__) {
+    if ((window as any).__SKIP_TEST__) {
       return; // no-op
     }
     location.replace(this.reloadTarget());
@@ -529,7 +529,7 @@ export class SettingsService {
       // AppNetworkInitService advances it. Stamping the latest here would prematurely mark the
       // migration done and lose the not-yet-lifted remote-control identity.
       configVersion: stored?.configVersion ?? CONNECTION_CONFIG_VERSION,
-      kipUUID: this.kipUUID,
+      skipUUID: this.skipUUID,
       signalKUrl: this.signalkUrl?.url ?? '',
       proxyEnabled: this.proxyEnabled,
       signalKSubscribeAll: this.signalKSubscribeAll,
@@ -579,7 +579,7 @@ export class SettingsService {
 
   private getDefaultConnectionConfig(): IConnectionConfig {
     const config: IConnectionConfig = cloneDeep(DefaultConnectionConfig);
-    config.kipUUID = UUID.create();
+    config.skipUUID = UUID.create();
     config.signalKUrl = window.location.origin;
     localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(config));
     return config;

@@ -1,18 +1,18 @@
 import { Directive, ElementRef, EventEmitter, OnDestroy, Output, inject } from '@angular/core';
 
-export interface IKipResizeEvent {
+export interface ISkipResizeEvent {
   width: number;
   height: number;
   entry: ResizeObserverEntry;
 }
 
 @Directive({
-  selector: '[kipResizeObserver]',
+  selector: '[skipResizeObserver]',
   standalone: true,
 })
-export class KipResizeObserverDirective implements OnDestroy {
+export class SkipResizeObserverDirective implements OnDestroy {
   @Output() resizeChange = new EventEmitter<ResizeObserverEntry>();
-  @Output() kipResize = new EventEmitter<IKipResizeEvent>();
+  @Output() skipResize = new EventEmitter<ISkipResizeEvent>();
 
   private readonly el = inject(ElementRef<HTMLElement>);
 
@@ -23,7 +23,7 @@ export class KipResizeObserverDirective implements OnDestroy {
       const entry = entries[entries.length - 1];
       const { width, height } = entry.contentRect;
       this.resizeChange.emit(entry);
-      this.kipResize.emit({ width, height, entry });
+      this.skipResize.emit({ width, height, entry });
     });
 
     this.ro.observe(this.el.nativeElement);

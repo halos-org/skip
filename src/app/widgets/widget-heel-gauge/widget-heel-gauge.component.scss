@@ -20,7 +20,7 @@
 .brand {
   font-size: 25px;
   font-weight: bold;
-  fill: var(--kip-contrast-dim-color);
+  fill: var(--skip-contrast-dim-color);
 }
 .angle {
   font-size: 50px;
@@ -56,7 +56,7 @@ svg.scale .tube-highlight-secondary {
 }
 
 .tube-highlight-color {
-  stop-color: var(--kip-contrast-color);
+  stop-color: var(--skip-contrast-color);
 }
 
 .opacity1 {
@@ -77,11 +77,11 @@ svg.scale .scale-line {
 
 
 .tick-marks {
-  stroke: var(--kip-contrast-dim-color);
+  stroke: var(--skip-contrast-dim-color);
 }
 
 .scale-values {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   text-anchor: middle;
   dominant-baseline: hanging;
   font-size: 12;

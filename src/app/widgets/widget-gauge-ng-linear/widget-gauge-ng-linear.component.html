@@ -2,7 +2,7 @@
   <linear-gauge
     class="linearGauge"
     #linearGauge
-    kipResizeObserver
+    skipResizeObserver
     (resizeChange)="onResized($event)"
     [options]="gaugeOptions"
     [value]="value() ?? 0"

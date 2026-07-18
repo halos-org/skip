@@ -10,13 +10,13 @@ const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const schema = buildSchema({ projectRoot });
 
 describe('buildSchema', () => {
-  it('stamps meta with the KIP version and the config versions from their source of truth', () => {
+  it('stamps meta with the Skip version and the config versions from their source of truth', () => {
     expect(schema.meta).toMatchObject({
       schemaVersion: 1,
       configFileVersion: REMOTE_CONFIG_FILE_VERSION,
       configVersion: LATEST_APP_CONFIG_VERSION,
     });
-    expect(schema.meta.kipVersion).toMatch(/^\d+\.\d+\.\d+/);
+    expect(schema.meta.skipVersion).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('includes the widget schemas and the design system', () => {

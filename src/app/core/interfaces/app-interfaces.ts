@@ -1,5 +1,5 @@
 /*********************************************************************************
- * This file contains the most, but not all, common KIP App internal data types and
+ * This file contains the most, but not all, common Skip App internal data types and
  * structure interfaces. They are used by various services, components and widgets.
  *
  * For external data interfaces, such as Signal K, see signalk-interfaces file.
@@ -97,18 +97,18 @@ export interface IMeta {
 }
 
 /**
- * KIP remote display models sourced from the Signal K data tree.
+ * Skip remote display models sourced from the Signal K data tree.
  *
  * @example
  * ```ts
- * const display: IKipDisplayInfo = {
+ * const display: ISkipDisplayInfo = {
  *   displayId: '881d9185-426e-4dc3-bb95-ed58b81392c1',
  *   displayName: 'Helm Port'
  * };
  * ```
  */
-export interface IKipDisplayInfo {
-  /** KIP instance UUID */
+export interface ISkipDisplayInfo {
+  /** Skip instance UUID */
   displayId: string;
   /** Optional friendly name (nullable) */
   displayName: string | null;
@@ -119,10 +119,10 @@ export interface IKipDisplayInfo {
  *
  * @example
  * ```ts
- * const screen: IKipScreenItem = { id: 'dash-nav', name: 'Navigation', icon: 'sailing' };
+ * const screen: ISkipScreenItem = { id: 'dash-nav', name: 'Navigation', icon: 'sailing' };
  * ```
  */
-export interface IKipScreenItem {
+export interface ISkipScreenItem {
   /** Unique dashboard identifier. */
   id: string;
   /** Human-readable dashboard title. */
@@ -136,10 +136,10 @@ export interface IKipScreenItem {
  *
  * @example
  * ```ts
- * const screens: IKipDisplayScreen = [
+ * const screens: ISkipDisplayScreen = [
  *   { id: 'dash-nav', name: 'Navigation', icon: 'sailing' }
  * ];
  * ```
  */
-export type IKipDisplayScreen = IKipScreenItem[];
+export type ISkipDisplayScreen = ISkipScreenItem[];
 

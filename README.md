@@ -27,7 +27,7 @@ Skip is designed for sailors and boaters who want:
 
 With Skip, you get the **familiar feel of professional Multi-Function Displays** combined with the flexibility of Signal K. It’s simple, reliable, and highly usable — a modern, touch-first Multi-Function Display for [Signal K](https://signalk.org) vessels.
 
-![Skip](./images/KIPDemo.png)
+![Skip](./images/SkipDemo.png)
 
 ## Table of Content
 - [Installations Showcase](#installations-showcase)
@@ -85,16 +85,16 @@ Meant to build purposeful dashboards with however many widgets you want, whereve
 Add, resize, and position the widgets of your choosing. Need more? Add as many additional dashboards as you wish to keep your display purposeful. Simply swipe up and down to quickly cycle through dashboards or effortlessly jump between dashboards with a single tap in the action sidenav, always knowing exactly where you are thanks to clear highlighting of your current dashboard.
 
 Widget lists are sorted by category.
-![Layouts Configuration Image](./images/KipWidgetConfig-layout-1024.png)
+![Layouts Configuration Image](./images/SkipWidgetConfig-layout-1024.png)
 
 Intuitive widget configuration.
-![Gauges Configuration Image](./images/KipConfig-display-1024x488.png)
+![Gauges Configuration Image](./images/SkipConfig-display-1024x488.png)
 
 See what Signal K has to offer that you can leverage with widgets. Select it and tweak the display options to suit your purpose.
-![Paths Configuration Image](./images/KipWidgetConfig-paths-1024x488.png)
+![Paths Configuration Image](./images/SkipWidgetConfig-paths-1024x488.png)
 
 Many units are supported. Choose your preferred app defaults, then tweak them widget-by-widget as necessary. Skip will automatically convert the units for you.
-![Units Configuration Image](./images/KipConfig-Units-1024.png)
+![Units Configuration Image](./images/SkipConfig-Units-1024.png)
 
 Organize your dashboards and access tools.
 ![Options and Dashboards](./images/Options.png)
@@ -127,16 +127,16 @@ Get the latest version of Skip to see what's new!
 
 ### Widget Samples
 Gauges sample
-![Sample Gauges Image](./images/KipGaugeSample1-1024x545.png)
+![Sample Gauges Image](./images/SkipGaugeSample1-1024x545.png)
 
 Various other types of widgets
-![Electrical Concept Image](./images/KipGaugeSample2-1024x488.png)
+![Electrical Concept Image](./images/SkipGaugeSample2-1024x488.png)
 
 Freeboard-SK Chartplotter integration with Autopilot widget
-![Freeboard-SK Image](./images/KipFreeboard-SK-1024.png)
+![Freeboard-SK Image](./images/SkipFreeboard-SK-1024.png)
 
 Grafana integration with other widgets
-![Embedded Webpage Concept Image](./images/KipGaugeSample3-1024x508.png)
+![Embedded Webpage Concept Image](./images/SkipGaugeSample3-1024x508.png)
 
 ## Historical Data
 Skip plots recent history for your numeric data by reading it from an external Signal K History API provider (such as `signalk-to-influxdb2` or `signalk-parquet`). Press and hold (long-press) a widget to open its history dialog, or use a Realtime Data Plot or Wind Trends widget to see recent trends. Skip does **not** record or store data itself — the detail and time span available depend on whatever provider your Signal K server runs, and plots show live data only when no provider is present. See the [History-API Provider](src/assets/help-docs/history-api.md) help file for setup.
@@ -144,9 +144,9 @@ Skip plots recent history for your numeric data by reading it from an external S
 ## Night Modes
 Keep your night vision with automatic or manual day and night switching to a color preserving dim mode or an all Red theme. The images below look very dark, but at night... they are perfect!
 
-![Night mode - All Red](./images/KipNightMode-1024.png)
+![Night mode - All Red](./images/SkipNightMode-1024.png)
 
-![Night mode - Brightness](./images/KipBrightness-1024.png)
+![Night mode - Brightness](./images/SkipBrightness-1024.png)
 
 ## Remote Control Other Skip Displays
 Control which dashboard is shown on another Skip instance (e.g., a mast display, hard-to-reach screen, or a non‑touch device) from any Skip, including your phone.

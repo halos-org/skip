@@ -29,7 +29,7 @@ export function generateSwipeScript(config: SwipeScriptConfig): string {
   const opts = { ...DEFAULTS, ...config };
   // Inline script as string, interpolating config
   return `(() => {
-    if (window.__kipSwipeInit) return; window.__kipSwipeInit = true;
+    if (window.__skipSwipeInit) return; window.__skipSwipeInit = true;
     const instanceId='${opts.instanceId}';
     let pointerId=null; let startX=0; let startY=0; let startT=0; let peakPrimary=0; let peakCross=0; let cancelled=false;
     let lockedAxis=null; let lockedPrimarySign=0; let reversed=false;

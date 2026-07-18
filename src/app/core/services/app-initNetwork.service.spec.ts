@@ -464,7 +464,7 @@ describe('AppNetworkInitService', () => {
         function seedPersistedConnConfig(name: string): void {
             localStorage.setItem('skip.connectionConfig', JSON.stringify({
                 configVersion: 13,
-                kipUUID: 'test-uuid',
+                skipUUID: 'test-uuid',
                 signalKUrl: 'http://localhost',
                 proxyEnabled: false,
                 signalKSubscribeAll: false,
@@ -541,7 +541,7 @@ describe('AppNetworkInitService', () => {
         it('pre-v13 boot: a valid override never leaks the ephemeral slot identity into the persisted config', async () => {
             // Pre-v13 connectionConfig so the one-time remote-control migration runs during bootstrap.
             localStorage.setItem('skip.connectionConfig', JSON.stringify({
-                configVersion: 12, kipUUID: 'test-uuid', signalKUrl: 'http://localhost',
+                configVersion: 12, skipUUID: 'test-uuid', signalKUrl: 'http://localhost',
                 proxyEnabled: false, signalKSubscribeAll: false, sharedConfigName: 'default',
                 isRemoteControl: false, instanceName: ''
             }));

@@ -11,11 +11,11 @@ import { SignalkRequestsService } from './signalk-requests.service';
 import { EmbedModeService } from './embed-mode.service';
 import { States } from '../interfaces/signalk-interfaces';
 
-const KIP_UUID = 'test-kip-uuid';
-const SET_DISPLAY_PATH = 'self.kip.remote.setDisplay';
-const SET_SCREEN_INDEX_PATH = 'self.kip.remote.setScreenIndex';
-const REQUEST_ACTIVE_SCREEN_PATH = 'self.kip.remote.requestActiveScreen';
-const OWN_ACTIVE_SCREEN_PATH = `self.displays.${KIP_UUID}.activeScreen`;
+const SKIP_UUID = 'test-kip-uuid';
+const SET_DISPLAY_PATH = 'self.skip.remote.setDisplay';
+const SET_SCREEN_INDEX_PATH = 'self.skip.remote.setScreenIndex';
+const REQUEST_ACTIVE_SCREEN_PATH = 'self.skip.remote.requestActiveScreen';
+const OWN_ACTIVE_SCREEN_PATH = `self.displays.${SKIP_UUID}.activeScreen`;
 
 const DASHBOARDS: Dashboard[] = [
   { id: 'dash-0', name: 'Navigation', icon: 'sailing', configuration: [] },
@@ -24,7 +24,7 @@ const DASHBOARDS: Dashboard[] = [
 ];
 
 class SettingsServiceStub {
-  public readonly KipUUID = KIP_UUID;
+  public readonly SkipUUID = SKIP_UUID;
   public readonly instanceName = signal<string>('Helm Display');
   public readonly isRemoteControl = signal<boolean>(false);
 }
@@ -103,9 +103,9 @@ describe('RemoteDashboardsService', () => {
       TestBed.inject(RemoteDashboardsService);
 
       expect(requests.putRequest).toHaveBeenCalledTimes(3);
-      expect(requests.putRequest).toHaveBeenNthCalledWith(1, SET_SCREEN_INDEX_PATH, { displayId: KIP_UUID, screenIdx: null }, KIP_UUID);
-      expect(requests.putRequest).toHaveBeenNthCalledWith(2, SET_DISPLAY_PATH, { displayId: KIP_UUID, display: null }, KIP_UUID);
-      expect(requests.putRequest).toHaveBeenNthCalledWith(3, REQUEST_ACTIVE_SCREEN_PATH, { displayId: KIP_UUID, screenIdx: null }, KIP_UUID);
+      expect(requests.putRequest).toHaveBeenNthCalledWith(1, SET_SCREEN_INDEX_PATH, { displayId: SKIP_UUID, screenIdx: null }, SKIP_UUID);
+      expect(requests.putRequest).toHaveBeenNthCalledWith(2, SET_DISPLAY_PATH, { displayId: SKIP_UUID, display: null }, SKIP_UUID);
+      expect(requests.putRequest).toHaveBeenNthCalledWith(3, REQUEST_ACTIVE_SCREEN_PATH, { displayId: SKIP_UUID, screenIdx: null }, SKIP_UUID);
     });
 
     it('subscribes only to its own display activeScreen path', () => {
@@ -133,7 +133,7 @@ describe('RemoteDashboardsService', () => {
       const displayCalls = callsTo(SET_DISPLAY_PATH);
       expect(displayCalls).toHaveLength(1);
       expect(displayCalls[0][1]).toEqual({
-        displayId: KIP_UUID,
+        displayId: SKIP_UUID,
         display: {
           displayName: 'Helm Display',
           screens: [
@@ -155,7 +155,7 @@ describe('RemoteDashboardsService', () => {
       enableRemoteControl();
 
       expect(callsTo(SET_SCREEN_INDEX_PATH)).toEqual([
-        [SET_SCREEN_INDEX_PATH, { displayId: KIP_UUID, screenIdx: 1 }, KIP_UUID]
+        [SET_SCREEN_INDEX_PATH, { displayId: SKIP_UUID, screenIdx: 1 }, SKIP_UUID]
       ]);
     });
 
@@ -197,10 +197,10 @@ describe('RemoteDashboardsService', () => {
       TestBed.tick();
 
       expect(callsTo(SET_SCREEN_INDEX_PATH)).toEqual([
-        [SET_SCREEN_INDEX_PATH, { displayId: KIP_UUID, screenIdx: null }, KIP_UUID]
+        [SET_SCREEN_INDEX_PATH, { displayId: SKIP_UUID, screenIdx: null }, SKIP_UUID]
       ]);
       expect(callsTo(SET_DISPLAY_PATH)).toEqual([
-        [SET_DISPLAY_PATH, { displayId: KIP_UUID, display: null }, KIP_UUID]
+        [SET_DISPLAY_PATH, { displayId: SKIP_UUID, display: null }, SKIP_UUID]
       ]);
     });
   });
@@ -280,7 +280,7 @@ describe('RemoteDashboardsService', () => {
       TestBed.tick();
 
       expect(callsTo(SET_SCREEN_INDEX_PATH)).toEqual([
-        [SET_SCREEN_INDEX_PATH, { displayId: KIP_UUID, screenIdx: 2 }, KIP_UUID]
+        [SET_SCREEN_INDEX_PATH, { displayId: SKIP_UUID, screenIdx: 2 }, SKIP_UUID]
       ]);
     });
 
@@ -382,8 +382,8 @@ describe('RemoteDashboardsService', () => {
       service.setActiveDashboardOnRemote('other-display', 4);
       service.clearActiveScreenOnRemote('other-display', 7);
 
-      expect(requests.putRequest).toHaveBeenNthCalledWith(1, SET_SCREEN_INDEX_PATH, { displayId: 'other-display', screenIdx: 4 }, KIP_UUID);
-      expect(requests.putRequest).toHaveBeenNthCalledWith(2, REQUEST_ACTIVE_SCREEN_PATH, { displayId: 'other-display', screenIdx: 7 }, KIP_UUID);
+      expect(requests.putRequest).toHaveBeenNthCalledWith(1, SET_SCREEN_INDEX_PATH, { displayId: 'other-display', screenIdx: 4 }, SKIP_UUID);
+      expect(requests.putRequest).toHaveBeenNthCalledWith(2, REQUEST_ACTIVE_SCREEN_PATH, { displayId: 'other-display', screenIdx: 7 }, SKIP_UUID);
     });
 
     it('publishes a deep-enough copy of the screens payload, sharing no reference with the caller', () => {
@@ -405,9 +405,9 @@ describe('RemoteDashboardsService', () => {
       requests.putRequest.mockReturnValue(null);
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-      service.setActiveDashboardOnRemote(KIP_UUID, 1);
-      service.setScreensOnRemote(KIP_UUID, null);
-      service.clearActiveScreenOnRemote(KIP_UUID, null);
+      service.setActiveDashboardOnRemote(SKIP_UUID, 1);
+      service.setScreensOnRemote(SKIP_UUID, null);
+      service.clearActiveScreenOnRemote(SKIP_UUID, null);
 
       expect(errorSpy).toHaveBeenCalledTimes(3);
       errorSpy.mockRestore();

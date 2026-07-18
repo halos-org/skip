@@ -57,7 +57,7 @@ describe('RemoteControlComponent registration release balance', () => {
       imports: [RemoteControlComponent],
       providers: [
         { provide: DataService, useValue: fakeData },
-        { provide: SettingsService, useValue: { KipUUID: 'test-uuid' } },
+        { provide: SettingsService, useValue: { SkipUUID: 'test-uuid' } },
         { provide: SignalkRequestsService, useValue: { putRequest: vi.fn() } }
       ]
     }).compileComponents();

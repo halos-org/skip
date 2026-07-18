@@ -6,7 +6,7 @@ import { cwd } from 'node:process';
 /**
  * Guard for #1056.
  *
- * Help markdown is rendered inside KIP while the app is served under a base href
+ * Help markdown is rendered inside Skip while the app is served under a base href
  * (e.g. /@mxtommy/kip/). Image references must resolve against that base, so local image
  * paths have to be base-relative (e.g. `assets/help-docs/img/x.png`). A parent-relative
  * path (`../../assets/...`) climbs above the base href and 404s on a real Signal K server;

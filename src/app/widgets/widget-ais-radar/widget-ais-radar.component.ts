@@ -4,7 +4,7 @@ import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { IKipResizeEvent, KipResizeObserverDirective } from '../../core/directives/kip-resize-observer.directive';
+import { ISkipResizeEvent, SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { MatButtonModule } from '@angular/material/button';
 import { AisAton, AisProcessingService, AisSar, AisTrack, AisVessel, Position } from '../../core/services/ais-processing.service';
 import { DialogService } from '../../core/services/dialog.service';
@@ -116,7 +116,7 @@ interface RadarFilterState {
 
 @Component({
   selector: 'widget-ais-radar',
-  imports: [KipResizeObserverDirective, MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule],
+  imports: [SkipResizeObserverDirective, MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule],
   templateUrl: './widget-ais-radar.component.html',
   styleUrls: ['./widget-ais-radar.component.scss'],
   encapsulation: ViewEncapsulation.None,
@@ -283,7 +283,7 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
-  protected onResized(event: IKipResizeEvent): void {
+  protected onResized(event: ISkipResizeEvent): void {
     this.hostSize.set({ width: event.width, height: event.height });
   }
 
@@ -842,7 +842,7 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
         const vectorLength = Math.max(0, (distanceNm / rangeNm) * radius - tipOffset);
         if (vectorLength > 0) {
           const end = this.offsetPoint(tip.x, tip.y, motionAngle, vectorLength);
-          ownShipMotionData.push({ id: 'ownship', x1: tip.x, y1: tip.y, x2: end.x, y2: end.y, className: 'ownship-vector', stroke: 'var(--kip-orange-color)' });
+          ownShipMotionData.push({ id: 'ownship', x1: tip.x, y1: tip.y, x2: end.x, y2: end.y, className: 'ownship-vector', stroke: 'var(--skip-orange-color)' });
         }
       }
     }

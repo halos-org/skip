@@ -23,7 +23,7 @@ export class WidgetsListComponent implements OnInit {
   }
 
   private async loadWidgets(): Promise<void> {
-    this._widgetsList = await this._widgets.getKipWidgetsWithStatus();
+    this._widgetsList = await this._widgets.getSkipWidgetsWithStatus();
     this.filteredWidgetsList.set(this._widgetsList.filter(widget => widget.category === this._widgetCategory()));
   }
 

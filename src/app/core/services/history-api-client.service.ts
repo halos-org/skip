@@ -46,7 +46,7 @@ export interface IHistoryValuesResponse {
  *
  * Extends server-api query params while preserving current app compatibility:
  * - allows string `resolution` passthrough (e.g. `PT1S`)
- * - requires `paths` for the HTTP endpoint variant used by KIP
+ * - requires `paths` for the HTTP endpoint variant used by Skip
  */
 export type IHistoryValuesQueryParams = Partial<TimeRangeQueryParams> & {
   paths: string;

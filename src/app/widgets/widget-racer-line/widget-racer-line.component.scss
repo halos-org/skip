@@ -58,8 +58,8 @@
   flex: none;
   width: 18%;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-blue-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-blue-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
@@ -67,8 +67,8 @@
   flex: none;
   width: 58%;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-grey-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-grey-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
@@ -76,40 +76,40 @@
   flex: none;
   width: 58%;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-orange-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-orange-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .port-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-port-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-port-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .starboard-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-starboard-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-starboard-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .port-small-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-port-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-port-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .starboard-small-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-starboard-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-starboard-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
@@ -147,7 +147,7 @@
 }
 
 .pin {
-  fill: var(--kip-port-color);
+  fill: var(--skip-port-color);
   text {
     font-size: 19px;
   }
@@ -158,7 +158,7 @@
 }
 
 .len-bias {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   text {
     font-size: 12px;
   }
@@ -169,7 +169,7 @@
 }
 
 .boat {
-  fill: var(--kip-starboard-color);
+  fill: var(--skip-starboard-color);
   text {
     font-size: 19px;
   }

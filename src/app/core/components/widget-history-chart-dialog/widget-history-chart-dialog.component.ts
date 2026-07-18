@@ -6,8 +6,8 @@ import { Chart, ChartConfiguration, ChartDataset, Color, LegendItem } from 'char
 import 'chartjs-adapter-date-fns';
 import { registerChartComponents } from '../../utils/chart-registration.util';
 import { IWidget } from '../../interfaces/widgets-interface';
-import { IKipSeriesDefinition } from '../../contracts/kip-series-contract';
-import { isKipTemplateSeriesDefinition, type IKipConcreteSeriesDefinition, type IKipTemplateSeriesDefinition } from '../../contracts/kip-series-contract';
+import { ISkipSeriesDefinition } from '../../contracts/skip-series-contract';
+import { isSkipTemplateSeriesDefinition, type ISkipConcreteSeriesDefinition, type ISkipTemplateSeriesDefinition } from '../../contracts/skip-series-contract';
 import {
   describeElectricalDualAxisSeries,
   getAxisConfigsForWidget,
@@ -42,7 +42,7 @@ type HistoryChartDataset = ChartDataset<'line', ChartPoint[]>;
 export interface IWidgetHistoryChartDialogData {
   title: string;
   widget: IWidget;
-  seriesDefinitions: IKipSeriesDefinition[];
+  seriesDefinitions: ISkipSeriesDefinition[];
 }
 
 @Component({
@@ -188,7 +188,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     this.tryRenderChart();
   }
 
-  private async buildDatasetForSeries(series: IKipSeriesDefinition, index: number): Promise<HistoryChartDataset | null> {
+  private async buildDatasetForSeries(series: ISkipSeriesDefinition, index: number): Promise<HistoryChartDataset | null> {
     const rawPath = series.path;
     if (!rawPath) {
       return null;
@@ -366,8 +366,8 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     return requests;
   }
 
-  private async resolveQueryableSeriesDefinitions(): Promise<IKipSeriesDefinition[]> {
-    const expandedSeries: IKipSeriesDefinition[] = [];
+  private async resolveQueryableSeriesDefinitions(): Promise<ISkipSeriesDefinition[]> {
+    const expandedSeries: ISkipSeriesDefinition[] = [];
 
     for (const series of this.data.seriesDefinitions) {
       const concreteSeries = await this.expandTemplateSeries(series);
@@ -382,7 +382,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
    * then by the metric position defined in dualAxisMetricOrder (primary before secondary).
    * Non-dual-axis series are left at the end in their original relative order.
    */
-  private sortExpandedSeries(series: IKipSeriesDefinition[]): IKipSeriesDefinition[] {
+  private sortExpandedSeries(series: ISkipSeriesDefinition[]): ISkipSeriesDefinition[] {
     const hasDualAxis = series.some(s => this.describeDualAxisSeries(s.path) !== null);
     if (!hasDualAxis) {
       return series;
@@ -406,11 +406,11 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     });
   }
 
-  private async expandTemplateSeries(series: IKipSeriesDefinition): Promise<IKipSeriesDefinition[]> {
+  private async expandTemplateSeries(series: ISkipSeriesDefinition): Promise<ISkipSeriesDefinition[]> {
     const normalizedPath = this.normalizeHistoryPath(series.path ?? '');
     const isWildcardPath = normalizedPath.endsWith('.*');
 
-    if (!isKipTemplateSeriesDefinition(series) && !isWildcardPath) {
+    if (!isSkipTemplateSeriesDefinition(series) && !isWildcardPath) {
       return [series];
     }
 
@@ -434,7 +434,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       return [series];
     }
 
-    return matchedPaths.map((path, index): IKipConcreteSeriesDefinition => ({
+    return matchedPaths.map((path, index): ISkipConcreteSeriesDefinition => ({
       ...series,
       seriesId: `${series.seriesId}:resolved:${index}`,
       datasetUuid: `${series.datasetUuid}:resolved:${index}`,
@@ -447,7 +447,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     }));
   }
 
-  private findConcreteTemplatePaths(series: IKipSeriesDefinition, prefix: string, availablePaths: string[]): string[] {
+  private findConcreteTemplatePaths(series: ISkipSeriesDefinition, prefix: string, availablePaths: string[]): string[] {
     const normalized = Array.from(new Set(availablePaths
       .map(path => this.normalizeHistoryPath(path))
       .filter(path => path.startsWith(`${prefix}.`))));
@@ -456,7 +456,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       return [];
     }
 
-    if (!isKipTemplateSeriesDefinition(series)) {
+    if (!isSkipTemplateSeriesDefinition(series)) {
       return normalized;
     }
 
@@ -464,13 +464,13 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     return filteredByMetric.filter(path => this.matchesTemplateAllowedIds(path, prefix, series));
   }
 
-  private matchesTemplateMetric(path: string, prefix: string, series: IKipTemplateSeriesDefinition): boolean {
+  private matchesTemplateMetric(path: string, prefix: string, series: ISkipTemplateSeriesDefinition): boolean {
     const suffix = path.slice(prefix.length + 1);
     const metricSuffixes = getTemplateMetricSuffixesForExpansionMode(series.expansionMode);
     return metricSuffixes.some(candidate => suffix.endsWith(candidate));
   }
 
-  private matchesTemplateAllowedIds(path: string, prefix: string, series: IKipTemplateSeriesDefinition): boolean {
+  private matchesTemplateAllowedIds(path: string, prefix: string, series: ISkipTemplateSeriesDefinition): boolean {
     const allowedGeneric = Array.isArray(series.allowedIds)
       ? series.allowedIds.map(id => String(id).trim()).filter(id => id.length > 0)
       : [];
@@ -483,7 +483,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     return !!entityId && allowedGeneric.includes(entityId);
   }
 
-  private extractEntityId(path: string, prefix: string, series: IKipTemplateSeriesDefinition): string | null {
+  private extractEntityId(path: string, prefix: string, series: ISkipTemplateSeriesDefinition): string | null {
     const suffix = path.slice(prefix.length + 1);
     if (!suffix.length) {
       return null;
@@ -762,7 +762,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     void this.loadHistoryDatasets();
   }
 
-  private resolveDuration(series: IKipSeriesDefinition): string {
+  private resolveDuration(series: ISkipSeriesDefinition): string {
     if (series.timeScale && series.period && Number.isFinite(series.period)) {
       return this.durationFromScaleAndPeriod(series.timeScale, series.period);
     }
@@ -770,7 +770,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     return this.selectedPeriod();
   }
 
-  private resolveEnumerationDuration(series: IKipSeriesDefinition): string {
+  private resolveEnumerationDuration(series: ISkipSeriesDefinition): string {
     const retentionMs = series.retentionDurationMs;
     const windowMs = typeof retentionMs === 'number' && Number.isFinite(retentionMs) && retentionMs > 0
       ? retentionMs

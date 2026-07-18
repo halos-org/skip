@@ -166,7 +166,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
   });
   protected readonly labelColor = computed(() => {
     const theme = this.theme();
-    return theme ? getColors(this.colorRole(), theme).dim : 'var(--kip-contrast-dim-color)';
+    return theme ? getColors(this.colorRole(), theme).dim : 'var(--skip-contrast-dim-color)';
   });
 
   protected readonly widgetColors = computed(() => {
@@ -185,25 +185,25 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     for (const battery of batteries) {
       const chargeBarColorCompact = resolveZoneAwareColor(
         battery.stateOfChargeState,
-        widgetColors?.dimmer ?? 'var(--kip-contrast-dimmer-color)',
+        widgetColors?.dimmer ?? 'var(--skip-contrast-dimmer-color)',
         theme,
         ignoreZones
       );
       const chargeBarColorRegular = resolveZoneAwareColor(
         battery.stateOfChargeState,
-        widgetColors?.dim ?? 'var(--kip-contrast-dim-color)',
+        widgetColors?.dim ?? 'var(--skip-contrast-dim-color)',
         theme,
         ignoreZones
       );
       const currentTextColorCompact = resolveZoneAwareColor(
         battery.currentState,
-        'var(--kip-contrast-dim-color)',
+        'var(--skip-contrast-dim-color)',
         theme,
         ignoreZones
       );
       const currentTextColorRegular = resolveZoneAwareColor(
         battery.currentState,
-        'var(--kip-contrast-color)',
+        'var(--skip-contrast-color)',
         theme,
         ignoreZones
       );
@@ -249,7 +249,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
         remainingTimeText: `${this.formatDuration(bank.timeRemaining)}`.trim(),
         remainingCapacityText: bank.remainingCapacity ? `${this.formatEnergy(bank.remainingCapacity)}` : '',
         gaugeValuePath: this.buildSemiGaugeArcPath(WidgetBmsComponent.BANK_GAUGE_RADIUS, bank.avgSoc),
-        gaugeValueColor: widgetColors?.color ?? 'var(--kip-contrast-color)',
+        gaugeValueColor: widgetColors?.color ?? 'var(--skip-contrast-color)',
         zoneState: null,
         zoneColor: null
       };
@@ -339,7 +339,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       .attr('width', '160%').attr('height', '160%');
     glowFilter.append('feFlood')
       .attr('class', 'bms-soc-glow-flood')
-      .attr('flood-color', 'var(--kip-widget-card-background-color)')
+      .attr('flood-color', 'var(--skip-widget-card-background-color)')
       .attr('flood-opacity', 0.9)
       .attr('result', 'color');
     glowFilter.append('feComposite')
@@ -812,7 +812,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       bankMerged.select('text.bank-title')
         .attr('x', layout.titleX)
         .attr('y', layout.titleY)
-        .attr('fill', 'var(--kip-contrast-dim-color)')
+        .attr('fill', 'var(--skip-contrast-dim-color)')
         .attr('font-size', layout.titleFontSize)
         .text(item => item.displayModel.titleText);
     } else {
@@ -821,20 +821,20 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     bankMerged.select('text.bank-card-current')
       .attr('x', layout.lineOneX)
       .attr('y', layout.lineOneY)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .attr('font-size', layout.lineOneFontSize);
     bankMerged.select('tspan.bank-card-current-value')
       .text(item => this.splitMetricText(item.displayModel.currentText, 'A').valueText);
     bankMerged.select('tspan.bank-card-current-unit')
       .attr('dx', 1)
       .attr('font-size', 12)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .text(item => this.splitMetricText(item.displayModel.currentText, 'A').unitText);
 
     bankMerged.select('text.bank-card-power')
       .attr('x', 5)
       .attr('y', 42)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .attr('font-size', 10)
       .attr('opacity', 0.8);
     bankMerged.select('tspan.bank-card-power-value')
@@ -842,7 +842,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     bankMerged.select('tspan.bank-card-power-unit')
       .attr('dx', 1)
       .attr('font-size', 6)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .text(item => this.splitMetricText(item.displayModel.powerText, 'W').unitText);
 
     bankMerged.select('g.bank-gauge')
@@ -850,7 +850,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     bankMerged.select('path.bank-gauge-bg')
       .attr('d', this.bankGaugeBackgroundPath)
       .attr('fill', 'none')
-      .attr('stroke', 'var(--kip-contrast-dimmer-color)')
+      .attr('stroke', 'var(--skip-contrast-dimmer-color)')
       .attr('stroke-width', WidgetBmsComponent.BANK_GAUGE_BG_STROKE)
       .attr('stroke-linecap', 'round');
     bankMerged.select('path.bank-gauge-value')
@@ -863,7 +863,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       .attr('x', 0)
       .attr('y', -5)
       .attr('text-anchor', 'middle')
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .attr('font-size', layout.primaryFontSize)
       .attr('font-weight', layout.primaryFontWeight);
     bankMerged.select('tspan.bank-gauge-soc-value')
@@ -872,19 +872,19 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       .attr('dx', 1)
       .attr('font-size', 22)
       .attr('font-weight', 500)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .text(item => this.splitMetricText(item.displayModel.socText, '%').unitText);
     bankMerged.select('text.bank-remaining')
       .attr('x', 143)
       .attr('y', 26)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('text-anchor', 'middle')
       .attr('font-size', 8)
       .text(item => item.displayModel.remainingTimeText);
     bankMerged.select('text.bank-actualCapacity')
       .attr('x', 143)
       .attr('y', 66)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('text-anchor', 'middle')
       .attr('font-size', 8);
     bankMerged.select('tspan.bank-actualCapacity-value')
@@ -892,7 +892,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     bankMerged.select('tspan.bank-actualCapacity-unit')
       .attr('dx', 1)
       .attr('font-size', 6)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .text(item => this.splitMetricText(item.displayModel.remainingCapacityText, 'kWh').unitText);
     bankMerged
       .select<SVGGElement>('g.bank-bms-batteries')
@@ -1081,15 +1081,15 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
         ? WidgetBmsComponent.BATTERY_CARD_WIDTH
         : (item.compact ? WidgetBmsComponent.BATTERY_CARD_WIDTH - WidgetBmsComponent.CARD_GAP : WidgetBmsComponent.BATTERY_CARD_WIDTH))
       .attr('height', WidgetBmsComponent.BATTERY_CARD_HEIGHT)
-      .attr('fill', item => item.compact ? 'var(--mat-sys-background)' : 'var(--kip-contrast-dimmer-color)')
-      .attr('stroke', 'var(--kip-contrast-dimmer-color)')
+      .attr('fill', item => item.compact ? 'var(--mat-sys-background)' : 'var(--skip-contrast-dimmer-color)')
+      .attr('stroke', 'var(--skip-contrast-dimmer-color)')
       .attr('stroke-width', 0);
     selection.select('rect.bms-battery-tip')
       .attr('x', WidgetBmsComponent.BATTERY_CARD_WIDTH)
       .attr('y', WidgetBmsComponent.BATTERY_CARD_HEIGHT / 2 - 10)
       .attr('width', 4)
       .attr('height', 20)
-      .attr('fill', item => item.compact ? 'var(--mat-sys-background)' : 'var(--kip-contrast-dimmer-color)')
+      .attr('fill', item => item.compact ? 'var(--mat-sys-background)' : 'var(--skip-contrast-dimmer-color)')
       .attr('stroke', widgetColors.color)
       .attr('stroke-width', 0);
     selection.select('rect.bms-charge-fill')
@@ -1102,7 +1102,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       selection.select('text.bms-title')
         .attr('x', 5)
         .attr('y', item => item.compact ? 11 : 14)
-        .attr('fill', 'var(--kip-contrast-dim-color)')
+        .attr('fill', 'var(--skip-contrast-dim-color)')
         .attr('font-size', item => item.compact ? 8 : 12)
         .attr('filter', item => item.displayModel.socGlowEnabled ? `url(#${this.glowFilterId})` : null)
         .text(item => item.displayModel.titleText);
@@ -1119,7 +1119,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     selection.select('text.bms-volt-power')
       .attr('x', 10)
       .attr('y', 45)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('font-size', 8)
       .attr('opacity', 0.8)
       .attr('filter', item => item.displayModel.socGlowEnabled ? `url(#${this.glowFilterId})` : null)
@@ -1127,7 +1127,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     selection.select('text.bms-soc')
       .attr('x', WidgetBmsComponent.BATTERY_CARD_WIDTH - 33)
       .attr('y', 34)
-      .attr('fill', item => item.compact ? 'var(--kip-contrast-dim-color)' : 'var(--kip-contrast-color)')
+      .attr('fill', item => item.compact ? 'var(--skip-contrast-dim-color)' : 'var(--skip-contrast-color)')
       .attr('text-anchor', 'middle')
       .attr('font-size', 25)
       .attr('font-weight', 700)
@@ -1142,7 +1142,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     selection.select('text.bms-actualCapacity')
       .attr('x', WidgetBmsComponent.BATTERY_CARD_WIDTH - 33)
       .attr('y', 45)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('text-anchor', 'middle')
       .attr('font-size', 8)
       .attr('filter', item => item.displayModel.socGlowEnabled ? `url(#${this.glowFilterId})` : null)
@@ -1150,7 +1150,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     selection.select('text.bms-remaining')
       .attr('x', WidgetBmsComponent.BATTERY_CARD_WIDTH - 33)
       .attr('y', 12)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('text-anchor', 'middle')
       .attr('font-size', 6)
       .attr('filter', item => item.displayModel.socGlowEnabled ? `url(#${this.glowFilterId})` : null)

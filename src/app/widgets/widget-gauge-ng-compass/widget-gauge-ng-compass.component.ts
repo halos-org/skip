@@ -13,7 +13,7 @@ import { GaugesModule, RadialGaugeOptions, RadialGauge } from '@godind/ng-canvas
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { getColors } from '../../core/utils/themeColors.utils';
-import { KipResizeObserverDirective } from '../../core/directives/kip-resize-observer.directive';
+import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { ITheme } from '../../core/services/app-service';
@@ -45,7 +45,7 @@ function convertNegToPortDegree(degree: number) {
 @Component({
   selector: 'widget-gauge-ng-compass',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [KipResizeObserverDirective, GaugesModule],
+  imports: [SkipResizeObserverDirective, GaugesModule],
   templateUrl: './widget-gauge-ng-compass.component.html',
   styleUrl: './widget-gauge-ng-compass.component.scss'
 })

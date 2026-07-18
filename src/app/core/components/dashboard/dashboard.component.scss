@@ -102,7 +102,7 @@
 
 .empty-state-button {
   @include mat.button-overrides((
-    filled-label-text-color: var(--kip-widget-card-background-color),
+    filled-label-text-color: var(--skip-widget-card-background-color),
     filled-container-color: var(--mat-sys-outline-variant),
     filled-hover-state-layer-opacity: 0.7,
     filled-state-layer-color: var(--mat-sys-primary-fixed-dim)

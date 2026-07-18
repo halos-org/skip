@@ -2,9 +2,9 @@ import type { Mock } from "vitest";
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { ElementRef } from '@angular/core';
-import { KipResizeObserverDirective } from './kip-resize-observer.directive';
+import { SkipResizeObserverDirective } from './skip-resize-observer.directive';
 
-describe('KipResizeObserverDirective', () => {
+describe('SkipResizeObserverDirective', () => {
     let originalResizeObserver: typeof ResizeObserver | undefined;
     let observeSpy: Mock;
     let disconnectSpy: Mock;
@@ -50,7 +50,7 @@ describe('KipResizeObserverDirective', () => {
     });
 
     it('should create an instance', () => {
-        const directive = TestBed.runInInjectionContext(() => new KipResizeObserverDirective());
+        const directive = TestBed.runInInjectionContext(() => new SkipResizeObserverDirective());
 
         expect(directive).toBeTruthy();
         expect(observeSpy).toHaveBeenCalled();
@@ -59,7 +59,7 @@ describe('KipResizeObserverDirective', () => {
     });
 
     it('should disconnect resize observer on destroy', () => {
-        const directive = TestBed.runInInjectionContext(() => new KipResizeObserverDirective());
+        const directive = TestBed.runInInjectionContext(() => new SkipResizeObserverDirective());
 
         directive.ngOnDestroy();
 

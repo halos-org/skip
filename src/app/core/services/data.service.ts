@@ -503,23 +503,23 @@ export class DataService implements OnDestroy {
 
   /**
    * IMPORTANT: We should always push to both pathValue and source's sourceValue. This is required
-   * as per SK specifications. By default, KIP uses the source "default". This
-   * means, read from the pathValue property, and not the sourceValue. In KIP's
+   * as per SK specifications. By default, Skip uses the source "default". This
+   * means, read from the pathValue property, and not the sourceValue. In Skip's
    * path selection component, users can also choose a specific source. This will
-   * force KIP to read data from the sourceValue and disregard pathValue.
+   * force Skip to read data from the sourceValue and disregard pathValue.
    *
-   * If we have multiple sources for a path and KIP's source is configured to use
-   * "default", KIP will read data from pathValue. In this case, this means that
-   * KIP's pathValue will be overwritten overwritten by both sources, potentially
+   * If we have multiple sources for a path and Skip's source is configured to use
+   * "default", Skip will read data from pathValue. In this case, this means that
+   * Skip's pathValue will be overwritten overwritten by both sources, potentially
    * cause erratic widget behaviors!
    *
    * This is, as per SK specifications, by design. Source priority must/should
    * be configured in Signal K server to prevent this. Once configured, only one
    * source will update at a time following priority settings making the pathValue
-   * (KIP's "default" source setting) behave accordingly. Else, user should select
+   * (Skip's "default" source setting) behave accordingly. Else, user should select
    * a specific source to read from. This feature allows configurations where multiple
    * source can collaborate to a single path based on priority. Such as if you have
-   * multiple GPS, and one goes down: SK priority will switch sources, and KIP
+   * multiple GPS, and one goes down: SK priority will switch sources, and Skip
    * (configured with "default" source) will continue reading as if nothing ever
    * happened.
   */

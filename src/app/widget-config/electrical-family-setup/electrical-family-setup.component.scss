@@ -15,7 +15,7 @@
 }
 
 .hint {
-  color: var(--kip-contrast-dim-color);
+  color: var(--skip-contrast-dim-color);
   font-size: 0.8rem;
 }
 
@@ -26,16 +26,16 @@
 
   h4 {
     margin: 0;
-    color: var(--kip-contrast-color);
+    color: var(--skip-contrast-color);
     font-size: 0.95rem;
   }
 }
 
 .group-card {
-  border: 1px solid var(--kip-widget-card-border-color);
+  border: 1px solid var(--skip-widget-card-border-color);
   border-radius: 8px;
   padding: 10px;
-  background: var(--kip-widget-card-background-color);
+  background: var(--skip-widget-card-background-color);
 }
 
 .group-grid {

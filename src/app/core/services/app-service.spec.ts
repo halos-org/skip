@@ -103,14 +103,14 @@ describe('AppService', () => {
   describe('setBrightness', () => {
     it('writes the brightness CSS variable without filters by default', () => {
       createService().setBrightness(0.35);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('0.35');
-      expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toBe('');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('0.35');
+      expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toBe('');
     });
 
     it('applies sepia and hue-rotate filters when night filters are requested', () => {
       createService().setBrightness(0.5, true);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('0.5');
-      const filters = document.body.style.getPropertyValue('--kip-nightModeFilters');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('0.5');
+      const filters = document.body.style.getPropertyValue('--skip-nightModeFilters');
       expect(filters).toContain('sepia(0.5)');
       expect(filters).toContain('hue-rotate(-30deg)');
     });
@@ -122,8 +122,8 @@ describe('AppService', () => {
       document.body.classList.add('night-theme');
       service.toggleDayNightMode();
       expect(document.body.classList.contains('night-theme')).toBe(false);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('1');
-      expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toBe('');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('1');
+      expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toBe('');
     });
 
     it('dims to the configured brightness with night filters in night mode', () => {
@@ -131,8 +131,8 @@ describe('AppService', () => {
       service.isNightMode.set(true);
       service.toggleDayNightMode();
       expect(document.body.classList.contains('night-theme')).toBe(false);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('0.27');
-      expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toContain('sepia(0.5)');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('0.27');
+      expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toContain('sepia(0.5)');
     });
 
     it('keeps the light-theme class in night mode when the theme is light', () => {
@@ -149,8 +149,8 @@ describe('AppService', () => {
       service.isNightMode.set(true);
       service.toggleDayNightMode();
       expect(document.body.classList.contains('night-theme')).toBe(true);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('1');
-      expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toBe('');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('1');
+      expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toBe('');
     });
 
     it('publishes a fresh theme color snapshot on each toggle', () => {
@@ -172,12 +172,12 @@ describe('AppService', () => {
       envMode$.next(modeUpdate('night'));
       TestBed.tick();
       expect(service.isNightMode()).toBe(true);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('0.27');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('0.27');
 
       envMode$.next(modeUpdate('day'));
       TestBed.tick();
       expect(service.isNightMode()).toBe(false);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('1');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('1');
     });
 
     it('ignores environment mode changes when auto night mode is off', () => {
@@ -212,8 +212,8 @@ describe('AppService', () => {
       settings.autoNightMode.set(true);
       TestBed.tick();
       expect(service.isNightMode()).toBe(true);
-      expect(document.body.style.getPropertyValue('--kip-nightModeBrightness')).toBe('0.27');
-      expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toContain('sepia(0.5)');
+      expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('0.27');
+      expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toContain('sepia(0.5)');
 
       envMode$.next(modeUpdate('day'));
       TestBed.tick();
@@ -235,7 +235,7 @@ describe('AppService', () => {
       settings.redNightMode.set(false);
       TestBed.tick();
       expect(document.body.classList.contains('night-theme')).toBe(false);
-      expect(document.body.style.getPropertyValue('--kip-nightModeFilters')).toContain('sepia(0.5)');
+      expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toContain('sepia(0.5)');
     });
   });
 

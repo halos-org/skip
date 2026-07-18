@@ -89,19 +89,19 @@ mat-icon {
 }
 
 .icon-alert-color {
-  color: var(--kip-zone-alert-color);
+  color: var(--skip-zone-alert-color);
 }
 
 .icon-warn-color {
-  color: var(--kip-zone-warn-color);
+  color: var(--skip-zone-warn-color);
 }
 
 .icon-alarm-color {
-  color: var(--kip-zone-alarm-color);
+  color: var(--skip-zone-alarm-color);
 }
 
 .icon-emergency-color {
-  color: var(--kip-zone-emergency-color);
+  color: var(--skip-zone-emergency-color);
 }
 
  // Blink button on Alarm or Emergency state
@@ -110,14 +110,14 @@ mat-icon {
 }
 
 @keyframes blinking-emergency {
-  0%{		background-color: var(--kip-zone-alarm-color);	}
+  0%{		background-color: var(--skip-zone-alarm-color);	}
   50%{	background-color: transparent;	}
-  100%{	background-color: var(--kip-zone-alarm-color);	}
+  100%{	background-color: var(--skip-zone-alarm-color);	}
 }
 
 // Change icon color based on warn state
 .warn {
-  color: var(--kip-zone-warn-color);
+  color: var(--skip-zone-warn-color);
 }
 
 .notification-divider {

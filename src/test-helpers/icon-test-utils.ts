@@ -14,7 +14,7 @@ function readTestIconsSvg(): string {
 export function ensureTestIconsReady(): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const w = window as any;
-  if (w.__KIP_ICONS_REGISTERED__) return;
+  if (w.__SKIP_ICONS_REGISTERED__) return;
   const iconRegistry = TestBed.inject(MatIconRegistry);
   const sanitizer = TestBed.inject(DomSanitizer);
   const iconSvg = readTestIconsSvg();
@@ -23,14 +23,14 @@ export function ensureTestIconsReady(): void {
     const doc = parser.parseFromString(iconSvg, 'image/svg+xml');
     const trusted = sanitizer.bypassSecurityTrustHtml(iconSvg);
     iconRegistry.addSvgIconSetLiteral(trusted);
-    iconRegistry.addSvgIconSetInNamespace('kip', trusted);
+    iconRegistry.addSvgIconSetInNamespace('skip', trusted);
     const svgs = Array.from(doc.querySelectorAll('svg[id]')) as SVGSVGElement[];
     for (const svg of svgs) {
       const id = svg.getAttribute('id');
       if (!id) continue;
       iconRegistry.addSvgIconLiteral(id, sanitizer.bypassSecurityTrustHtml(svg.outerHTML));
     }
-    w.__KIP_ICONS_REGISTERED__ = true;
+    w.__SKIP_ICONS_REGISTERED__ = true;
   } else {
     console.error('[TEST] Failed to load src/assets/svg/icons.svg.');
   }

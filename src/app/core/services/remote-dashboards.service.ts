@@ -51,9 +51,9 @@ interface IRemoteScreenCommand {
   providedIn: 'root'
 })
 export class RemoteDashboardsService {
-  private readonly COMMAND_SET_DISPLAY_PATH = 'self.kip.remote.setDisplay';
-  private readonly COMMAND_SET_SCREEN_INDEX_PATH = 'self.kip.remote.setScreenIndex';
-  private readonly COMMAND_REQUEST_ACTIVE_SCREEN_PATH = 'self.kip.remote.requestActiveScreen';
+  private readonly COMMAND_SET_DISPLAY_PATH = 'self.skip.remote.setDisplay';
+  private readonly COMMAND_SET_SCREEN_INDEX_PATH = 'self.skip.remote.setScreenIndex';
+  private readonly COMMAND_REQUEST_ACTIVE_SCREEN_PATH = 'self.skip.remote.requestActiveScreen';
 
   private readonly settings = inject(SettingsService);
   private readonly dashboard = inject(DashboardService);
@@ -61,8 +61,8 @@ export class RemoteDashboardsService {
   private readonly requests = inject(SignalkRequestsService);
   private readonly embedMode = inject(EmbedModeService);
 
-  private readonly KIP_UUID = this.settings.KipUUID;
-  private readonly CHANGE_SCREEN_PATH = `self.displays.${this.KIP_UUID}.activeScreen`;
+  private readonly SKIP_UUID = this.settings.SkipUUID;
+  private readonly CHANGE_SCREEN_PATH = `self.displays.${this.SKIP_UUID}.activeScreen`;
 
   private readonly displayName = this.settings.instanceName;
   private readonly isRemoteControl = this.settings.isRemoteControl;
@@ -78,9 +78,9 @@ export class RemoteDashboardsService {
     }
 
     // Clear all remote paths on service initialization
-    this.setActiveDashboardOnRemote(this.KIP_UUID, null);
-    this.setScreensOnRemote(this.KIP_UUID, null);
-    this.clearActiveScreenOnRemote(this.KIP_UUID, null);
+    this.setActiveDashboardOnRemote(this.SKIP_UUID, null);
+    this.setScreensOnRemote(this.SKIP_UUID, null);
+    this.clearActiveScreenOnRemote(this.SKIP_UUID, null);
     console.log('[Remote Dashboards] Cleaning paths on server');
 
     // Share dashboards configuration and active index when Remote Control is toggled
@@ -99,7 +99,7 @@ export class RemoteDashboardsService {
           screensPayload = this.getScreensPayload(this.dashboard.dashboards());
           const activeDashboard = this.dashboard.activeDashboard()
           if (activeDashboard !== null) {
-            this.setActiveDashboardOnRemote(this.KIP_UUID, activeDashboard)
+            this.setActiveDashboardOnRemote(this.SKIP_UUID, activeDashboard)
           }
         }
 
@@ -127,7 +127,7 @@ export class RemoteDashboardsService {
         if (!this.isRemoteControl()) return;
         if (activeIdx === null) return;
 
-        this.setActiveDashboardOnRemote(this.KIP_UUID, activeIdx)
+        this.setActiveDashboardOnRemote(this.SKIP_UUID, activeIdx)
         console.log(`[Remote Dashboards] Sent new dashboard highlight index ${activeIdx} to server.`);
       });
     });
@@ -151,7 +151,7 @@ export class RemoteDashboardsService {
   }
 
   private clearActiveDashboardOnServer() {
-    this.setActiveDashboardOnRemote(this.KIP_UUID, null)
+    this.setActiveDashboardOnRemote(this.SKIP_UUID, null)
     console.log('[Remote Dashboards] Disabled: Cleared active dashboard on server');
   }
 
@@ -163,14 +163,14 @@ export class RemoteDashboardsService {
   }
 
   private shareScreens(screens: IScreensPayload | null | undefined): void {
-    this.setScreensOnRemote(this.KIP_UUID, screens)
+    this.setScreensOnRemote(this.SKIP_UUID, screens)
     console.log('[Remote Dashboards] Sending dashboard configurations to server.');
   }
 
   /**
    * Publishes the current active dashboard index for a target display.
    *
-   * @param kipId Target display UUID.
+   * @param skipId Target display UUID.
    * @param screenIdx Zero-based active dashboard index, or `null` to clear.
    * @returns `void`.
    *
@@ -179,9 +179,9 @@ export class RemoteDashboardsService {
    * remoteDashboards.setActiveDashboardOnRemote('881d9185-426e-4dc3-bb95-ed58b81392c1', 2);
    * ```
    */
-  public setActiveDashboardOnRemote(kipId: string, screenIdx: number | null): void {
-    const payload: IRemoteScreenCommand = { displayId: kipId, screenIdx };
-    const requestId = this.requests.putRequest(this.COMMAND_SET_SCREEN_INDEX_PATH, payload, this.KIP_UUID);
+  public setActiveDashboardOnRemote(skipId: string, screenIdx: number | null): void {
+    const payload: IRemoteScreenCommand = { displayId: skipId, screenIdx };
+    const requestId = this.requests.putRequest(this.COMMAND_SET_SCREEN_INDEX_PATH, payload, this.SKIP_UUID);
     if (!requestId) {
       console.error('[Remote Dashboards] Error sharing active dashboard: request was not accepted');
     }
@@ -190,7 +190,7 @@ export class RemoteDashboardsService {
   /**
    * Publishes dashboard catalog metadata to a target display.
    *
-   * @param kipId Target display UUID.
+   * @param skipId Target display UUID.
    * @param screensPayload Remote display payload, or `null` to clear published value.
    * @returns `void`.
    *
@@ -202,12 +202,12 @@ export class RemoteDashboardsService {
    * });
    * ```
    */
-  public setScreensOnRemote(kipId: string, screensPayload: IScreensPayload | null | undefined): void {
+  public setScreensOnRemote(skipId: string, screensPayload: IScreensPayload | null | undefined): void {
     const payload: IRemoteDisplayCommand = {
-      displayId: kipId,
+      displayId: skipId,
       display: screensPayload == null ? null : { ...screensPayload, screens: [...screensPayload.screens] }
     };
-    const requestId = this.requests.putRequest(this.COMMAND_SET_DISPLAY_PATH, payload, this.KIP_UUID);
+    const requestId = this.requests.putRequest(this.COMMAND_SET_DISPLAY_PATH, payload, this.SKIP_UUID);
     if (!requestId) {
       console.error('[Remote Dashboards] Error sharing screen configuration: request was not accepted');
     }
@@ -216,7 +216,7 @@ export class RemoteDashboardsService {
   /**
    * Publishes a remote screen-change request command for a target display.
    *
-   * @param kipId Target display UUID.
+   * @param skipId Target display UUID.
    * @param screenIdx Requested dashboard index, or `null` to clear request.
    * @returns `void`.
    *
@@ -225,9 +225,9 @@ export class RemoteDashboardsService {
    * remoteDashboards.clearActiveScreenOnRemote('881d9185-426e-4dc3-bb95-ed58b81392c1', 1);
    * ```
    */
-  public clearActiveScreenOnRemote(kipId: string, screenIdx: number | null): void {
-    const payload: IRemoteScreenCommand = { displayId: kipId, screenIdx };
-    const requestId = this.requests.putRequest(this.COMMAND_REQUEST_ACTIVE_SCREEN_PATH, payload, this.KIP_UUID);
+  public clearActiveScreenOnRemote(skipId: string, screenIdx: number | null): void {
+    const payload: IRemoteScreenCommand = { displayId: skipId, screenIdx };
+    const requestId = this.requests.putRequest(this.COMMAND_REQUEST_ACTIVE_SCREEN_PATH, payload, this.SKIP_UUID);
     if (!requestId) {
       console.error('[Remote Dashboards] Error clearing active screen request path: request was not accepted');
     }

@@ -55,46 +55,46 @@
   flex: none;
   width: 18%;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-blue-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-blue-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .main-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-port-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-port-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .other-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-blue-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-blue-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .main-small-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-port-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-port-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .other-small-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-blue-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-blue-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 
 .set-start-at {
   flex: 1 1 auto;
-  background-color: var(--kip-contrast-color);
+  background-color: var(--skip-contrast-color);
 }
 
 .start-at {
@@ -102,7 +102,7 @@
   width: 100%;
   flex: 1 1 auto;
   svg {
-    fill: var(--kip-contrast-color);
+    fill: var(--skip-contrast-color);
     text {
       font-family: Roboto;
       font-size: 9px;
@@ -152,7 +152,7 @@
 
 .svg-start-at {
   text {
-    fill: var(--kip-contrast-dim-color);
+    fill: var(--skip-contrast-dim-color);
   }
 }
 

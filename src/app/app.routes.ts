@@ -31,7 +31,7 @@ export const routes: Routes = [
     path: 'settings',
     canActivate: [embedBlockedGuard],
     loadComponent: () => import('./core/components/settings/settings.component').then(m => m.SettingsComponent),
-    title: 'KIP - Settings'
+    title: 'Skip - Settings'
   },
   {
     path: 'options',

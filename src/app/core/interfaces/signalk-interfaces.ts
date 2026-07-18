@@ -4,7 +4,7 @@
  * Those interfaces describe the different data types and structures of the
  * Signal K specification. They apply to both REST and WebSocket.
  *
- * For internal Kip data interfaces, see app-interfaces file.
+ * For internal Skip data interfaces, see app-interfaces file.
  */
 
 // Metadata, Notification and Stream Subscription type restrictions.
@@ -183,7 +183,7 @@ export interface ISkMetadata {
   supportsPut?: boolean; // true if the path supports PUT (write) requests
   units?: string;        // required if value is present. Describe the SK type of data
   timeout?: number;     // tells the consumer how long it should consider the value valid
-  properties: object; // Not defined by Kip. Used by GPS and Ship details and other complex data types
+  properties: object; // Not defined by Skip. Used by GPS and Ship details and other complex data types
   method?: TMethod[];
   displayScale?: ISkDisplayScale
   /**

@@ -9,7 +9,7 @@ import { GestureDirective } from './gesture.directive';
     template: `
     <div
       id="host"
-      kipGestures
+      skipGestures
       [mode]="mode"
       [longPressMs]="longPressMs"
       [pressMoveSlop]="pressMoveSlop"

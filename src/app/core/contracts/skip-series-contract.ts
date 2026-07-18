@@ -1,5 +1,5 @@
 /**
- * Ownership: authoritative KIP series schema for the app's History-API consumers.
+ * Ownership: authoritative Skip series schema for the app's History-API consumers.
  *
  * Kept in `core/contracts` so the dashboard series sync and the chart widgets share one series
  * definition. Formerly re-exported from the bundled kip-plugin; that provider was retired, so the
@@ -15,7 +15,7 @@ export interface IElectricalTrackedDeviceRef {
   source: string;
 }
 
-interface IKipSeriesDefinitionBase {
+interface ISkipSeriesDefinitionBase {
   seriesId: string;
   datasetUuid: string;
   ownerWidgetUuid: string;
@@ -32,14 +32,14 @@ interface IKipSeriesDefinitionBase {
   reconcileTs?: number;
 }
 
-export interface IKipConcreteSeriesDefinition extends IKipSeriesDefinitionBase {
+export interface ISkipConcreteSeriesDefinition extends ISkipSeriesDefinitionBase {
   expansionMode?: null;
   familyKey?: null;
   allowedIds?: null;
   trackedDevices?: null;
 }
 
-export interface IElectricalTemplateSeriesDefinition extends IKipSeriesDefinitionBase {
+export interface IElectricalTemplateSeriesDefinition extends ISkipSeriesDefinitionBase {
   ownerWidgetSelector:
   | 'widget-bms'
   | 'widget-solar-charger'
@@ -53,16 +53,16 @@ export interface IElectricalTemplateSeriesDefinition extends IKipSeriesDefinitio
   trackedDevices?: readonly IElectricalTrackedDeviceRef[] | null;
 }
 
-export type IKipTemplateSeriesDefinition = IElectricalTemplateSeriesDefinition;
+export type ISkipTemplateSeriesDefinition = IElectricalTemplateSeriesDefinition;
 
 /** @deprecated Use IElectricalTemplateSeriesDefinition */
 export type IBmsTemplateSeriesDefinition = IElectricalTemplateSeriesDefinition;
 /** @deprecated Use IElectricalTemplateSeriesDefinition */
 export type ISolarTemplateSeriesDefinition = IElectricalTemplateSeriesDefinition;
 
-export type IKipSeriesDefinition = IKipConcreteSeriesDefinition | IKipTemplateSeriesDefinition;
+export type ISkipSeriesDefinition = ISkipConcreteSeriesDefinition | ISkipTemplateSeriesDefinition;
 
-export function isKipTemplateSeriesDefinition(series: IKipSeriesDefinition): series is IKipTemplateSeriesDefinition {
+export function isSkipTemplateSeriesDefinition(series: ISkipSeriesDefinition): series is ISkipTemplateSeriesDefinition {
   return series.expansionMode === 'bms-battery-tree'
     || series.expansionMode === 'solar-tree'
     || series.expansionMode === 'charger-tree'
@@ -71,22 +71,22 @@ export function isKipTemplateSeriesDefinition(series: IKipSeriesDefinition): ser
     || series.expansionMode === 'ac-tree';
 }
 
-export function isKipElectricalTemplateSeriesDefinition(series: IKipSeriesDefinition): series is IElectricalTemplateSeriesDefinition {
-  return isKipTemplateSeriesDefinition(series);
+export function isSkipElectricalTemplateSeriesDefinition(series: ISkipSeriesDefinition): series is IElectricalTemplateSeriesDefinition {
+  return isSkipTemplateSeriesDefinition(series);
 }
 
-export function isKipBmsTemplateSeriesDefinition(series: IKipSeriesDefinition): series is IBmsTemplateSeriesDefinition {
+export function isSkipBmsTemplateSeriesDefinition(series: ISkipSeriesDefinition): series is IBmsTemplateSeriesDefinition {
   return series.expansionMode === 'bms-battery-tree' && (series.familyKey == null || series.familyKey === 'batteries');
 }
 
-export function isKipSolarTemplateSeriesDefinition(series: IKipSeriesDefinition): series is ISolarTemplateSeriesDefinition {
+export function isSkipSolarTemplateSeriesDefinition(series: ISkipSeriesDefinition): series is ISolarTemplateSeriesDefinition {
   return series.expansionMode === 'solar-tree' && (series.familyKey == null || series.familyKey === 'solar');
 }
 
-export function isKipConcreteSeriesDefinition(series: IKipSeriesDefinition): series is IKipConcreteSeriesDefinition {
+export function isSkipConcreteSeriesDefinition(series: ISkipSeriesDefinition): series is ISkipConcreteSeriesDefinition {
   return series.expansionMode == null;
 }
 
-export function isKipSeriesEnabled(series: Pick<IKipSeriesDefinitionBase, 'enabled'>): boolean {
+export function isSkipSeriesEnabled(series: Pick<ISkipSeriesDefinitionBase, 'enabled'>): boolean {
   return series.enabled;
 }

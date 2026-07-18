@@ -5,7 +5,7 @@ import { ReloadService } from './reload.service';
 import { ToastService } from './toast.service';
 
 // Exposes the private raw-reload seam so a spec can assert the reload branch was taken without the
-// hard navigation actually running (it is a no-op under __KIP_TEST__ regardless), plus the target
+// hard navigation actually running (it is a no-op under __SKIP_TEST__ regardless), plus the target
 // computation so its query-preservation can be asserted directly.
 interface ReloadServiceInternals {
   performReload(): void;

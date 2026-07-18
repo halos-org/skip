@@ -6,7 +6,7 @@ import * as path from 'path';
 const collectionPath = path.join(__dirname, '..', 'collection.json').replace(/test\/[.][.]/, '..');
 
 describe('create-host2-widget schematic', () => {
-    const runner = new SchematicTestRunner('kip-schematics', collectionPath);
+    const runner = new SchematicTestRunner('skip-schematics', collectionPath);
     let appTree: UnitTestTree;
 
     beforeEach(() => {

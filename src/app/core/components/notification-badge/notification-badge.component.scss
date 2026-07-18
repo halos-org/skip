@@ -8,19 +8,19 @@
 }
 
 .icon-alert-color {
-  --mat-list-list-item-leading-icon-color: var(--kip-zone-alert-color);
+  --mat-list-list-item-leading-icon-color: var(--skip-zone-alert-color);
 }
 
 .icon-warn-color {
-  --mat-list-list-item-leading-icon-color: var(--kip-zone-warn-color);
+  --mat-list-list-item-leading-icon-color: var(--skip-zone-warn-color);
 }
 
 .icon-alarm-color {
-  --mat-list-list-item-leading-icon-color: var(--kip-zone-alarm-color);
+  --mat-list-list-item-leading-icon-color: var(--skip-zone-alarm-color);
 }
 
 .icon-emergency-color {
-  --mat-list-list-item-leading-icon-color: var(--kip-zone-emergency-color);
+  --mat-list-list-item-leading-icon-color: var(--skip-zone-emergency-color);
 }
 
  // Blink button on Alarm or Emergency state
@@ -29,12 +29,12 @@
 }
 
 @keyframes blinking-emergency {
-  0%{		background-color: var(--kip-zone-alarm-color);	}
+  0%{		background-color: var(--skip-zone-alarm-color);	}
   50%{	background-color: var(--mat-sys-primary);	}
-  100%{	background-color: var(--kip-zone-alarm-color);	}
+  100%{	background-color: var(--skip-zone-alarm-color);	}
 }
 
 // Change icon color based on warn state
 .warn {
-  color: var(--kip-zone-warn-color);
+  color: var(--skip-zone-warn-color);
 }

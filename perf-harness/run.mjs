@@ -19,7 +19,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBranch, WORKTREES } from './lib/build-serve.mjs';
 import { startServer } from './lib/server.mjs';
-import { localStorageBundle, serverConfigDocument, initScriptContent } from './lib/kip-config.mjs';
+import { localStorageBundle, serverConfigDocument, initScriptContent } from './lib/skip-config.mjs';
 import { scenarios as ALL } from './scenarios.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

@@ -3,7 +3,7 @@
  * before/after numbers map to a named root cause. Data profiles drive the mock
  * server; dashboards are built fresh per repeat (unique widget uuids).
  */
-import { numericWidget, radialGaugeWidget, aisRadarWidget, buildDashboards } from './lib/kip-config.mjs';
+import { numericWidget, radialGaugeWidget, aisRadarWidget, buildDashboards } from './lib/skip-config.mjs';
 
 const POOL = [
   'navigation.speedOverGround', 'navigation.headingTrue', 'navigation.courseOverGroundTrue',

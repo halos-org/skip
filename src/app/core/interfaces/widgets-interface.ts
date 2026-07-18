@@ -37,7 +37,7 @@ export interface IDimensions {
 export type TWidgetPathType = 'number' | 'string' | 'boolean' | 'Date' | 'multiple' | null;
 
 /**
- * KIP Dynamic Widgets interface.
+ * Skip Dynamic Widgets interface.
  *
  * @export
  * @interface DynamicWidget
@@ -207,7 +207,7 @@ export interface IWidgetSvcConfig {
     lower?: number;
     /** The upper bound of the scale. This is the maximum value that can be represented on the display. NOTE: This property can be overwritten by metadata. */
     upper?: number;
-    /** The type of scale to use. This can be 'linear', 'logarithmic', 'squareRoot', 'power' or null if no scale is used (KIP only support linear for now). NOTE: This property can be overwritten by metadata. */
+    /** The type of scale to use. This can be 'linear', 'logarithmic', 'squareRoot', 'power' or null if no scale is used (Skip only support linear for now). NOTE: This property can be overwritten by metadata. */
     type: TScaleType;
     /** If scale type is 'power', the power value to use of the display scale */
     power?: number;
@@ -234,9 +234,9 @@ export interface IWidgetSvcConfig {
   /** AC widget configuration */
   ac?: ElectricalFamilyConfig;
 
-  /** Color from KIP selection tool to use as main display color */
+  /** Color from Skip selection tool to use as main display color */
   color?: string;
-  /** Color from KIP selection tool to use as background color */
+  /** Color from Skip selection tool to use as background color */
   bgColor?: string;
   /** Don't apply any display color */
   noColor?: boolean;
@@ -262,7 +262,7 @@ export interface IWidgetSvcConfig {
   /** Set to True to limit all Widget's data paths selection of the configuration UI Paths panel to Self. ie. the user's vessel. Value of True will prevent listing of all Signal K known paths that come from buoy, towers, other vessels, etc. Else all Signal K know data will be listed for selection. Should be set to True unless you need non-self data paths such as monitoring remote vessels, etc. */
   filterSelfPaths?: boolean;
   /**
-   * Controls automatic historical series generation (KIP plugin series data capture and storage) for this widget.
+   * Controls automatic historical series generation (Skip plugin series data capture and storage) for this widget.
    *
    * - When set to `false`, Dashboard history sync excludes this widget from automatic path-based series generation.
    * - When `true` or `undefined`, Dashboard history sync includes eligible numeric paths from this widget.
@@ -578,7 +578,7 @@ export interface IDataHighlight {
 
 /**
  * Defines all possible properties for data paths. Combines both
- * KIP and Signal K path features. Used for widget configuration, UI, and data binding.
+ * Skip and Signal K path features. Used for widget configuration, UI, and data binding.
  *
  * @example
  * ```typescript
@@ -618,7 +618,7 @@ export interface IWidgetPath {
   description: string | null | '';
   /**
    * Required: Signal K path (ie. self.environment.wind.angleTrueWater) of the data to be received or null value.
-   * See KIP's Data Browser or Signal K's Data Browser UI to identify possible available paths.
+   * See Skip's Data Browser or Signal K's Data Browser UI to identify possible available paths.
    * NOTE: Not all setups will have the same paths. Path availability depends on network components and Signal K configuration that exists on each vessel.
    */
   path: string | null;

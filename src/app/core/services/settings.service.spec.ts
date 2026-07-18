@@ -26,7 +26,7 @@ function seedConfig(opts: SeedOpts = {}): void {
   localStorage.setItem('authorization_token', JSON.stringify(null));
   localStorage.setItem('skip.connectionConfig', JSON.stringify({
     configVersion: 13,
-    kipUUID: 'test-uuid',
+    skipUUID: 'test-uuid',
     signalKUrl: 'https://boat.example:3443',
     proxyEnabled: false,
     signalKSubscribeAll: false,
@@ -58,7 +58,7 @@ function seedConnectionConfig(extra: Record<string, unknown> = {}): void {
     'skip.connectionConfig',
     JSON.stringify({
       configVersion: 12,
-      kipUUID: 'test-uuid',
+      skipUUID: 'test-uuid',
       signalKUrl: 'http://localhost',
       proxyEnabled: false,
       signalKSubscribeAll: false,
@@ -161,7 +161,7 @@ describe('SettingsService — legacy credential purge', () => {
     expect(Object.prototype.hasOwnProperty.call(persisted, 'loginName')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(persisted, 'useDeviceToken')).toBe(false);
     // Non-legacy fields survive the targeted rewrite.
-    expect(persisted.kipUUID).toBe('test-uuid');
+    expect(persisted.skipUUID).toBe('test-uuid');
     expect(persisted.sharedConfigName).toBe('default');
     expect(persisted.configVersion).toBe(12);
   });
@@ -355,7 +355,7 @@ describe('SettingsService — default config isolation', () => {
   it('getDefaultConnectionConfig returns a fresh clone and never mutates the shared singleton', () => {
     const service = createService({}) as unknown as DefaultConfigGetters;
     const urlBefore = DefaultConnectionConfig.signalKUrl;
-    const uuidBefore = DefaultConnectionConfig.kipUUID;
+    const uuidBefore = DefaultConnectionConfig.skipUUID;
 
     const first = service.getDefaultConnectionConfig();
     first.sharedConfigName = 'mutated';
@@ -366,7 +366,7 @@ describe('SettingsService — default config isolation', () => {
     expect(second.signalKUrl).not.toBe('https://mutated.example');
     // The getter clones, so mutating a returned result never reaches the shared singleton.
     expect(DefaultConnectionConfig.signalKUrl).toBe(urlBefore);
-    expect(DefaultConnectionConfig.kipUUID).toBe(uuidBefore);
+    expect(DefaultConnectionConfig.skipUUID).toBe(uuidBefore);
   });
 });
 
@@ -552,7 +552,7 @@ describe('SettingsService — granular patch dispatch (end-to-end through Storag
 });
 
 describe('SettingsService — resetSettings (characterization)', () => {
-  beforeEach(() => { (window as unknown as Record<string, unknown>)['__KIP_TEST__'] = true; });
+  beforeEach(() => { (window as unknown as Record<string, unknown>)['__SKIP_TEST__'] = true; });
 
   it('storage ready: replaces the active profile slot with the built defaults', () => {
     const service = createService({ sharedConfigName: 'profileA' });
@@ -633,7 +633,7 @@ describe('SettingsService — resetSettings (characterization)', () => {
 describe('SettingsService — getDefault* localStorage side effects (characterization)', () => {
   beforeEach(() => {
     ensureLocalStorage();
-    (window as unknown as Record<string, unknown>)['__KIP_TEST__'] = true;
+    (window as unknown as Record<string, unknown>)['__SKIP_TEST__'] = true;
   });
 
   // Config persists to the server; the app/theme/dashboards localStorage mirrors are dead weight
@@ -668,9 +668,9 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
 
     const persisted = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
     expect(persisted.configVersion).toBe(CONNECTION_CONFIG_VERSION);
-    expect(persisted.kipUUID).toBeTruthy();
+    expect(persisted.skipUUID).toBeTruthy();
     expect(persisted.signalKUrl).toBe(window.location.origin);
-    expect(cfg.kipUUID).toBe(persisted.kipUUID);
+    expect(cfg.skipUUID).toBe(persisted.skipUUID);
   });
 
   // getDefaultThemeConfig clones (issue #17, decision 5 / PCS-08): a caller mutating the result
@@ -760,7 +760,7 @@ describe('SettingsService — getActiveProfileName ephemeral honesty (#216 E6)',
 
 describe('SettingsService — reloadApp target (query-string preservation, #216 E6)', () => {
   // Exposes the private target computation so its query-preservation can be asserted directly; the
-  // real navigation stays __KIP_TEST__-guarded and never fires here.
+  // real navigation stays __SKIP_TEST__-guarded and never fires here.
   interface ReloadInternals { reloadTarget(): string }
 
   beforeEach(() => ensureLocalStorage());

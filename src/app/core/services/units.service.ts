@@ -5,7 +5,7 @@ import Qty from 'js-quantities';
 import { SettingsService } from './settings.service';
 
 /**
- * All valid Signal K numeric units supported by KIP.
+ * All valid Signal K numeric units supported by Skip.
  *
  * Allowed values:
  * - 's'        (seconds)
@@ -44,7 +44,7 @@ import { SettingsService } from './settings.service';
 export type TValidSkUnits = 's' | 'Hz' | 'm3' | 'm3/s' | 'kg/s' | 'kg/m3' | 'deg' | 'rad' | 'rad/s' | 'A' | 'C' | 'V' | 'W' | 'Nm' | 'J' | 'ohm' | 'm' | 'm/s' | 'm2' | 'K' | 'Pa' | 'kg' | 'ratio' | 'm/s2' | 'rad/s2' | 'N' | 'T' | 'Lux' | 'Pa/s' | 'Pa.s' | 'unitless' | null;
 
 /**
- * Interface for a list of possible Kip value type conversions for a given path.
+ * Interface for a list of possible Skip value type conversions for a given path.
  *
  * @export
  * @interface IConversionPathList
@@ -54,7 +54,7 @@ export interface IConversionPathList {
   conversions: IUnitGroup[];
 }
 /**
- *  Group of Kip units array
+ *  Group of Skip units array
  */
 export interface IUnitGroup {
   group: string;
@@ -62,7 +62,7 @@ export interface IUnitGroup {
 }
 
 /**
- * Individual Kip units system measures definition
+ * Individual Skip units system measures definition
  */
 export interface IUnit {
   measure: string;
@@ -123,7 +123,7 @@ export class UnitsService {
 
 
   /**
-   * Definition of available Kip units to be used for conversion.
+   * Definition of available Skip units to be used for conversion.
    * Measure property has to match one Unit Conversion Function for proper operation.
    * Description is human readable property.
    */
@@ -655,10 +655,10 @@ export class UnitsService {
   }
 
   /**
-   * Returns the list KIP configured preferred unit conversion settings.
-   * as configured by user in KIP's Units configuration.
+   * Returns the list Skip configured preferred unit conversion settings.
+   * as configured by user in Skip's Units configuration.
    *
-   * Ex: If a Signal K path's meta Units is set to 'm/s', KIP can automatically
+   * Ex: If a Signal K path's meta Units is set to 'm/s', Skip can automatically
    * convert to a given unit, says 'knots'. Received Signal K data is always
    * in SI units.
    *
@@ -700,11 +700,11 @@ export class UnitsService {
   }
 
   /**
-   * Obtain a list of possible Kip value type conversions for a given path. ie,.: Speed conversion group
+   * Obtain a list of possible Skip value type conversions for a given path. ie,.: Speed conversion group
    * (kph, Knots, etc.). The conversion list will be trimmed to only the conversions for the group in question.
    * If a base value type (provided by server) for a path cannot be found,
    * the full list is returned and with 'unitless' as the base. Same goes if the value type exists,
-   * but Kip does not handle it...yet.
+   * but Skip does not handle it...yet.
    *
    * @param path The Signal K path of the value
    * @return conversions Full list array or subset of list array
@@ -736,7 +736,7 @@ export class UnitsService {
         return { base: serverDefault ?? defaultUnit, conversions: groupList };
       }
 
-      console.log("[Units Service] Unit type: " + pathUnitType + ", found for path: " + path + "\nbut Kip does not support it.");
+      console.log("[Units Service] Unit type: " + pathUnitType + ", found for path: " + path + "\nbut Skip does not support it.");
       return { base: UNITLESS, conversions: this._conversionList };
     }
   }
