@@ -186,11 +186,27 @@ export interface ISkMetadata {
   properties: object; // Not defined by Kip. Used by GPS and Ship details and other complex data types
   method?: TMethod[];
   displayScale?: ISkDisplayScale
+  /**
+   * Server-supplied display-unit preference (Signal K unit-preferences plugin). Present per path
+   * when the plugin is installed; absent otherwise. `targetUnit`/`symbol` are the plugin's unit key
+   * and abbreviation; `formula`/`inverseFormula` are math.js expressions (SI <-> target) reserved for
+   * a later phase — Skip currently maps `targetUnit` onto its own conversion engine.
+   */
+  displayUnits?: ISkDisplayUnits;
   alertMethod?: TMethod[];
   warnMethod?: TMethod[];
   alarmMethod?: TMethod[];
   emergencyMethod?: TMethod[];
   zones?: ISkZone[];
+}
+
+export interface ISkDisplayUnits {
+  category?: string;
+  targetUnit?: string;
+  symbol?: string;
+  formula?: string;
+  inverseFormula?: string;
+  displayFormat?: string;
 }
 
 export interface ISkPossibleValue {

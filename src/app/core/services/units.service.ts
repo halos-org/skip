@@ -98,6 +98,23 @@ export interface ISkUnitProperties {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type UnitConverter = (v: any) => any;
 
+/**
+ * Maps a Signal K unit-preferences `displayUnits.targetUnit` string onto Skip's internal conversion
+ * measure key, for the cases where the two differ. Keys are the strings the plugin actually EMITS in
+ * `meta.displayUnits.targetUnit` (verified from live path meta — e.g. temperature emits the bare `C`,
+ * time emits `hour`), NOT the plugin's internal preset/definition keys. Server targets that already
+ * equal a Skip measure (A, V, W, J, mbar, liter, percent, rpm, Ah, deg/s, ...) need no entry — an
+ * unmapped target is used as-is and, when it is not a resolvable conversion for the path's group,
+ * the caller degrades gracefully to Skip's own default. Extend as other presets/units are adopted.
+ */
+const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
+  kn: 'knots',
+  'naut-mile': 'nm',
+  degree: 'deg',
+  hour: 'Hours',
+  C: 'celsius',
+};
+
 @Injectable()
 
 export class UnitsService {
@@ -715,12 +732,38 @@ export class UnitsService {
       });
 
       if (groupList.length > 0) {
-        return { base: defaultUnit, conversions: groupList };
+        const serverDefault = this.resolveServerDefaultMeasure(path, groupList);
+        return { base: serverDefault ?? defaultUnit, conversions: groupList };
       }
 
       console.log("[Units Service] Unit type: " + pathUnitType + ", found for path: " + path + "\nbut Kip does not support it.");
       return { base: UNITLESS, conversions: this._conversionList };
     }
+  }
+
+  /** Map a server displayUnits.targetUnit onto a Skip conversion measure key (identity when no alias). */
+  private mapServerTargetToMeasure(targetUnit: string): string {
+    return SERVER_TARGET_UNIT_ALIASES[targetUnit] ?? targetUnit;
+  }
+
+  /**
+   * The server's preferred display measure for a path (Signal K unit-preferences plugin), used as the
+   * default conversion target when present. Returns a measure only when the server's targetUnit maps
+   * to a Skip measure that is valid for the path's own conversion group — so the resolved measure
+   * drives BOTH the conversion and the label from one source (the "label matches conversion"
+   * invariant). Undefined when there is no server preference or it is not honourable (unit-less path,
+   * or an unmapped/unsupported target), in which case the caller falls back to Skip's group default.
+   * Per-widget overrides are unaffected: this only supplies the default a fresh path selection seeds.
+   */
+  private resolveServerDefaultMeasure(path: string, groupList: IUnitGroup[]): string | undefined {
+    const targetUnit = this.data.getPathDisplayUnits(path)?.targetUnit;
+    if (!targetUnit) return undefined;
+    const measure = this.mapServerTargetToMeasure(targetUnit);
+    // Honour the server preference only when the mapped measure is a member of the path's group.
+    // Every conversion-list measure has a conversion function (pinned by a table-integrity test), so a
+    // group-valid measure is guaranteed to drive both a real conversion and a matching symbol — the
+    // label-matches-conversion invariant. Anything else degrades gracefully to Skip's group default.
+    return groupList.some(group => group.units.some(unit => unit.measure === measure)) ? measure : undefined;
   }
 
 }
