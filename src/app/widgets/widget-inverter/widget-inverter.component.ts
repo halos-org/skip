@@ -20,6 +20,7 @@ import {
 } from '../shared/electrical-card-layout.constants';
 import type { InverterDisplayModel, InverterSnapshot, InverterWidgetConfig, ElectricalCardModeConfig } from './widget-inverter.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
+import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -306,81 +307,29 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
   private resolveInverterConfig(cfg: IWidgetSvcConfig): InverterWidgetConfig {
     const inverter = cfg.inverter;
     return {
-      trackedDevices: this.normalizeTrackedDevices(inverter?.trackedDevices),
+      trackedDevices: normalizeTrackedDevices(inverter?.trackedDevices),
       optionsById: this.normalizeOptionsById(inverter?.optionsById),
       cardMode: this.normalizeCardMode(inverter?.cardMode)
     };
   }
 
-  private normalizeTrackedDevices(value: unknown): ElectricalTrackedDevice[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const devices = new Map<string, ElectricalTrackedDevice>();
-    value.forEach(item => {
-      if (!item || typeof item !== 'object') {
-        return;
-      }
-
-      const candidate = item as { id?: unknown; source?: unknown; key?: unknown };
-      const id = this.normalizeOptionalString(candidate.id);
-      const source = this.normalizeOptionalString(candidate.source);
-      if (!id || !source) {
-        return;
-      }
-
-      const key = this.normalizeOptionalString(candidate.key) ?? `${id}||${source}`;
-      devices.set(key, { id, source, key });
-    });
-
-    return [...devices.values()].sort((left, right) => left.key.localeCompare(right.key));
-  }
-
-  private buildIdToDeviceKeysMap(): Map<string, string[]> {
-    const map = new Map<string, string[]>();
-    this.trackedDevices().forEach(device => {
-      const existing = map.get(device.id) ?? [];
-      existing.push(device.key);
-      map.set(device.id, existing);
-    });
-    return map;
-  }
-
   private normalizeCardMode(value: unknown): ElectricalCardModeConfig {
     const candidate = (value && typeof value === 'object') ? value as { displayMode?: unknown; metrics?: unknown } : null;
-    const metrics = this.normalizeStringList(candidate?.metrics);
+    const metrics = normalizeStringList(candidate?.metrics);
     return {
       displayMode: candidate?.displayMode === 'compact' ? 'compact' : 'full',
       metrics: metrics.length ? metrics : ['dcVoltage', 'dcCurrent', 'acVoltage', 'acFrequency']
     };
   }
 
-  private normalizeStringList(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    const ids = new Set<string>();
-    value.forEach(item => {
-      if (typeof item !== 'string') return;
-      const normalized = item.trim();
-      if (normalized.length > 0) ids.add(normalized);
-    });
-    return [...ids].sort((a, b) => a.localeCompare(b));
-  }
-
   private normalizeOptionsById(value: unknown): InverterWidgetConfig['optionsById'] {
     if (!value || typeof value !== 'object') return {};
     const next: InverterWidgetConfig['optionsById'] = {};
     Object.entries(value as Record<string, unknown>).forEach(([id]) => {
-      const normalizedId = this.normalizeOptionalString(id);
+      const normalizedId = normalizeOptionalString(id);
       if (normalizedId) next[normalizedId] = {};
     });
     return next;
-  }
-
-  private normalizeOptionalString(value: unknown): string | null {
-    if (typeof value !== 'string') return null;
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
   }
 
   private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
@@ -421,7 +370,7 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
     const uniqueIds = new Set(updates.map(update => update.id));
     uniqueIds.forEach(id => this.trackDiscoveredInverter(id));
 
-    const idToKeys = this.buildIdToDeviceKeysMap();
+    const idToKeys = buildIdToDeviceKeysMap(this.trackedDevices());
 
     this.invertersByKey.update(current => {
       let nextState = current;

@@ -12,6 +12,7 @@ import type { ElectricalTrackedDevice, IWidgetSvcConfig } from '../../core/inter
 import type { ITheme } from '../../core/services/app-service';
 import type { ChargerDisplayModel, ChargerSnapshot } from './widget-charger.types';
 import { ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT } from '../shared/electrical-card-layout.constants';
+import { normalizeOptionalString, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface ChargerRenderSnapshot {
@@ -251,44 +252,9 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
   }
 
   private applyConfig(cfg: IWidgetSvcConfig): void {
-    const trackedDevices = this.normalizeTrackedDevices(cfg.charger?.trackedDevices);
+    const trackedDevices = normalizeTrackedDevices(cfg.charger?.trackedDevices);
     this.trackedDevices.set(trackedDevices);
     this.reprojectSnapshotsToDeviceKeys(trackedDevices);
-  }
-
-  private normalizeTrackedDevices(value: unknown): ElectricalTrackedDevice[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const devices = new Map<string, ElectricalTrackedDevice>();
-    value.forEach(item => {
-      if (!item || typeof item !== 'object') {
-        return;
-      }
-
-      const candidate = item as { id?: unknown; source?: unknown; key?: unknown };
-      const id = this.normalizeOptionalString(candidate.id);
-      const source = this.normalizeOptionalString(candidate.source);
-      if (!id || !source) {
-        return;
-      }
-
-      const key = this.normalizeOptionalString(candidate.key) ?? `${id}||${source}`;
-      devices.set(key, { id, source, key });
-    });
-
-    return [...devices.values()].sort((left, right) => left.key.localeCompare(right.key));
-  }
-
-  private buildIdToDeviceKeysMap(): Map<string, string[]> {
-    const map = new Map<string, string[]>();
-    this.trackedDevices().forEach(device => {
-      const existing = map.get(device.id) ?? [];
-      existing.push(device.key);
-      map.set(device.id, existing);
-    });
-    return map;
   }
 
   private reprojectSnapshotsToDeviceKeys(devices: ElectricalTrackedDevice[]): void {
@@ -329,15 +295,6 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
 
       return changed ? next : current;
     });
-  }
-
-  private normalizeOptionalString(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
-
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
   }
 
   private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
@@ -392,7 +349,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
     const uniqueIds = new Set(updates.map(update => update.id));
     uniqueIds.forEach(id => this.trackDiscoveredCharger(id));
 
-    const idToKeys = this.buildIdToDeviceKeysMap();
+    const idToKeys = buildIdToDeviceKeysMap(this.trackedDevices());
     const trackedDevicesByKey = new Map<string, ElectricalTrackedDevice>();
     this.trackedDevices().forEach(device => trackedDevicesByKey.set(device.key, device));
 
@@ -457,12 +414,12 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
   }
 
   private extractUpdateSource(update: IPathUpdateWithPath): string | null {
-    const sourceFromUpdate = this.normalizeOptionalString((update as { source?: unknown }).source);
+    const sourceFromUpdate = normalizeOptionalString((update as { source?: unknown }).source);
     if (sourceFromUpdate) {
       return sourceFromUpdate;
     }
 
-    const sourceFromData = this.normalizeOptionalString((update.update?.data as { source?: unknown } | undefined)?.source);
+    const sourceFromData = normalizeOptionalString((update.update?.data as { source?: unknown } | undefined)?.source);
     return sourceFromData ?? null;
   }
 

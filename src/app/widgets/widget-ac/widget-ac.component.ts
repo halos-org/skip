@@ -18,6 +18,7 @@ import {
   ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH,
   ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT
 } from '../shared/electrical-card-layout.constants';
+import { normalizeOptionalString, normalizeStringList, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
 import type { AcDisplayModel, AcSnapshot, AcWidgetConfig, ElectricalCardModeConfig } from './widget-ac.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
@@ -322,8 +323,8 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
       }
 
       const candidate = item as { id?: unknown; source?: unknown; key?: unknown };
-      const id = this.normalizeOptionalString(candidate.id);
-      const source = this.normalizeOptionalString(candidate.source);
+      const id = normalizeOptionalString(candidate.id);
+      const source = normalizeOptionalString(candidate.source);
       if (!id || !source) {
         return;
       }
@@ -332,57 +333,30 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
         return;
       }
 
-      const key = this.normalizeOptionalString(candidate.key) ?? `${id}||${source}`;
+      const key = normalizeOptionalString(candidate.key) ?? `${id}||${source}`;
       devices.set(key, { id, source, key });
     });
 
     return [...devices.values()].sort((left, right) => left.key.localeCompare(right.key));
   }
 
-  private buildIdToDeviceKeysMap(): Map<string, string[]> {
-    const map = new Map<string, string[]>();
-    this.trackedDevices().forEach(device => {
-      const existing = map.get(device.id) ?? [];
-      existing.push(device.key);
-      map.set(device.id, existing);
-    });
-    return map;
-  }
-
   private normalizeCardMode(value: unknown): ElectricalCardModeConfig {
     const candidate = (value && typeof value === 'object') ? value as { displayMode?: unknown; metrics?: unknown } : null;
-    const metrics = this.normalizeStringList(candidate?.metrics);
+    const metrics = normalizeStringList(candidate?.metrics);
     return {
       displayMode: candidate?.displayMode === 'compact' ? 'compact' : 'full',
       metrics: metrics.length ? metrics : ['line1Voltage', 'line1Current', 'line1Frequency', 'line2Voltage']
     };
   }
 
-  private normalizeStringList(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    const ids = new Set<string>();
-    value.forEach(item => {
-      if (typeof item !== 'string') return;
-      const normalized = item.trim();
-      if (normalized.length > 0) ids.add(normalized);
-    });
-    return [...ids].sort((a, b) => a.localeCompare(b));
-  }
-
   private normalizeOptionsById(value: unknown): AcWidgetConfig['optionsById'] {
     if (!value || typeof value !== 'object') return {};
     const next: AcWidgetConfig['optionsById'] = {};
     Object.entries(value as Record<string, unknown>).forEach(([id]) => {
-      const normalizedId = this.normalizeOptionalString(id);
+      const normalizedId = normalizeOptionalString(id);
       if (normalizedId) next[normalizedId] = {};
     });
     return next;
-  }
-
-  private normalizeOptionalString(value: unknown): string | null {
-    if (typeof value !== 'string') return null;
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
   }
 
   private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
@@ -416,7 +390,7 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
     const uniqueIds = new Set(updates.map(item => item.id));
     uniqueIds.forEach(id => this.trackDiscoveredBus(id));
 
-    const idToKeys = this.buildIdToDeviceKeysMap();
+    const idToKeys = buildIdToDeviceKeysMap(this.trackedDevices());
 
     this.busesByKey.update(current => {
       let next = current;
