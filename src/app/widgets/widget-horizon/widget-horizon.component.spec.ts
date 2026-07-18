@@ -51,3 +51,38 @@ describe('WidgetHorizonComponent frame visibility', () => {
     expect(c.frameVisibleView()).toBe(false);
   });
 });
+
+describe('WidgetHorizonComponent sub-field extraction', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('observes the whole navigation.attitude leaf and extracts pitch and roll', () => {
+    const calls: { pathName: string; subField?: string }[] = [];
+    const options = signal<IWidgetSvcConfig | undefined>({
+      gauge: { type: 'horizon' },
+      paths: {
+        gaugePitchPath: { path: 'self.navigation.attitude', sampleTime: 1000 },
+        gaugeRollPath: { path: 'self.navigation.attitude', sampleTime: 1000 },
+      },
+    } as unknown as IWidgetSvcConfig);
+    TestBed.configureTestingModule({
+      imports: [WidgetHorizonComponent],
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        {
+          provide: WidgetStreamsDirective,
+          useValue: {
+            observe: (pathName: string, _next: unknown, subField?: string) => calls.push({ pathName, subField }),
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(WidgetHorizonComponent);
+    fixture.componentRef.setInput('id', 'test-horizon');
+    fixture.componentRef.setInput('type', 'widget-horizon');
+    fixture.componentRef.setInput('theme', null);
+    fixture.detectChanges();
+
+    expect(calls).toContainEqual({ pathName: 'gaugePitchPath', subField: 'pitch' });
+    expect(calls).toContainEqual({ pathName: 'gaugeRollPath', subField: 'roll' });
+  });
+});

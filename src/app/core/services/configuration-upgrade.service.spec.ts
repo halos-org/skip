@@ -195,6 +195,120 @@ describe('ConfigurationUpgradeService', () => {
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
     });
 
+    it('v13 upgrade rewrites sub-field-aware widget paths, sets isPathConfigurable:false, reconciles auto-history, and stamps v14', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: {
+                        longPath: { path: 'self.navigation.position.longitude', pathType: 'number', isPathConfigurable: true },
+                        latPath: { path: 'self.navigation.position.latitude', pathType: 'number', isPathConfigurable: true }
+                    } } } } },
+                    { input: { widgetProperties: { type: 'widget-horizon', config: { supportAutomaticHistoricalSeries: true, paths: {
+                        gaugePitchPath: { path: 'self.navigation.attitude.pitch', pathType: 'number', isPathConfigurable: true },
+                        gaugeRollPath: { path: 'self.navigation.attitude.roll', pathType: 'number', isPathConfigurable: true }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(14);
+        const pos = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        expect(pos.longPath.path).toBe('self.navigation.position');
+        expect(pos.latPath.path).toBe('self.navigation.position');
+        // The stale stored true would otherwise override the new isPathConfigurable:false default.
+        expect(pos.longPath.isPathConfigurable).toBe(false);
+        expect(pos.latPath.isPathConfigurable).toBe(false);
+        const horizon = written.dashboards[0].configuration[1].input.widgetProperties.config;
+        expect(horizon.paths.gaugePitchPath.path).toBe('self.navigation.attitude');
+        expect(horizon.paths.gaugeRollPath.path).toBe('self.navigation.attitude');
+        // Charting a compound sub-field is deferred (#345): auto-history reconciled off.
+        expect(horizon.supportAutomaticHistoricalSeries).toBe(false);
+    });
+
+    it('v13 upgrade leaves a GENERIC widget pointed at a compound sub-field untouched (no whole-object readout)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-numeric', config: { paths: {
+                        numericPath: { path: 'self.navigation.attitude.pitch', pathType: 'number', isPathConfigurable: true }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(14); // still stamped current
+        const numeric = written.dashboards[0].configuration[0].input.widgetProperties.config.paths.numericPath;
+        expect(numeric.path).toBe('self.navigation.attitude.pitch'); // path left on the inert child (clean no-data), not collapsed
+        expect(numeric.isPathConfigurable).toBe(true);
+    });
+
+    it('v13 upgrade handles the array form of paths on a sub-field-aware widget', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: [
+                        { path: 'self.navigation.position.latitude', pathType: 'number', isPathConfigurable: true }
+                    ] } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths[0].path)
+            .toBe('self.navigation.position');
+    });
+
+    it('v13 upgrade skips a slot that is not at version 13 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 14 },
+            theme: { themeName: '' },
+            dashboards: []
+        });
+
+        await service.runUpgrade(13);
+
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('v13 upgrade is idempotent — a path already at the compound level is not re-trimmed', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-heel-gauge', config: { paths: {
+                        angle: { path: 'self.navigation.attitude', pathType: 'number' }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths.angle.path)
+            .toBe('self.navigation.attitude');
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([

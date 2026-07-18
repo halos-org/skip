@@ -60,17 +60,17 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
 
   // Static default config (legacy parity + displayName)
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
-    supportAutomaticHistoricalSeries: true,
+    supportAutomaticHistoricalSeries: false,
     displayName: 'Horizon',
     filterSelfPaths: true,
     paths: {
       gaugePitchPath: {
         description: 'Attitude Pitch Data',
-        path: 'self.navigation.attitude.pitch',
+        path: 'self.navigation.attitude',
         source: 'default',
         pathType: 'number',
         pathRequired: false,
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
@@ -78,11 +78,11 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
       },
       gaugeRollPath: {
         description: 'Attitude Roll Data',
-        path: 'self.navigation.attitude.roll',
+        path: 'self.navigation.attitude',
         source: 'default',
         pathType: 'number',
         pathRequired: false,
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
@@ -134,7 +134,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
           const inv = cfg.gauge?.invertPitch ? -v : v;
           try { this.gauge.setPitchAnimated(inv); } catch { /* ignore */ }
         }
-      }));
+      }, 'pitch'));
     });
 
     // Observe roll path
@@ -149,7 +149,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
           const inv = cfg.gauge?.invertRoll ? -v : v;
           try { this.gauge.setRollAnimated(inv); } catch { /* ignore */ }
         }
-      }));
+      }, 'roll'));
     });
 
     // Config structural effect (independent from size changes)

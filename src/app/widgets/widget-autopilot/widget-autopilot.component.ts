@@ -439,10 +439,10 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       paths: {
         "longPath": {
           description: "Longitude",
-          path: "self.navigation.courseGreatCircle.nextPoint.position.longitude",
+          path: "self.navigation.courseGreatCircle.nextPoint.position",
           source: "default",
           pathType: "number",
-          isPathConfigurable: true,
+          isPathConfigurable: false,
           convertUnitTo: "longitudeMin",
           showPathSkUnitsFilter: true,
           pathSkUnitsFilter: null,
@@ -450,10 +450,10 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         },
         "latPath": {
           description: "Latitude",
-          path: "self.navigation.courseGreatCircle.nextPoint.position.latitude",
+          path: "self.navigation.courseGreatCircle.nextPoint.position",
           source: "default",
           pathType: "number",
-          isPathConfigurable: true,
+          isPathConfigurable: false,
           convertUnitTo: "latitudeMin",
           showPathSkUnitsFilter: true,
           pathSkUnitsFilter: null,

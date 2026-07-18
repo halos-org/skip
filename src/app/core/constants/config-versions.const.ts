@@ -21,7 +21,7 @@ export const REMOTE_CONFIG_FILE_VERSION = 11;
  * its legacy transforms pin their own MIGRATION_OUTPUT_VERSION so that bumping this constant
  * cannot silently re-label old migration output as current — add a chained migration instead.
  */
-export const LATEST_APP_CONFIG_VERSION = 13;
+export const LATEST_APP_CONFIG_VERSION = 14;
 
 /**
  * Per-device connectionConfig schema version (its own version space, decoupled from the app config

@@ -5,10 +5,11 @@ import { StorageService } from './storage.service';
 import { SettingsService } from './settings.service';
 import { ConfigurationUpgradeService } from './configuration-upgrade.service';
 import { IConfig } from '../interfaces/app-settings.interfaces';
+import { LATEST_APP_CONFIG_VERSION } from '../constants/config-versions.const';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 
 const cfg = (theme = 'x'): IConfig => ({
-  app: { configVersion: 13 } as IConfig['app'],
+  app: { configVersion: LATEST_APP_CONFIG_VERSION } as IConfig['app'],
   theme: { themeName: theme },
   dashboards: [{ id: 'd' }]
 });
@@ -159,7 +160,7 @@ describe('ProfileService', () => {
       const migrated = await service.importProfile('imported', older);
       expect(migrated).toBe(true);
       const written = storage.setConfig.mock.calls.at(-1)?.[2] as IConfig;
-      expect(written.app?.configVersion).toBe(13);
+      expect(written.app?.configVersion).toBe(LATEST_APP_CONFIG_VERSION);
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
     });
 

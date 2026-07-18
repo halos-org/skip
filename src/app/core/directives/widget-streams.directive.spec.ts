@@ -168,6 +168,58 @@ describe('WidgetStreamsDirective', () => {
         subj.next({ data: { value: 'B', timestamp: new Date() }, state: 'normal' } as IPathUpdate);
     });
 
+    it('extracts the configured sub-field from a whole compound-object value', () => {
+        const cfg = makeCfg({ path: 'navigation.position', source: null, pathType: 'number', sampleTime: 50 });
+        directive.setStreamsConfig(cfg);
+
+        const received: unknown[] = [];
+        directive.observe('p', u => received.push(u?.data?.value), 'latitude');
+
+        const subj = dataSvc.subjects.get('navigation.position|default')!;
+        subj.next({ data: { value: { latitude: 48.5, longitude: -123.25 }, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        expect(received).toEqual([48.5]);
+    });
+
+    it('applies unit conversion to the extracted sub-field (extraction precedes conversion)', () => {
+        const cfg = makeCfg({ path: 'navigation.attitude', source: null, pathType: 'number', convertUnitTo: 'x10', sampleTime: 50 });
+        directive.setStreamsConfig(cfg);
+
+        const received: unknown[] = [];
+        directive.observe('p', u => received.push(u?.data?.value), 'roll');
+
+        const subj = dataSvc.subjects.get('navigation.attitude|default')!;
+        subj.next({ data: { value: { roll: 0.2, pitch: 0.1 }, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        expect(received).toEqual([2]); // 0.2 extracted first, then the x10 conversion applied
+    });
+
+    it('passes a scalar value straight through when a sub-field is configured (customised scalar path stays working)', () => {
+        const cfg = makeCfg({ path: 'steering.rudderAngle', source: null, pathType: 'number', sampleTime: 50 });
+        directive.setStreamsConfig(cfg);
+
+        const received: unknown[] = [];
+        directive.observe('p', u => received.push(u?.data?.value), 'roll');
+
+        const subj = dataSvc.subjects.get('steering.rudderAngle|default')!;
+        subj.next({ data: { value: 0.42, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        expect(received).toEqual([0.42]);
+    });
+
+    it('emits null for a missing sub-field of a compound value', () => {
+        const cfg = makeCfg({ path: 'navigation.position', source: null, pathType: 'number', sampleTime: 50 });
+        directive.setStreamsConfig(cfg);
+
+        const received: unknown[] = [];
+        directive.observe('p', u => received.push(u?.data?.value), 'altitude');
+
+        const subj = dataSvc.subjects.get('navigation.position|default')!;
+        subj.next({ data: { value: { latitude: 48.5, longitude: -123.25 }, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        expect(received).toEqual([null]);
+    });
+
     it('resubscribes to DataService when source changes', async () => {
         const cfg1 = makeCfg({ path: 'env.switch', source: null, pathType: 'string', sampleTime: 50 });
         directive.setStreamsConfig(cfg1);

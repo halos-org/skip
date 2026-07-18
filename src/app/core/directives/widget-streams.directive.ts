@@ -38,7 +38,7 @@ export class WidgetStreamsDirective implements OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   // Base raw observables per logical path key
   private streams: Map<string, Observable<IPathUpdate>> | undefined;
-  private registrations: { pathName: string; next: (value: IPathUpdate) => void }[] = [];
+  private registrations: { pathName: string; next: (value: IPathUpdate) => void; subField?: string }[] = [];
   // Active subscriptions per path (so we can surgically unsubscribe changed/removed paths)
   private subscriptions = new Map<string, { sub: Subscription; signature: string }>();
   // Track identity of the cached base observable (path + normalized source) per path key
@@ -98,8 +98,22 @@ export class WidgetStreamsDirective implements OnDestroy {
     this.baseReleases.clear();
   }
 
+  /**
+   * Extract a named sub-field from a whole compound-object value, so a numeric widget can read one
+   * field (e.g. `latitude`) of a Signal K compound leaf (e.g. `navigation.position`) that the server
+   * emits whole. A non-object value (a path pointed at a scalar) passes straight through, and a
+   * missing sub-field yields null — so the extraction never breaks a scalar path and slots into the
+   * pipeline BEFORE unit conversion, keeping convertUnitTo working on the extracted number.
+   */
+  private extractSubField(update: IPathUpdate, subField: string): IPathUpdate {
+    const value = update.data.value;
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return update;
+    const extracted = (value as Record<string, unknown>)[subField] ?? null;
+    return { data: { value: extracted, timestamp: update.data.timestamp }, state: update.state } as IPathUpdate;
+  }
+
   /** Create (or reuse) base observable, assemble pipeline, and subscribe with diff-aware replacement. */
-  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; sampleTime?: number; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }): void {
+  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; sampleTime?: number; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }, subField?: string): void {
     const normalizedPath = this.normalizePath(pathCfg.path);
     if (!normalizedPath) {
       const existing = this.subscriptions.get(pathName);
@@ -142,6 +156,11 @@ export class WidgetStreamsDirective implements OnDestroy {
     const toUnit = (val: number) => convert ? this.unitsService.convertToUnit(convert, val) : val;
 
     let data$: Observable<IPathUpdate> = base$;
+    if (subField) {
+      // Extract the widget's sub-field from the whole compound value first, so bootstrap-null
+      // suppression, sampling and unit conversion all operate on the extracted number.
+      data$ = data$.pipe(map(x => this.extractSubField(x, subField)));
+    }
     if (suppressBootstrapNull) {
       // Drop only the LEADING (bootstrap) null values. Once a real value has been seen, let
       // everything through - including a later null produced by a TTL timeout. The flag is
@@ -312,7 +331,7 @@ export class WidgetStreamsDirective implements OnDestroy {
         // Defer base observable creation/refresh to buildAndSubscribe(), which
         // will reuse the cached base when base identity (path+source) is unchanged.
         const reg = this.registrations.find(r => r.pathName === p);
-        if (reg) this.buildAndSubscribe(p, reg.next, cfg, normalizedCfg);
+        if (reg) this.buildAndSubscribe(p, reg.next, cfg, normalizedCfg, reg.subField);
       }
     }
   }
@@ -362,13 +381,18 @@ export class WidgetStreamsDirective implements OnDestroy {
    *
    * @param pathName Logical path key from widget config (config.paths[pathName])
    * @param next Callback for processed updates (unit conversion + sampling applied)
+   * @param subField Optional sub-field key to read out of a whole compound-object value (e.g.
+   *   'latitude' when the path is the canonical compound leaf 'navigation.position'). The widget
+   *   owns this — it is extracted before unit conversion; a scalar value passes through unchanged.
    */
-  public observe(pathName: string, next: (value: IPathUpdate) => void): void {
-    // Capture previous callback before replacing registration
-    const prevReg = this.registrations.find(r => r.pathName === pathName)?.next;
+  public observe(pathName: string, next: (value: IPathUpdate) => void, subField?: string): void {
+    // Capture previous registration before replacing it (callback + sub-field)
+    const prev = this.registrations.find(r => r.pathName === pathName);
+    const prevReg = prev?.next;
+    const prevSubField = prev?.subField;
     // Replace any existing registration for this path (one callback per path)
     this.registrations = this.registrations.filter(r => r.pathName !== pathName);
-    this.registrations.push({ pathName, next });
+    this.registrations.push({ pathName, next, subField });
 
     const cfg = this._streamsConfig();
     if (!cfg || !cfg.paths?.[pathName]) {
@@ -403,10 +427,11 @@ export class WidgetStreamsDirective implements OnDestroy {
     const normalizedCfg = { ...pathCfg, path: normalizedPath };
     const sig = this.computePathSignature(normalizedCfg);
     const existing = this.subscriptions.get(pathName);
-    // If signature unchanged but callback changed, rebuild to swap observer; otherwise keep
-    if (existing && existing.signature === sig && prevReg === next) return;
+    // If signature unchanged and neither the callback nor the sub-field changed, keep as-is;
+    // otherwise rebuild to swap the observer / sub-field extraction.
+    if (existing && existing.signature === sig && prevReg === next && prevSubField === subField) return;
 
-    this.buildAndSubscribe(pathName, next, cfg, normalizedCfg);
+    this.buildAndSubscribe(pathName, next, cfg, normalizedCfg, subField);
   }
 
   /**

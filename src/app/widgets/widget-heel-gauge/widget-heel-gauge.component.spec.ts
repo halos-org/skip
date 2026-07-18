@@ -7,10 +7,12 @@ import { WidgetStreamsDirective } from '../../core/directives/widget-streams.dir
 describe('WidgetHeelGaugeComponent', () => {
   let fixture: ComponentFixture<WidgetHeelGaugeComponent>;
   let component: WidgetHeelGaugeComponent;
+  let observeCalls: { pathName: string; subField?: string }[];
   let originalGetTotalLength: ((this: SVGElement) => number) | undefined;
   let originalGetPointAtLength: ((this: SVGElement, distance: number) => DOMPoint) | undefined;
 
   beforeEach(async () => {
+    observeCalls = [];
     originalGetTotalLength = (SVGElement.prototype as SVGElement & { getTotalLength?: () => number }).getTotalLength;
     originalGetPointAtLength = (SVGElement.prototype as SVGElement & { getPointAtLength?: (distance: number) => DOMPoint }).getPointAtLength;
 
@@ -30,6 +32,7 @@ describe('WidgetHeelGaugeComponent', () => {
               gauge: { sideLabel: true },
               paths: {
                 angle: {
+                  path: 'self.navigation.attitude',
                   sampleTime: 1000,
                 },
               },
@@ -42,7 +45,9 @@ describe('WidgetHeelGaugeComponent', () => {
         {
           provide: WidgetStreamsDirective,
           useValue: {
-            observe: () => undefined,
+            observe: (pathName: string, _next: unknown, subField?: string) => {
+              observeCalls.push({ pathName, subField });
+            },
           },
         },
       ],
@@ -76,5 +81,11 @@ describe('WidgetHeelGaugeComponent', () => {
 
     expect(component).toBeTruthy();
     expect(fixture.nativeElement.textContent).toContain('Heel');
+  });
+
+  it('observes the whole navigation.attitude leaf and extracts the roll sub-field', () => {
+    fixture.detectChanges();
+
+    expect(observeCalls).toContainEqual({ pathName: 'angle', subField: 'roll' });
   });
 });
