@@ -541,7 +541,7 @@
   },
   "meta": {
     "configFileVersion": 11,
-    "configVersion": 13,
+    "configVersion": 14,
     "kipVersion": "4.8.0",
     "schemaVersion": 1
   },
@@ -1435,16 +1435,16 @@
         "paths": {
           "angle": {
             "convertUnitTo": "deg",
-            "description": "Heel / Roll / Other Angle",
-            "isPathConfigurable": true,
-            "path": "self.navigation.attitude.roll",
+            "description": "Heel / Roll Angle",
+            "isPathConfigurable": false,
+            "path": "self.navigation.attitude",
             "pathRequired": true,
             "pathType": "number",
             "sampleTime": 1000,
             "source": "default"
           }
         },
-        "supportAutomaticHistoricalSeries": true
+        "supportAutomaticHistoricalSeries": false
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1456,10 +1456,10 @@
       "pathSlots": [
         {
           "defaultConvertUnitTo": "deg",
-          "defaultPath": "self.navigation.attitude.roll",
-          "description": "Heel / Roll / Other Angle",
+          "defaultPath": "self.navigation.attitude",
+          "description": "Heel / Roll Angle",
           "expectedSkUnit": null,
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": true,
           "pathType": "number",
           "sampleTime": 1000,
@@ -1508,8 +1508,8 @@
           "gaugePitchPath": {
             "convertUnitTo": "deg",
             "description": "Attitude Pitch Data",
-            "isPathConfigurable": true,
-            "path": "self.navigation.attitude.pitch",
+            "isPathConfigurable": false,
+            "path": "self.navigation.attitude",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -1520,8 +1520,8 @@
           "gaugeRollPath": {
             "convertUnitTo": "deg",
             "description": "Attitude Roll Data",
-            "isPathConfigurable": true,
-            "path": "self.navigation.attitude.roll",
+            "isPathConfigurable": false,
+            "path": "self.navigation.attitude",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -1530,7 +1530,7 @@
             "source": "default"
           }
         },
-        "supportAutomaticHistoricalSeries": true
+        "supportAutomaticHistoricalSeries": false
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1542,10 +1542,10 @@
       "pathSlots": [
         {
           "defaultConvertUnitTo": "deg",
-          "defaultPath": "self.navigation.attitude.pitch",
+          "defaultPath": "self.navigation.attitude",
           "description": "Attitude Pitch Data",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "sampleTime": 1000,
@@ -1554,10 +1554,10 @@
         },
         {
           "defaultConvertUnitTo": "deg",
-          "defaultPath": "self.navigation.attitude.roll",
+          "defaultPath": "self.navigation.attitude",
           "description": "Attitude Roll Data",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "sampleTime": 1000,
@@ -1757,8 +1757,8 @@
           "latPath": {
             "convertUnitTo": "latitudeMin",
             "description": "Latitude",
-            "isPathConfigurable": true,
-            "path": "self.navigation.position.latitude",
+            "isPathConfigurable": false,
+            "path": "self.navigation.position",
             "pathSkUnitsFilter": null,
             "pathType": "number",
             "sampleTime": 500,
@@ -1768,8 +1768,8 @@
           "longPath": {
             "convertUnitTo": "longitudeMin",
             "description": "Longitude",
-            "isPathConfigurable": true,
-            "path": "self.navigation.position.longitude",
+            "isPathConfigurable": false,
+            "path": "self.navigation.position",
             "pathSkUnitsFilter": null,
             "pathType": "number",
             "sampleTime": 500,
@@ -1789,10 +1789,10 @@
       "pathSlots": [
         {
           "defaultConvertUnitTo": "longitudeMin",
-          "defaultPath": "self.navigation.position.longitude",
+          "defaultPath": "self.navigation.position",
           "description": "Longitude",
           "expectedSkUnit": null,
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "sampleTime": 500,
@@ -1801,10 +1801,10 @@
         },
         {
           "defaultConvertUnitTo": "latitudeMin",
-          "defaultPath": "self.navigation.position.latitude",
+          "defaultPath": "self.navigation.position",
           "description": "Latitude",
           "expectedSkUnit": null,
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "sampleTime": 500,

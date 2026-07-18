@@ -1302,16 +1302,16 @@ export const DefaultDashboard: Dashboard[] = [
             "type": "widget-heel-gauge",
             "uuid": "84f7b83c-2fd9-4de6-88e8-a032a18048cd",
             "config": {
-              "supportAutomaticHistoricalSeries": true,
+              "supportAutomaticHistoricalSeries": false,
               "displayName": "Heel",
               "filterSelfPaths": true,
               "paths": {
                 "angle": {
-                  "description": "Heel / Roll / Other Angle",
-                  "path": "self.navigation.attitude.roll",
+                  "description": "Heel / Roll Angle",
+                  "path": "self.navigation.attitude",
                   "source": "default",
                   "pathType": "number",
-                  "isPathConfigurable": true,
+                  "isPathConfigurable": false,
                   "convertUnitTo": "deg",
                   "sampleTime": 1000,
                   "pathRequired": true
@@ -1345,17 +1345,17 @@ export const DefaultDashboard: Dashboard[] = [
             "type": "widget-horizon",
             "uuid": "119f2f65-e9f9-4c1d-ae93-2ac9ad12b313",
             "config": {
-              "supportAutomaticHistoricalSeries": true,
+              "supportAutomaticHistoricalSeries": false,
               "displayName": "Horizon",
               "filterSelfPaths": true,
               "paths": {
                 "gaugePitchPath": {
                   "description": "Attitude Pitch Data",
-                  "path": "self.navigation.attitude.pitch",
+                  "path": "self.navigation.attitude",
                   "source": "default",
                   "pathType": "number",
                   "pathRequired": false,
-                  "isPathConfigurable": true,
+                  "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
@@ -1363,11 +1363,11 @@ export const DefaultDashboard: Dashboard[] = [
                 },
                 "gaugeRollPath": {
                   "description": "Attitude Roll Data",
-                  "path": "self.navigation.attitude.roll",
+                  "path": "self.navigation.attitude",
                   "source": "default",
                   "pathType": "number",
                   "pathRequired": false,
-                  "isPathConfigurable": true,
+                  "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
@@ -1407,10 +1407,10 @@ export const DefaultDashboard: Dashboard[] = [
               "paths": {
                 "longPath": {
                   "description": "Longitude",
-                  "path": "self.navigation.position.longitude",
+                  "path": "self.navigation.position",
                   "source": "default",
                   "pathType": "number",
-                  "isPathConfigurable": true,
+                  "isPathConfigurable": false,
                   "convertUnitTo": "longitudeMin",
                   "showPathSkUnitsFilter": true,
                   "pathSkUnitsFilter": null,
@@ -1418,10 +1418,10 @@ export const DefaultDashboard: Dashboard[] = [
                 },
                 "latPath": {
                   "description": "Latitude",
-                  "path": "self.navigation.position.latitude",
+                  "path": "self.navigation.position",
                   "source": "default",
                   "pathType": "number",
-                  "isPathConfigurable": true,
+                  "isPathConfigurable": false,
                   "convertUnitTo": "latitudeMin",
                   "showPathSkUnitsFilter": true,
                   "pathSkUnitsFilter": null,
