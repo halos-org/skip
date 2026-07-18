@@ -32,7 +32,7 @@ describe('composeSnapshot', () => {
     expect(r.blob.type).toBe('image/jpeg');
     expect(r.blob.size).toBeGreaterThan(100);
     expect(r.filename).toBe('foredeck-cam-2026-06-26T04-30-15Z.jpg');
-    const gps = piexif.load(r.dataUrl).GPS;
+    const gps = piexif.load(r.dataUrl).GPS!;
     expect(gps[piexif.GPSIFD.GPSLatitudeRef]).toBe('N');
     expect(gps[piexif.GPSIFD.GPSSpeedRef]).toBe('N');
   });
@@ -40,15 +40,15 @@ describe('composeSnapshot', () => {
   it('omits GPS but keeps the timestamp when location is off', () => {
     const r = composeSnapshot(TINY_JPEG, SELF, { ...base, embedLocation: false });
     const loaded = piexif.load(r.dataUrl);
-    expect(loaded.GPS[piexif.GPSIFD.GPSLatitude]).toBeUndefined();
-    expect(loaded.Exif[piexif.ExifIFD.DateTimeOriginal]).toBe('2026:06:26 04:30:15');
+    expect(loaded.GPS![piexif.GPSIFD.GPSLatitude]).toBeUndefined();
+    expect(loaded.Exif![piexif.ExifIFD.DateTimeOriginal]).toBe('2026:06:26 04:30:15');
   });
 
   it('embeds no telemetry at all when the master switch is off', () => {
     const r = composeSnapshot(TINY_JPEG, SELF, { ...base, embedTelemetry: false });
     const loaded = piexif.load(r.dataUrl);
-    expect(loaded.GPS[piexif.GPSIFD.GPSLatitude]).toBeUndefined();
-    expect(loaded.Exif[piexif.ExifIFD.UserComment]).toBeUndefined();
-    expect(loaded.Exif[piexif.ExifIFD.DateTimeOriginal]).toBe('2026:06:26 04:30:15');
+    expect(loaded.GPS![piexif.GPSIFD.GPSLatitude]).toBeUndefined();
+    expect(loaded.Exif![piexif.ExifIFD.UserComment]).toBeUndefined();
+    expect(loaded.Exif![piexif.ExifIFD.DateTimeOriginal]).toBe('2026:06:26 04:30:15');
   });
 });

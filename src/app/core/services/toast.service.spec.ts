@@ -42,7 +42,7 @@ describe('ToastService', () => {
         const ref = service.show('Plugin disabled', 0, true, 'warn', 'Enable Plugin');
 
         expect(snackBar.openFromComponent).toHaveBeenCalled();
-        const openArgs = vi.mocked(snackBar.openFromComponent).mock.lastCall;
+        const openArgs = vi.mocked(snackBar.openFromComponent).mock.lastCall!;
         expect(openArgs[0]).toBe(ToastSnackbarComponent);
         expect(openArgs[1].data.action).toBe('Enable Plugin');
         expect(openArgs[1].data.message).toBe('Plugin disabled');

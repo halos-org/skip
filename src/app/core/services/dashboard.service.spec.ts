@@ -326,10 +326,10 @@ describe('DashboardService', () => {
       expect(copy.id).toMatch(UUID_PATTERN);
       const copiedWidget = widgetsOf(copy)[0];
       expect(copiedWidget.id).not.toBe('w-src');
-      expect(copiedWidget.input.widgetProperties.uuid).toBe(copiedWidget.id);
+      expect(copiedWidget.input!.widgetProperties.uuid).toBe(copiedWidget.id);
       const sourceWidget = widgetsOf(service.dashboards()[0])[0];
       expect(sourceWidget.id).toBe('w-src');
-      expect(sourceWidget.input.widgetProperties.uuid).toBe('w-src');
+      expect(sourceWidget.input!.widgetProperties.uuid).toBe('w-src');
     });
 
     it('replaces a missing configuration with an empty array', () => {
@@ -502,14 +502,14 @@ describe('DashboardService', () => {
     beforeEach(() => setup());
 
     it('replays null to subscribers before any action', () => {
-      const seen: widgetOperation[] = [];
+      const seen: (widgetOperation | null)[] = [];
       const subscription = service.widgetAction$.subscribe(op => seen.push(op));
       expect(seen).toEqual([null]);
       subscription.unsubscribe();
     });
 
     it('emits one operation per action call', () => {
-      const seen: widgetOperation[] = [];
+      const seen: (widgetOperation | null)[] = [];
       const subscription = service.widgetAction$.subscribe(op => seen.push(op));
       service.deleteWidget('w-1');
       service.duplicateWidget('w-2');
@@ -538,8 +538,8 @@ describe('DashboardService', () => {
         selector: 'widget-host2',
         input: { widgetProperties: { type: 'widget-numeric', uuid: 'clipboard', config: { displayName: 'w-src' } } }
       });
-      node.input.widgetProperties.config.displayName = 'mutated';
-      expect(service.widgetClipboard().input.widgetProperties.config.displayName).toBe('w-src');
+      node.input!.widgetProperties.config.displayName = 'mutated';
+      expect(service.widgetClipboard()!.input!.widgetProperties.config.displayName).toBe('w-src');
       service.clearWidgetClipboard();
       expect(service.widgetClipboard()).toBeNull();
     });
@@ -620,7 +620,7 @@ describe('DashboardService', () => {
       service.add('Fourth', []);
       TestBed.tick();
       expect(settings.saveDashboards).toHaveBeenCalledTimes(2);
-      expect(settings.saveDashboards.mock.lastCall[0]).toHaveLength(4);
+      expect(settings.saveDashboards.mock.lastCall![0]).toHaveLength(4);
     });
 
     it('does not re-save when an update leaves the list deep-equal', () => {
@@ -645,7 +645,7 @@ describe('DefaultDashboard seed constant', () => {
   it('gives every widget a unique gridstack id that matches its widgetProperties uuid', () => {
     const ids = widgets.map(w => w.id);
     expect(new Set(ids).size).toBe(ids.length);
-    widgets.forEach(w => expect(w.id).toBe(w.input.widgetProperties.uuid));
+    widgets.forEach(w => expect(w.id).toBe(w.input!.widgetProperties.uuid));
   });
 
   it('pins no vessel-specific $source — every source resolves to the server default', () => {

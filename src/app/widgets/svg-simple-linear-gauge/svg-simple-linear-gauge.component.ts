@@ -10,8 +10,8 @@ import { IDataHighlight } from '../../core/interfaces/widgets-interface';
 export class SvgSimpleLinearGaugeComponent implements OnDestroy {
   protected readonly gaugeBarAnimate = viewChild<ElementRef>('gaugeBarAnimate');
   protected readonly displayName = input.required<string>();
-  protected readonly displayNameColor = input.required<string>();
-  protected readonly dataValue = input.required<number>();
+  protected readonly displayNameColor = input.required<string | undefined>();
+  protected readonly dataValue = input.required<number | null>();
   protected readonly dataValueLabel = input.required<string>();
   protected readonly unitLabel = input.required<string>();
   protected readonly barColor = input.required<string>();

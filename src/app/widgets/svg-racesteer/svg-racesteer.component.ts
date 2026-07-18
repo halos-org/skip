@@ -28,7 +28,7 @@ export class SvgRacesteerComponent implements OnDestroy {
   protected readonly polarSpeedRatio = input.required<number>();
   protected readonly trueWindAngle = input.required<number>();
   protected readonly trueWindSpeed = input.required<number>();
-  protected readonly targetAngle = input.required<number>();
+  protected readonly targetAngle = input.required<number | null>();
   protected readonly optimalWindAngle = input.required<number>();
   protected readonly targetVMG = input.required<number>();
   protected readonly VMG = input.required<number>();
@@ -515,9 +515,9 @@ export class SvgRacesteerComponent implements OnDestroy {
   }
 
   private setWindSectorPath(sector: SectorAngles, isPort: boolean): void {
-    const minAngle = this.addHeading(this.addHeading(sector.min, Number(this.compass.newValue) * -1), this.targetAngle() / 2 * (isPort ? -1 : 1));
-    const midAngle = this.addHeading(this.addHeading(sector.mid, Number(this.compass.newValue) * -1), this.targetAngle() / 2 * (isPort ? -1 : 1));
-    const maxAngle = this.addHeading(this.addHeading(sector.max, Number(this.compass.newValue) * -1), this.targetAngle() / 2 * (isPort ? -1 : 1));
+    const minAngle = this.addHeading(this.addHeading(sector.min, Number(this.compass.newValue) * -1), (this.targetAngle() ?? 0) / 2 * (isPort ? -1 : 1));
+    const midAngle = this.addHeading(this.addHeading(sector.mid, Number(this.compass.newValue) * -1), (this.targetAngle() ?? 0) / 2 * (isPort ? -1 : 1));
+    const maxAngle = this.addHeading(this.addHeading(sector.max, Number(this.compass.newValue) * -1), (this.targetAngle() ?? 0) / 2 * (isPort ? -1 : 1));
 
     const minX = this.RADIUS * Math.sin((minAngle * Math.PI) / 180) + this.CENTER_X;
     const minY = (this.RADIUS * Math.cos((minAngle * Math.PI) / 180) * -1) + this.CENTER_Y;

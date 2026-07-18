@@ -18,10 +18,10 @@ describe('embedExifInJpegDataUrl', () => {
     expect(out).not.toBe(TINY_JPEG); // EXIF was actually inserted
 
     const loaded = piexif.load(out);
-    expect(loaded.GPS[piexif.GPSIFD.GPSLatitudeRef]).toBe('N');
-    expect(loaded.GPS[piexif.GPSIFD.GPSLongitudeRef]).toBe('W');
-    expect(loaded.GPS[piexif.GPSIFD.GPSSpeedRef]).toBe('N');
-    expect(loaded.Exif[piexif.ExifIFD.DateTimeOriginal]).toBe('2026:06:26 04:30:15');
+    expect(loaded.GPS![piexif.GPSIFD.GPSLatitudeRef]).toBe('N');
+    expect(loaded.GPS![piexif.GPSIFD.GPSLongitudeRef]).toBe('W');
+    expect(loaded.GPS![piexif.GPSIFD.GPSSpeedRef]).toBe('N');
+    expect(loaded.Exif![piexif.ExifIFD.DateTimeOriginal]).toBe('2026:06:26 04:30:15');
   });
 });
 

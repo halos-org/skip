@@ -341,7 +341,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     return this.signalk.putRequest('navigation.racing.setStartLine', {end, position: 'bow'}, this.id());
   }
 
-  public adjustLineEnd(end: string, delta: number, rotateRadians: number): string | null {
+  public adjustLineEnd(end: string, delta: number, rotateRadians: number | null): string | null {
     return this.signalk.putRequest('navigation.racing.setStartLine', {end, delta, rotate: rotateRadians || null}, this.id());
   }
 

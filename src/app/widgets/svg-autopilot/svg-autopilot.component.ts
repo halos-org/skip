@@ -18,12 +18,12 @@ export class SvgAutopilotComponent implements OnDestroy {
 
   protected readonly apMode = input<TApMode>('off-line');
   protected readonly targetPilotHeadingTrue = input.required<boolean>();
-  protected readonly autopilotTarget = input.required<number>();
+  protected readonly autopilotTarget = input.required<number | null>();
   protected readonly courseXte = input.required<number>();
-  protected readonly compassHeading = input.required<number>();
+  protected readonly compassHeading = input.required<number | null>();
   protected readonly headingDirectionTrue = input.required<boolean>();
-  protected readonly appWindAngle = input.required<number>();
-  protected readonly rudderAngle = input.required<number>();
+  protected readonly appWindAngle = input.required<number | null>();
+  protected readonly rudderAngle = input.required<number | null>();
 
   protected compassAngle = signal<number>(0);
   protected awaAngle = signal<number>(0);
@@ -55,8 +55,8 @@ export class SvgAutopilotComponent implements OnDestroy {
   });
   protected lockedHdg = computed<number | null>(() => {
     const target = this.autopilotTarget();
-    if (!Number.isFinite(target as number)) return null;
-    return this.roundDeg(target as number);
+    if (target == null || !Number.isFinite(target)) return null;
+    return this.roundDeg(target);
   });
   protected lockedHdgAnnotation = computed(() => {
     const state = this.apMode();
@@ -92,7 +92,7 @@ export class SvgAutopilotComponent implements OnDestroy {
   constructor() {
     effect(() => {
       const heading = this.compassHeading();
-      if (!Number.isFinite(heading as number)) return;
+      if (heading == null || !Number.isFinite(heading)) return;
       const next = this.roundDeg(heading);
       untracked(() => {
         const prev = this.prevCompassAngle;
@@ -118,7 +118,7 @@ export class SvgAutopilotComponent implements OnDestroy {
 
     effect(() => {
       const aWA = this.appWindAngle();
-      if (!Number.isFinite(aWA as number)) return;
+      if (aWA == null || !Number.isFinite(aWA)) return;
       const nextRaw = this.roundDeg(aWA);
       const next = (nextRaw + 360) % 360;
       untracked(() => {
@@ -145,7 +145,7 @@ export class SvgAutopilotComponent implements OnDestroy {
 
     effect(() => {
       const rudderAngle = this.rudderAngle();
-      if (!Number.isFinite(rudderAngle as number)) return;
+      if (rudderAngle == null || !Number.isFinite(rudderAngle)) return;
       untracked(() => {
         this.updateRudderAngle(-rudderAngle);
       });
@@ -154,7 +154,7 @@ export class SvgAutopilotComponent implements OnDestroy {
     effect(() => {
       const state = this.apMode();
       const awaRaw = this.appWindAngle();
-      const awa = Number.isFinite(awaRaw as number) ? this.roundDeg(awaRaw) : 0;
+      const awa = (awaRaw != null && Number.isFinite(awaRaw)) ? this.roundDeg(awaRaw) : 0;
       let xteValue = this.courseXte();
 
       untracked(() => {

@@ -16,7 +16,9 @@ export class NotificationBadgeComponent {
   protected badgeButton = viewChild.required<ElementRef<HTMLButtonElement>>('badgeButton');
   private readonly _notifications = inject(NotificationsService);
   private readonly _dialog = inject(DialogService);
-  protected readonly notificationsInfo = toSignal(this._notifications.observerNotificationsInfo());
+  protected readonly notificationsInfo = toSignal(this._notifications.observerNotificationsInfo(), {
+    initialValue: { audioSev: 0, visualSev: 0, alarmCount: 0, isMuted: false, isWarn: false, isAlarmEmergency: false },
+  });
 
   protected openNotificationMenu(): void {
     this._dialog.openNotifications();

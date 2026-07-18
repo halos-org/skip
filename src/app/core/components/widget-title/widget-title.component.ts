@@ -8,8 +8,8 @@ import { CanvasService } from '../../services/canvas.service';
   styleUrl: './widget-title.component.scss'
 })
 export class WidgetTitleComponent implements AfterViewInit, OnChanges, OnDestroy {
-  protected text = input.required<string>();
-  protected color = input.required<string>();
+  protected text = input.required<string | null | undefined>();
+  protected color = input.required<string | null | undefined>();
   protected canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private canvas = inject(CanvasService);
   private canvasElement: HTMLCanvasElement | null = null;
@@ -46,7 +46,7 @@ export class WidgetTitleComponent implements AfterViewInit, OnChanges, OnDestroy
 
   protected drawTitle() {
     if (!this.isReady || !this.canvasCtx) return;
-    this.canvas.drawTitle(this.canvasCtx, this.text(), this.color(), 'normal', this.cssWidth, this.cssHeight);
+    this.canvas.drawTitle(this.canvasCtx, this.text() ?? '', this.color() ?? '', 'normal', this.cssWidth, this.cssHeight);
   }
 
   ngOnDestroy(): void {

@@ -300,7 +300,7 @@ export class DashboardService {
    * @param itemIndex The index of the dashboard to update.
    * @param configuration The new widget configuration array.
    */
-  public updateConfiguration(itemIndex: number, configuration: NgGridStackWidget[]): void {
+  public updateConfiguration(itemIndex: number, configuration: NgGridStackWidget[] | null): void {
     const nextConfiguration = cloneDeep(configuration ?? []);
     this.dashboards.update(dashboards => dashboards.map((dashboard, i) => {
       if (i === itemIndex) {
@@ -463,8 +463,9 @@ export class DashboardService {
    * Stores a sanitized widget snapshot for cross-dashboard paste.
    * @param node The Gridstack widget node to copy.
    */
-  public setWidgetClipboardFromNode(node: NgGridStackWidget): void {
-    const widgetProps = node?.input?.widgetProperties;
+  public setWidgetClipboardFromNode(node: NgGridStackWidget | null): void {
+    if (!node) return;
+    const widgetProps = node.input?.widgetProperties;
     const type = widgetProps?.type;
     if (!type) return;
 
