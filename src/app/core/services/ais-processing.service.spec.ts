@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AisProcessingService,
   AisVessel,
+  AisSar,
   AisAton,
   AisTrack
 } from './ais-processing.service';
@@ -27,6 +28,7 @@ describe('AisProcessingService applyAisUpdate dispatch', () => {
 
   const VESSEL_CONTEXT = 'vessels.urn:mrn:imo:mmsi:123456789';
   const ATON_CONTEXT = 'atons.urn:mrn:imo:mmsi:987654321';
+  const SAR_CONTEXT = 'sar.urn:mrn:imo:mmsi:111222333';
 
   function makeEvent(fullPath: string, value: unknown): IPathUpdateWithPath {
     return {
@@ -142,6 +144,161 @@ describe('AisProcessingService applyAisUpdate dispatch', () => {
     // Track exists (created on resolve) but position was never set.
     expect(track).toBeDefined();
     expect(track.position).toBeUndefined();
+  });
+
+  it('applies a whole-object position value at the canonical navigation.position path', () => {
+    push(`${VESSEL_CONTEXT}.navigation.position`, { latitude: 48.5, longitude: -123.25 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.position?.latitude).toBe(48.5);
+    expect(track.position?.longitude).toBe(-123.25);
+    expect(track.lastPositionAt).toBe(new Date('2026-06-24T00:00:00Z').getTime());
+  });
+
+  it('applies a whole-object design.length value', () => {
+    push(`${VESSEL_CONTEXT}.design.length`, { overall: 42, hull: 40, waterline: 38 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.length?.overall).toBe(42);
+    expect(track.design?.length?.hull).toBe(40);
+    expect(track.design?.length?.waterline).toBe(38);
+  });
+
+  it('applies a whole-object design.draft value', () => {
+    push(`${VESSEL_CONTEXT}.design.draft`, { maximum: 2.5, minimum: 1.8, current: 2.1 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.draft?.maximum).toBe(2.5);
+    expect(track.design?.draft?.minimum).toBe(1.8);
+    expect(track.design?.draft?.current).toBe(2.1);
+  });
+
+  it('applies a whole-object design.aisShipType value', () => {
+    push(`${VESSEL_CONTEXT}.design.aisShipType`, { id: 36, name: 'Sailing' });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.aisShipType?.id).toBe(36);
+    expect(track.design?.aisShipType?.name).toBe('Sailing');
+  });
+
+  it('applies a whole-object navigation.closestApproach value', () => {
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { distance: 719.5, timeTo: -768.3 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.closestApproach?.distance).toBe(719.5);
+    expect(track.closestApproach?.timeTo).toBe(-768.3);
+  });
+
+  it('flags collision-risk data when a whole closestApproach carries collisionRiskRating', () => {
+    push(`${VESSEL_CONTEXT}.mmsi`, '123456789');
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { distance: 500, timeTo: 300, collisionRiskRating: 0.2 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.closestApproach?.collisionRiskRating).toBe(0.2);
+    expect(service.hasCollisionRiskData()).toBe(true);
+  });
+
+  it('merges a whole-object design compound without clobbering sibling design fields', () => {
+    push(`${VESSEL_CONTEXT}.design.beam`, 8);
+    push(`${VESSEL_CONTEXT}.design.length`, { overall: 42 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.beam).toBe(8);
+    expect(track.design?.length?.overall).toBe(42);
+  });
+
+  it('does not set whole-object design compounds on a non-vessel (ATON guard holds)', () => {
+    push(`${ATON_CONTEXT}.atonType.name`, 'Buoy 7');
+    push(`${ATON_CONTEXT}.design.length`, { overall: 42 });
+
+    const track = trackByContext(ATON_CONTEXT);
+    expect((track as AisAton).typeName).toBe('Buoy 7');
+    expect((track as unknown as AisVessel).design).toBeUndefined();
+  });
+
+  it('carries altitude on a whole-object position value', () => {
+    push(`${VESSEL_CONTEXT}.navigation.position`, { latitude: 48.5, longitude: -123.25, altitude: 12 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.position?.altitude).toBe(12);
+  });
+
+  it('applies whole-object design compounds to a SAR target (isVesselLike admits sar)', () => {
+    push(`${SAR_CONTEXT}.design.length`, { overall: 30 });
+    push(`${SAR_CONTEXT}.navigation.closestApproach`, { distance: 400, timeTo: 120 });
+
+    const track = trackByContext(SAR_CONTEXT) as AisSar;
+    expect(track.type).toBe('sar');
+    expect(track.design?.length?.overall).toBe(30);
+    expect(track.closestApproach?.distance).toBe(400);
+  });
+
+  it('replaces a design compound sub-object wholesale (a later partial clears omitted fields)', () => {
+    push(`${VESSEL_CONTEXT}.design.length`, { overall: 42, hull: 40 });
+    push(`${VESSEL_CONTEXT}.design.length`, { overall: 43 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.length?.overall).toBe(43);
+    expect(track.design?.length?.hull).toBeUndefined();
+  });
+
+  it('applies a partial aisShipType (id only) and closestApproach range/bearing whole objects', () => {
+    push(`${VESSEL_CONTEXT}.design.aisShipType`, { id: 37 });
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { range: 800, bearing: 90 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.aisShipType?.id).toBe(37);
+    expect(track.design?.aisShipType?.name).toBeUndefined();
+    expect(track.closestApproach?.range).toBe(800);
+    expect(track.closestApproach?.bearing).toBe(90);
+  });
+
+  it('applies design.draft.canoe from a whole-object value', () => {
+    push(`${VESSEL_CONTEXT}.design.draft`, { canoe: 1.2 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.draft?.canoe).toBe(1.2);
+  });
+
+  it('does not flag collision-risk data for a whole closestApproach without collisionRiskRating', () => {
+    push(`${VESSEL_CONTEXT}.mmsi`, '123456789');
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { distance: 500, timeTo: 300 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(Object.prototype.hasOwnProperty.call(track.closestApproach ?? {}, 'collisionRiskRating')).toBe(false);
+    expect(service.hasCollisionRiskData()).toBe(false);
+  });
+
+  it('clears a stale collisionRiskRating when a later whole closestApproach omits it', () => {
+    push(`${VESSEL_CONTEXT}.mmsi`, '123456789');
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { distance: 500, timeTo: 300, collisionRiskRating: 0.2 });
+    expect(service.hasCollisionRiskData()).toBe(true);
+
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { distance: 3000, timeTo: 9000 });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.closestApproach?.collisionRiskRating).toBeUndefined();
+    expect(service.hasCollisionRiskData()).toBe(false);
+  });
+
+  it('treats a null collisionRiskRating as absent, not zero-risk', () => {
+    push(`${VESSEL_CONTEXT}.mmsi`, '123456789');
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { distance: 500, timeTo: 300, collisionRiskRating: null });
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.closestApproach?.collisionRiskRating).toBeUndefined();
+    expect(service.hasCollisionRiskData()).toBe(false);
+  });
+
+  it('ignores a non-object whole-compound value (guard holds, no corruption)', () => {
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, { distance: 500 });
+    push(`${VESSEL_CONTEXT}.design.length`, 42);
+    push(`${VESSEL_CONTEXT}.navigation.closestApproach`, 'garbage');
+
+    const track = trackByContext(VESSEL_CONTEXT) as AisVessel;
+    expect(track.design?.length).toBeUndefined();
+    // A non-object value must not replace the prior closestApproach.
+    expect(track.closestApproach?.distance).toBe(500);
   });
 
   it('sets an ATON field gated by isAton (atonType.name)', () => {
