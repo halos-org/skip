@@ -86,16 +86,6 @@ export class SignalKDeltaService implements OnDestroy {
   private auth = inject(AuthenticationService);
   private connectionStateMachine = inject(ConnectionStateMachine);
 
-  // Object flattening configuration - conservative settings for performance
-  private readonly FLATTEN_CONFIG = {
-    maxDepth: 3,        // Object recursive depth limit
-    maxObjectSize: 20,  // Object number of property limit
-    enableFlattening: true // Enable or disable recursive flattening of objects
-  };
-  private readonly DO_NOT_FLATTEN_PATHS = [  // StartWith paths fragment to exclude from flattening
-    'displays.',
-  ];
-
   constructor() {
     // Register WebSocket retry callback with ConnectionStateMachine
     this.connectionStateMachine.setWebSocketRetryCallback(() => {
@@ -385,108 +375,23 @@ export class SignalKDeltaService implements OnDestroy {
               }
               return;
             }
-            if ((typeof(item.value) == 'object') && (item.value !== null)) {
-              if (this.DO_NOT_FLATTEN_PATHS.some(sub_string => item.path.includes(sub_string))) {
-                // Skip flattening, treat as a single value
-                const dataPath: IPathValueData = {
-                  context: context,
-                  path: item.path,
-                  source: update.$source,
-                  timestamp: update.timestamp,
-                  value: item.value,
-                };
-                this._skValue$.next(dataPath);
-              } else if (this.FLATTEN_CONFIG.enableFlattening &&
-                this.canFlattenCompletely(item.value, this.FLATTEN_CONFIG.maxDepth, this.FLATTEN_CONFIG.maxObjectSize)) {
-                // Perform recursive flattening
-                const flattenedItems = this.flattenObjectValue(item.value, item.path);
-                flattenedItems.forEach(flatItem => {
-                  const dataPath: IPathValueData = {
-                    context: context,
-                    path: flatItem.path,
-                    source: update.$source,
-                    timestamp: update.timestamp,
-                    value: flatItem.value,
-                  };
-                  this._skValue$.next(dataPath);
-                });
-              } else {
-                // Fall back to single-level flattening for objects that exceed limits
-                Object.keys(item.value).forEach(key => {
-                  const dataPath: IPathValueData = {
-                    context: context,
-                    path: `${item.path}.${key}`,
-                    source: update.$source,
-                    timestamp: update.timestamp,
-                    value: item.value[key],
-                  };
-                  this._skValue$.next(dataPath);
-                });
-              }
-            } else {
-              // It's a Primitive type or a null value
-              const dataPath: IPathValueData = {
-                context: context,
-                path: item.path,
-                source: update.$source,
-                timestamp: update.timestamp,
-                value: item.value,
-              };
-              this._skValue$.next(dataPath);
-            }
+            // Emit every value whole at its canonical Signal K path. Object and array values are
+            // no longer flattened into fabricated dotted child paths (SK-02 / #21) — consumers that
+            // need a single sub-field of a compound leaf read it off the whole value. This also
+            // stops the array index-explosion and the size/depth-dependent non-determinism, and
+            // fixes the empty-object ({}) case that previously emitted nothing.
+            const dataPath: IPathValueData = {
+              context: context,
+              path: item.path,
+              source: update.$source,
+              timestamp: update.timestamp,
+              value: item.value,
+            };
+            this._skValue$.next(dataPath);
           }
         });
       }
     });
-  }
-
-  /**
-   * Validates if an object can be completely flattened within configured limits.
-   * Uses all-or-nothing approach to prevent partial flattening.
-   */
-  private canFlattenCompletely(obj: unknown, maxDepth: number, maxSize: number, currentDepth = 0): boolean {
-    if (currentDepth >= maxDepth) {
-      return false;
-    }
-
-    if (typeof obj !== 'object' || obj === null) {
-      return true;
-    }
-
-    const keys = Object.keys(obj);
-    if (keys.length > maxSize) {
-      return false;
-    }
-
-    // Check all nested objects recursively
-    for (const key of keys) {
-      if (!this.canFlattenCompletely((obj as Record<string, unknown>)[key], maxDepth, maxSize, currentDepth + 1)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * Recursively flattens an object into an array of path-value pairs.
-   * Only called after validation confirms complete flattening is possible.
-   */
-  private flattenObjectValue(obj: unknown, basePath: string, currentDepth = 0): {path: string, value: unknown}[] {
-    const results: {path: string, value: unknown}[] = [];
-
-    if (typeof obj !== 'object' || obj === null || currentDepth >= this.FLATTEN_CONFIG.maxDepth) {
-      return [{ path: basePath, value: obj }];
-    }
-
-    const keys = Object.keys(obj);
-    for (const key of keys) {
-      const newPath = basePath ? `${basePath}.${key}` : key;
-      const nestedResults = this.flattenObjectValue((obj as Record<string, unknown>)[key], newPath, currentDepth + 1);
-      results.push(...nestedResults);
-    }
-
-    return results;
   }
 
   private parseSkMeta(metadata: ISignalKMeta, context: string | undefined) {
@@ -498,21 +403,14 @@ export class SignalKDeltaService implements OnDestroy {
       console.warn("[Delta Service] Dropping metadata update without a path:", metadata);
       return;
     }
-    if (metadata.value.properties != null) {
-      Object.keys(metadata.value.properties).forEach(key => {
-        this._skMetadata$.next({
-          context: context,
-          path: `${metadata.path}.${key}`,
-          meta: metadata.value.properties[key],
-        });
-      });
-    } else {
-      this._skMetadata$.next({
-        context: context,
-        path: metadata.path,
-        meta: metadata.value,
-      });
-    }
+    // Emit meta whole at its canonical path, mirroring whole-value emission (SK-02 / #21). A
+    // compound leaf's per-sub-field meta stays nested in metadata.value.properties rather than
+    // being fanned out to fabricated child paths, so value and meta stay coherent.
+    this._skMetadata$.next({
+      context: context,
+      path: metadata.path,
+      meta: metadata.value,
+    });
   }
 
   // WebSocket Stream Status observable

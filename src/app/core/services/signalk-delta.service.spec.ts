@@ -175,19 +175,18 @@ describe('SignalKDeltaService', () => {
       ]);
     });
 
-    it('recursively flattens a nested object into synthetic dotted child paths', () => {
-      // Pins current behaviour (finding SK-02 / #21): KIP fabricates child paths absent from the SK spec.
+    it('emits an object value whole at its canonical path (no child-path fabrication)', () => {
+      // SK-02 / #21: compound leaves emit whole; the delta service no longer fabricates dotted child paths.
       const { service } = setup();
       const out = collectData(service);
-      parse(service, { context: CTX, updates: [update([{ path: 'navigation.position', value: { latitude: 48.1, longitude: -4.5 } }], { $source: 'gps.1' })] });
-      expect(out.map(v => [v.path, v.value])).toEqual([
-        ['navigation.position.latitude', 48.1],
-        ['navigation.position.longitude', -4.5],
+      const value = { latitude: 48.1, longitude: -4.5 };
+      parse(service, { context: CTX, updates: [update([{ path: 'navigation.position', value }], { $source: 'gps.1' })] });
+      expect(out).toEqual([
+        { context: CTX, path: 'navigation.position', source: 'gps.1', timestamp: TS, value },
       ]);
-      expect(out.every(v => v.source === 'gps.1' && v.timestamp === TS)).toBe(true);
     });
 
-    it('leaves paths in DO_NOT_FLATTEN_PATHS (displays.*) as a single whole-object value', () => {
+    it('emits a nested-object value whole (no recursive flattening)', () => {
       const { service } = setup();
       const out = collectData(service);
       const value = { layout: { rows: 2 }, name: 'main' };
@@ -197,25 +196,25 @@ describe('SignalKDeltaService', () => {
       ]);
     });
 
-    it('falls back to a single-level split when nesting exceeds the depth limit', () => {
-      // Deeper than maxDepth (3): canFlattenCompletely fails, so only the top level is split and the nested value is kept whole.
+    it('emits a deeply nested object whole (no depth-based splitting)', () => {
       const { service } = setup();
       const out = collectData(service);
-      parse(service, { context: CTX, updates: [update([{ path: 'foo.bar', value: { a: { b: { c: { d: 1 } } } } }])] });
+      const value = { a: { b: { c: { d: 1 } } } };
+      parse(service, { context: CTX, updates: [update([{ path: 'foo.bar', value }])] });
       expect(out).toEqual([
-        { context: CTX, path: 'foo.bar.a', source: 'src.1', timestamp: TS, value: { b: { c: { d: 1 } } } },
+        { context: CTX, path: 'foo.bar', source: 'src.1', timestamp: TS, value },
       ]);
     });
 
-    it('falls back to a single-level split when an object exceeds the size limit', () => {
-      // More than maxObjectSize (20) keys: canFlattenCompletely fails, so the object is split one level deep.
+    it('emits a large object whole (no size-based splitting)', () => {
       const { service } = setup();
       const out = collectData(service);
       const wide: Record<string, number> = {};
       for (let i = 0; i < 21; i++) { wide[`k${i}`] = i; }
       parse(service, { context: CTX, updates: [update([{ path: 'wide.obj', value: wide }])] });
-      expect(out).toHaveLength(21);
-      expect(out[0]).toEqual({ context: CTX, path: 'wide.obj.k0', source: 'src.1', timestamp: TS, value: 0 });
+      expect(out).toEqual([
+        { context: CTX, path: 'wide.obj', source: 'src.1', timestamp: TS, value: wide },
+      ]);
     });
 
     it('routes notifications.* items to the notifications stream, not the data stream', () => {
@@ -238,17 +237,19 @@ describe('SignalKDeltaService', () => {
       expect(out[0].context).toBe(foreign);
     });
 
-    it('expands metadata carrying a properties map into per-property emissions', () => {
+    it('emits metadata carrying a properties map whole at the canonical path', () => {
+      // SK-02 / #21: meta mirrors whole-value emission — the per-sub-field properties map stays nested
+      // rather than being fanned out to fabricated child paths.
       const { service } = setup();
       const out: IMeta[] = [];
       service.subscribeMetadataUpdates().subscribe(v => out.push(v));
       const latMeta = { units: 'rad', description: 'Latitude' };
       const lonMeta = { units: 'rad', description: 'Longitude' };
-      const meta = [skMeta('navigation.position', { description: 'Position', properties: { latitude: latMeta, longitude: lonMeta } })];
+      const value = { description: 'Position', properties: { latitude: latMeta, longitude: lonMeta } };
+      const meta = [skMeta('navigation.position', value)];
       parse(service, { context: CTX, updates: [update([], { meta })] });
       expect(out).toEqual([
-        { context: CTX, path: 'navigation.position.latitude', meta: latMeta },
-        { context: CTX, path: 'navigation.position.longitude', meta: lonMeta },
+        { context: CTX, path: 'navigation.position', meta: value },
       ]);
     });
 
@@ -285,49 +286,23 @@ describe('SignalKDeltaService', () => {
       expect(setServerInfo).toHaveBeenCalledWith('sk', '2.0.0', ['main', 'master']);
     });
 
-    it('drops an empty object value entirely — no emissions (latent data loss)', () => {
-      // canFlattenCompletely({}) is true, flattenObjectValue({}) returns [], so nothing is emitted.
+    it('emits an empty object value whole (fixes the former silent-drop data loss)', () => {
+      // Previously canFlattenCompletely({}) was true and flattenObjectValue({}) returned [], dropping data.
       const { service } = setup();
       const out = collectData(service);
       parse(service, { context: CTX, updates: [update([{ path: 'some.path', value: {} }])] });
-      expect(out).toEqual([]);
-    });
-
-    it('flattens an array value into indexed child paths', () => {
-      const { service } = setup();
-      const out = collectData(service);
-      parse(service, { context: CTX, updates: [update([{ path: 'foo.list', value: [10, 20] }])] });
-      expect(out.map(v => [v.path, v.value])).toEqual([
-        ['foo.list.0', 10],
-        ['foo.list.1', 20],
+      expect(out).toEqual([
+        { context: CTX, path: 'some.path', source: 'src.1', timestamp: TS, value: {} },
       ]);
     });
 
-    it('fully flattens nesting whose values sit at depth 2 (inside the depth limit)', () => {
+    it('emits an array value whole (no index-explosion into numeric child paths)', () => {
       const { service } = setup();
       const out = collectData(service);
-      parse(service, { context: CTX, updates: [update([{ path: 'x', value: { a: { b: 1 } } }])] });
-      expect(out.map(v => [v.path, v.value])).toEqual([['x.a.b', 1]]);
-    });
-
-    it('falls back to single-level split once a value sits at depth 3 (the exact cutoff)', () => {
-      // The depth guard fires at currentDepth >= maxDepth (3) before the scalar check, so a value at depth 3 fails.
-      const { service } = setup();
-      const out = collectData(service);
-      parse(service, { context: CTX, updates: [update([{ path: 'x', value: { a: { b: { c: 1 } } } }])] });
+      const value = [10, 20];
+      parse(service, { context: CTX, updates: [update([{ path: 'foo.list', value }])] });
       expect(out).toEqual([
-        { context: CTX, path: 'x.a', source: 'src.1', timestamp: TS, value: { b: { c: 1 } } },
-      ]);
-    });
-
-    it('skips flattening for any path CONTAINING "displays." (substring, not prefix)', () => {
-      // DO_NOT_FLATTEN_PATHS is matched with .includes(), so the guard triggers mid-path too.
-      const { service } = setup();
-      const out = collectData(service);
-      const value = { a: 1, b: 2 };
-      parse(service, { context: CTX, updates: [update([{ path: 'foo.displays.bar', value }])] });
-      expect(out).toEqual([
-        { context: CTX, path: 'foo.displays.bar', source: 'src.1', timestamp: TS, value },
+        { context: CTX, path: 'foo.list', source: 'src.1', timestamp: TS, value },
       ]);
     });
 
