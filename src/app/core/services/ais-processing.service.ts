@@ -548,6 +548,51 @@ export class AisProcessingService {
           track.closestApproach.collisionRiskRating = this.toNumberOrUndefined(update.value);
         }
         break;
+      // Whole-object compound leaves: the delta service emits these SK compound
+      // values whole at their canonical path (navigation.position handled above),
+      // so read the sub-fields off the object. The whole object is the complete
+      // authoritative value, so each sub-object is REPLACED wholesale (like
+      // navigation.position) — an omitted sub-field clears a prior one, which
+      // matters for the present-vs-absent closestApproach.collisionRiskRating
+      // signal. Sibling design leaves (beam, draft, ...) arrive as separate paths
+      // and are preserved by merging at the design level. The dotted child-path
+      // cases above still cover a server that emits the split form.
+      case 'design.length':
+        if (this.isVesselLike(track)) {
+          const length = this.readNumericFields(update.value, ['overall', 'hull', 'waterline']);
+          if (length) {
+            track.design = { ...(track.design ?? {}), length };
+          }
+        }
+        break;
+      case 'design.draft':
+        if (this.isVesselLike(track)) {
+          const draft = this.readNumericFields(update.value, ['maximum', 'minimum', 'current', 'canoe']);
+          if (draft) {
+            track.design = { ...(track.design ?? {}), draft };
+          }
+        }
+        break;
+      case 'design.aisShipType':
+        if (this.isVesselLike(track)) {
+          const value = this.asRecord(update.value);
+          if (value) {
+            const aisShipType: { id?: number; name?: string } = { ...this.readNumericFields(value, ['id']) };
+            const name = this.toStringOrUndefined(value.name);
+            if (name !== undefined) aisShipType.name = name;
+            track.design = { ...(track.design ?? {}), aisShipType };
+          }
+        }
+        break;
+      case 'navigation.closestApproach':
+        if (this.isVesselLike(track)) {
+          const closestApproach = this.readNumericFields(update.value,
+            ['distance', 'timeTo', 'range', 'bearing', 'collisionRiskRating']);
+          if (closestApproach) {
+            track.closestApproach = closestApproach;
+          }
+        }
+        break;
     }
 
     this.updateTargetsSignal();
@@ -794,5 +839,30 @@ export class AisProcessingService {
     if (latitude === undefined || longitude === undefined) return undefined;
     const altitude = this.toNumberOrUndefined((value as { altitude?: unknown }).altitude);
     return { latitude, longitude, altitude };
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    return value as Record<string, unknown>;
+  }
+
+  /**
+   * Reads the requested finite-number sub-fields off a whole-object SK value.
+   * Returns undefined for a non-object value (caller preserves prior state);
+   * otherwise a record of only the keys that carry a finite number. A `null`
+   * sub-field (Signal K's "value unavailable") is omitted rather than coerced to
+   * 0, so an absent/unavailable field never reads as a real value.
+   */
+  private readNumericFields(value: unknown, keys: string[]): Record<string, number> | undefined {
+    const record = this.asRecord(value);
+    if (!record) return undefined;
+    const fields: Record<string, number> = {};
+    for (const key of keys) {
+      const raw = record[key];
+      if (raw === null || raw === undefined) continue;
+      const num = this.toNumberOrUndefined(raw);
+      if (num !== undefined) fields[key] = num;
+    }
+    return fields;
   }
 }
