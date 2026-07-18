@@ -453,6 +453,11 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     expect(runUpgradeSpy).toHaveBeenCalledWith(12);
   });
 
+  it('runs the config migration in the full app for an upgradeable v13 config (the S2-0 gate)', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 13 });
+    expect(runUpgradeSpy).toHaveBeenCalledWith(13);
+  });
+
   it('does NOT show the missing-shared-config create prompt under embed', async () => {
     const { toast, bootstrapIssue$ } = await render({ embed: true });
     toast.show.mockClear();

@@ -8,7 +8,7 @@
  *
  * Three distinct version spaces (all from src/app/core/constants/config-versions.const.ts):
  *  - applicationData URL path segment 11 (REMOTE_CONFIG_FILE_VERSION)
- *  - app.configVersion 13 (LATEST_APP_CONFIG_VERSION)
+ *  - app.configVersion 14 (LATEST_APP_CONFIG_VERSION)
  *  - connectionConfig.configVersion 13 (CONNECTION_CONFIG_VERSION)
  */
 export const SELF_URN = 'vessels.urn:mrn:signalk:uuid:11111111-1111-4111-8111-111111111111';
@@ -30,11 +30,12 @@ const DEFAULT_NOTIF = {
 };
 
 export function appConfig(extra = {}) {
-  // configVersion 13 with no dataSets field: a genuine post-v12->v13 config, so the
-  // boot skips ConfigurationUpgradeService's migration toast/reload (which is what
-  // strips dataSets/datasetUUID/chartEngine) inside the measurement window.
+  // configVersion at LATEST (14): a genuine current config, so the boot skips
+  // ConfigurationUpgradeService's migration toast/reload entirely inside the
+  // measurement window. Bump this in lockstep with LATEST_APP_CONFIG_VERSION, or
+  // the boot triggers an upgrade+reload and the boot-assert fails.
   return {
-    configVersion: 13, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
+    configVersion: 14, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
     widgetHistoryDisabled: false, unitDefaults: DEFAULT_UNITS,
     notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'Skip', ...extra,
   };

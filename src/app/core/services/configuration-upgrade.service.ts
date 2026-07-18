@@ -32,6 +32,14 @@ const COMPOUND_SUBFIELD_PATH_SUFFIXES = [
   '.attitude.roll', '.attitude.pitch', '.attitude.yaw',
 ];
 
+// Only the predefined widgets that were adapted to read a compound sub-field off the whole value are
+// rewritten. A generic widget (numeric, gauge, ...) a user pointed at a compound sub-field has no
+// sub-field accessor, so rewriting its path to the whole leaf would render a raw object — worse than
+// leaving it on the now-inert child path (which shows a clean no-data placeholder). Charting a
+// compound sub-field is deferred to #345. Autopilot's Next-WPT position is an internal widget config,
+// not a stored path, so it is not listed here.
+const SUBFIELD_WIDGET_TYPES = new Set(['widget-position', 'widget-heel-gauge', 'widget-horizon']);
+
 // NOTE: This service encapsulates the app-config upgrades — the legacy migration (remote file
 // version 9 / app-config version 10) and the v11 remote upgrade — each stamping the upgraded
 // config with MIGRATION_OUTPUT_VERSION.
@@ -537,10 +545,13 @@ export class ConfigurationUpgradeService {
 
   /**
    * v13 -> v14 (SK-02 / #21): the delta parser no longer flattens compound Signal K leaves into
-   * fabricated dotted child paths. Rewrite every stored widget path that points at a sub-field of a
-   * known compound leaf (`navigation.position.*`, `navigation.attitude.*`, and their nested
-   * occurrences) to the whole canonical path — the affected widgets read the sub-field off the whole
-   * value. Idempotent: a path already at the compound level matches no suffix and is left untouched.
+   * fabricated dotted child paths. For the predefined widgets that were adapted to read a sub-field
+   * off the whole value (SUBFIELD_WIDGET_TYPES only), rewrite each stored path pointing at a
+   * sub-field of a known compound leaf (`navigation.position.*`, `navigation.attitude.*`) to the
+   * whole canonical path, and reconcile the fields whose new defaults a stale stored value would
+   * otherwise override (`isPathConfigurable` -> false; heel/horizon auto-history -> off). A generic
+   * widget is deliberately left untouched (see SUBFIELD_WIDGET_TYPES). Idempotent: a path already at
+   * the compound level matches no suffix.
    */
   private upgradeConfigV13toV14(config: IConfig): IConfig | null {
     try {
@@ -555,18 +566,27 @@ export class ConfigurationUpgradeService {
         for (const dash of config.dashboards) {
           if (!dash || !Array.isArray(dash.configuration)) continue;
           for (const widget of dash.configuration) {
-            const cfg = (widget as { input?: { widgetProperties?: { config?: { paths?: unknown } } } })
-              ?.input?.widgetProperties?.config;
+            const wp = (widget as { input?: { widgetProperties?: {
+              type?: unknown;
+              config?: { paths?: unknown; supportAutomaticHistoricalSeries?: boolean };
+            } } })?.input?.widgetProperties;
+            if (!wp || typeof wp.type !== 'string' || !SUBFIELD_WIDGET_TYPES.has(wp.type)) continue;
+            const type = wp.type;
+            const cfg = wp.config;
             const paths = cfg?.paths;
-            if (!paths || typeof paths !== 'object') continue;
-            // paths is either a Record<string, IWidgetPath> or an IWidgetPath[]; Object.values covers both.
-            for (const pathCfg of Object.values(paths as Record<string, { path?: unknown }>)) {
-              if (!pathCfg || typeof pathCfg.path !== 'string') continue;
-              const suffix = COMPOUND_SUBFIELD_PATH_SUFFIXES.find(s => (pathCfg.path as string).endsWith(s));
-              if (suffix) {
-                pathCfg.path = (pathCfg.path as string).slice(0, (pathCfg.path as string).lastIndexOf('.'));
-                rewritten++;
+            if (paths && typeof paths === 'object') {
+              // paths is either a Record<string, IWidgetPath> or an IWidgetPath[]; Object.values covers both.
+              for (const pathCfg of Object.values(paths as Record<string, { path?: unknown; isPathConfigurable?: boolean }>)) {
+                if (!pathCfg || typeof pathCfg.path !== 'string') continue;
+                if (COMPOUND_SUBFIELD_PATH_SUFFIXES.some(s => (pathCfg.path as string).endsWith(s))) {
+                  pathCfg.path = (pathCfg.path as string).slice(0, (pathCfg.path as string).lastIndexOf('.'));
+                  pathCfg.isPathConfigurable = false;
+                  rewritten++;
+                }
               }
+            }
+            if (cfg && (type === 'widget-heel-gauge' || type === 'widget-horizon')) {
+              cfg.supportAutomaticHistoricalSeries = false;
             }
           }
         }

@@ -195,24 +195,21 @@ describe('ConfigurationUpgradeService', () => {
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
     });
 
-    it('v13 upgrade rewrites compound sub-field widget paths to the whole canonical path and stamps v14', async () => {
+    it('v13 upgrade rewrites sub-field-aware widget paths, sets isPathConfigurable:false, reconciles auto-history, and stamps v14', async () => {
         mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
         mockStorage.getConfig.mockResolvedValue({
             app: { configVersion: 13 },
             theme: { themeName: '' },
             dashboards: [
                 { id: 'd0', configuration: [
-                    // Record form of paths (typical widget): position sub-fields, attitude sub-field, and a genuine scalar leaf.
-                    { input: { widgetProperties: { config: { paths: {
-                        longPath: { path: 'self.navigation.position.longitude', pathType: 'number' },
-                        latPath: { path: 'self.navigation.position.latitude', pathType: 'number' },
-                        angle: { path: 'self.navigation.attitude.roll', pathType: 'number' },
-                        speed: { path: 'self.navigation.speedOverGround', pathType: 'number' }
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: {
+                        longPath: { path: 'self.navigation.position.longitude', pathType: 'number', isPathConfigurable: true },
+                        latPath: { path: 'self.navigation.position.latitude', pathType: 'number', isPathConfigurable: true }
                     } } } } },
-                    // Array form of paths (multi-control widget) + a nested compound (autopilot nextPoint position).
-                    { input: { widgetProperties: { config: { paths: [
-                        { path: 'self.navigation.courseGreatCircle.nextPoint.position.latitude', pathType: 'number' }
-                    ] } } } }
+                    { input: { widgetProperties: { type: 'widget-horizon', config: { supportAutomaticHistoricalSeries: true, paths: {
+                        gaugePitchPath: { path: 'self.navigation.attitude.pitch', pathType: 'number', isPathConfigurable: true },
+                        gaugeRollPath: { path: 'self.navigation.attitude.roll', pathType: 'number', isPathConfigurable: true }
+                    } } } } }
                 ] }
             ]
         });
@@ -221,14 +218,61 @@ describe('ConfigurationUpgradeService', () => {
 
         const written = mockStorage.setConfig.mock.calls.at(-1)![2];
         expect(written.app.configVersion).toBe(14);
-        const recordPaths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
-        expect(recordPaths.longPath.path).toBe('self.navigation.position');
-        expect(recordPaths.latPath.path).toBe('self.navigation.position');
-        expect(recordPaths.angle.path).toBe('self.navigation.attitude');
-        // A genuine scalar leaf must be left untouched.
-        expect(recordPaths.speed.path).toBe('self.navigation.speedOverGround');
-        const arrayPaths = written.dashboards[0].configuration[1].input.widgetProperties.config.paths;
-        expect(arrayPaths[0].path).toBe('self.navigation.courseGreatCircle.nextPoint.position');
+        const pos = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        expect(pos.longPath.path).toBe('self.navigation.position');
+        expect(pos.latPath.path).toBe('self.navigation.position');
+        // The stale stored true would otherwise override the new isPathConfigurable:false default.
+        expect(pos.longPath.isPathConfigurable).toBe(false);
+        expect(pos.latPath.isPathConfigurable).toBe(false);
+        const horizon = written.dashboards[0].configuration[1].input.widgetProperties.config;
+        expect(horizon.paths.gaugePitchPath.path).toBe('self.navigation.attitude');
+        expect(horizon.paths.gaugeRollPath.path).toBe('self.navigation.attitude');
+        // Charting a compound sub-field is deferred (#345): auto-history reconciled off.
+        expect(horizon.supportAutomaticHistoricalSeries).toBe(false);
+    });
+
+    it('v13 upgrade leaves a GENERIC widget pointed at a compound sub-field untouched (no whole-object readout)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-numeric', config: { paths: {
+                        numericPath: { path: 'self.navigation.attitude.pitch', pathType: 'number', isPathConfigurable: true }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(14); // still stamped current
+        const numeric = written.dashboards[0].configuration[0].input.widgetProperties.config.paths.numericPath;
+        expect(numeric.path).toBe('self.navigation.attitude.pitch'); // path left on the inert child (clean no-data), not collapsed
+        expect(numeric.isPathConfigurable).toBe(true);
+    });
+
+    it('v13 upgrade handles the array form of paths on a sub-field-aware widget', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: [
+                        { path: 'self.navigation.position.latitude', pathType: 'number', isPathConfigurable: true }
+                    ] } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths[0].path)
+            .toBe('self.navigation.position');
     });
 
     it('v13 upgrade skips a slot that is not at version 13 (no re-stamp)', async () => {
@@ -251,7 +295,7 @@ describe('ConfigurationUpgradeService', () => {
             theme: { themeName: '' },
             dashboards: [
                 { id: 'd0', configuration: [
-                    { input: { widgetProperties: { config: { paths: {
+                    { input: { widgetProperties: { type: 'widget-heel-gauge', config: { paths: {
                         angle: { path: 'self.navigation.attitude', pathType: 'number' }
                     } } } } }
                 ] }
