@@ -20,6 +20,7 @@ import {
 } from '../shared/electrical-card-layout.constants';
 import type { AlternatorDisplayModel, AlternatorSnapshot, AlternatorWidgetConfig, ElectricalCardModeConfig } from './widget-alternator.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
+import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -324,45 +325,10 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
     );
 
     return {
-      trackedDevices: this.normalizeTrackedDevices(alternator?.trackedDevices),
+      trackedDevices: normalizeTrackedDevices(alternator?.trackedDevices),
       optionsById,
       cardMode: this.normalizeCardMode(alternator?.cardMode)
     };
-  }
-
-  private normalizeTrackedDevices(value: unknown): ElectricalTrackedDevice[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const devices = new Map<string, ElectricalTrackedDevice>();
-    value.forEach(item => {
-      if (!item || typeof item !== 'object') {
-        return;
-      }
-
-      const candidate = item as { id?: unknown; source?: unknown; key?: unknown };
-      const id = this.normalizeOptionalString(candidate.id);
-      const source = this.normalizeOptionalString(candidate.source);
-      if (!id || !source) {
-        return;
-      }
-
-      const key = this.normalizeOptionalString(candidate.key) ?? `${id}||${source}`;
-      devices.set(key, { id, source, key });
-    });
-
-    return [...devices.values()].sort((left, right) => left.key.localeCompare(right.key));
-  }
-
-  private buildIdToDeviceKeysMap(): Map<string, string[]> {
-    const map = new Map<string, string[]>();
-    this.trackedDevices().forEach(device => {
-      const existing = map.get(device.id) ?? [];
-      existing.push(device.key);
-      map.set(device.id, existing);
-    });
-    return map;
   }
 
   private normalizeCardMode(value: unknown): ElectricalCardModeConfig {
@@ -374,31 +340,11 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
       };
     }
 
-    const metrics = this.normalizeStringList(candidate?.metrics);
+    const metrics = normalizeStringList(candidate?.metrics);
     return {
       displayMode: candidate?.displayMode === 'compact' ? 'compact' : 'full',
       metrics: metrics.length ? metrics : ['voltage', 'current', 'power', 'revolutions']
     };
-  }
-
-  private normalizeStringList(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const ids = new Set<string>();
-    value.forEach(item => {
-      if (typeof item !== 'string') {
-        return;
-      }
-
-      const normalized = item.trim();
-      if (normalized.length > 0) {
-        ids.add(normalized);
-      }
-    });
-
-    return [...ids].sort((left, right) => left.localeCompare(right));
   }
 
   private normalizeOptionsById(value: unknown): AlternatorWidgetConfig['optionsById'] {
@@ -408,7 +354,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
 
     const next: AlternatorWidgetConfig['optionsById'] = {};
     Object.entries(value as Record<string, unknown>).forEach(([id]) => {
-      const normalizedId = this.normalizeOptionalString(id);
+      const normalizedId = normalizeOptionalString(id);
       if (!normalizedId) {
         return;
       }
@@ -417,15 +363,6 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
     });
 
     return next;
-  }
-
-  private normalizeOptionalString(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
-
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
   }
 
   private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
@@ -476,7 +413,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
     const uniqueIds = new Set(updates.map(update => update.id));
     uniqueIds.forEach(id => this.trackDiscoveredAlternator(id));
 
-    const idToKeys = this.buildIdToDeviceKeysMap();
+    const idToKeys = buildIdToDeviceKeysMap(this.trackedDevices());
 
     this.alternatorsByKey.update(current => {
       let nextState = current;

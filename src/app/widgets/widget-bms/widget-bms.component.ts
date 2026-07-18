@@ -15,6 +15,7 @@ import type { BmsBankDisplayModel, BmsBankSummary, BmsBatteryDisplayModel, BmsBa
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import type { ITheme } from '../../core/services/app-service';
 import { ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH } from '../shared/electrical-card-layout.constants';
+import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface BmsRenderBank extends BmsBankSummary {
@@ -436,31 +437,11 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       ? value as { displayMode?: unknown; metrics?: unknown }
       : null;
 
-    const metrics = this.normalizeStringList(cardMode?.metrics);
+    const metrics = normalizeStringList(cardMode?.metrics);
     return {
       displayMode: cardMode?.displayMode === 'compact' ? 'compact' : 'full',
       metrics
     };
-  }
-
-  private normalizeStringList(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const ids = new Set<string>();
-    value.forEach(item => {
-      if (typeof item !== 'string') {
-        return;
-      }
-
-      const normalized = item.trim();
-      if (normalized.length > 0) {
-        ids.add(normalized);
-      }
-    });
-
-    return [...ids].sort((left, right) => left.localeCompare(right));
   }
 
   private normalizeBanksFromGroups(groups: unknown): BmsBankConfig[] {
@@ -470,9 +451,9 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
 
     return groups
       .map(group => {
-        const id = this.normalizeOptionalString((group as { id?: unknown })?.id) ?? `bank-${Date.now()}`;
-        const name = this.normalizeOptionalString((group as { name?: unknown })?.name) ?? id;
-        const memberIds = this.normalizeStringList((group as { memberIds?: unknown })?.memberIds);
+        const id = normalizeOptionalString((group as { id?: unknown })?.id) ?? `bank-${Date.now()}`;
+        const name = normalizeOptionalString((group as { name?: unknown })?.name) ?? id;
+        const memberIds = normalizeStringList((group as { memberIds?: unknown })?.memberIds);
         return {
           id,
           name,
@@ -490,9 +471,9 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
 
     return banks
       .map(bank => {
-        const id = this.normalizeOptionalString((bank as { id?: unknown })?.id) ?? `bank-${Date.now()}`;
-        const name = this.normalizeOptionalString((bank as { name?: unknown })?.name) ?? id;
-        const batteryIds = this.normalizeStringList((bank as { batteryIds?: unknown })?.batteryIds);
+        const id = normalizeOptionalString((bank as { id?: unknown })?.id) ?? `bank-${Date.now()}`;
+        const name = normalizeOptionalString((bank as { name?: unknown })?.name) ?? id;
+        const batteryIds = normalizeStringList((bank as { batteryIds?: unknown })?.batteryIds);
         return {
           id,
           name,
@@ -501,15 +482,6 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
         };
       })
       .filter(bank => bank.id.length > 0);
-  }
-
-  private normalizeOptionalString(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
-
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
   }
 
   private normalizeConnectionMode(mode: unknown): BmsBankConnectionMode {

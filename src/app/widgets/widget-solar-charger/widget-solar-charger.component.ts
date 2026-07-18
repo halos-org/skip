@@ -12,6 +12,7 @@ import type { ElectricalCardModeConfig, ElectricalTrackedDevice, SolarChargerDis
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT } from '../shared/electrical-card-layout.constants';
+import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface SolarRenderSnapshot {
@@ -425,31 +426,11 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       ? value as { displayMode?: unknown; metrics?: unknown }
       : null;
 
-    const metrics = this.normalizeStringList(cardMode?.metrics);
+    const metrics = normalizeStringList(cardMode?.metrics);
     return {
       displayMode: cardMode?.displayMode === 'compact' ? 'compact' : 'full',
       metrics: metrics.length ? metrics : ['panelVoltage', 'panelCurrent', 'voltage', 'current']
     };
-  }
-
-  private normalizeStringList(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const ids = new Set<string>();
-    value.forEach(item => {
-      if (typeof item !== 'string') {
-        return;
-      }
-
-      const normalized = item.trim();
-      if (normalized.length > 0) {
-        ids.add(normalized);
-      }
-    });
-
-    return [...ids].sort((left, right) => left.localeCompare(right));
   }
 
   private normalizeOptionsById(value: unknown): Record<string, SolarOptionConfig> {
@@ -461,7 +442,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
     const next: Record<string, SolarOptionConfig> = {};
 
     entries.forEach(([id, rawOption]) => {
-      const normalizedId = this.normalizeOptionalString(id);
+      const normalizedId = normalizeOptionalString(id);
       if (!normalizedId) {
         return;
       }
@@ -475,15 +456,6 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
     });
 
     return next;
-  }
-
-  private normalizeOptionalString(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
-
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
   }
 
   private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
