@@ -132,7 +132,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
   });
   protected readonly labelColor = computed(() => {
     const theme = this.theme();
-    return theme ? getColors(this.colorRole(), theme).dim : 'var(--kip-contrast-dim-color)';
+    return theme ? getColors(this.colorRole(), theme).dim : 'var(--skip-contrast-dim-color)';
   });
 
   protected readonly widgetColors = computed(() => {
@@ -637,9 +637,9 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       .attr('ry', 2)
       .attr('width', WidgetChargerComponent.CHARGER_DISPLAY_BASE_WIDTH + 10)
       .attr('height', WidgetChargerComponent.CHARGER_DISPLAY_BASE_HEIGHT)
-      .attr('fill', 'var(--kip-contrast-dimmer-color)')
+      .attr('fill', 'var(--skip-contrast-dimmer-color)')
       .attr('fill-opacity', 0.8)
-      .attr('stroke', 'var(--kip-contrast-dimmer-color)')
+      .attr('stroke', 'var(--skip-contrast-dimmer-color)')
       .attr('stroke-width', 0)
       .lower(); */
     shapeGroupEnter.append('path')
@@ -717,9 +717,9 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
         const strokeColor = this.isShapeMode(mode, 'sustain') || isPowerSupply
           ? 'none'
           : this.isShapeMode(mode, 'equalization')
-            ? 'var(--kip-zone-alert-color)'
+            ? 'var(--skip-zone-alert-color)'
             : this.isShapeMode(mode, 'overload')
-              ? 'var(--kip-zone-alarm-color)'
+              ? 'var(--skip-zone-alarm-color)'
               : snapshot.widgetColors.color;
 
         const shapeGroup = select(nodes[_index]);
@@ -742,7 +742,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
         .attr('x', layout.titleX)
         .attr('y', titleY)
         .attr('font-size', layout.titleFontSize)
-        .attr('fill', 'var(--kip-contrast-dim-color)')
+        .attr('fill', 'var(--skip-contrast-dim-color)')
         .text(item => snapshot.displayModels[item.key]?.titleText ?? this.resolveTitleText(item.charger));
     } else {
       merged.select('text.charger-title').text('');
@@ -754,7 +754,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       .attr('text-anchor', 'end')
       .attr('font-size', layout.primaryFontSize)
       .attr('font-weight', layout.primaryFontWeight)
-      .attr('fill', 'var(--kip-contrast-color)');
+      .attr('fill', 'var(--skip-contrast-color)');
 
     merged.select('tspan.voltage-metric-value')
       .text(item => snapshot.displayModels[item.key]?.voltageText ?? '');
@@ -763,7 +763,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       .attr('dx', 1)
       .attr('font-size', 22)
       .attr('font-weight', 500)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .text('V');
 
     merged.select('text.charger-current')
@@ -771,7 +771,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       .attr('y', 48)
       .attr('text-anchor', 'end')
       .attr('font-size', layout.lineOneFontSize)
-      .attr('fill', 'var(--kip-contrast-color)');
+      .attr('fill', 'var(--skip-contrast-color)');
 
     merged.select('tspan.current-metric-value')
       .text(item => snapshot.displayModels[item.key]?.currentText ?? '');
@@ -779,13 +779,13 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
     merged.select('tspan.current-metric-unit')
       .attr('dx', 1)
       .attr('font-size', 12)
-      .attr('fill', 'var(--kip-contrast-color)')
+      .attr('fill', 'var(--skip-contrast-color)')
       .text('A');
 
     merged.select('text.charger-power')
       .attr('x', 5)
       .attr('y', 22)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('font-size', 10);
 
     merged.select('tspan.power-metric-value')
@@ -794,13 +794,13 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
     merged.select('tspan.power-metric-unit')
       .attr('dx', 1)
       .attr('font-size', 6)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .text('W');
 
     merged.select('text.charger-temperature')
       .attr('x', 5)
       .attr('y', 34)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .attr('font-size', 10);
 
     merged.select('tspan.temperature-metric-value')
@@ -809,14 +809,14 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
     merged.select('tspan.temperature-metric-unit')
       .attr('dx', 1)
       .attr('font-size', 6)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .text(this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature));
 
     merged.select('text.charger-mode')
       .attr('x', 5)
       .attr('y', 46)
       .attr('font-size', 10)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .text(item => snapshot.displayModels[item.key]?.modeText ?? '');
 
     selection.exit().remove();

@@ -521,7 +521,7 @@ describe('WidgetSolarChargerComponent', () => {
     expect(merged.color).toBe('green');
   });
 
-  // End-to-end persistence round-trip for #1061, mirroring the exact KIP operations:
+  // End-to-end persistence round-trip for #1061, mirroring the exact Skip operations:
   //   dashboard.component.saveDashboard(): cloneDeep(grid.save(false,false))
   //   storage.patchConfig('Dashboards', dashboards): [{ op:'replace', path:'/<name>/dashboards', value }]
   //   settings.loadConfigFromLocalStorage(): JSON.parse(...)
@@ -557,7 +557,7 @@ describe('WidgetSolarChargerComponent', () => {
       dashboards[0].configuration[0].input.widgetProperties.config;
 
     // The pure JSON.stringify/parse round-trip and the JSON-Patch replace round-trip were dropped:
-    // they only re-asserted that plain objects survive JSON serialization (tautological, no KIP code
+    // they only re-asserted that plain objects survive JSON serialization (tautological, no Skip code
     // exercised). The #1061 gotcha is the lodash merge below clobbering saved arrays with the empty
     // DEFAULT_CONFIG defaults, which the remaining test and the sibling 'config merge' test pin.
     it('still has the saved options after the full persist -> reload -> runtime merge chain', () => {

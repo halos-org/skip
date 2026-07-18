@@ -1,6 +1,6 @@
 @let dashboardStatic = dashboardStaticView() ?? true;
 <div class="page-slide" #pageSlide>
-<gridstack kipGestures [mode]="dashboardStatic === true ? 'press' : 'editor'" [enablePress]="false" [enableTap]="dashboardStatic === false" [enableDoubleTap]="false" #grid
+<gridstack skipGestures [mode]="dashboardStatic === true ? 'press' : 'editor'" [enablePress]="false" [enableTap]="dashboardStatic === false" [enableDoubleTap]="false" #grid
   [isEmpty]="false"
   [options]="gridOptions()"
   (addedCB)="onGridItemsChanged()"
@@ -11,7 +11,7 @@
 @if (gridIsEmpty()) {
   <div
     class="dashboard-empty-state-container"
-    kipGestures
+    skipGestures
     [mode]="dashboardStatic === true ? 'press' : 'editor'"
     [enablePress]="false"
     [enableTap]="dashboardStatic === false"

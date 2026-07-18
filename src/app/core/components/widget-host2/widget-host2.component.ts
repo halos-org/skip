@@ -162,7 +162,7 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
     this._hasInitialized = true;
 
     if (shouldAutoOpenOptions) {
-      queueMicrotask(() => this.openWidgetOptions(new Event('kip:auto-open-options')));
+      queueMicrotask(() => this.openWidgetOptions(new Event('skip:auto-open-options')));
     }
   }
 

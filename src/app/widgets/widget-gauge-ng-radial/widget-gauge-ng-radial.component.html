@@ -1,7 +1,7 @@
 @if (shouldRenderGauge()) {
   <radial-gauge
     #radialGauge
-    kipResizeObserver
+    skipResizeObserver
     [options]="gaugeOptions"
     [value]="value() ?? 0"
     [attr.value-text]="textValue()"

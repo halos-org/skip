@@ -482,7 +482,7 @@ export class WidgetService {
     },
     {
       name: 'Realtime Data Plot',
-      description: 'Visualizes data on a real-time plot with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the KIP Dataset to be configured.',
+      description: 'Visualizes data on a real-time plot with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the Skip Dataset to be configured.',
       icon: 'datachartWidget',
       minWidth: 2,
       minHeight: 3,
@@ -626,7 +626,7 @@ export class WidgetService {
     },
   ];
 
-  get kipWidgets(): readonly WidgetDescription[] {
+  get skipWidgets(): readonly WidgetDescription[] {
     return this._widgetDefinition;
   }
 
@@ -723,13 +723,13 @@ export class WidgetService {
    *
    * Example usage:
    * ```typescript
-   * const widgets = await widgetService.getKipWidgetsWithStatus();
+   * const widgets = await widgetService.getSkipWidgetsWithStatus();
    * widgets.forEach(widget => {
    *   console.log(widget.name, widget.isDependencyValid, widget.pluginsStatus);
    * });
    * ```
    */
-  public async getKipWidgetsWithStatus(): Promise<WidgetDescriptionWithPluginStatus[]> {
+  public async getSkipWidgetsWithStatus(): Promise<WidgetDescriptionWithPluginStatus[]> {
     const pluginCache: Record<string, boolean> = {};
 
     // Collect all unique plugin dependencies (required + optional)

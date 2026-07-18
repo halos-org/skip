@@ -28,11 +28,11 @@ export class uiEventService implements OnDestroy {
   constructor() {
     // Skip side-effectful logic during unit tests to avoid reloads / timers
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isTest = (window as any).__KIP_TEST__;
+    const isTest = (window as any).__SKIP_TEST__;
     if (!isTest) {
       if (isEmbeddedInIframe()) {
         // Running inside a host iframe (app-dock, Freeboard, ...). The host owns fullscreen,
-        // so hide KIP's control and defer to it (#1062).
+        // so hide Skip's control and defer to it (#1062).
         this.fullscreenSupported.set(false);
         console.log('[UI Event Service] Running inside an iframe; fullscreen control hidden, deferring to host.');
       } else if (screenfull.isEnabled) {

@@ -15,7 +15,7 @@ describe('WidgetService', () => {
   });
 
   it('registers the available electrical family widgets in definitions', () => {
-    const selectors = service.kipWidgets.map(widget => widget.selector);
+    const selectors = service.skipWidgets.map(widget => widget.selector);
 
     expect(selectors).toContain('widget-solar-charger');
     expect(selectors).toContain('widget-charger');

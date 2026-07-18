@@ -9,7 +9,7 @@ import { HistoryApiClientService } from '../../services/history-api-client.servi
 import { HistoryToChartMapperService } from '../../services/history-to-chart-mapper.service';
 import { UnitsService } from '../../services/units.service';
 import { IWidget } from '../../interfaces/widgets-interface';
-import { IKipSeriesDefinition } from '../../contracts/kip-series-contract';
+import { ISkipSeriesDefinition } from '../../contracts/skip-series-contract';
 
 describe('WidgetHistoryChartDialogComponent', () => {
   let fixture: ComponentFixture<WidgetHistoryChartDialogComponent>;
@@ -36,7 +36,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
     contrastDimmer: '#5a5a5a'
   };
 
-  const seriesDefinitions: IKipSeriesDefinition[] = [
+  const seriesDefinitions: ISkipSeriesDefinition[] = [
     {
       seriesId: 'widget-bms-1:bms:battery-1:capacity.stateOfCharge:default',
       datasetUuid: 'widget-bms-1:bms:battery-1:capacity.stateOfCharge:default',
@@ -123,7 +123,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
 
   it('uses axis-metric colors for BMS series and keeps first-entity lines solid', async () => {
     const socDataset = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         data: {
           x: number;
           y: number;
@@ -134,7 +134,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       } | null>;
     }).buildDatasetForSeries(seriesDefinitions[0], 0);
     const currentDataset = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         data: {
           x: number;
           y: number;
@@ -157,7 +157,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
   });
 
   it('uses series-order dash with metric-order colors across multiple BMS entities', async () => {
-    const bmsSeries: IKipSeriesDefinition[] = [
+    const bmsSeries: ISkipSeriesDefinition[] = [
       {
         seriesId: 'widget-bms-1:bms:battery-1:capacity.stateOfCharge:default',
         datasetUuid: 'widget-bms-1:bms:battery-1:capacity.stateOfCharge:default',
@@ -196,7 +196,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Battery History',
@@ -205,28 +205,28 @@ describe('WidgetHistoryChartDialogComponent', () => {
     };
 
     const soc1 = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         borderColor: string;
         borderDash?: number[];
       } | null>;
     }).buildDatasetForSeries(bmsSeries[0], 0);
 
     const current1 = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         borderColor: string;
         borderDash?: number[];
       } | null>;
     }).buildDatasetForSeries(bmsSeries[1], 1);
 
     const soc2 = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         borderColor: string;
         borderDash?: number[];
       } | null>;
     }).buildDatasetForSeries(bmsSeries[2], 2);
 
     const current2 = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         borderColor: string;
         borderDash?: number[];
       } | null>;
@@ -287,7 +287,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       return [{ timestamp: 1000, data: { value: 12.5 } }];
     });
 
-    const panelPowerSeries: IKipSeriesDefinition = {
+    const panelPowerSeries: ISkipSeriesDefinition = {
       seriesId: 'widget-solar-1:solar:charger-1:panelPower:default',
       datasetUuid: 'widget-solar-1:solar:charger-1:panelPower:default',
       ownerWidgetUuid: 'widget-solar-1',
@@ -295,7 +295,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       path: 'self.electrical.solar.charger-1.panelPower',
       enabled: true
     };
-    const currentSeries: IKipSeriesDefinition = {
+    const currentSeries: ISkipSeriesDefinition = {
       seriesId: 'widget-solar-1:solar:charger-1:current:default',
       datasetUuid: 'widget-solar-1:solar:charger-1:current:default',
       ownerWidgetUuid: 'widget-solar-1',
@@ -305,7 +305,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
     };
 
     const panelPowerDataset = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         data: {
           x: number;
           y: number;
@@ -317,7 +317,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
     }).buildDatasetForSeries(panelPowerSeries, 0);
 
     const currentDataset = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         data: {
           x: number;
           y: number;
@@ -340,7 +340,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
   });
 
   it('does not apply convertUnitTo override for dual-axis series when path config is provided', async () => {
-    const panelPowerSeries: IKipSeriesDefinition = {
+    const panelPowerSeries: ISkipSeriesDefinition = {
       seriesId: 'widget-solar-1:solar:charger-1:panelPower:default',
       datasetUuid: 'widget-solar-1:solar:charger-1:panelPower:default',
       ownerWidgetUuid: 'widget-solar-1',
@@ -353,7 +353,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Solar History',
@@ -369,7 +369,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
     };
 
     const dataset = await (component as unknown as {
-      buildDatasetForSeries: (series: IKipSeriesDefinition, index: number) => Promise<{
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
         data: {
           x: number;
           y: number;
@@ -431,7 +431,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Solar History',
@@ -498,7 +498,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Battery History',
@@ -550,7 +550,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Charger History',
@@ -604,7 +604,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Source-Aware History',
@@ -677,7 +677,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'AC History',
@@ -771,7 +771,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Solar History',
@@ -819,7 +819,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
       data: {
         title: string;
         widget: IWidget;
-        seriesDefinitions: IKipSeriesDefinition[];
+        seriesDefinitions: ISkipSeriesDefinition[];
       };
     }).data = {
       title: 'Solar History',
@@ -898,7 +898,7 @@ describe('WidgetHistoryChartDialogComponent', () => {
         data: {
           title: string;
           widget: IWidget;
-          seriesDefinitions: IKipSeriesDefinition[];
+          seriesDefinitions: ISkipSeriesDefinition[];
         };
       }).data = {
         title: 'Solar History',

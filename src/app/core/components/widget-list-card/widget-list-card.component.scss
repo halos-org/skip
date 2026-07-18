@@ -54,24 +54,24 @@
 }
 
 .dependency-error {
-  color: var(--kip-port-color);
+  color: var(--skip-port-color);
   font-weight: bold;
 }
 
 .dependency-required-ok {
-  color: var(--kip-starboard-color);
+  color: var(--skip-starboard-color);
   font-weight: bold;
 }
 .dependency-required-error {
-  color: var(--kip-port-color);
+  color: var(--skip-port-color);
   font-weight: bold;
   text-decoration: underline;
 }
 .dependency-optional-ok {
-  color: var(--kip-starboard-color);
+  color: var(--skip-starboard-color);
 }
 .dependency-optional-error {
-  color: var(--kip-port-color);
+  color: var(--skip-port-color);
 }
 .dependency-optional-missing-met {
   color: var(--mat-sys-outline);
@@ -87,7 +87,7 @@
 }
 
 .dependency-ok {
-  color: var(--kip-starboard-color);
+  color: var(--skip-starboard-color);
 }
 
 .no-text-select {

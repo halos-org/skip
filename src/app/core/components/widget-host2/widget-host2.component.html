@@ -1,4 +1,4 @@
-<mat-card kipGestures mode="press" [enablePress]="dashboardStaticView()" [enableTap]="true" [enableDoubleTap]="false" [longPressMs]="400" appearance="raised" class="widget-container kip-widget-card-colors" [style.border]="dashboardStaticView() ? '1px dashed transparent' : '1px dashed var(--mat-sys-outline)'"
+<mat-card skipGestures mode="press" [enablePress]="dashboardStaticView()" [enableTap]="true" [enableDoubleTap]="false" [longPressMs]="400" appearance="raised" class="widget-container skip-widget-card-colors" [style.border]="dashboardStaticView() ? '1px dashed transparent' : '1px dashed var(--mat-sys-outline)'"
   (press)="onWidgetLongPress($event)"
   (tap)="onSingleTap($event)">
   <ng-container #childOutlet></ng-container>

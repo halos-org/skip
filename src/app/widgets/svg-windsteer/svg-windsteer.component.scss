@@ -13,7 +13,7 @@ svg {
 }
 
 .fixed-dial-background {
-  fill: var(--kip-grey-color);
+  fill: var(--skip-grey-color);
 }
 
 .rotating-dial-Backplate {
@@ -23,74 +23,74 @@ svg {
 }
 
 .starboard  {
-  stroke: var(--kip-starboard-color);
+  stroke: var(--skip-starboard-color);
 }
 
 .port {
-  stroke: var(--kip-port-color);
+  stroke: var(--skip-port-color);
 }
 
 .heading-background {
-  stroke: var(--kip-grey-color);
-  fill: var(--kip-widget-card-background-color);
+  stroke: var(--skip-grey-color);
+  fill: var(--skip-widget-card-background-color);
 }
 
 .boat {
-  stop-color: var(--kip-grey-color) !important;
+  stop-color: var(--skip-grey-color) !important;
 }
 
 .contrast-text {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
 }
 
 .contrast-stroke {
-  stroke: var(--kip-contrast-color);
+  stroke: var(--skip-contrast-color);
 }
 
 .card-color {
-  fill: var(--kip-widget-card-background-color);
+  fill: var(--skip-widget-card-background-color);
 }
 
 .true-wind {
-  fill: var(--kip-yellow-color);
+  fill: var(--skip-yellow-color);
 }
 
 .true-wind-label {
-  fill: var(--kip-yellow-dim-color);
+  fill: var(--skip-yellow-dim-color);
 }
 
 .app-wind {
-    fill: var(--kip-orange-color);
+    fill: var(--skip-orange-color);
 }
 
 .app-wind-label {
-    fill: var(--kip-orange-dim-color);
+    fill: var(--skip-orange-dim-color);
 }
 
 .course-over-ground {
-  fill: var(--kip-pink-color);
+  fill: var(--skip-pink-color);
 }
 
 .next-waypoint {
-  stroke: var(--kip-green-color);
+  stroke: var(--skip-green-color);
 }
 
 .next-waypoint-bar {
-  stroke: var(--kip-grey-color);
+  stroke: var(--skip-grey-color);
 }
 
 .laylines {
-  stroke:  var(--kip-contrast-color);
+  stroke:  var(--skip-contrast-color);
 }
 
 .wind-sector-port {
-  fill: var(--kip-port-color);
+  fill: var(--skip-port-color);
 }
 
 .wind-sector-stbd {
-  fill: var(--kip-starboard-color);
+  fill: var(--skip-starboard-color);
 }
 
 .drift-arrow {
-  stop-color: var(--kip-blue-color);
+  stop-color: var(--skip-blue-color);
 }

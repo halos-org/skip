@@ -91,7 +91,7 @@ export class ProfileService {
       await this.refresh();
       const normalized = this.validateNewName(name);
       if (!this.isValidConfigShape(config)) {
-        throw new Error('The selected file is not a valid KIP configuration.');
+        throw new Error('The selected file is not a valid Skip configuration.');
       }
       const { config: prepared, migrated } = this.upgrade.migrateImportedConfig(config);
       await this.storage.setConfig(PROFILE_SCOPE, normalized, prepared);

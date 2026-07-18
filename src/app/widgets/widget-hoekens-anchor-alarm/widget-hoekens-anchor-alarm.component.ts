@@ -122,7 +122,7 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
       return;
     }
     try {
-      const id = `kip-gesture-inject-${this.id()}`;
+      const id = `skip-gesture-inject-${this.id()}`;
       // Avoid double-injecting the same script
       if (iframeDocument.getElementById(id)) return;
       const scriptText = generateSwipeScript({ instanceId: this.id() });
@@ -143,7 +143,7 @@ export class WidgetHoekensAnchorAlarmComponent implements AfterViewInit, OnDestr
     try {
       const iframeDoc = this.iframe()?.nativeElement.contentDocument;
       if (iframeDoc) {
-        const id = `kip-gesture-inject-${this.id()}`;
+        const id = `skip-gesture-inject-${this.id()}`;
         const existing = iframeDoc.getElementById(id);
         if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
       }

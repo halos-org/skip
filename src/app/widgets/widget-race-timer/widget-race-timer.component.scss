@@ -18,8 +18,8 @@
 }
 
 .button-color-red {
-  --mat-button-filled-container-color: var(--kip-port-color);
-  --mat-button-filled-label-text-color: var(--kip-contrast-color);
+  --mat-button-filled-container-color: var(--skip-port-color);
+  --mat-button-filled-label-text-color: var(--skip-contrast-color);
 }
 
 .timerBarContainer {
@@ -93,8 +93,8 @@
 .main-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-port-color),
-    filled-label-text-color: var(--kip-contrast-color)
+    filled-container-color: var(--skip-port-color),
+    filled-label-text-color: var(--skip-contrast-color)
   ));
 }
 

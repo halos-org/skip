@@ -1,7 +1,7 @@
 /**
- * Generator for the KIP dashboard schema artifact.
+ * Generator for the Skip dashboard schema artifact.
  *
- * Reads KIP source statically (never executes Angular components) and produces a
+ * Reads Skip source statically (never executes Angular components) and produces a
  * JSON description of the widget catalog and design system for the kip-mcp-server.
  */
 import * as fs from 'node:fs';
@@ -21,7 +21,7 @@ import type {
   BindingKind,
   DesignSystem,
   GenerateOptions,
-  KipDashboardSchema,
+  SkipDashboardSchema,
   PathSlot,
   WidgetCatalogEntry,
   WidgetCategory,
@@ -43,7 +43,7 @@ const ICONS_SVG = 'src/assets/svg/icons.svg';
 const M3_DARK = 'src/themes/_m3dark.scss';
 const CONFIG_VERSIONS_CONST = 'src/app/core/constants/config-versions.const.ts';
 
-// KIP applies themes as body CSS classes; the default (dark) theme is the empty
+// Skip applies themes as body CSS classes; the default (dark) theme is the empty
 // string. There is no single source literal to read, so these are listed here and
 // kept in step with src/styles.scss and src/themes/_m3{dark,light,night}.scss.
 const THEME_NAMES: readonly string[] = ['', 'light-theme', 'night-theme'];
@@ -51,7 +51,7 @@ const THEME_NAMES: readonly string[] = ['', 'light-theme', 'night-theme'];
 const SCHEMA_VERSION = 1;
 
 /**
- * Extracts KIP's widget catalog (`_widgetDefinition`) from widget.service.ts.
+ * Extracts Skip's widget catalog (`_widgetDefinition`) from widget.service.ts.
  *
  * Only the active (non-commented-out) widget definitions are returned, sorted by
  * selector so the generated artifact diffs stay localized when widgets change.
@@ -146,8 +146,8 @@ function asStringOrNull(value: unknown): string | null {
 }
 
 /**
- * Extracts KIP's design system (grid, colour tokens, theme names, dashboard
- * icons and unit groups) from KIP source.
+ * Extracts Skip's design system (grid, colour tokens, theme names, dashboard
+ * icons and unit groups) from Skip source.
  */
 export function extractDesignSystem(opts: GenerateOptions): DesignSystem {
   return {
@@ -180,21 +180,21 @@ function extractGrid(root: string): DesignSystem['grid'] {
     row: numberProp(props, 'row', file),
     margin: numberProp(props, 'margin', file),
     float: booleanProp(props, 'float', file),
-    // KIP computes the row height at runtime; it is not in the literal.
+    // Skip computes the row height at runtime; it is not in the literal.
     cellHeight: 'auto',
   };
 }
 
 /**
  * Reads the base (dark-theme) hex for each colour token from the
- * `$kip-dark-color` SCSS map. Only `name: #hex` pairs are captured, so the
+ * `$skip-dark-color` SCSS map. Only `name: #hex` pairs are captured, so the
  * `#{$...}` interpolations and `map.get(...)` aliases are skipped.
  */
 function extractColorHex(root: string): Map<string, string> {
   const scss = fs.readFileSync(path.join(root, M3_DARK), 'utf8');
-  const block = /\$kip-dark-color:\s*\(([\s\S]*?)\)\s*;/.exec(scss);
+  const block = /\$skip-dark-color:\s*\(([\s\S]*?)\)\s*;/.exec(scss);
   if (!block) {
-    throw new Error(`Could not find the $kip-dark-color map in ${M3_DARK}`);
+    throw new Error(`Could not find the $skip-dark-color map in ${M3_DARK}`);
   }
   const hexByToken = new Map<string, string>();
   const pair = /([a-z][a-z0-9-]*)\s*:\s*(#[0-9a-fA-F]{3,8})\b/g;
@@ -260,14 +260,14 @@ function booleanProp(props: Map<string, ts.Expression>, key: string, file: strin
 /**
  * Assembles the full schema artifact: version-stamped meta, the widget schemas,
  * and the design system. Deterministic — no timestamps — so the committed
- * artifact only changes when KIP source changes.
+ * artifact only changes when Skip source changes.
  */
-export function buildSchema(opts: GenerateOptions): KipDashboardSchema {
+export function buildSchema(opts: GenerateOptions): SkipDashboardSchema {
   const versions = readConfigVersions(opts.projectRoot);
   return {
     meta: {
       schemaVersion: SCHEMA_VERSION,
-      kipVersion: readKipVersion(opts.projectRoot),
+      skipVersion: readSkipVersion(opts.projectRoot),
       configFileVersion: versions.fileVersion,
       configVersion: versions.appVersion,
     },
@@ -300,12 +300,12 @@ function requireNumberConstant(source: ts.SourceFile, name: string, file: string
   return value;
 }
 
-function readKipVersion(root: string): string {
+function readSkipVersion(root: string): string {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as {
     version?: string;
   };
   if (!pkg.version) {
-    throw new Error('KIP package.json has no "version"');
+    throw new Error('Skip package.json has no "version"');
   }
   return pkg.version;
 }

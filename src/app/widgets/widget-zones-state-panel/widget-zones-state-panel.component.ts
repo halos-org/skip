@@ -5,7 +5,7 @@ import { DashboardService } from '../../core/services/dashboard.service';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { KipResizeObserverDirective } from '../../core/directives/kip-resize-observer.directive';
+import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { SvgZoneStatesComponent } from '../svg-zone-states/svg-zone-states.component';
 import { INotification, NotificationsService } from '../../core/services/notifications.service';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -15,7 +15,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
   templateUrl: './widget-zones-state-panel.component.html',
   styleUrls: ['./widget-zones-state-panel.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [KipResizeObserverDirective, SvgZoneStatesComponent, WidgetTitleComponent]
+  imports: [SkipResizeObserverDirective, SvgZoneStatesComponent, WidgetTitleComponent]
 })
 export class WidgetZonesStatePanelComponent {
   public id = input.required<string>();

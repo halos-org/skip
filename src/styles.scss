@@ -14,130 +14,130 @@
 @use '@angular/material' as mat;
 
 :root {
-  // Create KIP M3 token variables
+  // Create Skip M3 token variables
   --mat-sys-background: #{dark.$background};
 
-  --kip-nightModeBrightness: 1;
-  --kip-widget-card-background-color: #{dark.$kip-widget-card-background-color};
-  --kip-widget-card-border-color: #{dark.$kip-widget-card-border-color};
-  --kip-widget-card-border-style: solid;
-  --kip-widget-card-border-width: 2px;
+  --skip-nightModeBrightness: 1;
+  --skip-widget-card-background-color: #{dark.$skip-widget-card-background-color};
+  --skip-widget-card-border-color: #{dark.$skip-widget-card-border-color};
+  --skip-widget-card-border-style: solid;
+  --skip-widget-card-border-width: 2px;
 
-  --kip-blue-color: #{dark.$blue};
-  --kip-blue-dim-color: #{dark.$blueDim};
-  --kip-blue-dimmer-color: #{dark.$blueDimmer};
+  --skip-blue-color: #{dark.$blue};
+  --skip-blue-dim-color: #{dark.$blueDim};
+  --skip-blue-dimmer-color: #{dark.$blueDimmer};
 
-  --kip-green-color: #{dark.$green};
-  --kip-green-dim-color: #{dark.$greenDim};
-  --kip-green-dimmer-color: #{dark.$greenDimmer};
+  --skip-green-color: #{dark.$green};
+  --skip-green-dim-color: #{dark.$greenDim};
+  --skip-green-dimmer-color: #{dark.$greenDimmer};
 
-  --kip-purple-color: #{dark.$purple};
-  --kip-purple-dim-color: #{dark.$purpleDim};
-  --kip-purple-dimmer-color: #{dark.$purpleDimmer};
+  --skip-purple-color: #{dark.$purple};
+  --skip-purple-dim-color: #{dark.$purpleDim};
+  --skip-purple-dimmer-color: #{dark.$purpleDimmer};
 
-  --kip-yellow-color: #{dark.$yellow};
-  --kip-yellow-dim-color: #{dark.$yellowDim};
-  --kip-yellow-dimmer-color: #{dark.$yellowDimmer};
+  --skip-yellow-color: #{dark.$yellow};
+  --skip-yellow-dim-color: #{dark.$yellowDim};
+  --skip-yellow-dimmer-color: #{dark.$yellowDimmer};
 
-  --kip-pink-color: #{dark.$pink};
-  --kip-pink-dim-color: #{dark.$pinkDim};
-  --kip-pink-dimmer-color: #{dark.$pinkDimmer};
+  --skip-pink-color: #{dark.$pink};
+  --skip-pink-dim-color: #{dark.$pinkDim};
+  --skip-pink-dimmer-color: #{dark.$pinkDimmer};
 
-  --kip-orange-color: #{dark.$orange};
-  --kip-orange-dim-color: #{dark.$orangeDim};
-  --kip-orange-dimmer-color: #{dark.$orangeDimmer};
+  --skip-orange-color: #{dark.$orange};
+  --skip-orange-dim-color: #{dark.$orangeDim};
+  --skip-orange-dimmer-color: #{dark.$orangeDimmer};
 
-  --kip-contrast-color: #{dark.$contrast};
-  --kip-contrast-dim-color: #{dark.$contrastDim};
-  --kip-contrast-dimmer-color: #{dark.$contrastDimmer};
+  --skip-contrast-color: #{dark.$contrast};
+  --skip-contrast-dim-color: #{dark.$contrastDim};
+  --skip-contrast-dimmer-color: #{dark.$contrastDimmer};
 
-  --kip-grey-color: #{dark.$grey};
-  --kip-grey-dim-color: #{dark.$greyDim};
-  --kip-grey-dimmer-color: #{dark.$greyDimmer};
+  --skip-grey-color: #{dark.$grey};
+  --skip-grey-dim-color: #{dark.$greyDim};
+  --skip-grey-dimmer-color: #{dark.$greyDimmer};
 
-  --kip-port-color: #{dark.$port};
-  --kip-starboard-color: #{dark.$starboard};
-  --kip-zone-nominal-color: #{dark.$zone-nominal};
-  --kip-zone-alert-color: #{dark.$zone-alert};
-  --kip-zone-warn-color: #{dark.$zone-warn};
-  --kip-zone-alarm-color: #{dark.$zone-alarm};
-  --kip-zone-emergency-color: #{dark.$zone-emergency};
+  --skip-port-color: #{dark.$port};
+  --skip-starboard-color: #{dark.$starboard};
+  --skip-zone-nominal-color: #{dark.$zone-nominal};
+  --skip-zone-alert-color: #{dark.$zone-alert};
+  --skip-zone-warn-color: #{dark.$zone-warn};
+  --skip-zone-alarm-color: #{dark.$zone-alarm};
+  --skip-zone-emergency-color: #{dark.$zone-emergency};
 }
 
 body.light-theme {
   --mat-sys-background: #{light.$background};
-  --kip-widget-card-background-color: #{light.$kip-widget-card-background-color};
-  --kip-widget-card-border-color: #{light.$kip-widget-card-border-color};
+  --skip-widget-card-background-color: #{light.$skip-widget-card-background-color};
+  --skip-widget-card-border-color: #{light.$skip-widget-card-border-color};
 
-  --kip-contrast-color: #{light.$contrast};
-  --kip-contrast-dim-color: #{light.$contrastDim};
-  --kip-contrast-dimmer-color: #{light.$contrastDimmer};
-  --kip-grey-color: #{light.$grey};
-  --kip-grey-dim-color: #{light.$greyDim};
-  --kip-grey-dimmer-color: #{light.$greyDimmer};
-  --kip-blue-color: #{light.$blue};
-  --kip-blue-dim-color: #{light.$blueDim};
-  --kip-blue-dimmer-color: #{light.$blueDimmer};
-  --kip-green-color: #{light.$green};
-  --kip-green-dim-color: #{light.$greenDim};
-  --kip-green-dimmer-color: #{light.$greenDimmer};
-  --kip-purple-color: #{light.$purple};
-  --kip-purple-dim-color: #{light.$purpleDim};
-  --kip-purple-dimmer-color: #{light.$purpleDimmer};
-  --kip-yellow-color: #{light.$yellow};
-  --kip-yellow-dim-color: #{light.$yellowDim};
-  --kip-yellow-dimmer-color: #{light.$yellowDimmer};
-  --kip-pink-color: #{light.$pink};
-  --kip-pink-dim-color: #{light.$pinkDim};
-  --kip-pink-dimmer-color: #{light.$pinkDimmer};
-  --kip-orange-color: #{light.$orange};
-  --kip-orange-dim-color: #{light.$orangeDim};
-  --kip-orange-dimmer-color: #{light.$orangeDimmer};
-  --kip-port-color: #{light.$port};
-  --kip-starboard-color: #{light.$starboard};
-  --kip-zone-nominal-color: #{light.$zone-nominal};
-  --kip-zone-alert-color: #{light.$zone-alert};
-  --kip-zone-warn-color: #{light.$zone-warn};
-  --kip-zone-alarm-color: #{light.$zone-alarm};
-  --kip-zone-emergency-color: #{light.$zone-emergency};
+  --skip-contrast-color: #{light.$contrast};
+  --skip-contrast-dim-color: #{light.$contrastDim};
+  --skip-contrast-dimmer-color: #{light.$contrastDimmer};
+  --skip-grey-color: #{light.$grey};
+  --skip-grey-dim-color: #{light.$greyDim};
+  --skip-grey-dimmer-color: #{light.$greyDimmer};
+  --skip-blue-color: #{light.$blue};
+  --skip-blue-dim-color: #{light.$blueDim};
+  --skip-blue-dimmer-color: #{light.$blueDimmer};
+  --skip-green-color: #{light.$green};
+  --skip-green-dim-color: #{light.$greenDim};
+  --skip-green-dimmer-color: #{light.$greenDimmer};
+  --skip-purple-color: #{light.$purple};
+  --skip-purple-dim-color: #{light.$purpleDim};
+  --skip-purple-dimmer-color: #{light.$purpleDimmer};
+  --skip-yellow-color: #{light.$yellow};
+  --skip-yellow-dim-color: #{light.$yellowDim};
+  --skip-yellow-dimmer-color: #{light.$yellowDimmer};
+  --skip-pink-color: #{light.$pink};
+  --skip-pink-dim-color: #{light.$pinkDim};
+  --skip-pink-dimmer-color: #{light.$pinkDimmer};
+  --skip-orange-color: #{light.$orange};
+  --skip-orange-dim-color: #{light.$orangeDim};
+  --skip-orange-dimmer-color: #{light.$orangeDimmer};
+  --skip-port-color: #{light.$port};
+  --skip-starboard-color: #{light.$starboard};
+  --skip-zone-nominal-color: #{light.$zone-nominal};
+  --skip-zone-alert-color: #{light.$zone-alert};
+  --skip-zone-warn-color: #{light.$zone-warn};
+  --skip-zone-alarm-color: #{light.$zone-alarm};
+  --skip-zone-emergency-color: #{light.$zone-emergency};
 }
 
 body.night-theme {
   --mat-sys-background: #{night.$background};
-  --kip-widget-card-background-color: #{night.$kip-widget-card-background-color};
-  --kip-widget-card-border-color: #{night.$kip-widget-card-border-color};
+  --skip-widget-card-background-color: #{night.$skip-widget-card-background-color};
+  --skip-widget-card-border-color: #{night.$skip-widget-card-border-color};
 
-  --kip-contrast-color: #{night.$contrast};
-  --kip-contrast-dim-color: #{night.$contrastDim};
-  --kip-contrast-dimmer-color: #{night.$contrastDimmer};
-  --kip-grey-color: #{night.$grey};
-  --kip-grey-dim-color: #{night.$greyDim};
-  --kip-grey-dimmer-color: #{night.$greyDimmer};
-  --kip-blue-color: #{night.$blue};
-  --kip-blue-dim-color: #{night.$blueDim};
-  --kip-blue-dimmer-color: #{night.$blueDimmer};
-  --kip-green-color: #{night.$green};
-  --kip-green-dim-color: #{night.$greenDim};
-  --kip-green-dimmer-color: #{night.$greenDimmer};
-  --kip-purple-color: #{night.$purple};
-  --kip-purple-dim-color: #{night.$purpleDim};
-  --kip-purple-dimmer-color: #{night.$purpleDimmer};
-  --kip-yellow-color: #{night.$yellow};
-  --kip-yellow-dim-color: #{night.$yellowDim};
-  --kip-yellow-dimmer-color: #{night.$yellowDimmer};
-  --kip-pink-color: #{night.$pink};
-  --kip-pink-dim-color: #{night.$pinkDim};
-  --kip-pink-dimmer-color: #{night.$pinkDimmer};
-  --kip-orange-color: #{night.$orange};
-  --kip-orange-dim-color: #{night.$orangeDim};
-  --kip-orange-dimmer-color: #{night.$orangeDimmer};
-  --kip-port-color: #{night.$port};
-  --kip-starboard-color: #{night.$starboard};
-  --kip-zone-nominal-color: #{night.$zone-nominal};
-  --kip-zone-alert-color: #{night.$zone-alert};
-  --kip-zone-warn-color: #{night.$zone-warn};
-  --kip-zone-alarm-color: #{night.$zone-alarm};
-  --kip-zone-emergency-color: #{night.$zone-emergency};
+  --skip-contrast-color: #{night.$contrast};
+  --skip-contrast-dim-color: #{night.$contrastDim};
+  --skip-contrast-dimmer-color: #{night.$contrastDimmer};
+  --skip-grey-color: #{night.$grey};
+  --skip-grey-dim-color: #{night.$greyDim};
+  --skip-grey-dimmer-color: #{night.$greyDimmer};
+  --skip-blue-color: #{night.$blue};
+  --skip-blue-dim-color: #{night.$blueDim};
+  --skip-blue-dimmer-color: #{night.$blueDimmer};
+  --skip-green-color: #{night.$green};
+  --skip-green-dim-color: #{night.$greenDim};
+  --skip-green-dimmer-color: #{night.$greenDimmer};
+  --skip-purple-color: #{night.$purple};
+  --skip-purple-dim-color: #{night.$purpleDim};
+  --skip-purple-dimmer-color: #{night.$purpleDimmer};
+  --skip-yellow-color: #{night.$yellow};
+  --skip-yellow-dim-color: #{night.$yellowDim};
+  --skip-yellow-dimmer-color: #{night.$yellowDimmer};
+  --skip-pink-color: #{night.$pink};
+  --skip-pink-dim-color: #{night.$pinkDim};
+  --skip-pink-dimmer-color: #{night.$pinkDimmer};
+  --skip-orange-color: #{night.$orange};
+  --skip-orange-dim-color: #{night.$orangeDim};
+  --skip-orange-dimmer-color: #{night.$orangeDimmer};
+  --skip-port-color: #{night.$port};
+  --skip-starboard-color: #{night.$starboard};
+  --skip-zone-nominal-color: #{night.$zone-nominal};
+  --skip-zone-alert-color: #{night.$zone-alert};
+  --skip-zone-warn-color: #{night.$zone-warn};
+  --skip-zone-alarm-color: #{night.$zone-alarm};
+  --skip-zone-emergency-color: #{night.$zone-emergency};
 }
 
 html {
@@ -176,12 +176,12 @@ html {
   ));
 
   @include mat.button-overrides((
-    filled-container-color: var(--kip-contrast-dim-color),
-    outlined-outline-color: var(--kip-contrast-color),
+    filled-container-color: var(--skip-contrast-dim-color),
+    outlined-outline-color: var(--skip-contrast-color),
   ));
 
   @include mat.icon-overrides((
-    color: var(--kip-contrast-color),
+    color: var(--skip-contrast-color),
   ));
 
   @include mat.theme-overrides((
@@ -191,8 +191,8 @@ html {
     inverse-surface: #831d1d,
     primary: #831d1d,
     outline: #831d1d,
-    tertiary-fixed: var(--kip-contrast-color),
-    tertiary-fixed-dim: var(--kip-contrast-color),
+    tertiary-fixed: var(--skip-contrast-color),
+    tertiary-fixed-dim: var(--skip-contrast-color),
     ));
 }
 
@@ -239,8 +239,8 @@ body {
 }
 
 #app-filter-wrapper {
-  filter: brightness(var(--kip-nightModeBrightness)) var(--kip-nightModeFilters);
-  backdrop-filter: brightness(var(--kip-nightModeBrightness));
+  filter: brightness(var(--skip-nightModeBrightness)) var(--skip-nightModeFilters);
+  backdrop-filter: brightness(var(--skip-nightModeBrightness));
   transition: filter 0.3s ease;
   position: relative; /* ensure z-index takes effect on this stacking context */
   z-index: 1300;      /* sits above overlay (1100) so sidenav will cover the FAB */
@@ -251,10 +251,10 @@ body {
 }
 
 .ng-invalid:not(form) {
-  border-left: 5px solid var(--kip-zone-alarm-color);
+  border-left: 5px solid var(--skip-zone-alarm-color);
 }
 .ng-valid[required], .ng-valid.required  {
-  border-left: 5px solid var(--kip-green-color);
+  border-left: 5px solid var(--skip-green-color);
 }
 
 /* Make gridstack resize handles larger */
@@ -440,7 +440,7 @@ widget-ais-radar {
     width: 100%;
     height: 100%;
     border-radius: 12px;
-    background: var(--kip-card-background-color);
+    background: var(--skip-card-background-color);
   }
 
   .radar-rings .ring {
@@ -451,7 +451,7 @@ widget-ais-radar {
   .radar-rings .ring-label {
     font-size: 14px;
     font-weight: 300;
-    fill: var(--kip-contrast-dim-color);
+    fill: var(--skip-contrast-dim-color);
     opacity: 0.75;
   }
 
@@ -461,7 +461,7 @@ widget-ais-radar {
     right: 12px;
     z-index: 2;
     @include mat.fab-overrides((
-      small-container-color: var(--kip-contrast-dimmer-color),
+      small-container-color: var(--skip-contrast-dimmer-color),
     ));
   }
 
@@ -471,8 +471,8 @@ widget-ais-radar {
   }
 
   .ais-mode-icon-bg {
-    fill: var(--kip-widget-card-background-color);
-    stroke: var(--kip-contrast-dim-color);
+    fill: var(--skip-widget-card-background-color);
+    stroke: var(--skip-contrast-dim-color);
     stroke-width: 2;
   }
 
@@ -501,7 +501,7 @@ widget-ais-radar {
     right: 12px;
     z-index: 2;
     @include mat.fab-overrides((
-      small-container-color: var(--kip-contrast-dimmer-color),
+      small-container-color: var(--skip-contrast-dimmer-color),
     ));
   }
 
@@ -531,8 +531,8 @@ widget-ais-radar {
 
   .ais-radar-filter-button.is-active {
     @include mat.fab-overrides((
-      small-container-color: var(--kip-contrast-dim-color),
-      small-foreground-color: var(--kip-card-background-color),
+      small-container-color: var(--skip-contrast-dim-color),
+      small-foreground-color: var(--skip-card-background-color),
     ));
   }
 
@@ -544,14 +544,14 @@ widget-ais-radar {
 
   .ais-radar-collision-button.is-active {
     @include mat.fab-overrides((
-      small-container-color: var(--kip-contrast-dim-color),
-      small-foreground-color: var(--kip-card-background-color),
+      small-container-color: var(--skip-contrast-dim-color),
+      small-foreground-color: var(--skip-card-background-color),
     ));
   }
 
   .radar-rings .radar-ownship .ownship-shape {
-    fill: var(--kip-contrast-color);
-    stroke: var(--kip-contrast-color);
+    fill: var(--skip-contrast-color);
+    stroke: var(--skip-contrast-color);
     stroke-width: 1;
   }
 
@@ -562,7 +562,7 @@ widget-ais-radar {
   }
 
   .motion-vector {
-    stroke: var(--kip-contrast-dim-color);
+    stroke: var(--skip-contrast-dim-color);
   }
 
   .target {
@@ -571,18 +571,18 @@ widget-ais-radar {
 
   .target-shape {
     stroke-width: 1.4;
-    stroke: var(--kip-contrast-color);
+    stroke: var(--skip-contrast-color);
   }
 
   .target-label {
     font-size: 7px;
     text-anchor: middle;
     dominant-baseline: middle;
-    fill: var(--kip-contrast-color);
+    fill: var(--skip-contrast-color);
   }
 
   .status-confirmed .target-shape {
-    fill: var(--kip-green-color);
+    fill: var(--skip-green-color);
   }
 
   .status-unconfirmed .target-shape {
@@ -595,18 +595,18 @@ widget-ais-radar {
   }
 
   .type-aton .target-shape {
-    fill: var(--kip-green-color);
-    stroke: var(--kip-green-color);
+    fill: var(--skip-green-color);
+    stroke: var(--skip-green-color);
   }
 
   .selected-ring {
     fill: none;
-    stroke: var(--kip-contrast-color);
+    stroke: var(--skip-contrast-color);
     stroke-width: 4;
     stroke-linecap: square;
     stroke-linejoin: miter;
     opacity: 0.8;
-    filter: drop-shadow(0 0 6px var(--kip-green-color));
+    filter: drop-shadow(0 0 6px var(--skip-green-color));
   }
 
   .ais-filter-menu-header {

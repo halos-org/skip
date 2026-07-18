@@ -1,4 +1,4 @@
-import type { TElectricalExpansionMode } from './kip-series-contract';
+import type { TElectricalExpansionMode } from './skip-series-contract';
 
 export type TDualAxisWidgetType = 'widget-bms' | 'widget-solar-charger' | 'widget-charger' | 'widget-inverter' | 'widget-alternator' | 'widget-ac';
 export type TDualAxisMetric = 'soc' | 'current' | 'panelPower' | 'voltage' | 'frequency';

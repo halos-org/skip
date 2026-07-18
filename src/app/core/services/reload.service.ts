@@ -60,7 +60,7 @@ export class ReloadService {
   private performReload(): void {
     // Prevent hard navigation under the unit-test runner (it tears down the test page).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((window as any).__KIP_TEST__) {
+    if ((window as any).__SKIP_TEST__) {
       return;
     }
     location.replace(this.reloadTarget());

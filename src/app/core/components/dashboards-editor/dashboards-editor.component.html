@@ -1,7 +1,7 @@
 <div class="dashboard-manage" cdkDropList cdkDropListOrientation="mixed" (cdkDropListDropped)="drop($event)">
   @for (dashboard of _dashboard.dashboards(); track dashboard.id; let index = $index) {
     <div class="dashboard-card dashboard-item"
-      kipGestures
+      skipGestures
       [mode]="'editor'"
       [enableTap]="true"
       [enablePress]="false"

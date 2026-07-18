@@ -1,8 +1,8 @@
 /**
- * Small helpers for reading static literals out of KIP source with the
+ * Small helpers for reading static literals out of Skip source with the
  * TypeScript Compiler API.
  *
- * KIP already depends on `typescript`, so the generator uses the compiler API
+ * Skip already depends on `typescript`, so the generator uses the compiler API
  * directly (no extra dependency). We only ever parse syntactically and read
  * literal values — Angular components are never executed.
  */

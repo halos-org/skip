@@ -156,7 +156,7 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
       // Step 4: Reload immediately - APP_INITIALIZER will handle connection and authentication with new URL
       // Skip during unit tests to avoid breaking the test connection
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (!(window as any).__KIP_TEST__) {
+      if (!(window as any).__SKIP_TEST__) {
         location.reload();
       }
 

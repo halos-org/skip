@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { cwd } from 'node:process';
 // Mark global test flag before anything else so app code can detect test context
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).__KIP_TEST__ = true;
+(window as any).__SKIP_TEST__ = true;
 // Neutralize hard navigation that break Karma connection
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const loc: any = window.location;
@@ -217,19 +217,19 @@ const GLOBAL_PROVIDERS: GlobalProvider[] = [
         // Ensure we only register once across multiple configureTestingModule calls
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const w2 = window as any;
-        if (w2.__KIP_ICONS_REGISTERED__) return;
+        if (w2.__SKIP_ICONS_REGISTERED__) return;
         const iconRegistry = diInject(MatIconRegistry);
         const sanitizer = diInject(DomSanitizer);
         const iconSvg = readTestIconsSvg();
         if (typeof iconSvg === 'string' && iconSvg.length > 0) {
           const parser = new DOMParser();
           const doc = parser.parseFromString(iconSvg, 'image/svg+xml');
-          // Register the whole set in supported namespaces (default and 'kip')
+          // Register the whole set in supported namespaces (default and 'skip')
           const trusted = sanitizer.bypassSecurityTrustHtml(iconSvg);
           // Default (no namespace, svgIcon="name")
           iconRegistry.addSvgIconSetLiteral(trusted);
-          // App-level namespace commonly used in KIP (svgIcon="kip:name")
-          iconRegistry.addSvgIconSetInNamespace('kip', trusted);
+          // App-level namespace commonly used in Skip (svgIcon="skip:name")
+          iconRegistry.addSvgIconSetInNamespace('skip', trusted);
           const svgs = Array.from(doc.querySelectorAll('svg[id]')) as SVGSVGElement[];
           for (const svg of svgs) {
             const id = svg.getAttribute('id');
@@ -237,7 +237,7 @@ const GLOBAL_PROVIDERS: GlobalProvider[] = [
             iconRegistry.addSvgIconLiteral(id, sanitizer.bypassSecurityTrustHtml(svg.outerHTML));
           }
           // Mark as registered to avoid rework in subsequent modules
-          w2.__KIP_ICONS_REGISTERED__ = true;
+          w2.__SKIP_ICONS_REGISTERED__ = true;
         } else {
           console.error('[TEST BOOTSTRAP] Failed to load src/assets/svg/icons.svg. SVG icon ids will not be validated.');
         }

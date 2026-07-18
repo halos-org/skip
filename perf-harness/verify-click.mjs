@@ -9,7 +9,7 @@ import { chromium } from 'playwright-core';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
-import { aisRadarWidget, buildDashboards, localStorageBundle, serverConfigDocument } from './lib/kip-config.mjs';
+import { aisRadarWidget, buildDashboards, localStorageBundle, serverConfigDocument } from './lib/skip-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -32,7 +32,7 @@ const browser = await chromium.launch({ executablePath: CHROME, headless: true }
 const ctx = await browser.newContext({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 1 });
 await ctx.route('https://www.gstatic.com/generate_204', (route) => route.fulfill({ status: 204, body: '' }));
 const bundle = localStorageBundle({ origin: server.origin, subscribeAll: true });
-await ctx.addInitScript({ content: `window.__KIP_TEST__=true;` + Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('') });
+await ctx.addInitScript({ content: `window.__SKIP_TEST__=true;` + Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('') });
 const page = await ctx.newPage();
 
 server.setControl({ streaming: true, staticScene: { ownShip: own, targets } });

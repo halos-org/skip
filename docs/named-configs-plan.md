@@ -1,12 +1,12 @@
 ---
-title: "feat: Profile support (named configs) for KIP"
+title: "feat: Profile support (named configs) for Skip"
 type: feat
 status: active
 date: 2026-06-23
 deepened: 2026-06-23
 ---
 
-# Profile support (named configs) for KIP
+# Profile support (named configs) for Skip
 
 > Design + implementation plan. Lives on the `named_configs` branch. Conventions aim at
 > upstreamability (`mxtommy/kip`); not a hard constraint.
@@ -21,7 +21,7 @@ deepened: 2026-06-23
 
 Let a user keep several independent **profiles** — each owning its own dashboards, layouts, and
 theme — and switch between them at runtime, **without creating a separate Signal K user per
-screen set** (today's workaround). A profile maps onto KIP's existing *named config slot* in the
+screen set** (today's workaround). A profile maps onto Skip's existing *named config slot* in the
 Signal K `applicationData` store. The active profile is remembered **per device**, so a cabin,
 mast, and cockpit display can each show a different profile from the same single Signal K login.
 
@@ -34,9 +34,9 @@ name is known). No `IConfig` schema change is required.
 
 ## Glossary (device vs profile)
 
-- **Device** — one browser/screen running KIP. Its `connectionConfig` lives in that browser's
+- **Device** — one browser/screen running Skip. Its `connectionConfig` lives in that browser's
   localStorage and is never shared: server URL, credentials, `useSharedConfig`, `sharedConfigName`
-  (*which profile this screen shows*), `kipUUID` (per-device id that identifies this screen to
+  (*which profile this screen shows*), `skipUUID` (per-device id that identifies this screen to
   remote controllers). Two tablets = two devices, even on one Signal K login.
 - **Profile** — a named bundle of `{app, theme, dashboards}` stored server-side under the Signal K
   user, shared across that user's devices. A device points at one profile via its own
@@ -44,10 +44,10 @@ name is known). No `IConfig` schema change is required.
 
 ## Problem Frame
 
-KIP stores one active configuration. When logged in (`useSharedConfig = true`) it persists to
+Skip stores one active configuration. When logged in (`useSharedConfig = true`) it persists to
 `…/applicationData/user/kip/{fileVersion}/{configName}`. Per-user isolation is a property of
-Signal K's `user` scope keyed by the bearer JWT — not of KIP. The config name is pinned to
-`default`, so the only lever for "a different set of screens" is a different Signal K login. KIP's
+Signal K's `user` scope keyed by the bearer JWT — not of Skip. The config name is pinned to
+`default`, so the only lever for "a different set of screens" is a different Signal K login. Skip's
 README frames multi-config mostly around different *people*; this feature extends it to one person
 (or boat) wanting different screen sets per display. The "separate logins" workaround is the
 assumed motivation; it is a hypothesis, not a measured pain point (see Open Questions).
@@ -98,7 +98,7 @@ not a profile selector.
 
 - `src/app/core/interfaces/app-settings.interfaces.ts` — `IConfig {app, theme, dashboards}`;
   `IAppConfig` (currently holds `isRemoteControl`, `instanceName` — Unit 5 moves these, and has its
-  own `configVersion`); `IConnectionConfig` (`useSharedConfig`, `sharedConfigName`, `kipUUID`, its
+  own `configVersion`); `IConnectionConfig` (`useSharedConfig`, `sharedConfigName`, `skipUUID`, its
   own `configVersion`, currently 12).
 - `src/app/core/services/storage.service.ts` — named-slot CRUD: `listConfigs` (`?keys=true`),
   `getConfig`, `setConfig` ("if name exists, replaced; else created"; returns awaitable
@@ -112,7 +112,7 @@ not a profile selector.
   `connectionConfig`, **defaults to `'default'`, never `undefined`**); persists via
   `buildConnectionStorageObject`; `latestConfigVersion = 12`; `loadConnectionConfig` accepts only
   versions {11,12} then `resetConnection()` (which wipes per-device state). `reloadApp()` is
-  `location.replace("./")`, a **no-op under `__KIP_TEST__`**. `startup()` early-returns before
+  `location.replace("./")`, a **no-op under `__SKIP_TEST__`**. `startup()` early-returns before
   `pushSettings()` when not bootstrapped (in-memory getters empty on the degraded path).
   `resetSettings()` writes a blank default into the *current* `sharedConfigName` (gated on
   `storageServiceReady$`); `loadDemoConfig()` calls `setConfig` **without** a readiness gate.
@@ -134,7 +134,7 @@ not a profile selector.
   UI pattern to mirror. `src/app/core/services/dialog.service.ts` — `openNameDialog` (name only) +
   `openConfirmationDialog`.
 - `src/app/core/services/remote-dashboards.service.ts` — drives remote participation off
-  `isRemoteControl` + display name; `displayId` is `kipUUID` (per-device), so two displays never
+  `isRemoteControl` + display name; `displayId` is `skipUUID` (per-device), so two displays never
   collide — but `isRemoteControl`/`instanceName` are per-profile today (the R8 / Unit 5 driver).
   The setter UI for these lives in `display.component`.
 
@@ -142,7 +142,7 @@ not a profile selector.
 
 New app-internal types → `src/app/core/interfaces`. Service-centric; signal-based state. Tests:
 **Vitest** (`@angular/build:unit-test` + `vitest.config.ts`, jsdom, `TestBed` + `describe/it/expect`,
-co-located `*.spec.ts`). Theme via KIP theme roles / CSS variables.
+co-located `*.spec.ts`). Theme via Skip theme roles / CSS variables.
 
 ## Key Technical Decisions
 
@@ -178,7 +178,7 @@ co-located `*.spec.ts`). Theme via KIP theme roles / CSS variables.
   v1 treats `default` as reserved: cannot create another named `default`, cannot delete/rename it,
   and recovery/fallback must **create** it (blank `IConfig`) when genuinely absent.
 - **Remote-control identity is per-device (R8).** `isRemoteControl` + `instanceName` move from
-  `IAppConfig` to `IConnectionConfig`, beside `kipUUID`, so switching profiles never changes a
+  `IAppConfig` to `IConnectionConfig`, beside `skipUUID`, so switching profiles never changes a
   screen's remote role or advertised name (Unit 5).
 - **Logic lives in a new `ProfileService`** (mirrors `DashboardService`), orchestrating
   `StorageService` + `SettingsService`. Could fold into `SettingsService`; kept separate for
@@ -192,7 +192,7 @@ co-located `*.spec.ts`). Theme via KIP theme roles / CSS variables.
 - Profile = `user`-scope named `IConfig` slot; active per-device; switch = persist + reload; no
   `IConfig` migration; local mode out of scope; logic in `ProfileService`; `default` reserved.
 - Multi-display per-login does **not** collide on remote-control id (`displayId` = per-device
-  `kipUUID`); but `isRemoteControl`/`instanceName` were per-profile → R8 hoist (Unit 5).
+  `skipUUID`); but `isRemoteControl`/`instanceName` were per-profile → R8 hoist (Unit 5).
 - Name validation pinned as a Unit 3 invariant.
 - Import creates a new profile (R7); never silently overwrites.
 - **Unit 1 pre-flight — DONE** (2026-06-23, halosdev.local, Signal K 2.27.0, user scope):
@@ -233,7 +233,7 @@ Signal K applicationData (per Signal K user, JWT-gated)
 
 Per device (localStorage connectionConfig):
   sharedConfigName  → which profile this screen shows
-  kipUUID           → this screen's remote-control identity
+  skipUUID           → this screen's remote-control identity
   isRemoteControl   → this screen participates in remote control   (moved here in Unit 5)
   instanceName      → this screen's advertised name                (moved here in Unit 5)
 ```
@@ -253,7 +253,7 @@ sequenceDiagram
   PS->>ST: await completion-primitive (bounded timeout) for pending writes
   PS->>SET: setActiveProfile("cockpit")
   SET->>LS: persist sharedConfigName="cockpit"
-  SET->>SET: reloadApp()  (location.replace; no-op under __KIP_TEST__)
+  SET->>SET: reloadApp()  (location.replace; no-op under __SKIP_TEST__)
   Note over BOOT,ST: on reload
   BOOT->>ST: getConfig('user',"cockpit")
   alt slot exists
@@ -317,7 +317,7 @@ can target an unset slot.
   **Guard:** these are populated only by `pushSettings()`, skipped on the degraded path — only offer
   "clone current" when settings are actually loaded; else disable clone / fall back to blank.
 
-**Patterns to follow:** existing setter→persist pattern; `reloadApp()`'s `__KIP_TEST__` guard.
+**Patterns to follow:** existing setter→persist pattern; `reloadApp()`'s `__SKIP_TEST__` guard.
 
 **Test scenarios:**
 - Happy: setting the active profile persists the new name to `connectionConfig` and invokes reload
@@ -484,7 +484,7 @@ target-named confirm; import never clobbers another profile or boot-loops the de
 - Repoint `RemoteDashboardsService` to the connectionConfig-backed values.
 
 **Patterns to follow:** the existing connectionConfig version-upgrade steps; per-device handling of
-`kipUUID`.
+`skipUUID`.
 
 **Test scenarios:**
 - Happy: setting `isRemoteControl`/`instanceName` persists to connectionConfig (per-device), not the
@@ -570,7 +570,7 @@ now per-device (R8); the remote-only v1 limitation; and that prior backups now a
   `SettingsService`'s private copy defaults to `'default'` and is never `undefined`; only
   `StorageService.sharedConfigName` is unset pre-bootstrap — that is the `/undefined` risk the guard
   targets. The active-profile setter must keep both coherent across a switch.
-- **Integration coverage:** the reload is a no-op under `__KIP_TEST__`; assert pre-reload side effects
+- **Integration coverage:** the reload is a no-op under `__SKIP_TEST__`; assert pre-reload side effects
   in unit tests, and cover the post-reload load path with a focused integration test that drives
   `AppNetworkInitService.initNetworkServices` with a non-`default` `sharedConfigName` and asserts
   `bootstrapRemoteContext` is called with that name.

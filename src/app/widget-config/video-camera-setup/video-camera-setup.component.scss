@@ -51,7 +51,7 @@
   // (e.g. "Best Quality Smoothest", not "Best QualitySmoothest").
   margin-left: 6px;
   font-size: 0.72rem;
-  color: var(--kip-contrast-dim-color);
+  color: var(--skip-contrast-dim-color);
 }
 
 .video-setup__url {
@@ -100,7 +100,7 @@
 
 // Disabled-camera marker shown after the name in the picker.
 .video-setup__off {
-  color: var(--kip-contrast-dim-color);
+  color: var(--skip-contrast-dim-color);
 }
 
 // Per-camera enable/disable toggle under the picker.
@@ -221,15 +221,15 @@
   padding: 10px 12px;
   border-radius: 8px;
   font-size: 0.85rem;
-  color: var(--kip-contrast-color);
-  background: color-mix(in srgb, var(--kip-blue-color, #4aa3ff) 16%, transparent);
+  color: var(--skip-contrast-color);
+  background: color-mix(in srgb, var(--skip-blue-color, #4aa3ff) 16%, transparent);
 
   mat-icon {
     flex: 0 0 auto;
     font-size: 20px;
     width: 20px;
     height: 20px;
-    color: var(--kip-blue-color, #4aa3ff);
+    color: var(--skip-blue-color, #4aa3ff);
   }
 
   span {
@@ -246,10 +246,10 @@
 
 .video-setup__test {
   &.video-setup__test--ok {
-    color: var(--kip-zone-nominal-color, #43a047);
+    color: var(--skip-zone-nominal-color, #43a047);
   }
   &.video-setup__test--bad {
-    color: var(--kip-zone-alarm-color, #e53935);
+    color: var(--skip-zone-alarm-color, #e53935);
   }
 }
 
@@ -259,7 +259,7 @@
   align-items: center;
   gap: 8px;
   font-size: 0.82rem;
-  color: var(--kip-contrast-dim-color);
+  color: var(--skip-contrast-dim-color);
 
   mat-icon {
     flex: 0 0 auto;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { IKipConcreteSeriesDefinition, IKipSeriesDefinition, IKipTemplateSeriesDefinition, isKipConcreteSeriesDefinition, isKipSeriesEnabled, isKipTemplateSeriesDefinition, } from './kip-series-contract';
+import { ISkipConcreteSeriesDefinition, ISkipSeriesDefinition, ISkipTemplateSeriesDefinition, isSkipConcreteSeriesDefinition, isSkipSeriesEnabled, isSkipTemplateSeriesDefinition, } from './skip-series-contract';
 
-describe('kip-series-contract guards', () => {
-    const concreteSeries: IKipConcreteSeriesDefinition = {
+describe('skip-series-contract guards', () => {
+    const concreteSeries: ISkipConcreteSeriesDefinition = {
         seriesId: 'widget-1:datachart',
         datasetUuid: 'widget-1',
         ownerWidgetUuid: 'widget-1',
@@ -19,7 +19,7 @@ describe('kip-series-contract guards', () => {
         enabled: true,
     };
 
-    const templateSeries: IKipTemplateSeriesDefinition = {
+    const templateSeries: ISkipTemplateSeriesDefinition = {
         seriesId: 'widget-2:bms-template',
         datasetUuid: 'widget-2:bms-template',
         ownerWidgetUuid: 'widget-2',
@@ -37,7 +37,7 @@ describe('kip-series-contract guards', () => {
         enabled: true,
     };
 
-    const solarTemplateSeries: IKipTemplateSeriesDefinition = {
+    const solarTemplateSeries: ISkipTemplateSeriesDefinition = {
         seriesId: 'widget-3:solar-template',
         datasetUuid: 'widget-3:solar-template',
         ownerWidgetUuid: 'widget-3',
@@ -56,28 +56,28 @@ describe('kip-series-contract guards', () => {
     };
 
     it('identifies concrete series definitions', () => {
-        const value: IKipSeriesDefinition = concreteSeries;
+        const value: ISkipSeriesDefinition = concreteSeries;
 
-        expect(isKipConcreteSeriesDefinition(value)).toBe(true);
-        expect(isKipTemplateSeriesDefinition(value)).toBe(false);
+        expect(isSkipConcreteSeriesDefinition(value)).toBe(true);
+        expect(isSkipTemplateSeriesDefinition(value)).toBe(false);
     });
 
     it('identifies template series definitions', () => {
-        const value: IKipSeriesDefinition = templateSeries;
+        const value: ISkipSeriesDefinition = templateSeries;
 
-        expect(isKipTemplateSeriesDefinition(value)).toBe(true);
-        expect(isKipConcreteSeriesDefinition(value)).toBe(false);
+        expect(isSkipTemplateSeriesDefinition(value)).toBe(true);
+        expect(isSkipConcreteSeriesDefinition(value)).toBe(false);
     });
 
     it('treats enabled false as disabled', () => {
-        expect(isKipSeriesEnabled(concreteSeries)).toBe(true);
-        expect(isKipSeriesEnabled({ ...concreteSeries, enabled: false })).toBe(false);
+        expect(isSkipSeriesEnabled(concreteSeries)).toBe(true);
+        expect(isSkipSeriesEnabled({ ...concreteSeries, enabled: false })).toBe(false);
     });
 
     it('preserves template allowedIds filters for battery templates', () => {
-        const value: IKipSeriesDefinition = templateSeries;
+        const value: ISkipSeriesDefinition = templateSeries;
 
-        if (!isKipTemplateSeriesDefinition(value)) {
+        if (!isSkipTemplateSeriesDefinition(value)) {
             throw new Error('Expected template series definition');
             return;
         }
@@ -86,9 +86,9 @@ describe('kip-series-contract guards', () => {
     });
 
     it('preserves template allowedIds filters for solar templates', () => {
-        const value: IKipSeriesDefinition = solarTemplateSeries;
+        const value: ISkipSeriesDefinition = solarTemplateSeries;
 
-        if (!isKipTemplateSeriesDefinition(value)) {
+        if (!isSkipTemplateSeriesDefinition(value)) {
             throw new Error('Expected template series definition');
             return;
         }
@@ -97,9 +97,9 @@ describe('kip-series-contract guards', () => {
     });
 
     it('keeps concrete series free of template expansion state', () => {
-        const value: IKipSeriesDefinition = concreteSeries;
+        const value: ISkipSeriesDefinition = concreteSeries;
 
-        if (!isKipConcreteSeriesDefinition(value)) {
+        if (!isSkipConcreteSeriesDefinition(value)) {
             throw new Error('Expected concrete series definition');
             return;
         }

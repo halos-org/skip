@@ -56,8 +56,8 @@ describe('WidgetRaceTimerComponent timer subscription lifecycle', () => {
   });
 
   const observerCount = (): number =>
-    (timers as unknown as { kipTimers: Record<string, { currentValue: { observers: unknown[] } }> })
-      .kipTimers['race']?.currentValue.observers.length ?? 0;
+    (timers as unknown as { skipTimers: Record<string, { currentValue: { observers: unknown[] } }> })
+      .skipTimers['race']?.currentValue.observers.length ?? 0;
 
   it('keeps a single timer subscription when the timer is re-armed', async () => {
     await setup();

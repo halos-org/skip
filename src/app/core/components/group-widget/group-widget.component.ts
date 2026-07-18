@@ -51,7 +51,7 @@ export class GroupWidgetComponent extends BaseWidget implements OnInit {
     this.runtime?.initialize?.(GroupWidgetComponent.DEFAULT_CONFIG, this.widgetProperties.config);
 
     if (shouldAutoOpenOptions) {
-      queueMicrotask(() => this.openWidgetOptions(new Event('kip:auto-open-options')));
+      queueMicrotask(() => this.openWidgetOptions(new Event('skip:auto-open-options')));
     }
   }
 

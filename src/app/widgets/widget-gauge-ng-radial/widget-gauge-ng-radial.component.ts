@@ -14,7 +14,7 @@ import { adjustLinearScaleAndMajorTicks, IScale } from '../../core/utils/dataSca
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { getHighlights } from '../../core/utils/zones-highlight.utils';
 import { getColors } from '../../core/utils/themeColors.utils';
-import { KipResizeObserverDirective } from '../../core/directives/kip-resize-observer.directive';
+import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
@@ -26,7 +26,7 @@ import { ITheme } from '../../core/services/app-service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './widget-gauge-ng-radial.component.html',
   styleUrls: ['./widget-gauge-ng-radial.component.scss'],
-  imports: [KipResizeObserverDirective, GaugesModule]
+  imports: [SkipResizeObserverDirective, GaugesModule]
 })
 export class WidgetGaugeNgRadialComponent implements AfterViewInit {
   // Functional Host2 inputs

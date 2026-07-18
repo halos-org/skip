@@ -17,7 +17,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
-import { numericWidget, buildDashboards, localStorageBundle, serverConfigDocument, initScriptContent } from './lib/kip-config.mjs';
+import { numericWidget, buildDashboards, localStorageBundle, serverConfigDocument, initScriptContent } from './lib/skip-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';

@@ -27,7 +27,7 @@ The same probe (`probe.js`) is injected into every build under test via Playwrig
 hardware (Skip's Pi-class HaLOS target), runs each scenario K times, and writes
 `results/<label>.json` (raw + median/p95).
 
-Skip's boot config is split across two tiers (`lib/kip-config.mjs`):
+Skip's boot config is split across two tiers (`lib/skip-config.mjs`):
 
 - **localStorage** gets only `skip.connectionConfig` — the sole key Skip reads at
   boot — pointing `signalKUrl` at the mock's origin.
@@ -138,7 +138,7 @@ Claims the data cannot support:
    (`rateHz`, `selfPaths`, `ais: { count, churnPerSec }`). Add an
    `action(page, server, durationMs)` only when the scenario needs interaction
    (viewport resizes, `blastBig`); otherwise the runner just waits `durationMs`.
-2. Widget factories live in `lib/kip-config.mjs` (`numericWidget`,
+2. Widget factories live in `lib/skip-config.mjs` (`numericWidget`,
    `radialGaugeWidget`, `aisRadarWidget`). For a new widget type, add a factory
    whose `config` shape is taken verbatim from the widget's current schema — a
    mis-shaped config silently renders defaults instead of erroring.
@@ -155,7 +155,7 @@ Claims the data cannot support:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `boot check failed: 0 widget-host2 rendered, expected N` | The build rejected or ignored the seeded config — config-version drift (three distinct version spaces; see the `lib/kip-config.mjs` header) or widget-schema drift — and booted the default empty dashboard | Diff `lib/kip-config.mjs` version constants and widget config shapes against the ref's `src/`; rerun with `--headed` to watch the boot |
+| `boot check failed: 0 widget-host2 rendered, expected N` | The build rejected or ignored the seeded config — config-version drift (three distinct version spaces; see the `lib/skip-config.mjs` header) or widget-schema drift — and booted the default empty dashboard | Diff `lib/skip-config.mjs` version constants and widget config shapes against the ref's `src/`; rerun with `--headed` to watch the boot |
 | App boots degraded or lands on the sign-in flow | The build probes a session/config endpoint the mock doesn't answer (`loginStatus`, `applicationData`, `/plugins`, discovery) | Cover the endpoint in `lib/server.mjs`; find the missing call with `--headed` and devtools |
 | Console shows `Unexpected token '<'` / an API response is HTML | An extensionless request fell through to the SPA `index.html` fallback — an unmocked API route | Same as above: add the route to `lib/server.mjs` |
 | `ENOENT … results/<label>.json` from `report.mjs` | Label typo, or the run never completed a scenario | `ls results/`; report labels must match `run.mjs --label` exactly |
@@ -183,7 +183,7 @@ Claims the data cannot support:
   `applicationData` GET/POST (config file version path segment matched
   per-request), `/plugins` + `/plugins/kip` (+ reconcile absorb), and a modern
   `server.version` in the discovery document.
-- `lib/kip-config.mjs` (name kept for upstream-reconcile friendliness): only
+- `lib/skip-config.mjs` (mocks the served @halos-org/skip package): only
   `skip.connectionConfig` is seeded into localStorage (upstream's bare
   `connectionConfig`/`appConfig`/`dashboardsConfig`/`themeConfig` keys are dead
   in Skip); a new `serverConfigDocument()` feeds the mock; the radial-gauge

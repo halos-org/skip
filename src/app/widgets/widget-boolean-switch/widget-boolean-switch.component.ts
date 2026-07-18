@@ -12,7 +12,7 @@ import { WidgetTitleComponent } from '../../core/components/widget-title/widget-
 import { getColors } from '../../core/utils/themeColors.utils';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
-import { KipResizeObserverDirective } from '../../core/directives/kip-resize-observer.directive';
+import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { CanvasService } from '../../core/services/canvas.service';
 import { measureBooleanControlsHeight } from './boolean-control-layout.util';
 
@@ -21,7 +21,7 @@ import { measureBooleanControlsHeight } from './boolean-control-layout.util';
   templateUrl: './widget-boolean-switch.component.html',
   styleUrls: ['./widget-boolean-switch.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [KipResizeObserverDirective, SvgBooleanSwitchComponent, SvgBooleanButtonComponent, SvgBooleanLightComponent, WidgetTitleComponent]
+  imports: [SkipResizeObserverDirective, SvgBooleanSwitchComponent, SvgBooleanButtonComponent, SvgBooleanLightComponent, WidgetTitleComponent]
 })
 export class WidgetBooleanSwitchComponent implements OnDestroy {
   // Host2 functional inputs (provided by widget-host2 wrapper)

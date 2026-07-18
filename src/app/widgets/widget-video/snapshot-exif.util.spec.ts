@@ -56,7 +56,7 @@ describe('buildSnapshotExif', () => {
 
   it('sets identifying 0th tags and a DateTimeOriginal', () => {
     const exif = buildSnapshotExif(FULL, { cameraName: 'Foredeck Cam' });
-    expect(exif['0th'][I.Make]).toBe('KIP');
+    expect(exif['0th'][I.Make]).toBe('Skip');
     expect(exif['0th'][I.Model]).toBe('Foredeck Cam');
     expect(exif.Exif[E.DateTimeOriginal]).toBe('2026:06:26 04:30:15');
   });

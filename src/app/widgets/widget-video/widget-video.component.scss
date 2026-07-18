@@ -17,8 +17,8 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--kip-contrast-color, #fff);
-  background: var(--kip-widget-card-background-color, #1e1e1e);
+  color: var(--skip-contrast-color, #fff);
+  background: var(--skip-widget-card-background-color, #1e1e1e);
 }
 
 .video-widget__stage {
@@ -39,8 +39,8 @@
   gap: 8px;
   pointer-events: none;
   font-size: 0.85rem;
-  color: var(--kip-contrast-dim-color, #fff);
-  background: color-mix(in srgb, var(--kip-widget-card-background-color, #000) 70%, transparent);
+  color: var(--skip-contrast-dim-color, #fff);
+  background: color-mix(in srgb, var(--skip-widget-card-background-color, #000) 70%, transparent);
 }
 
 .video-widget__player {
@@ -87,7 +87,7 @@
 }
 
 .video-widget__ctrl {
-  color: var(--kip-contrast-color, #fff);
+  color: var(--skip-contrast-color, #fff);
   width: 44px;
   height: 44px;
   // Flex-center the glyph on the backdrop — an explicit line-height left the
@@ -104,7 +104,7 @@
 
 // A focus ring that stays visible over any video frame (dark halo + light outline).
 .video-widget__ctrl:focus-visible {
-  outline: 2px solid var(--kip-blue-color, #4aa3ff);
+  outline: 2px solid var(--skip-blue-color, #4aa3ff);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.6);
 }
@@ -181,7 +181,7 @@
   padding: 6px 12px;
   border-radius: 8px;
   font-size: 0.8rem;
-  color: var(--kip-contrast-color, #fff);
+  color: var(--skip-contrast-color, #fff);
   text-align: center;
   background: color-mix(in srgb, #000 70%, transparent);
   display: inline-flex;
@@ -191,16 +191,16 @@
 
 // Severity cue: a colored left edge so an error reads differently from a confirmation.
 .video-widget__toast--error {
-  border-left: 4px solid var(--kip-zone-alarm-color, #e53935);
+  border-left: 4px solid var(--skip-zone-alarm-color, #e53935);
 }
 .video-widget__toast--success {
-  border-left: 4px solid var(--kip-zone-nominal-color, #43a047);
+  border-left: 4px solid var(--skip-zone-nominal-color, #43a047);
 }
 
 .video-widget__retry {
   // The only way back from a terminal error — make it a prominent, themed action.
-  color: var(--kip-contrast-color, #fff);
-  background: var(--kip-blue-dim-color, #1565c0);
+  color: var(--skip-contrast-color, #fff);
+  background: var(--skip-blue-dim-color, #1565c0);
   min-width: auto;
   line-height: 1.6;
 }
@@ -216,15 +216,15 @@
   text-align: center;
   padding: 8px;
   box-sizing: border-box;
-  color: var(--kip-contrast-dim-color);
-  background: color-mix(in srgb, var(--kip-widget-card-background-color) 92%, transparent);
+  color: var(--skip-contrast-dim-color);
+  background: color-mix(in srgb, var(--skip-widget-card-background-color) 92%, transparent);
 }
 
 .video-widget__empty-title {
   font-size: 1rem;
-  color: var(--kip-contrast-color);
+  color: var(--skip-contrast-color);
 }
 
 .video-widget__empty-hint {
-  color: var(--kip-contrast-dim-color);
+  color: var(--skip-contrast-dim-color);
 }

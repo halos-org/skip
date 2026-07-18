@@ -55,7 +55,7 @@ export class SettingsConfigComponent {
     const confirmed = await firstValueFrom(
       this.dialog.openConfirmationDialog({
         title: 'Switch profile',
-        message: `Switch this device to "${name}"? KIP will reload to load the profile.`,
+        message: `Switch this device to "${name}"? Skip will reload to load the profile.`,
         confirmBtnText: 'Switch',
         cancelBtnText: 'Cancel'
       })
@@ -156,7 +156,7 @@ export class SettingsConfigComponent {
     const downloadURL = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = downloadURL;
-    a.download = 'KipConfig.json';
+    a.download = 'SkipConfig.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -4,7 +4,7 @@
 </widget-title>
 @if (!dashboard.isDashboardStatic()) {
   <div class="widgetOverlay"
-    kipGestures mode="press" [enablePress]="false" [enableTap]="true" [enableDoubleTap]="false"
+    skipGestures mode="press" [enablePress]="false" [enableTap]="true" [enableDoubleTap]="false"
     (tap)="onSingleTap($event)">
   </div>
 }

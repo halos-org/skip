@@ -3,20 +3,20 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 
 
-interface IKipTimer {
+interface ISkipTimer {
   currentValue: BehaviorSubject<number>;
   timeoutID: ReturnType<typeof setInterval> | null;
   intervalMS: number;
 }
 
-type IKipTimers = Record<string, IKipTimer>;
+type ISkipTimers = Record<string, ISkipTimer>;
 
 @Injectable({
   providedIn: 'root'
 })
 export class TimersService implements OnDestroy {
 
-  kipTimers: IKipTimers = {};
+  skipTimers: ISkipTimers = {};
 
   constructor() {
 
@@ -36,56 +36,56 @@ export class TimersService implements OnDestroy {
    */
   public createTimer(timerName: string, count: number, timerInterval: number): Observable<number> {
     // return if exists
-    if (timerName in this.kipTimers) {
-      return this.kipTimers[timerName].currentValue.asObservable();
+    if (timerName in this.skipTimers) {
+      return this.skipTimers[timerName].currentValue.asObservable();
     }
     // create it
-    this.kipTimers[timerName] = {
+    this.skipTimers[timerName] = {
       currentValue: new BehaviorSubject<number>(count),
       timeoutID: null,
       intervalMS: timerInterval
     }
-    return this.kipTimers[timerName].currentValue.asObservable();
+    return this.skipTimers[timerName].currentValue.asObservable();
   }
 
 
 
   public startTimer(timerName: string) {
-    if (!Object.prototype.hasOwnProperty.call(this.kipTimers, timerName)) { return; }
+    if (!Object.prototype.hasOwnProperty.call(this.skipTimers, timerName)) { return; }
 
-    if (this.kipTimers[timerName].timeoutID !== null) { return } // already running
+    if (this.skipTimers[timerName].timeoutID !== null) { return } // already running
 
-    this.kipTimers[timerName].timeoutID = setInterval(() => {
-      this.kipTimers[timerName].currentValue.next(this.kipTimers[timerName].currentValue.value + 1)
-    }, this.kipTimers[timerName].intervalMS);
+    this.skipTimers[timerName].timeoutID = setInterval(() => {
+      this.skipTimers[timerName].currentValue.next(this.skipTimers[timerName].currentValue.value + 1)
+    }, this.skipTimers[timerName].intervalMS);
   }
 
   public stopTimer(timerName: string) {
-    if (!Object.prototype.hasOwnProperty.call(this.kipTimers, timerName)) { return; }
-    if (this.kipTimers[timerName].timeoutID === null) { return; } // already Stopped
-    clearInterval(this.kipTimers[timerName].timeoutID);
-    this.kipTimers[timerName].timeoutID = null;
+    if (!Object.prototype.hasOwnProperty.call(this.skipTimers, timerName)) { return; }
+    if (this.skipTimers[timerName].timeoutID === null) { return; } // already Stopped
+    clearInterval(this.skipTimers[timerName].timeoutID);
+    this.skipTimers[timerName].timeoutID = null;
   }
 
 
   public setTimer(timerName: string, timerValue: number) {
-    if (!Object.prototype.hasOwnProperty.call(this.kipTimers, timerName)) { return; }
-    this.kipTimers[timerName].currentValue.next(timerValue);
+    if (!Object.prototype.hasOwnProperty.call(this.skipTimers, timerName)) { return; }
+    this.skipTimers[timerName].currentValue.next(timerValue);
   }
 
 
   public deleteTimer(timerName: string) {
-    if (!Object.prototype.hasOwnProperty.call(this.kipTimers, timerName)) { return; }
+    if (!Object.prototype.hasOwnProperty.call(this.skipTimers, timerName)) { return; }
     this.stopTimer(timerName);
-    this.kipTimers[timerName].currentValue.complete();
-    delete this.kipTimers[timerName];
+    this.skipTimers[timerName].currentValue.complete();
+    delete this.skipTimers[timerName];
   }
 
 
   public isRunning(timerName: string) : boolean {
     let running = false;
-    if (timerName in this.kipTimers) {
-      running = this.kipTimers[timerName].timeoutID === null ? false : true;
+    if (timerName in this.skipTimers) {
+      running = this.skipTimers[timerName].timeoutID === null ? false : true;
     };
 
     return running;
@@ -96,15 +96,15 @@ export class TimersService implements OnDestroy {
    * retaining references to large graphs / widget subjects.
    */
   ngOnDestroy(): void {
-    Object.keys(this.kipTimers).forEach(name => {
-      if (this.kipTimers[name].timeoutID) {
-        clearInterval(this.kipTimers[name].timeoutID);
-        this.kipTimers[name].timeoutID = null;
+    Object.keys(this.skipTimers).forEach(name => {
+      if (this.skipTimers[name].timeoutID) {
+        clearInterval(this.skipTimers[name].timeoutID);
+        this.skipTimers[name].timeoutID = null;
       }
       // Complete any subjects to release observers
-      this.kipTimers[name].currentValue.complete();
+      this.skipTimers[name].currentValue.complete();
     });
-    this.kipTimers = {};
+    this.skipTimers = {};
   }
 
 

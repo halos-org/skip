@@ -1,8 +1,8 @@
-// KIP routes that must never be a returnTo target — redirecting back to them would loop the
+// Skip routes that must never be a returnTo target — redirecting back to them would loop the
 // SSO bounce instead of returning the user to real content.
 const SELF_ROUTE_PATHS = ['/login'];
 
-// The app uses hash-based routing (main.ts withHashLocation), so KIP's own routes live in the URL
+// The app uses hash-based routing (main.ts withHashLocation), so Skip's own routes live in the URL
 // fragment: /#/login resolves to pathname '/' with hash '#/login'. Checking only the pathname would
 // let /#/login pass as a safe returnTo and loop the SSO bounce, so the fragment's route is checked too.
 function isSelfRoute(resolved: URL): boolean {
@@ -18,8 +18,8 @@ function isSelfRoute(resolved: URL): boolean {
 /**
  * Validates a returnTo target for the SSO redirect. Accepts only site-relative paths on the app's
  * own origin; rejects protocol-relative (`//host`), backslash (normalized to `/` by browsers),
- * control characters, absolute/scheme URLs, cross-origin targets, and KIP's own login route (loop).
- * Mirrors the Signal K server's loginRedirect validation so KIP cannot construct an open redirect.
+ * control characters, absolute/scheme URLs, cross-origin targets, and Skip's own login route (loop).
+ * Mirrors the Signal K server's loginRedirect validation so Skip cannot construct an open redirect.
  */
 export function isSafeReturnTo(target: string | null | undefined): boolean {
   if (!target || typeof target !== 'string') {

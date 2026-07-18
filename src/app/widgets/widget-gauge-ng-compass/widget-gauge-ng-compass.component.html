@@ -1,7 +1,7 @@
 @if (shouldRenderGauge()) {
   <radial-gauge
     #compassGauge
-    kipResizeObserver
+    skipResizeObserver
     (resizeChange)="onResized($event)"
     [options]="gaugeOptions"
     [value]="value() ?? 0"

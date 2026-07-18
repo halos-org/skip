@@ -125,7 +125,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
   });
   protected readonly labelColor = computed(() => {
     const theme = this.theme();
-    return theme ? getColors(this.colorRole(), theme).dim : 'var(--kip-contrast-dim-color)';
+    return theme ? getColors(this.colorRole(), theme).dim : 'var(--skip-contrast-dim-color)';
   });
 
   protected readonly widgetColors = computed(() => {
@@ -178,16 +178,16 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
         ),
         metricsLineOne,
         metricsLineTwo,
-        stateBarColor: resolveZoneAwareColor(aggregateState, widgetColors?.dim ?? 'var(--kip-contrast-color)', theme, ignoreZones),
-        titleTextColor: resolveZoneAwareColor(aggregateState, 'var(--kip-contrast-color)', theme, ignoreZones),
+        stateBarColor: resolveZoneAwareColor(aggregateState, widgetColors?.dim ?? 'var(--skip-contrast-color)', theme, ignoreZones),
+        titleTextColor: resolveZoneAwareColor(aggregateState, 'var(--skip-contrast-color)', theme, ignoreZones),
         metaTextColor: resolveZoneAwareColor(
           this.resolveMostSevereState(alternator.chargingModeState ?? null, alternator.fieldDriveState ?? null),
-          'var(--kip-contrast-dim-color)',
+          'var(--skip-contrast-dim-color)',
           theme,
           ignoreZones
         ),
-        primaryMetricsTextColor: resolveZoneAwareColor(primaryState, 'var(--kip-contrast-color)', theme, ignoreZones),
-        secondaryMetricsTextColor: resolveZoneAwareColor(secondaryState, 'var(--kip-contrast-color)', theme, ignoreZones)
+        primaryMetricsTextColor: resolveZoneAwareColor(primaryState, 'var(--skip-contrast-color)', theme, ignoreZones),
+        secondaryMetricsTextColor: resolveZoneAwareColor(secondaryState, 'var(--skip-contrast-color)', theme, ignoreZones)
       };
     }
 
@@ -686,7 +686,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
         .attr('x', layout.titleX)
         .attr('y', layout.titleY)
         .attr('font-size', layout.titleFontSize)
-        .attr('fill', item => snapshot.displayModels[item.key]?.titleTextColor ?? 'var(--kip-contrast-color)')
+        .attr('fill', item => snapshot.displayModels[item.key]?.titleTextColor ?? 'var(--skip-contrast-color)')
         .text(item => snapshot.displayModels[item.key]?.titleText ?? this.resolveTitleText(item.alternator));
     } else {
       merged.select('text.alternator-title').text('');
@@ -697,7 +697,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
       .attr('y', layout.idY)
       .attr('text-anchor', 'end')
       .attr('font-size', layout.idFontSize)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .text(item => item.alternator.id);
 
     merged.select('text.alternator-mode')
@@ -705,7 +705,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
       .attr('y', layout.metaY)
       .attr('font-size', layout.metaFontSize)
       .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--kip-contrast-dim-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
       .text(item => snapshot.displayModels[item.key]?.modeText ?? '');
 
     merged.select('text.alternator-bus')
@@ -714,14 +714,14 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
       .attr('text-anchor', 'end')
       .attr('font-size', layout.metaFontSize)
       .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--kip-contrast-dim-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
       .text(item => snapshot.displayModels[item.key]?.busText ?? '');
 
     merged.select('text.alternator-metrics-1')
       .attr('x', layout.lineOneX)
       .attr('y', layout.lineOneY)
       .attr('font-size', layout.lineOneFontSize)
-      .attr('fill', item => snapshot.displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--kip-contrast-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--skip-contrast-color)')
       .text(item => snapshot.displayModels[item.key]?.metricsLineOne ?? '');
 
     merged.select('text.alternator-metrics-2')
@@ -729,7 +729,7 @@ export class WidgetAlternatorComponent implements AfterViewInit, OnDestroy {
       .attr('y', layout.lineTwoY)
       .attr('font-size', layout.lineTwoFontSize)
       .attr('opacity', 0.85)
-      .attr('fill', item => snapshot.displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--kip-contrast-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--skip-contrast-color)')
       .text(item => snapshot.displayModels[item.key]?.metricsLineTwo ?? '');
 
     selection.exit().remove();

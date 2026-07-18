@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { IWidget, IWidgetPath, IWidgetSvcConfig } from '../interfaces/widgets-interface';
-import { IElectricalTrackedDeviceRef, IKipConcreteSeriesDefinition, IKipSeriesDefinition, IKipTemplateSeriesDefinition } from '../contracts/kip-series-contract';
+import { IElectricalTrackedDeviceRef, ISkipConcreteSeriesDefinition, ISkipSeriesDefinition, ISkipTemplateSeriesDefinition } from '../contracts/skip-series-contract';
 import { WidgetService } from './widget.service';
 import {
   ElectricalFamilyKey,
@@ -42,12 +42,12 @@ export class DashboardHistorySeriesSyncService {
    * sync rules (dedicated widget mappings + automatic numeric path mapping).
    *
    * @param {IWidget | null | undefined} widget Widget definition to evaluate.
-   * @returns {IKipSeriesDefinition[]} Historical series definitions for the widget.
+   * @returns {ISkipSeriesDefinition[]} Historical series definitions for the widget.
    *
    * @example
    * const series = service.resolveSeriesForWidget(widget);
    */
-  public resolveSeriesForWidget(widget: IWidget | null | undefined): IKipSeriesDefinition[] {
+  public resolveSeriesForWidget(widget: IWidget | null | undefined): ISkipSeriesDefinition[] {
     const widgetType = widget?.type;
     const widgetUuid = widget?.uuid;
     const cfg = this.resolveWidgetConfig(widgetType, widget?.config);
@@ -104,7 +104,7 @@ export class DashboardHistorySeriesSyncService {
     return this.widgetService.getDefaultConfig(widgetType);
   }
 
-  private mapDataChartWidget(widgetUuid: string, widgetType: string, cfg: IWidgetSvcConfig | undefined): IKipConcreteSeriesDefinition | null {
+  private mapDataChartWidget(widgetUuid: string, widgetType: string, cfg: IWidgetSvcConfig | undefined): ISkipConcreteSeriesDefinition | null {
     const path = this.normalizeString(cfg?.datachartPath);
     if (!path) {
       return null;
@@ -126,7 +126,7 @@ export class DashboardHistorySeriesSyncService {
     };
   }
 
-  private mapWindTrendsWidget(widgetUuid: string, widgetType: string, cfg: IWidgetSvcConfig | undefined): IKipConcreteSeriesDefinition[] {
+  private mapWindTrendsWidget(widgetUuid: string, widgetType: string, cfg: IWidgetSvcConfig | undefined): ISkipConcreteSeriesDefinition[] {
     const shared = {
       ownerWidgetUuid: widgetUuid,
       ownerWidgetSelector: widgetType,
@@ -144,7 +144,7 @@ export class DashboardHistorySeriesSyncService {
     // widget's per-series gating and mapDataChartWidget's null-path omission.
     const dir = this.resolveWindTrendsSlot(cfg, 'trueWindDirection');
     const spd = this.resolveWindTrendsSlot(cfg, 'trueWindSpeed');
-    const series: IKipConcreteSeriesDefinition[] = [];
+    const series: ISkipConcreteSeriesDefinition[] = [];
 
     const dirPath = this.normalizeString(dir?.path);
     if (dirPath) {
@@ -184,7 +184,7 @@ export class DashboardHistorySeriesSyncService {
     widgetUuid: string,
     cfg: IWidgetSvcConfig | undefined,
     descriptor: NonNullable<ReturnType<typeof getElectricalWidgetFamilyDescriptor>>
-  ): IKipTemplateSeriesDefinition | null {
+  ): ISkipTemplateSeriesDefinition | null {
     const expansionMode = descriptor.templateExpansionMode;
     if (!expansionMode) {
       return null;
@@ -323,9 +323,9 @@ export class DashboardHistorySeriesSyncService {
     return normalized.slice(0, separatorIndex).trim();
   }
 
-  private mapAutomaticHistorySeries(widgetUuid: string, widgetType: string, cfg: IWidgetSvcConfig | undefined): IKipConcreteSeriesDefinition[] {
+  private mapAutomaticHistorySeries(widgetUuid: string, widgetType: string, cfg: IWidgetSvcConfig | undefined): ISkipConcreteSeriesDefinition[] {
     const paths = this.extractWidgetPaths(cfg?.paths);
-    const seriesBySignature = new Map<string, IKipConcreteSeriesDefinition>();
+    const seriesBySignature = new Map<string, ISkipConcreteSeriesDefinition>();
 
     paths.forEach(pathCfg => {
       if (pathCfg.pathType !== 'number') {

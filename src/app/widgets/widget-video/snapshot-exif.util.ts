@@ -67,7 +67,7 @@ export function buildSnapshotExif(telemetry: ISnapshotTelemetry, options: IBuild
   const exif: Record<number, unknown> = {};
   const gps: Record<number, unknown> = {};
 
-  zeroth[I.Make] = 'KIP';
+  zeroth[I.Make] = 'Skip';
   if (options.cameraName) {
     zeroth[I.Model] = options.cameraName;
   }

@@ -7,8 +7,8 @@ import { States, TState } from '../interfaces/signalk-interfaces';
  *
  * @param {string} color - The color key to retrieve from the theme palette.
  *   Supported keys: "contrast", "blue", "green", "pink", "orange", "purple", "yellow", "grey".
- * @param {ITheme} theme - The KIP theme object containing color definitions. ie.: this.theme() from a widget.
- * @returns {{ color: string, dim: string, dimmer: string }} An object with the main KIP theme color hex value,
+ * @param {ITheme} theme - The Skip theme object containing color definitions. ie.: this.theme() from a widget.
+ * @returns {{ color: string, dim: string, dimmer: string }} An object with the main Skip theme color hex value,
  *   a dimmed version, and a dimmer version for the specified color key.
  *
  * palette = { color: '#2196f3', dim: '#90caf9', dimmer: '#e3f2fd' }
@@ -39,7 +39,7 @@ export function getColors(color: string, theme: ITheme): { color: string; dim: s
 }
 
 /**
- * Maps a SignalK state to a KIP theme color, respecting zone-aware semantics.
+ * Maps a SignalK state to a Skip theme color, respecting zone-aware semantics.
  *
  * Resolves state-based colors (Nominal, Alarm, Warn, Alert) from the theme.
  * Returns a fallback color when:
@@ -52,9 +52,9 @@ export function getColors(color: string, theme: ITheme): { color: string; dim: s
  *
  * @param {TState | null | undefined} state - The SignalK state (e.g., States.Warn, States.Alarm).
  *   Passed as-is; null/undefined treated as "no state info available".
- * @param {string} defaultColor - Fallback color hex from theme (e.g. 'getColors('blue', theme).color') or CSS variable (e.g., 'var(--kip-contrast-color)').
+ * @param {string} defaultColor - Fallback color hex from theme (e.g. 'getColors('blue', theme).color') or CSS variable (e.g., 'var(--skip-contrast-color)').
  *   Returned when state is not available or zones are ignored.
- * @param {ITheme | null} theme - The KIP theme object containing zone colors (zoneNominal, zoneAlarm, etc.).
+ * @param {ITheme | null} theme - The Skip theme object containing zone colors (zoneNominal, zoneAlarm, etc.).
  *   Can be null if theme loads asynchronously; returns defaultColor in that case.
  * @param {boolean} ignoreZones - If true, skip zone mapping and return defaultColor.
  *   Typically set from widget config `ignoreZones` option.

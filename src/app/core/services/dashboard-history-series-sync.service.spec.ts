@@ -2,11 +2,11 @@ import type { Mock } from "vitest";
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardHistorySeriesSyncService } from './dashboard-history-series-sync.service';
-import { IKipSeriesDefinition } from '../contracts/kip-series-contract';
+import { ISkipSeriesDefinition } from '../contracts/skip-series-contract';
 import { IWidget, IWidgetPath, IWidgetSvcConfig } from '../interfaces/widgets-interface';
 import { WidgetService } from './widget.service';
 
-function seriesIds(series: IKipSeriesDefinition[]): string[] {
+function seriesIds(series: ISkipSeriesDefinition[]): string[] {
     return series.map(item => item.seriesId).sort();
 }
 

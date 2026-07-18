@@ -14,7 +14,7 @@ svg {
 
 .fixed-dial-background {
   fill: none;
-  stroke: var(--kip-grey-color);
+  stroke: var(--skip-grey-color);
 }
 
 .rotating-dial-Backplate {
@@ -22,42 +22,42 @@ svg {
 }
 
 .starboard  {
-  stroke: var(--kip-starboard-color);
+  stroke: var(--skip-starboard-color);
 }
 
 .port {
-  stroke: var(--kip-port-color);
+  stroke: var(--skip-port-color);
 }
 
 .heading-box {
-  stroke: var(--kip-grey-color);
-  fill: var(--kip-widget-card-background-color);
+  stroke: var(--skip-grey-color);
+  fill: var(--skip-widget-card-background-color);
 }
 
 .boat {
-  stop-color: var(--kip-grey-color) !important;
+  stop-color: var(--skip-grey-color) !important;
 }
 
 .contrast-text {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
 }
 
 .contrast-stroke {
-  stroke: var(--kip-contrast-color);
+  stroke: var(--skip-contrast-color);
 }
 
 .card-color {
-  fill: var(--kip-widget-card-background-color);
+  fill: var(--skip-widget-card-background-color);
 }
 
 .tack-box {
-  stroke: var(--kip-yellow-dim-color);
-  fill: var(--kip-widget-card-background-color);
+  stroke: var(--skip-yellow-dim-color);
+  fill: var(--skip-widget-card-background-color);
   stroke-width: 5;
 }
 
 .tack-value {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   font-family: Roboto;
   font-size: 80px;
   font-style: normal;
@@ -68,7 +68,7 @@ svg {
 }
 
 .tack-label {
-  fill: var(--kip-contrast-dim-color);
+  fill: var(--skip-contrast-dim-color);
   font-family:Roboto;
   font-size:35px;
   font-style: normal;
@@ -79,13 +79,13 @@ svg {
 }
 
 .waypoint-box {
-  stroke: var(--kip-orange-dim-color);
-  fill: var(--kip-widget-card-background-color);
+  stroke: var(--skip-orange-dim-color);
+  fill: var(--skip-widget-card-background-color);
   stroke-width: 5;
 }
 
 .waypoint-value {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   font-family: Roboto;
   font-size: 50px;
   font-style: normal;
@@ -96,7 +96,7 @@ svg {
 }
 
 .wind-vmg-value {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   font-family: Roboto;
   font-size: 80px;
   font-style: normal;
@@ -107,7 +107,7 @@ svg {
 }
 
 .wind-vmg-offset {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   font-family: Roboto;
   font-size: 35px;
   font-style: normal;
@@ -118,60 +118,60 @@ svg {
 }
 
 .true-wind {
-    fill: var(--kip-blue-color);
+    fill: var(--skip-blue-color);
 }
 
 .app-wind-label {
-    fill: var(--kip-orange-dim-color);
+    fill: var(--skip-orange-dim-color);
 }
 
 .tack-angle {
-  fill: var(--kip-yellow-color);
+  fill: var(--skip-yellow-color);
   stroke-width: 15;
   stroke-linecap: square;
 }
 
 .next-waypoint {
-  stroke: var(--kip-orange-color);
+  stroke: var(--skip-orange-color);
   stroke-width:20;
   fill: none;
 }
 
 .next-waypoint-bar {
-  stroke: var(--kip-grey-color);
+  stroke: var(--skip-grey-color);
 }
 
 .portLayline {
-  stroke:  var(--kip-port-color);
+  stroke:  var(--skip-port-color);
   stroke-width: 5;
 }
 
 .stbdLayline {
-  stroke:  var(--kip-starboard-color);
+  stroke:  var(--skip-starboard-color);
   stroke-width: 5;
 }
 
 .direction-line {
-  stroke: var(--kip-contrast-color);
+  stroke: var(--skip-contrast-color);
   stroke-width: 5;
 }
 
 .speed-line {
-  stroke: var(--kip-blue-color);
+  stroke: var(--skip-blue-color);
   stroke-width: 10;
-  fill: var(--kip-blue-color);
+  fill: var(--skip-blue-color);
 }
 
 .wind-sector-port {
-  fill: var(--kip-port-color);
+  fill: var(--skip-port-color);
 }
 
 .wind-sector-stbd {
-  fill: var(--kip-starboard-color);
+  fill: var(--skip-starboard-color);
 }
 
 .drift-arrow {
-  stop-color: var(--kip-blue-color);
-  stroke: var(--kip-widget-card-background-color);
+  stop-color: var(--skip-blue-color);
+  stroke: var(--skip-widget-card-background-color);
   stroke-width: 3;
 }

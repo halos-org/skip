@@ -71,8 +71,8 @@
   justify-content: center;
   cursor: pointer;
   @include mat.button-overrides((
-    filled-container-color: var(--kip-blue-dim-color),
-    filled-label-text-color: var(--kip-contrast-color),
+    filled-container-color: var(--skip-blue-dim-color),
+    filled-label-text-color: var(--skip-contrast-color),
     filled-container-height: 100%
   ));
 }
@@ -89,21 +89,21 @@
 
 .ap-btn-notifications {
   @include mat.button-overrides((
-    filled-container-color: var(--kip-yellow-dim-color),
+    filled-container-color: var(--skip-yellow-dim-color),
   ));
 }
 
 .ap-btn-engage {
   @include mat.button-overrides((
     filled-horizontal-padding: 0rem,
-    filled-container-color: var(--kip-port-color),
+    filled-container-color: var(--skip-port-color),
   ));
 }
 
 .ap-btn-disengage {
   @include mat.button-overrides((
     filled-horizontal-padding: 0rem,
-    filled-container-color: var(--kip-starboard-color),
+    filled-container-color: var(--skip-starboard-color),
   ));
 }
 
@@ -161,7 +161,7 @@
   font-variant-caps: normal;
   font-variant-numeric: normal;
   font-variant-east-asian: normal;
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   fill-opacity: 1;
   stroke: none;
 }
@@ -179,7 +179,7 @@
   font-variant-caps: normal;
   font-variant-numeric: normal;
   font-variant-east-asian: normal;
-  fill: var(--kip-contrast-dim-color);
+  fill: var(--skip-contrast-dim-color);
   fill-opacity: 1;
   stroke: none;
 }
@@ -189,11 +189,11 @@
 }
 
 .svg-element-notifications {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
 }
 
 .svg-element-clear-notifications {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   fill-opacity: 1;
   stroke: none;
 }
@@ -283,29 +283,29 @@ g:active text {
 }
 
 .svg-menu-item {
-  fill: var(--kip-blue-color);
+  fill: var(--skip-blue-color);
   stroke: var(--mat-sys-outline-variant);
 }
 
 .svg-menu-item-text {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   stroke: none;
 }
 
 .svg-menu-item-current {
-  fill: var(--kip-blue-color);
+  fill: var(--skip-blue-color);
   pointer-events: none;
   stroke: var(--mat-sys-outline-variant);
 }
 
 .svg-menu-item-current-text {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   stroke: none;
   pointer-events: none;
 }
 
 .svg-menu-item-disabled {
-  fill: var(--kip-blue-color);
+  fill: var(--skip-blue-color);
   pointer-events: none;
   stroke: var(--mat-sys-outline-variant);
 }
@@ -322,7 +322,7 @@ g:active text {
 }
 
 .svg-menu-item-cancel-text {
-  fill: var(--kip-contrast-color);
+  fill: var(--skip-contrast-color);
   stroke: none;
 }
 

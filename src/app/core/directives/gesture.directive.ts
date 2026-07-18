@@ -55,7 +55,7 @@ interface CancelHandlerEntry {
  * Usage:
  * @example
  *  <div
- *    kipGestures
+ *    skipGestures
  *    [mode]="'press'"
  *    [enablePress]="true"
  *    [enableDoubleTap]="true"
@@ -64,7 +64,7 @@ interface CancelHandlerEntry {
  *    (doubletap)="onDoubleTap($event)">
  *  </div>
  */
-@Directive({ selector: '[kipGestures]' })
+@Directive({ selector: '[skipGestures]' })
 export class GestureDirective {
   // Debug flag: set to true to enable gesture debug logging
   private static readonly DEBUG = false;
@@ -1222,13 +1222,13 @@ export class GestureDirective {
     if (stored === '1') {
       (GestureDirective as unknown as { DEBUG: boolean }).DEBUG = true;
     }
-    // Expose console helper: kipGesturesDebug(true|false) or kipGesturesDebug() to toggle
-    const w = window as unknown as { kipGesturesDebug?: (on?: boolean) => boolean };
-    w.kipGesturesDebug = (on?: boolean) => {
+    // Expose console helper: skipGesturesDebug(true|false) or skipGesturesDebug() to toggle
+    const w = window as unknown as { skipGesturesDebug?: (on?: boolean) => boolean };
+    w.skipGesturesDebug = (on?: boolean) => {
       const ctor = GestureDirective as unknown as { DEBUG: boolean };
       if (typeof on === 'boolean') ctor.DEBUG = on; else ctor.DEBUG = !ctor.DEBUG;
       try { localStorage.setItem(GESTURES_DEBUG_KEY, ctor.DEBUG ? '1' : '0'); } catch { /* ignore */ }
-      console.info('KIP gestures debug:', ctor.DEBUG);
+      console.info('Skip gestures debug:', ctor.DEBUG);
       return ctor.DEBUG;
     };
   } catch {

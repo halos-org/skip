@@ -167,7 +167,7 @@ export function localStorageBundle({ origin, subscribeAll }) {
  * localStorageBundle().
  */
 export function initScriptContent(bundle) {
-  return `window.__KIP_TEST__=true;` +
+  return `window.__SKIP_TEST__=true;` +
     Object.entries(bundle).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join('');
 }
 

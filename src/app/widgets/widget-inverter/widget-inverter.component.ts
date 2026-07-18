@@ -124,7 +124,7 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
   });
   protected readonly labelColor = computed(() => {
     const theme = this.theme();
-    return theme ? getColors(this.colorRole(), theme).dim : 'var(--kip-contrast-dim-color)';
+    return theme ? getColors(this.colorRole(), theme).dim : 'var(--skip-contrast-dim-color)';
   });
 
   protected readonly widgetColors = computed(() => {
@@ -174,11 +174,11 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
         ),
         metricsLineOne,
         metricsLineTwo,
-        stateBarColor: resolveZoneAwareColor(aggregateState, widgetColors?.dim ?? 'var(--kip-contrast-color)', theme, ignoreZones),
-        titleTextColor: resolveZoneAwareColor(aggregateState, 'var(--kip-contrast-color)', theme, ignoreZones),
-        metaTextColor: resolveZoneAwareColor(inverter.inverterModeState ?? null, 'var(--kip-contrast-dim-color)', theme, ignoreZones),
-        primaryMetricsTextColor: resolveZoneAwareColor(primaryState, 'var(--kip-contrast-color)', theme, ignoreZones),
-        secondaryMetricsTextColor: resolveZoneAwareColor(secondaryState, 'var(--kip-contrast-color)', theme, ignoreZones)
+        stateBarColor: resolveZoneAwareColor(aggregateState, widgetColors?.dim ?? 'var(--skip-contrast-color)', theme, ignoreZones),
+        titleTextColor: resolveZoneAwareColor(aggregateState, 'var(--skip-contrast-color)', theme, ignoreZones),
+        metaTextColor: resolveZoneAwareColor(inverter.inverterModeState ?? null, 'var(--skip-contrast-dim-color)', theme, ignoreZones),
+        primaryMetricsTextColor: resolveZoneAwareColor(primaryState, 'var(--skip-contrast-color)', theme, ignoreZones),
+        secondaryMetricsTextColor: resolveZoneAwareColor(secondaryState, 'var(--skip-contrast-color)', theme, ignoreZones)
       };
     }
 
@@ -584,7 +584,7 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
     if (snapshot.inverters.length > 1) {
       merged.select('text.inverter-title')
         .attr('x', layout.titleX).attr('y', layout.titleY).attr('font-size', layout.titleFontSize)
-        .attr('fill', item => snapshot.displayModels[item.key]?.titleTextColor ?? 'var(--kip-contrast-color)')
+        .attr('fill', item => snapshot.displayModels[item.key]?.titleTextColor ?? 'var(--skip-contrast-color)')
         .text(item => snapshot.displayModels[item.key]?.titleText ?? this.resolveTitleText(item.inverter));
     } else {
       merged.select('text.inverter-title').text('');
@@ -592,30 +592,30 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
 
     merged.select('text.inverter-id')
       .attr('x', layout.idX).attr('y', layout.idY).attr('text-anchor', 'end').attr('font-size', layout.idFontSize)
-      .attr('fill', 'var(--kip-contrast-dim-color)')
+      .attr('fill', 'var(--skip-contrast-dim-color)')
       .text(item => item.inverter.id);
 
     merged.select('text.inverter-mode')
       .attr('x', layout.metaLeftX).attr('y', layout.metaY).attr('font-size', layout.metaFontSize)
       .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--kip-contrast-dim-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
       .text(item => snapshot.displayModels[item.key]?.modeText ?? '');
 
     merged.select('text.inverter-bus')
       .attr('x', layout.metaRightX).attr('y', layout.metaY).attr('text-anchor', 'end').attr('font-size', layout.metaFontSize)
       .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--kip-contrast-dim-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
       .text(item => snapshot.displayModels[item.key]?.busText ?? '');
 
     merged.select('text.inverter-metrics-1')
       .attr('x', layout.lineOneX).attr('y', layout.lineOneY).attr('font-size', layout.lineOneFontSize)
-      .attr('fill', item => snapshot.displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--kip-contrast-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--skip-contrast-color)')
       .text(item => snapshot.displayModels[item.key]?.metricsLineOne ?? '');
 
     merged.select('text.inverter-metrics-2')
       .attr('x', layout.lineTwoX).attr('y', layout.lineTwoY).attr('font-size', layout.lineTwoFontSize)
       .attr('opacity', 0.85)
-      .attr('fill', item => snapshot.displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--kip-contrast-color)')
+      .attr('fill', item => snapshot.displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--skip-contrast-color)')
       .text(item => snapshot.displayModels[item.key]?.metricsLineTwo ?? '');
 
     selection.exit().remove();

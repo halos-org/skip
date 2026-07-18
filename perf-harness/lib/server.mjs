@@ -12,7 +12,7 @@ import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { join, extname, normalize } from 'node:path';
 import { WebSocketServer } from 'ws';
-import { SELF_URN } from './kip-config.mjs';
+import { SELF_URN } from './skip-config.mjs';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript',
