@@ -20,6 +20,18 @@ const MIGRATION_OUTPUT_VERSION = 12;
 // config instead of relabeling it as current.
 const V13_MIGRATION_OUTPUT_VERSION = 13;
 
+// The v13 -> v14 transform output. Pinned to a fixed 14 for the same reason as the constants above.
+const V14_MIGRATION_OUTPUT_VERSION = 14;
+
+// SK-02 / #21: the delta parser stopped fabricating dotted child paths for compound leaves, so a
+// stored widget path pointing at a sub-field of one of these leaves must be rewritten to the whole
+// canonical path (the widgets read the sub-field off the whole value). Matched by suffix so a nested
+// compound (e.g. courseGreatCircle.nextPoint.position) is covered as well as the top-level leaf.
+const COMPOUND_SUBFIELD_PATH_SUFFIXES = [
+  '.position.latitude', '.position.longitude', '.position.altitude',
+  '.attitude.roll', '.attitude.pitch', '.attitude.yaw',
+];
+
 // NOTE: This service encapsulates the app-config upgrades — the legacy migration (remote file
 // version 9 / app-config version 10) and the v11 remote upgrade — each stamping the upgraded
 // config with MIGRATION_OUTPUT_VERSION.
@@ -192,6 +204,30 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
+    } else if (version === 13) {
+      // Remote (Signal K) configs. v13 slots live in the same active file version as v11/v12.
+      try {
+        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+
+        for (const item of configsList) {
+          try {
+            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V14_MIGRATION_OUTPUT_VERSION}.`);
+            const migratedConfig = this.migrateOneAppVersion(config, 13);
+            if (!migratedConfig) continue; // skip if not a v13 slot
+
+            await this._storage.setConfig(item.scope, item.name, migratedConfig);
+          } catch (error) {
+            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
+          }
+        }
+        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
+        setTimeout(() => this._settings.reloadApp(), 1500);
+      } catch (error) {
+        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        this.upgrading.set(false);
+      }
+
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = {
@@ -320,6 +356,7 @@ export class ConfigurationUpgradeService {
     switch (fromVersion) {
       case 11: return this.upgradeConfig(config);
       case 12: return this.upgradeConfigV12toV13(config);
+      case 13: return this.upgradeConfigV13toV14(config);
       default: return null;
     }
   }
@@ -494,6 +531,54 @@ export class ConfigurationUpgradeService {
       return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading v12->v13: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * v13 -> v14 (SK-02 / #21): the delta parser no longer flattens compound Signal K leaves into
+   * fabricated dotted child paths. Rewrite every stored widget path that points at a sub-field of a
+   * known compound leaf (`navigation.position.*`, `navigation.attitude.*`, and their nested
+   * occurrences) to the whole canonical path — the affected widgets read the sub-field off the whole
+   * value. Idempotent: a path already at the compound level matches no suffix and is left untouched.
+   */
+  private upgradeConfigV13toV14(config: IConfig): IConfig | null {
+    try {
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 13) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v13 config. Skipping...`);
+        return null;
+      }
+
+      let rewritten = 0;
+      if (Array.isArray(config.dashboards)) {
+        for (const dash of config.dashboards) {
+          if (!dash || !Array.isArray(dash.configuration)) continue;
+          for (const widget of dash.configuration) {
+            const cfg = (widget as { input?: { widgetProperties?: { config?: { paths?: unknown } } } })
+              ?.input?.widgetProperties?.config;
+            const paths = cfg?.paths;
+            if (!paths || typeof paths !== 'object') continue;
+            // paths is either a Record<string, IWidgetPath> or an IWidgetPath[]; Object.values covers both.
+            for (const pathCfg of Object.values(paths as Record<string, { path?: unknown }>)) {
+              if (!pathCfg || typeof pathCfg.path !== 'string') continue;
+              const suffix = COMPOUND_SUBFIELD_PATH_SUFFIXES.find(s => (pathCfg.path as string).endsWith(s));
+              if (suffix) {
+                pathCfg.path = (pathCfg.path as string).slice(0, (pathCfg.path as string).lastIndexOf('.'));
+                rewritten++;
+              }
+            }
+          }
+        }
+      }
+      if (rewritten) {
+        this.pushMsg(`[Upgrade] Rewrote ${rewritten} compound sub-field path(s) to their canonical whole path.`);
+      }
+
+      appConfig.configVersion = V14_MIGRATION_OUTPUT_VERSION;
+      return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
+    } catch (error) {
+      this.pushError(`[Upgrade Service] Error upgrading v13->v14: ${(error as Error).message}`);
       return null;
     }
   }

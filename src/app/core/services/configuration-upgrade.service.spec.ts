@@ -195,6 +195,76 @@ describe('ConfigurationUpgradeService', () => {
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
     });
 
+    it('v13 upgrade rewrites compound sub-field widget paths to the whole canonical path and stamps v14', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    // Record form of paths (typical widget): position sub-fields, attitude sub-field, and a genuine scalar leaf.
+                    { input: { widgetProperties: { config: { paths: {
+                        longPath: { path: 'self.navigation.position.longitude', pathType: 'number' },
+                        latPath: { path: 'self.navigation.position.latitude', pathType: 'number' },
+                        angle: { path: 'self.navigation.attitude.roll', pathType: 'number' },
+                        speed: { path: 'self.navigation.speedOverGround', pathType: 'number' }
+                    } } } } },
+                    // Array form of paths (multi-control widget) + a nested compound (autopilot nextPoint position).
+                    { input: { widgetProperties: { config: { paths: [
+                        { path: 'self.navigation.courseGreatCircle.nextPoint.position.latitude', pathType: 'number' }
+                    ] } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(14);
+        const recordPaths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        expect(recordPaths.longPath.path).toBe('self.navigation.position');
+        expect(recordPaths.latPath.path).toBe('self.navigation.position');
+        expect(recordPaths.angle.path).toBe('self.navigation.attitude');
+        // A genuine scalar leaf must be left untouched.
+        expect(recordPaths.speed.path).toBe('self.navigation.speedOverGround');
+        const arrayPaths = written.dashboards[0].configuration[1].input.widgetProperties.config.paths;
+        expect(arrayPaths[0].path).toBe('self.navigation.courseGreatCircle.nextPoint.position');
+    });
+
+    it('v13 upgrade skips a slot that is not at version 13 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 14 },
+            theme: { themeName: '' },
+            dashboards: []
+        });
+
+        await service.runUpgrade(13);
+
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('v13 upgrade is idempotent — a path already at the compound level is not re-trimmed', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 13 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { config: { paths: {
+                        angle: { path: 'self.navigation.attitude', pathType: 'number' }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(13);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths.angle.path)
+            .toBe('self.navigation.attitude');
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([
