@@ -4,7 +4,7 @@ import { select, type Selection } from 'd3-selection';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import type { ITheme } from '../../core/services/app-service';
-import { States, TState } from '../../core/interfaces/signalk-interfaces';
+import { TState } from '../../core/interfaces/signalk-interfaces';
 import type { ElectricalTrackedDevice, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { UnitsService } from '../../core/services/units.service';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
@@ -21,6 +21,7 @@ import {
 import type { InverterDisplayModel, InverterSnapshot, InverterWidgetConfig, ElectricalCardModeConfig } from './widget-inverter.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
+import { setValue, setMetricValue, toStringValue, toBoolean, resolveMostSevereState } from '../shared/electrical-apply.util';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -151,7 +152,7 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
     for (const inverter of inverters) {
       const modelKey = inverter.deviceKey ?? inverter.id;
       const showSource = !!inverter.source && duplicateIds.has(inverter.id);
-      const aggregateState = this.resolveMostSevereState(
+      const aggregateState = resolveMostSevereState(
         inverter.dcVoltageState ?? null,
         inverter.dcCurrentState ?? null,
         inverter.acVoltageState ?? null,
@@ -160,8 +161,8 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
         inverter.temperatureState ?? null,
         inverter.inverterModeState ?? null
       );
-      const primaryState = this.resolveMostSevereState(inverter.dcVoltageState ?? null, inverter.dcCurrentState ?? null);
-      const secondaryState = this.resolveMostSevereState(inverter.acVoltageState ?? null, inverter.acCurrentState ?? null, inverter.acFrequencyState ?? null);
+      const primaryState = resolveMostSevereState(inverter.dcVoltageState ?? null, inverter.dcCurrentState ?? null);
+      const secondaryState = resolveMostSevereState(inverter.acVoltageState ?? null, inverter.acCurrentState ?? null, inverter.acFrequencyState ?? null);
       const [metricsLineOne, metricsLineTwo] = this.buildMetricRows(inverter);
 
       models[modelKey] = {
@@ -398,7 +399,7 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
           if (next.dcVoltage != null && next.dcCurrent != null) {
             const derived = next.dcVoltage * next.dcCurrent;
             next.dcPower = Number.isFinite(derived) ? derived : null;
-            next.dcPowerState = this.resolveMostSevereState(next.dcVoltageState ?? null, next.dcCurrentState ?? null);
+            next.dcPowerState = resolveMostSevereState(next.dcVoltageState ?? null, next.dcCurrentState ?? null);
           } else {
             next.dcPower = null;
             next.dcPowerState = null;
@@ -421,50 +422,33 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
 
   private applyValue(snapshot: InverterSnapshot, key: string, value: unknown, state: TState | null): boolean {
     switch (key) {
-      case 'name': return this.setValue(snapshot, 'name', this.toStringValue(value));
-      case 'location': return this.setValue(snapshot, 'location', this.toStringValue(value));
-      case 'associatedBus': return this.setValue(snapshot, 'associatedBus', this.toStringValue(value));
-      case 'dc.voltage': return this.setMetricValue(snapshot, 'dcVoltage', 'dcVoltageState', this.toNumber(value, 'V'), state);
-      case 'dc.current': return this.setMetricValue(snapshot, 'dcCurrent', 'dcCurrentState', this.toNumber(value, 'A'), state);
-      case 'acin.voltage': return this.setMetricValue(snapshot, 'acInVoltage', 'acInVoltageState', this.toNumber(value, 'V'), state);
-      case 'acin.current': return this.setMetricValue(snapshot, 'acInCurrent', 'acInCurrentState', this.toNumber(value, 'A'), state);
-      case 'acin.frequency': return this.setMetricValue(snapshot, 'acInFrequency', 'acInFrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'acin.power': return this.setMetricValue(snapshot, 'acInPower', 'acInPowerState', this.toNumber(value, 'W'), state);
-      case 'acin.1.currentLimit': return this.setMetricValue(snapshot, 'acIn1CurrentLimit', 'acIn1CurrentLimitState', this.toNumber(value, 'A'), state);
-      case 'acin.currentLimit': return this.setMetricValue(snapshot, 'acInCurrentLimit', 'acInCurrentLimitState', this.toNumber(value, 'A'), state);
-      case 'acState.acIn1Available': return this.setMetricValue(snapshot, 'acIn1Available', 'acIn1AvailableState', this.toBoolean(value), state);
-      case 'acState.ignoreAcIn1.state': return this.setMetricValue(snapshot, 'ignoreAcIn1', 'ignoreAcIn1State', this.toBoolean(value), state);
-      case 'ac.voltage': return this.setMetricValue(snapshot, 'acVoltage', 'acVoltageState', this.toNumber(value, 'V'), state);
-      case 'ac.current': return this.setMetricValue(snapshot, 'acCurrent', 'acCurrentState', this.toNumber(value, 'A'), state);
-      case 'ac.frequency': return this.setMetricValue(snapshot, 'acFrequency', 'acFrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'acout.voltage': return this.setMetricValue(snapshot, 'acOutVoltage', 'acOutVoltageState', this.toNumber(value, 'V'), state);
-      case 'acout.current': return this.setMetricValue(snapshot, 'acOutCurrent', 'acOutCurrentState', this.toNumber(value, 'A'), state);
-      case 'acout.frequency': return this.setMetricValue(snapshot, 'acOutFrequency', 'acOutFrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'acout.power': return this.setMetricValue(snapshot, 'acOutPower', 'acOutPowerState', this.toNumber(value, 'W'), state);
-      case 'inverterMode': return this.setMetricValue(snapshot, 'inverterMode', 'inverterModeState', this.toStringValue(value), state);
-      case 'inverterModeNumber': return this.setMetricValue(snapshot, 'inverterModeNumber', 'inverterModeNumberState', this.toNumber(value, ''), state);
-      case 'preferRenewableEnergy': return this.setMetricValue(snapshot, 'preferRenewableEnergy', 'preferRenewableEnergyState', this.toBoolean(value), state);
-      case 'preferRenewableEnergyActive': return this.setMetricValue(snapshot, 'preferRenewableEnergyActive', 'preferRenewableEnergyActiveState', this.toBoolean(value), state);
-      case 'temperature': return this.setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+      case 'name': return setValue(snapshot, 'name', toStringValue(value));
+      case 'location': return setValue(snapshot, 'location', toStringValue(value));
+      case 'associatedBus': return setValue(snapshot, 'associatedBus', toStringValue(value));
+      case 'dc.voltage': return setMetricValue(snapshot, 'dcVoltage', 'dcVoltageState', this.toNumber(value, 'V'), state);
+      case 'dc.current': return setMetricValue(snapshot, 'dcCurrent', 'dcCurrentState', this.toNumber(value, 'A'), state);
+      case 'acin.voltage': return setMetricValue(snapshot, 'acInVoltage', 'acInVoltageState', this.toNumber(value, 'V'), state);
+      case 'acin.current': return setMetricValue(snapshot, 'acInCurrent', 'acInCurrentState', this.toNumber(value, 'A'), state);
+      case 'acin.frequency': return setMetricValue(snapshot, 'acInFrequency', 'acInFrequencyState', this.toNumber(value, 'Hz'), state);
+      case 'acin.power': return setMetricValue(snapshot, 'acInPower', 'acInPowerState', this.toNumber(value, 'W'), state);
+      case 'acin.1.currentLimit': return setMetricValue(snapshot, 'acIn1CurrentLimit', 'acIn1CurrentLimitState', this.toNumber(value, 'A'), state);
+      case 'acin.currentLimit': return setMetricValue(snapshot, 'acInCurrentLimit', 'acInCurrentLimitState', this.toNumber(value, 'A'), state);
+      case 'acState.acIn1Available': return setMetricValue(snapshot, 'acIn1Available', 'acIn1AvailableState', toBoolean(value), state);
+      case 'acState.ignoreAcIn1.state': return setMetricValue(snapshot, 'ignoreAcIn1', 'ignoreAcIn1State', toBoolean(value), state);
+      case 'ac.voltage': return setMetricValue(snapshot, 'acVoltage', 'acVoltageState', this.toNumber(value, 'V'), state);
+      case 'ac.current': return setMetricValue(snapshot, 'acCurrent', 'acCurrentState', this.toNumber(value, 'A'), state);
+      case 'ac.frequency': return setMetricValue(snapshot, 'acFrequency', 'acFrequencyState', this.toNumber(value, 'Hz'), state);
+      case 'acout.voltage': return setMetricValue(snapshot, 'acOutVoltage', 'acOutVoltageState', this.toNumber(value, 'V'), state);
+      case 'acout.current': return setMetricValue(snapshot, 'acOutCurrent', 'acOutCurrentState', this.toNumber(value, 'A'), state);
+      case 'acout.frequency': return setMetricValue(snapshot, 'acOutFrequency', 'acOutFrequencyState', this.toNumber(value, 'Hz'), state);
+      case 'acout.power': return setMetricValue(snapshot, 'acOutPower', 'acOutPowerState', this.toNumber(value, 'W'), state);
+      case 'inverterMode': return setMetricValue(snapshot, 'inverterMode', 'inverterModeState', toStringValue(value), state);
+      case 'inverterModeNumber': return setMetricValue(snapshot, 'inverterModeNumber', 'inverterModeNumberState', this.toNumber(value, ''), state);
+      case 'preferRenewableEnergy': return setMetricValue(snapshot, 'preferRenewableEnergy', 'preferRenewableEnergyState', toBoolean(value), state);
+      case 'preferRenewableEnergyActive': return setMetricValue(snapshot, 'preferRenewableEnergyActive', 'preferRenewableEnergyActiveState', toBoolean(value), state);
+      case 'temperature': return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
       default: return false;
     }
-  }
-
-  private setValue<K extends keyof InverterSnapshot>(target: InverterSnapshot, key: K, nextValue: InverterSnapshot[K]): boolean {
-    if (Object.is(target[key], nextValue)) return false;
-    target[key] = nextValue;
-    return true;
-  }
-
-  private setMetricValue<K extends keyof InverterSnapshot, S extends keyof InverterSnapshot>(
-    target: InverterSnapshot, key: K, stateKey: S, nextValue: InverterSnapshot[K], state: TState | null
-  ): boolean {
-    const valueChanged = !Object.is(target[key], nextValue);
-    const stateChanged = !Object.is(target[stateKey], state);
-    if (!valueChanged && !stateChanged) return false;
-    target[key] = nextValue;
-    target[stateKey] = state as InverterSnapshot[S];
-    return true;
   }
 
   private requestRender(snapshot?: InverterRenderSnapshot): void {
@@ -638,18 +622,6 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
     return `${value.toFixed(1)} ${this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature)}`;
   }
 
-  private toStringValue(value: unknown): string | null {
-    return typeof value === 'string' ? value : null;
-  }
-
-  private resolveMostSevereState(...states: (TState | null | undefined)[]): TState | null {
-    if (states.some(s => s === States.Alert)) return States.Alert;
-    if (states.some(s => s === States.Alarm)) return States.Alarm;
-    if (states.some(s => s === States.Warn)) return States.Warn;
-    if (states.some(s => s === States.Normal)) return States.Normal;
-    return null;
-  }
-
   private toNumber(value: unknown, unitHint: string): number | null {
     if (value == null || typeof value === 'boolean') return null;
     const rawNumber = typeof value === 'number' ? value : Number(value);
@@ -658,22 +630,4 @@ export class WidgetInverterComponent implements AfterViewInit, OnDestroy {
     return typeof converted === 'number' && Number.isFinite(converted) ? converted : null;
   }
 
-  private toBoolean(value: unknown): boolean | null {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-
-    if (typeof value === 'number') {
-      if (value === 1) return true;
-      if (value === 0) return false;
-    }
-
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase();
-      if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
-      if (normalized === 'false' || normalized === '0' || normalized === 'off') return false;
-    }
-
-    return null;
-  }
 }

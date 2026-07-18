@@ -4,7 +4,7 @@ import { select, type Selection } from 'd3-selection';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import type { ITheme } from '../../core/services/app-service';
-import { States, TState } from '../../core/interfaces/signalk-interfaces';
+import { TState } from '../../core/interfaces/signalk-interfaces';
 import type { ElectricalTrackedDevice, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { UnitsService } from '../../core/services/units.service';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
@@ -19,6 +19,7 @@ import {
   ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT
 } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
+import { setValue, setMetricValue, toStringValue, resolveMostSevereState } from '../shared/electrical-apply.util';
 import type { AcDisplayModel, AcSnapshot, AcWidgetConfig, ElectricalCardModeConfig } from './widget-ac.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
@@ -148,7 +149,7 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
     for (const bus of buses) {
       const modelKey = bus.deviceKey ?? bus.id;
       const showSource = !!bus.source && duplicateIds.has(bus.id);
-      const aggregateState = this.resolveMostSevereState(
+      const aggregateState = resolveMostSevereState(
         bus.line1VoltageState ?? null,
         bus.line1CurrentState ?? null,
         bus.line2VoltageState ?? null,
@@ -157,12 +158,12 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
         bus.line3CurrentState ?? null,
         bus.modeState ?? null
       );
-      const primaryState = this.resolveMostSevereState(
+      const primaryState = resolveMostSevereState(
         bus.line1VoltageState ?? null,
         bus.line1CurrentState ?? null,
         bus.line1FrequencyState ?? null
       );
-      const secondaryState = this.resolveMostSevereState(
+      const secondaryState = resolveMostSevereState(
         bus.line2VoltageState ?? null,
         bus.line2CurrentState ?? null,
         bus.line3VoltageState ?? null,
@@ -482,52 +483,30 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
     }
 
     switch (normalizedKey) {
-      case 'name': return this.setValue(snapshot, 'name', this.toStringValue(value));
-      case 'location': return this.setValue(snapshot, 'location', this.toStringValue(value));
-      case 'associatedBus': return this.setValue(snapshot, 'associatedBus', this.toStringValue(value));
-      case 'mode': return this.setMetricValue(snapshot, 'mode', 'modeState', this.toStringValue(value), state);
+      case 'name': return setValue(snapshot, 'name', toStringValue(value));
+      case 'location': return setValue(snapshot, 'location', toStringValue(value));
+      case 'associatedBus': return setValue(snapshot, 'associatedBus', toStringValue(value));
+      case 'mode': return setMetricValue(snapshot, 'mode', 'modeState', toStringValue(value), state);
       // Backward-compatible flat AC keys map to line 1 when source data is single-phase per id.
-      case 'voltage': return this.setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', this.toNumber(value, 'V'), state);
-      case 'current': return this.setMetricValue(snapshot, 'line1Current', 'line1CurrentState', this.toNumber(value, 'A'), state);
-      case 'frequency': return this.setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line1.voltage': return this.setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', this.toNumber(value, 'V'), state);
-      case 'line1.current': return this.setMetricValue(snapshot, 'line1Current', 'line1CurrentState', this.toNumber(value, 'A'), state);
-      case 'line1.frequency': return this.setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line1.realPower': return this.setMetricValue(snapshot, 'power', 'line1CurrentState', this.toNumber(value, 'W'), state);
-      case 'line2.voltage': return this.setMetricValue(snapshot, 'line2Voltage', 'line2VoltageState', this.toNumber(value, 'V'), state);
-      case 'line2.current': return this.setMetricValue(snapshot, 'line2Current', 'line2CurrentState', this.toNumber(value, 'A'), state);
-      case 'line2.frequency': return this.setMetricValue(snapshot, 'line2Frequency', 'line2FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line2.realPower': return this.setMetricValue(snapshot, 'power', 'line2CurrentState', this.toNumber(value, 'W'), state);
-      case 'line3.voltage': return this.setMetricValue(snapshot, 'line3Voltage', 'line3VoltageState', this.toNumber(value, 'V'), state);
-      case 'line3.current': return this.setMetricValue(snapshot, 'line3Current', 'line3CurrentState', this.toNumber(value, 'A'), state);
-      case 'line3.frequency': return this.setMetricValue(snapshot, 'line3Frequency', 'line3FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line3.realPower': return this.setMetricValue(snapshot, 'power', 'line3CurrentState', this.toNumber(value, 'W'), state);
-      case 'power': return this.setMetricValue(snapshot, 'power', 'line1CurrentState', this.toNumber(value, 'W'), state);
+      case 'voltage': return setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', this.toNumber(value, 'V'), state);
+      case 'current': return setMetricValue(snapshot, 'line1Current', 'line1CurrentState', this.toNumber(value, 'A'), state);
+      case 'frequency': return setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', this.toNumber(value, 'Hz'), state);
+      case 'line1.voltage': return setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', this.toNumber(value, 'V'), state);
+      case 'line1.current': return setMetricValue(snapshot, 'line1Current', 'line1CurrentState', this.toNumber(value, 'A'), state);
+      case 'line1.frequency': return setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', this.toNumber(value, 'Hz'), state);
+      case 'line1.realPower': return setMetricValue(snapshot, 'power', 'line1CurrentState', this.toNumber(value, 'W'), state);
+      case 'line2.voltage': return setMetricValue(snapshot, 'line2Voltage', 'line2VoltageState', this.toNumber(value, 'V'), state);
+      case 'line2.current': return setMetricValue(snapshot, 'line2Current', 'line2CurrentState', this.toNumber(value, 'A'), state);
+      case 'line2.frequency': return setMetricValue(snapshot, 'line2Frequency', 'line2FrequencyState', this.toNumber(value, 'Hz'), state);
+      case 'line2.realPower': return setMetricValue(snapshot, 'power', 'line2CurrentState', this.toNumber(value, 'W'), state);
+      case 'line3.voltage': return setMetricValue(snapshot, 'line3Voltage', 'line3VoltageState', this.toNumber(value, 'V'), state);
+      case 'line3.current': return setMetricValue(snapshot, 'line3Current', 'line3CurrentState', this.toNumber(value, 'A'), state);
+      case 'line3.frequency': return setMetricValue(snapshot, 'line3Frequency', 'line3FrequencyState', this.toNumber(value, 'Hz'), state);
+      case 'line3.realPower': return setMetricValue(snapshot, 'power', 'line3CurrentState', this.toNumber(value, 'W'), state);
+      case 'power': return setMetricValue(snapshot, 'power', 'line1CurrentState', this.toNumber(value, 'W'), state);
       default:
         return false;
     }
-  }
-
-  private setValue<K extends keyof AcSnapshot>(target: AcSnapshot, key: K, nextValue: AcSnapshot[K]): boolean {
-    if (Object.is(target[key], nextValue)) return false;
-    target[key] = nextValue;
-    return true;
-  }
-
-  private setMetricValue<K extends keyof AcSnapshot, S extends keyof AcSnapshot>(
-    target: AcSnapshot,
-    key: K,
-    stateKey: S,
-    nextValue: AcSnapshot[K],
-    state: TState | null
-  ): boolean {
-    const valueChanged = !Object.is(target[key], nextValue);
-    const stateChanged = !Object.is(target[stateKey], state);
-    if (!valueChanged && !stateChanged) return false;
-
-    target[key] = nextValue;
-    target[stateKey] = state as AcSnapshot[S];
-    return true;
   }
 
   private requestRender(snapshot?: AcRenderSnapshot): void {
@@ -692,18 +671,6 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
   private formatValue(value: number | null | undefined, unit: string): string {
     if (value == null || Number.isNaN(value)) return '-';
     return `${value.toFixed(1)} ${unit}`;
-  }
-
-  private toStringValue(value: unknown): string | null {
-    return typeof value === 'string' ? value : null;
-  }
-
-  private resolveMostSevereState(...states: (TState | null | undefined)[]): TState | null {
-    if (states.some(state => state === States.Alert)) return States.Alert;
-    if (states.some(state => state === States.Alarm)) return States.Alarm;
-    if (states.some(state => state === States.Warn)) return States.Warn;
-    if (states.some(state => state === States.Normal)) return States.Normal;
-    return null;
   }
 
   private toNumber(value: unknown, unitHint: string): number | null {
