@@ -1,7 +1,7 @@
 import { DestroyRef, inject, Injectable, OnDestroy } from '@angular/core';
 import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, interval, filter, Subscription } from 'rxjs';
 import { ISkPathData, IPathValueData, IPathMetaData, IMeta, IPathUpdateEvent } from "../interfaces/app-interfaces";
-import { ISignalKDataValueUpdate, ISkMetadata, ISignalKNotification, States, TState } from '../interfaces/signalk-interfaces'
+import { ISignalKDataValueUpdate, ISkMetadata, ISkDisplayUnits, ISignalKNotification, States, TState } from '../interfaces/signalk-interfaces'
 import { SignalKDeltaService } from './signalk-delta.service';
 import { cloneDeep, merge } from 'lodash-es';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -851,6 +851,15 @@ export class DataService implements OnDestroy {
 
   public getPathUnitType(path: string): string | null {
     return this._skData.get(path)?.meta?.units || null;
+  }
+
+  /**
+   * Server-supplied display-unit preference for a path (Signal K unit-preferences plugin), captured
+   * off the existing sendMeta=all stream. Returns undefined when the plugin is absent or the path
+   * carries no displayUnits meta.
+   */
+  public getPathDisplayUnits(path: string): ISkDisplayUnits | undefined {
+    return this._skData.get(path)?.meta?.displayUnits;
   }
 
   /**
