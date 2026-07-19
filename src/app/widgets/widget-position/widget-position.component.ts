@@ -61,6 +61,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
         pathType: 'number',
         isPathConfigurable: false,
         convertUnitTo: 'longitudeMin',
+        showConvertUnitTo: false,
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: null,
         sampleTime: 500
@@ -72,6 +73,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
         pathType: 'number',
         isPathConfigurable: false,
         convertUnitTo: 'latitudeMin',
+        showConvertUnitTo: false,
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: null,
         sampleTime: 500

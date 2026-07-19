@@ -74,6 +74,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
+        showConvertUnitTo: false,
         sampleTime: 1000
       },
       gaugeRollPath: {
@@ -86,6 +87,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
+        showConvertUnitTo: false,
         sampleTime: 1000
       }
     },

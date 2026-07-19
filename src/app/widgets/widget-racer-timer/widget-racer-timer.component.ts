@@ -51,7 +51,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
     paths: {
       ttsPath: { description: 'Time to the Start in seconds', path: 'self.navigation.racing.timeToStart', source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, convertUnitTo: 's', showConvertUnitTo: false, showPathSkUnitsFilter: false, pathSkUnitsFilter: 's', sampleTime: 500 },
       startTimePath: { description: 'Time of the start', path: 'self.navigation.racing.startTime', source: 'default', pathType: 'Date', pathRequired: false, isPathConfigurable: false, sampleTime: 500 },
-      dtsPath: { description: 'Distance to Start Line path, used to determine OCS', path: 'self.navigation.racing.distanceStartline', source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, convertUnitTo: 'm', showPathSkUnitsFilter: false, pathSkUnitsFilter: 'm', sampleTime: 500 }
+      dtsPath: { description: 'Distance to Start Line path, used to determine OCS', path: 'self.navigation.racing.distanceStartline', source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, convertUnitTo: 'm', showConvertUnitTo: false, showPathSkUnitsFilter: false, pathSkUnitsFilter: 'm', sampleTime: 500 }
     },
     color: 'contrast',
     enableTimeout: false,
