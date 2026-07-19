@@ -96,7 +96,10 @@ export class WidgetSimpleLinearComponent {
     if (!zones?.length) return [];
 
     // Zones (base SI units) convert to the effective measure; bounds are reinterpreted to match.
-    return getHighlights(zones, theme, this.effectiveUnit(), this.unitsService, this.displayLower(), this.displayUpper());
+    // Before the measure resolves, fall back to the stored unit (like the ng gauges) so bands render
+    // in the same unit as the still-stored-unit boot scale instead of vanishing until the first value.
+    const zoneUnit = this.effectiveUnit() || (cfg.paths?.['gaugePath']?.convertUnitTo ?? '');
+    return getHighlights(zones, theme, zoneUnit, this.unitsService, this.displayLower(), this.displayUpper());
   });
   private lastState: States | null = null; // simple cache to avoid redundant color sets
 

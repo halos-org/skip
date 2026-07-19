@@ -338,8 +338,12 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     const dataValue = this.dataValue;
     if (dataValue === null) return "--";
     const cfg = this.runtime.options();
-    const cUnit = cfg?.paths?.['numericPath']?.convertUnitTo;
-    if (cUnit !== undefined && ['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'].includes(cUnit)) {
+    // The format decision must follow the measure the value was actually converted to (the tagged
+    // effective measure), not the stored convertUnitTo: a display path's resolved measure can differ,
+    // and a position/duration format measure arrives as a pre-formatted string — testing the stored
+    // unit here would call toFixed() on that string (crash) or print a raw number for a format measure.
+    const measure = this.effectiveUnit();
+    if (['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'].includes(measure)) {
       return dataValue.toString();
     }
     return this.applyDecorations(dataValue.toFixed(cfg?.numDecimal));
@@ -374,7 +378,9 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private applyDecorations(txtValue: string): string {
-    switch (this.runtime.options()?.paths?.['numericPath']?.convertUnitTo) {
+    // Percent decoration follows the applied measure, not the stored convertUnitTo — same reason as
+    // getValueText: a display path's value is scaled per the resolved measure, so the '%' must too.
+    switch (this.effectiveUnit()) {
       case 'percent':
       case 'percentraw':
         txtValue += '%';
