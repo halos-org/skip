@@ -82,6 +82,7 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
         pathType: 'number',
         isPathConfigurable: false,
         convertUnitTo: 'deg',
+        showConvertUnitTo: false,
         sampleTime: 1000,
         pathRequired: true
       }
