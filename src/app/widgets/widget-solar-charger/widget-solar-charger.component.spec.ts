@@ -101,7 +101,7 @@ describe('WidgetSolarChargerComponent', () => {
       expect(dataServiceMock.subscribePathTreeWithInitial).toHaveBeenCalledWith('self.electrical.solar.*');
       expect((component as unknown as { discoveredSolarIds: () => string[] }).discoveredSolarIds()).toEqual(['sc1', 'sc2']);
 
-      const flushSpy = vi.spyOn(component as unknown as { flushPendingPathUpdates: () => void }, 'flushPendingPathUpdates');
+      const flushSpy = vi.spyOn(component as unknown as { processBatch: () => void }, 'processBatch');
       flushSpy.mockClear();
 
       liveSubject.next(makeUpdate('self.electrical.solar.sc3.voltage', 14.5));
