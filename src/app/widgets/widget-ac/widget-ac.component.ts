@@ -1,7 +1,6 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { select, type Selection } from 'd3-selection';
-import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
+import { DataService } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import type { ITheme } from '../../core/services/app-service';
 import { TState } from '../../core/interfaces/signalk-interfaces';
@@ -18,8 +17,10 @@ import {
   ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH,
   ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT
 } from '../shared/electrical-card-layout.constants';
-import { normalizeOptionalString, normalizeStringList, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
+import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
 import { setValue, setMetricValue, toStringValue, resolveMostSevereState } from '../shared/electrical-apply.util';
+import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
+import { ElectricalTopologyStore, type ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import type { AcDisplayModel, AcSnapshot, AcWidgetConfig, ElectricalCardModeConfig } from './widget-ac.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
@@ -36,7 +37,7 @@ interface AcRenderSnapshot {
   imports: [WidgetTitleComponent],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class WidgetAcComponent implements AfterViewInit, OnDestroy {
+export class WidgetAcComponent implements AfterViewInit {
   private static readonly AC_DESCRIPTOR = getElectricalWidgetFamilyDescriptor('widget-ac');
   private static readonly SELF_ROOT_PATH = (() => {
     const root = WidgetAcComponent.AC_DESCRIPTOR?.selfRootPath;
@@ -75,39 +76,53 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
   private svg?: Selection<SVGSVGElement, unknown, null, undefined>;
   private layer?: Selection<SVGGElement, unknown, null, undefined>;
 
-  private readonly pendingPathUpdates = new Map<string, { id: string; key: string; value: unknown; state: TState | null }>();
-  private pathBatchTimerId: ReturnType<typeof setTimeout> | null = null;
-  private initialPathPaintDone = false;
-  private renderFrameId: number | null = null;
-  private pendingRenderSnapshot: AcRenderSnapshot | null = null;
+  private readonly store = new ElectricalTopologyStore<AcSnapshot>({
+    createSnapshot: seed => ({ id: seed.id, source: seed.source, deviceKey: seed.deviceKey }),
+    applyValue: (snapshot, key, value, state) => this.applyValue(snapshot, key, value, state)
+  });
 
-  protected readonly discoveredBusIds = signal<string[]>([]);
-  protected readonly trackedDevices = signal<ElectricalTrackedDevice[]>([]);
+  private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, AcRenderSnapshot>({
+    data: this.data,
+    destroyRef: this.destroyRef,
+    rootPattern: WidgetAcComponent.ROOT_PATTERN,
+    batchWindowMs: WidgetAcComponent.PATH_BATCH_WINDOW_MS,
+    parseUpdate: update => {
+      const parsed = this.parsePath(update.path);
+      if (!parsed) return null;
+      return {
+        key: `${parsed.id}::${parsed.key}`,
+        entry: {
+          id: parsed.id,
+          key: parsed.key,
+          value: update.update?.data?.value ?? null,
+          state: update.update?.state ?? null
+        }
+      };
+    },
+    onFlush: entries => this.store.processBatch(entries),
+    resolveRenderSnapshot: explicit => {
+      const widgetColors = this.widgetColors();
+      if (!this.svg || !widgetColors) return null;
+      return explicit ?? {
+        buses: this.visibleBuses(),
+        displayModels: this.displayModels(),
+        widgetColors
+      };
+    },
+    draw: snapshot => this.render(snapshot)
+  });
+
   protected readonly optionsById = signal<AcWidgetConfig['optionsById']>({});
   protected readonly cardMode = signal<ElectricalCardModeConfig>({
     displayMode: 'full',
     metrics: ['line1Voltage', 'line1Current', 'line1Frequency', 'line2Voltage']
   });
-  protected readonly busesByKey = signal<Record<string, AcSnapshot>>({});
 
-  protected readonly visibleBusKeys = computed(() => {
-    const tracked = this.trackedDevices();
-    if (tracked.length) return tracked.map(device => device.key);
-    const map = this.busesByKey();
-    const ids = new Set(this.discoveredBusIds());
-    return Object.keys(map)
-      .filter(key => {
-        const snapshot = map[key];
-        return !!snapshot && ids.has(snapshot.id);
-      })
-      .sort((left, right) => left.localeCompare(right));
-  });
-
-  protected readonly visibleBuses = computed<AcSnapshot[]>(() => {
-    const keys = this.visibleBusKeys();
-    const map = this.busesByKey();
-    return keys.map(key => map[key]).filter((item): item is AcSnapshot => !!item);
-  });
+  protected readonly busesByKey = this.store.store;
+  protected readonly discoveredBusIds = this.store.discoveredIds;
+  protected readonly trackedDevices = this.store.trackedDevices;
+  protected readonly visibleBusKeys = this.store.visibleKeys;
+  protected readonly visibleBuses = this.store.visibleSnapshots;
 
   protected readonly hasBuses = computed(() => this.visibleBuses().length > 0);
   protected readonly activeDisplayMode = computed<ElectricalCardDisplayMode>(() => this.renderMode() ?? this.cardMode().displayMode ?? 'full');
@@ -203,49 +218,13 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
       const buses = this.visibleBuses();
       const widgetColors = this.widgetColors();
       if (!this.svg || !widgetColors) return;
-      this.requestRender({ buses, displayModels: models, widgetColors });
+      this.scheduler.requestRender({ buses, displayModels: models, widgetColors });
     });
-
-    const acTrees = [
-      this.data.subscribePathTreeWithInitial(WidgetAcComponent.ROOT_PATTERN)
-    ];
-
-    let hasInitialUpdates = false;
-    for (const tree of acTrees) {
-      if (!tree.initial.length) continue;
-      hasInitialUpdates = true;
-      for (const update of tree.initial) {
-        this.enqueuePathUpdate(update, true);
-      }
-    }
-
-    if (hasInitialUpdates) {
-      this.flushPendingPathUpdates();
-      this.initialPathPaintDone = true;
-    }
-
-    for (const tree of acTrees) {
-      tree.live$
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe(update => this.enqueuePathUpdate(update));
-    }
   }
 
   ngAfterViewInit(): void {
     this.initializeSvg();
-    this.requestRender();
-  }
-
-  ngOnDestroy(): void {
-    if (this.pathBatchTimerId !== null) {
-      clearTimeout(this.pathBatchTimerId);
-      this.pathBatchTimerId = null;
-    }
-    if (this.renderFrameId !== null) {
-      cancelAnimationFrame(this.renderFrameId);
-      this.renderFrameId = null;
-    }
-    this.pendingRenderSnapshot = null;
+    this.scheduler.requestRender();
   }
 
   private initializeSvg(): void {
@@ -260,47 +239,9 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
 
   private applyConfig(cfg: IWidgetSvcConfig): void {
     const acCfg = this.resolveAcConfig(cfg);
-    this.trackedDevices.set(acCfg.trackedDevices ?? []);
-    this.reprojectSnapshotsToDeviceKeys(acCfg.trackedDevices ?? []);
+    this.store.applyConfig(acCfg.trackedDevices ?? []);
     this.optionsById.set(acCfg.optionsById);
     this.cardMode.set(this.normalizeCardMode(acCfg.cardMode));
-  }
-
-  private reprojectSnapshotsToDeviceKeys(devices: ElectricalTrackedDevice[]): void {
-    if (!devices.length) return;
-
-    const idToKeys = new Map<string, string[]>();
-    devices.forEach(device => {
-      const existing = idToKeys.get(device.id) ?? [];
-      existing.push(device.key);
-      idToKeys.set(device.id, existing);
-    });
-
-    this.busesByKey.update(current => {
-      let next = current;
-      let changed = false;
-
-      idToKeys.forEach((keys, id) => {
-        const sourceSnapshot = current[id];
-        if (!sourceSnapshot) return;
-
-        for (const deviceKey of keys) {
-          if (current[deviceKey]) continue;
-          const trackedDevice = devices.find(device => device.key === deviceKey);
-          if (!changed) {
-            next = { ...current };
-            changed = true;
-          }
-          next[deviceKey] = { ...sourceSnapshot, source: trackedDevice?.source ?? null, deviceKey };
-        }
-
-        if (changed && next[id]?.deviceKey === undefined) {
-          delete next[id];
-        }
-      });
-
-      return changed ? next : current;
-    });
   }
 
   private resolveAcConfig(cfg: IWidgetSvcConfig): AcWidgetConfig {
@@ -360,72 +301,6 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
     return next;
   }
 
-  private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
-    const parsed = this.parsePath(update.path);
-    if (!parsed) return;
-
-    const value = update.update?.data?.value ?? null;
-    const state = update.update?.state ?? null;
-    this.pendingPathUpdates.set(`${parsed.id}::${parsed.key}`, { id: parsed.id, key: parsed.key, value, state });
-
-    if (fromInitial) return;
-    if (!this.initialPathPaintDone) {
-      this.initialPathPaintDone = true;
-      this.flushPendingPathUpdates();
-      return;
-    }
-
-    if (this.pathBatchTimerId !== null) return;
-    this.pathBatchTimerId = setTimeout(() => {
-      this.pathBatchTimerId = null;
-      this.flushPendingPathUpdates();
-    }, WidgetAcComponent.PATH_BATCH_WINDOW_MS);
-  }
-
-  private flushPendingPathUpdates(): void {
-    if (!this.pendingPathUpdates.size) return;
-
-    const updates = Array.from(this.pendingPathUpdates.values());
-    this.pendingPathUpdates.clear();
-
-    const uniqueIds = new Set(updates.map(item => item.id));
-    uniqueIds.forEach(id => this.trackDiscoveredBus(id));
-
-    const idToKeys = buildIdToDeviceKeysMap(this.trackedDevices());
-
-    this.busesByKey.update(current => {
-      let next = current;
-      let changed = false;
-
-      for (const update of updates) {
-        const keysForId = idToKeys.get(update.id);
-        const targetKeys: string[] = keysForId?.length ? keysForId : [update.id];
-
-        for (const deviceKey of targetKeys) {
-          const isTracked = !!(keysForId?.length);
-          const trackedDevice = isTracked ? this.trackedDevices().find(device => device.key === deviceKey) : null;
-          const existing = next[deviceKey] ?? {
-            id: update.id,
-            source: trackedDevice?.source ?? null,
-            deviceKey: isTracked ? deviceKey : undefined
-          };
-          const snapshot = { ...existing } as AcSnapshot;
-          const fieldChanged = this.applyValue(snapshot, update.key, update.value, update.state);
-
-          if (!fieldChanged) continue;
-
-          if (!changed) {
-            next = { ...next };
-            changed = true;
-          }
-          next[deviceKey] = snapshot;
-        }
-      }
-
-      return changed ? next : current;
-    });
-  }
-
   private parsePath(path: string): { id: string; key: string } | null {
     if (!path.startsWith(WidgetAcComponent.ROOT_PREFIX)) return null;
 
@@ -470,12 +345,6 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
     return null;
   }
 
-  private trackDiscoveredBus(id: string): void {
-    const ids = this.discoveredBusIds();
-    if (ids.includes(id)) return;
-    this.discoveredBusIds.set([...ids, id].sort((a, b) => a.localeCompare(b)));
-  }
-
   private applyValue(snapshot: AcSnapshot, key: string, value: unknown, state: TState | null): boolean {
     const normalizedKey = this.normalizeMetricKey(key);
     if (!normalizedKey) {
@@ -507,27 +376,6 @@ export class WidgetAcComponent implements AfterViewInit, OnDestroy {
       default:
         return false;
     }
-  }
-
-  private requestRender(snapshot?: AcRenderSnapshot): void {
-    const widgetColors = this.widgetColors();
-    if (!this.svg || !widgetColors) return;
-
-    this.pendingRenderSnapshot = snapshot ?? {
-      buses: this.visibleBuses(),
-      displayModels: this.displayModels(),
-      widgetColors
-    };
-
-    if (this.renderFrameId !== null) return;
-
-    this.renderFrameId = requestAnimationFrame(() => {
-      this.renderFrameId = null;
-      const nextSnapshot = this.pendingRenderSnapshot;
-      this.pendingRenderSnapshot = null;
-      if (!nextSnapshot) return;
-      this.render(nextSnapshot);
-    });
   }
 
   private render(snapshot: AcRenderSnapshot): void {
