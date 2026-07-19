@@ -53,9 +53,11 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     }
   };
 
-  private static readonly VIEWBOX_WIDTH = ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH;
-  private static readonly CARD_HEIGHT = ELECTRICAL_DIRECT_CARD_HEIGHT;
-  private static readonly CARD_GAP = ELECTRICAL_DIRECT_CARD_GAP;
+  // Getters, not fields: read the shared layout constants at access time. A
+  // class-def-time capture reads undefined in combined test bundles (#360).
+  private static get VIEWBOX_WIDTH(): number { return ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH; }
+  private static get CARD_HEIGHT(): number { return ELECTRICAL_DIRECT_CARD_HEIGHT; }
+  private static get CARD_GAP(): number { return ELECTRICAL_DIRECT_CARD_GAP; }
   private static readonly SOLAR_PANEL_SYMBOL_WIDTH = 158.90796;
   private static readonly SOLAR_PANEL_SYMBOL_HEIGHT = 94.949027;
   private static readonly SOLAR_PANEL_SCALE = 0.77;

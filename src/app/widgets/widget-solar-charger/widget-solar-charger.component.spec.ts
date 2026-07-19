@@ -575,4 +575,24 @@ describe('WidgetSolarChargerComponent', () => {
       expect(merged.color).toBe('green');
     });
   });
+
+  // Guards #360: the layout-constant getters must yield well-formed geometry. The
+  // NaN only appears when >=2 electrical specs share a test bundle, so this bites
+  // in the full suite, not when this spec runs alone.
+  it('renders well-formed geometry (no NaN/undefined viewBox)', async () => {
+    vi.useFakeTimers();
+    try {
+      fixture.detectChanges();
+      await vi.runAllTimersAsync();
+      fixture.detectChanges();
+      await vi.runAllTimersAsync();
+      const svg = fixture.nativeElement.querySelector('svg') as SVGSVGElement | null;
+      const viewBox = svg?.getAttribute('viewBox') ?? '';
+      expect(viewBox).not.toBe('');
+      expect(viewBox).not.toContain('NaN');
+      expect(viewBox).not.toContain('undefined');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
