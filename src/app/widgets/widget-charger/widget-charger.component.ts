@@ -1,5 +1,4 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { select, type Selection } from 'd3-selection';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
@@ -14,6 +13,7 @@ import type { ChargerDisplayModel, ChargerSnapshot } from './widget-charger.type
 import { ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
 import { setValue, setMetricValue, toStringValue, toBoolean, resolveMostSevereState } from '../shared/electrical-apply.util';
+import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface ChargerRenderSnapshot {
@@ -33,7 +33,7 @@ function escapeRegex(value: string): string {
   imports: [WidgetTitleComponent],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
+export class WidgetChargerComponent implements AfterViewInit {
   private static readonly CHARGER_DESCRIPTOR = getElectricalWidgetFamilyDescriptor('widget-charger');
   private static readonly SELF_ROOT_PATH = (() => {
     const root = WidgetChargerComponent.CHARGER_DESCRIPTOR?.selfRootPath;
@@ -74,15 +74,42 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
   private svg?: Selection<SVGSVGElement, unknown, null, undefined>;
   private layer?: Selection<SVGGElement, unknown, null, undefined>;
 
-  private readonly pendingPathUpdates = new Map<string, { id: string; key: string; source: string | null; value: unknown; state: TState | null }>();
-  private pathBatchTimerId: number | null = null;
-  private initialPathPaintDone = false;
-  private renderFrameId: number | null = null;
-  private pendingRenderSnapshot: ChargerRenderSnapshot | null = null;
-
   protected readonly discoveredChargerIds = signal<string[]>([]);
   protected readonly trackedDevices = signal<ElectricalTrackedDevice[]>([]);
   protected readonly chargersByKey = signal<Record<string, ChargerSnapshot>>({});
+
+  private readonly scheduler = new ElectricalIngestScheduler<{ id: string; key: string; source: string | null; value: unknown; state: TState | null }, ChargerRenderSnapshot>({
+    data: this.data,
+    destroyRef: this.destroyRef,
+    rootPattern: WidgetChargerComponent.ROOT_PATTERN,
+    batchWindowMs: WidgetChargerComponent.PATH_BATCH_WINDOW_MS,
+    parseUpdate: update => {
+      const parsed = this.parsePath(update.path);
+      if (!parsed) return null;
+      const source = this.extractUpdateSource(update);
+      return {
+        key: `${parsed.id}::${source ?? '*'}::${parsed.key}`,
+        entry: {
+          id: parsed.id,
+          key: parsed.key,
+          source,
+          value: update.update?.data?.value ?? null,
+          state: update.update?.state ?? null
+        }
+      };
+    },
+    onFlush: entries => this.processBatch(entries),
+    resolveRenderSnapshot: explicit => {
+      const widgetColors = this.widgetColors();
+      if (!this.svg || !widgetColors) return null;
+      return explicit ?? {
+        chargers: this.visibleChargers(),
+        displayModels: this.displayModels(),
+        widgetColors
+      };
+    },
+    draw: snapshot => this.render(snapshot)
+  });
 
   protected readonly visibleChargerKeys = computed(() => {
     const tracked = this.trackedDevices();
@@ -189,56 +216,13 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       const chargers = this.visibleChargers();
       const widgetColors = this.widgetColors();
       if (!this.svg || !widgetColors) return;
-      this.requestRender({ chargers, displayModels: models, widgetColors });
+      this.scheduler.requestRender({ chargers, displayModels: models, widgetColors });
     });
-
-    const chargerTrees = [
-      this.data.subscribePathTreeWithInitial(WidgetChargerComponent.ROOT_PATTERN)
-    ];
-
-    let hasInitialUpdates = false;
-    for (const tree of chargerTrees) {
-      if (!tree.initial.length) {
-        continue;
-      }
-
-      hasInitialUpdates = true;
-      for (const update of tree.initial) {
-        this.enqueuePathUpdate(update, true);
-      }
-    }
-
-    if (hasInitialUpdates) {
-      this.flushPendingPathUpdates();
-      this.initialPathPaintDone = true;
-    }
-
-    for (const tree of chargerTrees) {
-      tree.live$
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe(update => {
-          this.enqueuePathUpdate(update);
-        });
-    }
   }
 
   ngAfterViewInit(): void {
     this.initializeSvg();
-    this.requestRender();
-  }
-
-  ngOnDestroy(): void {
-    if (this.pathBatchTimerId !== null) {
-      clearTimeout(this.pathBatchTimerId);
-      this.pathBatchTimerId = null;
-    }
-
-    if (this.renderFrameId !== null) {
-      cancelAnimationFrame(this.renderFrameId);
-      this.renderFrameId = null;
-    }
-
-    this.pendingRenderSnapshot = null;
+    this.scheduler.requestRender();
   }
 
   private initializeSvg(): void {
@@ -298,38 +282,6 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
-    const parsed = this.parsePath(update.path);
-    if (!parsed) {
-      return;
-    }
-
-    const value = update.update?.data?.value ?? null;
-    const state = update.update?.state ?? null;
-    const source = this.extractUpdateSource(update);
-    const updateKey = `${parsed.id}::${source ?? '*'}::${parsed.key}`;
-    this.pendingPathUpdates.set(updateKey, { id: parsed.id, key: parsed.key, source, value, state });
-
-    if (fromInitial) {
-      return;
-    }
-
-    if (!this.initialPathPaintDone) {
-      this.initialPathPaintDone = true;
-      this.flushPendingPathUpdates();
-      return;
-    }
-
-    if (this.pathBatchTimerId !== null) {
-      return;
-    }
-
-    this.pathBatchTimerId = window.setTimeout(() => {
-      this.pathBatchTimerId = null;
-      this.flushPendingPathUpdates();
-    }, WidgetChargerComponent.PATH_BATCH_WINDOW_MS);
-  }
-
   private parsePath(path: string): { id: string; key: string } | null {
     const match = path.match(WidgetChargerComponent.PATH_REGEX);
     if (!match) {
@@ -339,15 +291,8 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
     return { id: match[1], key: match[2] };
   }
 
-  private flushPendingPathUpdates(): void {
-    if (!this.pendingPathUpdates.size) {
-      return;
-    }
-
-    const updates = Array.from(this.pendingPathUpdates.values());
-    this.pendingPathUpdates.clear();
-
-    const uniqueIds = new Set(updates.map(update => update.id));
+  private processBatch(entries: { id: string; key: string; source: string | null; value: unknown; state: TState | null }[]): void {
+    const uniqueIds = new Set(entries.map(update => update.id));
     uniqueIds.forEach(id => this.trackDiscoveredCharger(id));
 
     const idToKeys = buildIdToDeviceKeysMap(this.trackedDevices());
@@ -358,7 +303,7 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       let nextState = current;
       let changed = false;
 
-      for (const update of updates) {
+      for (const update of entries) {
         const affectedKeys = idToKeys.get(update.id);
         const isTracked = !!affectedKeys?.length;
         let keysToUpdate: string[] = [];
@@ -492,33 +437,6 @@ export class WidgetChargerComponent implements AfterViewInit, OnDestroy {
       default:
         return false;
     }
-  }
-
-  private requestRender(snapshot?: ChargerRenderSnapshot): void {
-    const widgetColors = this.widgetColors();
-    if (!this.svg || !widgetColors) {
-      return;
-    }
-
-    this.pendingRenderSnapshot = snapshot ?? {
-      chargers: this.visibleChargers(),
-      displayModels: this.displayModels(),
-      widgetColors
-    };
-    if (this.renderFrameId !== null) {
-      return;
-    }
-
-    this.renderFrameId = requestAnimationFrame(() => {
-      this.renderFrameId = null;
-      const nextSnapshot = this.pendingRenderSnapshot;
-      this.pendingRenderSnapshot = null;
-      if (!nextSnapshot) {
-        return;
-      }
-
-      this.render(nextSnapshot);
-    });
   }
 
   private render(snapshot: ChargerRenderSnapshot): void {
