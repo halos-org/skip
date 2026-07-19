@@ -655,6 +655,41 @@ export class UnitsService {
   }
 
   /**
+   * Re-express a value already in `fromMeasure` as `toMeasure` within the same conversion group,
+   * for the case where a stored number is in one display unit while the value it must line up with
+   * is now converted to another (e.g. a gauge's user-set displayScale bounds after the server unit
+   * preference flip). Recovers the SI base from two forward evaluations of the affine
+   * `convertToUnit(fromMeasure, ·)` and forward-converts to the target, so no inverse table is needed.
+   *
+   * Returns the value unchanged (a safe no-op) whenever the round-trip is not a valid affine numeric
+   * conversion: identical measures, an unknown or cross-group pair (same-group is asserted, never
+   * assumed), a string-format measure (position/duration produce non-numeric output), a degenerate
+   * span, or a non-finite input.
+   */
+  public convertBetweenMeasures(fromMeasure: string, toMeasure: string, value: number): number {
+    if (!Number.isFinite(value)) { return value; }
+    if (fromMeasure === toMeasure) { return value; }
+    const group = this.measureGroup(fromMeasure);
+    if (!group || group !== this.measureGroup(toMeasure)) { return value; }
+    const f0 = this.convertToUnit(fromMeasure, 0);
+    const f1 = this.convertToUnit(fromMeasure, 1);
+    if (typeof f0 !== 'number' || typeof f1 !== 'number' || !Number.isFinite(f0) || !Number.isFinite(f1)) { return value; }
+    const span = f1 - f0;
+    if (span === 0 || !Number.isFinite(span)) { return value; }
+    const base = (value - f0) / span;
+    const out = this.convertToUnit(toMeasure, base);
+    return (typeof out === 'number' && Number.isFinite(out)) ? out : value;
+  }
+
+  /** The conversion group a measure belongs to, or undefined when it is not a known measure. */
+  private measureGroup(measure: string): string | undefined {
+    for (const group of this._conversionList) {
+      if (group.units.some(unit => unit.measure === measure)) { return group.group; }
+    }
+    return undefined;
+  }
+
+  /**
    * Returns the list Skip configured preferred unit conversion settings.
    * as configured by user in Skip's Units configuration.
    *

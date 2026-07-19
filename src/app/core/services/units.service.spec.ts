@@ -60,6 +60,56 @@ describe('UnitsService', () => {
     });
   });
 
+  describe('convertBetweenMeasures (affine round-trip)', () => {
+    it('returns the value unchanged when from === to', () => {
+      const s = setup({});
+      expect(s.convertBetweenMeasures('m', 'm', 42)).toBe(42);
+    });
+
+    it('converts within the Length group (m -> feet) and back exactly', () => {
+      const s = setup({});
+      const feet = s.convertBetweenMeasures('m', 'feet', 10);
+      expect(feet).toBeCloseTo(32.8084, 3);
+      expect(s.convertBetweenMeasures('feet', 'm', feet)).toBeCloseTo(10, 9);
+    });
+
+    it('converts an offset (Temperature) measure: 293.15 K <-> 20 C', () => {
+      const s = setup({});
+      expect(s.convertBetweenMeasures('K', 'celsius', 293.15)).toBeCloseTo(20, 9);
+      expect(s.convertBetweenMeasures('celsius', 'K', 20)).toBeCloseTo(293.15, 9);
+    });
+
+    it('converts a scaled Ratio measure: ratio 0.5 -> 50 percent', () => {
+      const s = setup({});
+      expect(s.convertBetweenMeasures('ratio', 'percent', 0.5)).toBeCloseTo(50, 9);
+    });
+
+    it('is identity across different groups (never fabricates a cross-dimension value)', () => {
+      const s = setup({});
+      expect(s.convertBetweenMeasures('knots', 'celsius', 7)).toBe(7);
+      expect(s.convertBetweenMeasures('m', 'V', 3)).toBe(3);
+    });
+
+    it('is identity when either same-group endpoint is a string-format measure', () => {
+      const s = setup({});
+      // Time group mixes numeric ('s') with a string-format measure ('D HH:MM:SS').
+      expect(s.convertBetweenMeasures('D HH:MM:SS', 's', 5)).toBe(5);
+      expect(s.convertBetweenMeasures('s', 'D HH:MM:SS', 5)).toBe(5);
+    });
+
+    it('is identity for an unknown measure or a unitless endpoint', () => {
+      const s = setup({});
+      expect(s.convertBetweenMeasures('not-a-unit', 'm', 5)).toBe(5);
+      expect(s.convertBetweenMeasures('unitless', 'knots', 5)).toBe(5);
+    });
+
+    it('passes a non-finite value through unchanged', () => {
+      const s = setup({});
+      expect(s.convertBetweenMeasures('m', 'feet', NaN)).toBeNaN();
+      expect(s.convertBetweenMeasures('m', 'feet', Infinity)).toBe(Infinity);
+    });
+  });
+
   describe('getConversionsForPath server displayUnits (#246 Phase 1)', () => {
     // Build a UnitsService whose DataService reports a path's SI unit + optional server displayUnits.
     function setupWithData(
