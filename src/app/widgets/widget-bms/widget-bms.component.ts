@@ -1,12 +1,11 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { select, type Selection } from 'd3-selection';
 import { arc } from 'd3-shape';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { take } from 'rxjs/operators';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
 import { BmsBankConfig, BmsBankConnectionMode, BmsWidgetConfig, ElectricalCardModeConfig, ElectricalTrackedDevice, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
+import { DataService } from '../../core/services/data.service';
 import { UnitsService } from '../../core/services/units.service';
 import { States, TState } from '../../core/interfaces/signalk-interfaces';
 import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
@@ -16,6 +15,8 @@ import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-
 import type { ITheme } from '../../core/services/app-service';
 import { ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
+import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
+import type { ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface BmsRenderBank extends BmsBankSummary {
@@ -58,7 +59,7 @@ interface BmsRenderSnapshot {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatIconModule, WidgetTitleComponent]
 })
-export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
+export class WidgetBmsComponent implements AfterViewInit {
   private static readonly BMS_DESCRIPTOR = getElectricalWidgetFamilyDescriptor('widget-bms');
   private static readonly ROOT_PATTERN = `${WidgetBmsComponent.BMS_DESCRIPTOR?.selfRootPath ?? 'self.electrical.batteries'}.*`;
 
@@ -109,11 +110,6 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
   private readonly bankGaugeBackgroundPath = this.buildSemiGaugeArcPath(WidgetBmsComponent.BANK_GAUGE_RADIUS, 1);
 
   private glowFilterId = '';
-  private renderFrameId: number | null = null;
-  private pendingRenderSnapshot: BmsRenderSnapshot | null = null;
-  private pathBatchTimerId: number | null = null;
-  private initialPathPaintDone = false;
-  private readonly pendingPathUpdates = new Map<string, { id: string; key: string; value: unknown; state: TState | null }>();
   private powerAvailableIconTemplate: SVGElement | null = null;
   private powerRenewalIconTemplate: SVGElement | null = null;
 
@@ -125,6 +121,32 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     metrics: []
   });
   protected readonly batteries = signal<Record<string, BmsBatterySnapshot>>({});
+
+  private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, BmsRenderSnapshot>({
+    data: this.data,
+    destroyRef: this.destroyRef,
+    rootPattern: WidgetBmsComponent.ROOT_PATTERN,
+    batchWindowMs: WidgetBmsComponent.PATH_BATCH_WINDOW_MS,
+    parseUpdate: update => {
+      const match = this.parseBatteryPath(update.path);
+      if (!match) return null;
+      return {
+        key: `${match.id}::${match.key}`,
+        entry: {
+          id: match.id,
+          key: match.key,
+          value: update.update?.data?.value ?? null,
+          state: update.update?.state ?? null
+        }
+      };
+    },
+    onFlush: entries => this.processBatch(entries),
+    resolveRenderSnapshot: explicit => {
+      if (!this.svg) return null;
+      return explicit ?? this.buildRenderSnapshot();
+    },
+    draw: snapshot => this.render(snapshot)
+  });
 
   protected readonly visibleBatteryIds = computed(() => {
     const tracked = this.trackedBatteryDeviceIds();
@@ -277,7 +299,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       const bankDisplayModels = this.bankDisplayModels();
       if (!this.svg || !widgetColors) return;
 
-      this.requestRender({
+      this.scheduler.requestRender({
         banks,
         batteries,
         batteryDisplayModels,
@@ -285,42 +307,12 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
         widgetColors
       });
     });
-
-    const batteryTree = this.data.subscribePathTreeWithInitial(WidgetBmsComponent.ROOT_PATTERN);
-
-    if (batteryTree.initial.length) {
-      for (const update of batteryTree.initial) {
-        this.enqueuePathUpdate(update, true);
-      }
-      this.flushPendingPathUpdates();
-      this.initialPathPaintDone = true;
-    }
-
-    batteryTree.live$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(update => {
-        this.enqueuePathUpdate(update);
-      });
   }
 
   ngAfterViewInit(): void {
     this.initializeSvg();
     this.loadPowerIcons();
-    this.requestRender();
-  }
-
-  ngOnDestroy(): void {
-    if (this.pathBatchTimerId !== null) {
-      clearTimeout(this.pathBatchTimerId);
-      this.pathBatchTimerId = null;
-    }
-
-    if (this.renderFrameId !== null) {
-      cancelAnimationFrame(this.renderFrameId);
-      this.renderFrameId = null;
-    }
-
-    this.pendingRenderSnapshot = null;
+    this.scheduler.requestRender();
   }
 
   private initializeSvg(): void {
@@ -377,7 +369,7 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       .subscribe({
         next: icon => {
           onLoaded(icon);
-          this.requestRender();
+          this.scheduler.requestRender();
         },
         error: () => {
         }
@@ -488,45 +480,15 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
     return mode === 'series' ? 'series' : 'parallel';
   }
 
-  private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
-    const match = this.parseBatteryPath(update.path);
-    if (!match) return;
-
-    const { id, key } = match;
-    const value = update.update?.data?.value ?? null;
-    const state = update.update?.state ?? null;
-    const updateKey = `${id}::${key}`;
-    this.pendingPathUpdates.set(updateKey, { id, key, value, state });
-
-    if (fromInitial) return;
-
-    if (!this.initialPathPaintDone) {
-      this.initialPathPaintDone = true;
-      this.flushPendingPathUpdates();
-      return;
-    }
-
-    if (this.pathBatchTimerId !== null) return;
-    this.pathBatchTimerId = window.setTimeout(() => {
-      this.pathBatchTimerId = null;
-      this.flushPendingPathUpdates();
-    }, WidgetBmsComponent.PATH_BATCH_WINDOW_MS);
-  }
-
-  private flushPendingPathUpdates(): void {
-    if (!this.pendingPathUpdates.size) return;
-
-    const updates = Array.from(this.pendingPathUpdates.values());
-    this.pendingPathUpdates.clear();
-
-    const uniqueBatteryIds = new Set(updates.map(update => update.id));
+  private processBatch(entries: ElectricalTopologyEntry[]): void {
+    const uniqueBatteryIds = new Set(entries.map(update => update.id));
     uniqueBatteryIds.forEach(id => this.trackDiscoveredBattery(id));
 
     this.batteries.update(current => {
       let nextState = current;
       let hasChanges = false;
 
-      for (const update of updates) {
+      for (const update of entries) {
         const existing = nextState[update.id] ?? { id: update.id } as BmsBatterySnapshot;
         const next = { ...existing } as BmsBatterySnapshot;
         const valueChanged = this.applyBatteryValue(next, update.key, update.value, update.state);
@@ -702,23 +664,6 @@ export class WidgetBmsComponent implements AfterViewInit, OnDestroy {
       return this.minNumber(values);
     }
     return this.averageNumbers(values);
-  }
-
-  private requestRender(snapshot?: BmsRenderSnapshot): void {
-    if (!this.svg) return;
-
-    this.pendingRenderSnapshot = snapshot ?? this.buildRenderSnapshot();
-    if (!this.pendingRenderSnapshot) return;
-    if (this.renderFrameId !== null) return;
-
-    this.renderFrameId = requestAnimationFrame(() => {
-      this.renderFrameId = null;
-      const nextSnapshot = this.pendingRenderSnapshot;
-      this.pendingRenderSnapshot = null;
-      if (!nextSnapshot) return;
-
-      this.render(nextSnapshot);
-    });
   }
 
   private buildRenderSnapshot(): BmsRenderSnapshot | null {

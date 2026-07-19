@@ -115,8 +115,8 @@ describe('WidgetBmsComponent', () => {
             }).discoveredBatteryIds()).toEqual(['bat1', 'bat2']);
 
             const flushSpy = vi.spyOn(component as unknown as {
-                flushPendingPathUpdates: () => void;
-            }, 'flushPendingPathUpdates');
+                processBatch: (entries: unknown[]) => void;
+            }, 'processBatch');
 
             flushSpy.mockClear();
 
