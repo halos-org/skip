@@ -1,9 +1,8 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { select, type Selection } from 'd3-selection';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
+import { DataService } from '../../core/services/data.service';
 import { UnitsService } from '../../core/services/units.service';
 import type { ITheme } from '../../core/services/app-service';
 import { States, TState } from '../../core/interfaces/signalk-interfaces';
@@ -14,6 +13,8 @@ import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-
 import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
 import { setValue } from '../shared/electrical-apply.util';
+import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
+import type { ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
 interface SolarRenderSnapshot {
@@ -29,7 +30,7 @@ interface SolarRenderSnapshot {
   imports: [WidgetTitleComponent],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
+export class WidgetSolarChargerComponent implements AfterViewInit {
   private static readonly SOLAR_DESCRIPTOR = getElectricalWidgetFamilyDescriptor('widget-solar-charger');
   private static readonly SELF_ROOT_PATH = (() => {
     const root = WidgetSolarChargerComponent.SOLAR_DESCRIPTOR?.selfRootPath;
@@ -89,12 +90,6 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
   private layer?: Selection<SVGGElement, unknown, null, undefined>;
   private glowFilterId = '';
 
-  private renderFrameId: number | null = null;
-  private pendingRenderSnapshot: SolarRenderSnapshot | null = null;
-  private pathBatchTimerId: number | null = null;
-  private initialPathPaintDone = false;
-  private readonly pendingPathUpdates = new Map<string, { id: string; key: string; value: unknown; state: TState | null }>();
-
   protected readonly discoveredSolarIds = signal<string[]>([]);
   protected readonly trackedDevices = signal<ElectricalTrackedDevice[]>([]);
   protected readonly optionsById = signal<Record<string, SolarOptionConfig>>({});
@@ -103,6 +98,32 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
     metrics: ['panelVoltage', 'panelCurrent', 'voltage', 'current']
   });
   protected readonly chargersByKey = signal<Record<string, SolarChargerSnapshot>>({});
+
+  private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, SolarRenderSnapshot>({
+    data: this.data,
+    destroyRef: this.destroyRef,
+    rootPattern: WidgetSolarChargerComponent.ROOT_PATTERN,
+    batchWindowMs: WidgetSolarChargerComponent.PATH_BATCH_WINDOW_MS,
+    parseUpdate: update => {
+      const match = this.parseSolarPath(update.path);
+      if (!match) return null;
+      return {
+        key: `${match.id}::${match.key}`,
+        entry: {
+          id: match.id,
+          key: match.key,
+          value: update.update?.data?.value ?? null,
+          state: update.update?.state ?? null
+        }
+      };
+    },
+    onFlush: entries => this.processBatch(entries),
+    resolveRenderSnapshot: explicit => {
+      if (!this.svg) return null;
+      return explicit ?? this.buildRenderSnapshot();
+    },
+    draw: snapshot => this.render(snapshot)
+  });
 
   protected readonly visibleSolarKeys = computed(() => {
     const tracked = this.trackedDevices();
@@ -256,43 +277,13 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
       const solarUnits = this.visibleSolarUnits();
       const widgetColors = this.widgetColors();
       if (!this.svg || !widgetColors) return;
-      this.requestRender({ solarUnits, displayModels: models, widgetColors });
+      this.scheduler.requestRender({ solarUnits, displayModels: models, widgetColors });
     });
-
-    const solarTree = this.data.subscribePathTreeWithInitial(WidgetSolarChargerComponent.ROOT_PATTERN);
-
-    if (solarTree.initial.length) {
-      for (const update of solarTree.initial) {
-        this.enqueuePathUpdate(update, true);
-      }
-      this.flushPendingPathUpdates();
-      this.initialPathPaintDone = true;
-    }
-
-    solarTree.live$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(update => {
-        this.enqueuePathUpdate(update);
-      });
   }
 
   ngAfterViewInit(): void {
     this.initializeSvg();
-    this.requestRender();
-  }
-
-  ngOnDestroy(): void {
-    if (this.pathBatchTimerId !== null) {
-      clearTimeout(this.pathBatchTimerId);
-      this.pathBatchTimerId = null;
-    }
-
-    if (this.renderFrameId !== null) {
-      cancelAnimationFrame(this.renderFrameId);
-      this.renderFrameId = null;
-    }
-
-    this.pendingRenderSnapshot = null;
+    this.scheduler.requestRender();
   }
 
   private initializeSvg(): void {
@@ -459,38 +450,8 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
     return next;
   }
 
-  private enqueuePathUpdate(update: IPathUpdateWithPath, fromInitial = false): void {
-    const match = this.parseSolarPath(update.path);
-    if (!match) return;
-
-    const { id, key } = match;
-    const value = update.update?.data?.value ?? null;
-    const state = update.update?.state ?? null;
-    const updateKey = `${id}::${key}`;
-    this.pendingPathUpdates.set(updateKey, { id, key, value, state });
-
-    if (fromInitial) return;
-
-    if (!this.initialPathPaintDone) {
-      this.initialPathPaintDone = true;
-      this.flushPendingPathUpdates();
-      return;
-    }
-
-    if (this.pathBatchTimerId !== null) return;
-    this.pathBatchTimerId = window.setTimeout(() => {
-      this.pathBatchTimerId = null;
-      this.flushPendingPathUpdates();
-    }, WidgetSolarChargerComponent.PATH_BATCH_WINDOW_MS);
-  }
-
-  private flushPendingPathUpdates(): void {
-    if (!this.pendingPathUpdates.size) return;
-
-    const updates = Array.from(this.pendingPathUpdates.values());
-    this.pendingPathUpdates.clear();
-
-    const uniqueIds = new Set(updates.map(update => update.id));
+  private processBatch(entries: ElectricalTopologyEntry[]): void {
+    const uniqueIds = new Set(entries.map(update => update.id));
     uniqueIds.forEach(id => this.trackDiscoveredSolar(id));
 
     this.chargersByKey.update(current => {
@@ -508,7 +469,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
         });
       }
 
-      for (const update of updates) {
+      for (const update of entries) {
         const targetKeys = hasTracked
           ? (idToTracked.get(update.id) ?? [])
           : [update.id];
@@ -692,23 +653,6 @@ export class WidgetSolarChargerComponent implements AfterViewInit, OnDestroy {
     }
 
     return undefined;
-  }
-
-  private requestRender(snapshot?: SolarRenderSnapshot): void {
-    if (!this.svg) return;
-
-    this.pendingRenderSnapshot = snapshot ?? this.buildRenderSnapshot();
-    if (!this.pendingRenderSnapshot) return;
-    if (this.renderFrameId !== null) return;
-
-    this.renderFrameId = requestAnimationFrame(() => {
-      this.renderFrameId = null;
-      const nextSnapshot = this.pendingRenderSnapshot;
-      this.pendingRenderSnapshot = null;
-      if (!nextSnapshot) return;
-
-      this.render(nextSnapshot);
-    });
   }
 
   private buildRenderSnapshot(): SolarRenderSnapshot | null {
