@@ -144,16 +144,40 @@ describe('UnitsService', () => {
       }
     });
 
-    it('every conversion-list measure has a working conversion (a group-valid server base is never value-less)', () => {
-      // Underpins the group-membership guard: because every measure converts, resolving a server
-      // target to any group-valid measure guarantees a real value + matching symbol. Fails loudly if
-      // a future measure is added to the table without a conversion function.
+    it('every conversion-list measure drives BOTH a working conversion and a non-empty symbol (label-matches-conversion, comprehensively)', () => {
+      // Underpins the whole Phase-2 resolver: because every group-valid measure both converts and
+      // labels, resolving a server target (or the client default) to any group-valid measure yields a
+      // real value AND a matching symbol from one source. Fails loudly if a future measure is added to
+      // the table without a conversion function or a resolvable symbol.
       const service = setup({});
       for (const group of service.getConversions()) {
         for (const unit of group.units) {
-          expect(service.convertToUnit(unit.measure, 1), `measure ${unit.measure}`).not.toBeNull();
+          expect(service.convertToUnit(unit.measure, 1), `conversion ${unit.measure}`).not.toBeNull();
+          expect(service.getUnitDisplaySymbol(unit.measure), `symbol ${unit.measure}`).not.toBe('');
         }
       }
+    });
+
+    // --- Phase 2 (#347): the public per-path measure resolver ---
+    it('resolvePathMeasure returns the honourable server preference over the group default', () => {
+      const service = setupWithData({ Speed: 'mph' }, 'm/s', { targetUnit: 'kn' });
+      expect(service.resolvePathMeasure('self.navigation.speedOverGround')).toBe('knots');
+    });
+
+    it('resolvePathMeasure falls back to the group default when there is no server preference', () => {
+      const service = setupWithData({ Speed: 'mph' }, 'm/s', undefined);
+      expect(service.resolvePathMeasure('self.navigation.speedOverGround')).toBe('mph');
+    });
+
+    it('resolvePathMeasure returns unitless for a path with no SI unit', () => {
+      const service = setupWithData({}, null, undefined);
+      expect(service.resolvePathMeasure('self.some.stringPath')).toBe('unitless');
+    });
+
+    it('resolvePathMeasure never drifts from getConversionsForPath().base', () => {
+      const service = setupWithData({ Temperature: 'K' }, 'K', { targetUnit: 'C' });
+      const path = 'self.environment.water.temperature';
+      expect(service.resolvePathMeasure(path)).toBe(service.getConversionsForPath(path).base);
     });
   });
 });

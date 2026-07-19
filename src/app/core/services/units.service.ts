@@ -741,6 +741,18 @@ export class UnitsService {
     }
   }
 
+  /**
+   * The measure Skip applies to a path's value — the single source of BOTH the conversion
+   * (convertToUnit) and its display symbol (getUnitDisplaySymbol), so the rendered label always
+   * matches the applied conversion. Resolves to the server's honourable displayUnits preference when
+   * present, else Skip's per-group default, else 'unitless'. This is the Phase-2 seam (#347) that
+   * display widgets and the streams directive read in place of a stored per-widget convertUnitTo;
+   * structural (fixed-unit) paths bypass it and keep their widget-owned unit.
+   */
+  public resolvePathMeasure(path: string): string {
+    return this.getConversionsForPath(path).base;
+  }
+
   /** Map a server displayUnits.targetUnit onto a Skip conversion measure key (identity when no alias). */
   private mapServerTargetToMeasure(targetUnit: string): string {
     return SERVER_TARGET_UNIT_ALIASES[targetUnit] ?? targetUnit;
