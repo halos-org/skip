@@ -1,5 +1,5 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { select, type Selection } from 'd3-selection';
+import type { Selection } from 'd3-selection';
 import { DataService } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import type { ITheme } from '../../core/services/app-service';
@@ -9,18 +9,11 @@ import { UnitsService } from '../../core/services/units.service';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
-import {
-  ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT,
-  ELECTRICAL_DIRECT_CARD_FULL_LAYOUT,
-  ELECTRICAL_DIRECT_CARD_GAP,
-  ELECTRICAL_DIRECT_CARD_HEIGHT,
-  ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH,
-  ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT
-} from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
 import { setValue, setMetricValue, toStringValue, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import { ElectricalTopologyStore, type ElectricalTopologyEntry } from '../shared/electrical-topology-store';
+import { drawDirectCards, initDirectCardSvg } from '../shared/electrical-direct-card-draw';
 import type { AcDisplayModel, AcSnapshot, AcWidgetConfig, ElectricalCardModeConfig } from './widget-ac.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
@@ -46,10 +39,6 @@ export class WidgetAcComponent implements AfterViewInit {
   })();
   private static readonly ROOT_PATTERN = `${WidgetAcComponent.SELF_ROOT_PATH}.*`;
   private static readonly ROOT_PREFIX = `${WidgetAcComponent.SELF_ROOT_PATH}.`;
-  private static readonly VIEWBOX_WIDTH = ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH;
-  private static readonly CARD_HEIGHT = ELECTRICAL_DIRECT_CARD_HEIGHT;
-  private static readonly COMPACT_CARD_HEIGHT = ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT;
-  private static readonly CARD_GAP = ELECTRICAL_DIRECT_CARD_GAP;
   private static readonly PATH_BATCH_WINDOW_MS = 500;
   private static readonly RESERVED_AC_AGGREGATE_IDS = new Set(['totalCurrent', 'totalPower']);
 
@@ -228,13 +217,12 @@ export class WidgetAcComponent implements AfterViewInit {
   }
 
   private initializeSvg(): void {
-    this.svg = select(this.svgRef().nativeElement);
-    this.svg
-      .attr('viewBox', `0 0 ${WidgetAcComponent.VIEWBOX_WIDTH} ${WidgetAcComponent.CARD_HEIGHT}`)
-      .attr('preserveAspectRatio', 'xMidYMid meet')
-      .attr('role', 'img')
-      .attr('aria-label', 'AC View');
-    this.layer = this.svg.append('g').attr('class', 'ac-layer');
+    const { svg, layer } = initDirectCardSvg(this.svgRef().nativeElement, {
+      ariaLabel: 'AC View',
+      classPrefix: 'ac'
+    });
+    this.svg = svg;
+    this.layer = layer;
   }
 
   private applyConfig(cfg: IWidgetSvcConfig): void {
@@ -381,96 +369,19 @@ export class WidgetAcComponent implements AfterViewInit {
   private render(snapshot: AcRenderSnapshot): void {
     if (!this.layer || !this.svg) return;
 
-    const compact = this.isCompactCardMode();
-    const layout = compact ? ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT : ELECTRICAL_DIRECT_CARD_FULL_LAYOUT;
-    const cardHeight = compact ? WidgetAcComponent.COMPACT_CARD_HEIGHT : WidgetAcComponent.CARD_HEIGHT;
-    const cards = snapshot.buses.map((bus, index) => ({
-      key: bus.deviceKey ?? bus.id,
-      bus,
-      y: index * (cardHeight + WidgetAcComponent.CARD_GAP)
-    }));
-
-    const contentHeight = cards.length ? cards[cards.length - 1].y + cardHeight : cardHeight;
-    this.svg.attr('viewBox', `0 0 ${WidgetAcComponent.VIEWBOX_WIDTH} ${contentHeight}`);
-
-    const selection = this.layer
-      .selectAll<SVGGElement, { key: string; bus: AcSnapshot; y: number }>('g.ac-card')
-      .data(cards, item => item.key);
-
-    const enter = selection.enter().append('g').attr('class', 'ac-card');
-    enter.append('rect').attr('class', 'ac-state-bar');
-    enter.append('text').attr('class', 'ac-title');
-    enter.append('text').attr('class', 'ac-id');
-    enter.append('text').attr('class', 'ac-mode');
-    enter.append('text').attr('class', 'ac-bus');
-    enter.append('text').attr('class', 'ac-metrics-1');
-    enter.append('text').attr('class', 'ac-metrics-2');
-
-    const merged = enter.merge(selection as Selection<SVGGElement, { key: string; bus: AcSnapshot; y: number }, SVGGElement, unknown>);
-
-    merged.attr('transform', item => `translate(0, ${item.y})`);
-
-    merged.select('rect.ac-state-bar')
-      .attr('x', 1.5)
-      .attr('y', 1.5)
-      .attr('rx', layout.stateBarCornerRadius)
-      .attr('ry', layout.stateBarCornerRadius)
-      .attr('width', 3)
-      .attr('height', cardHeight - 3)
-      .attr('fill', item => snapshot.displayModels[item.key]?.stateBarColor ?? snapshot.widgetColors.dim);
-
-    if (snapshot.buses.length > 1) {
-      merged.select('text.ac-title')
-        .attr('x', layout.titleX)
-        .attr('y', layout.titleY)
-        .attr('font-size', layout.titleFontSize)
-        .attr('fill', item => snapshot.displayModels[item.key]?.titleTextColor ?? 'var(--skip-contrast-color)')
-        .text(item => snapshot.displayModels[item.key]?.titleText ?? this.resolveTitleText(item.bus));
-    } else {
-      merged.select('text.ac-title').text('');
-    }
-
-    merged.select('text.ac-id')
-      .attr('x', layout.idX)
-      .attr('y', layout.idY)
-      .attr('text-anchor', 'end')
-      .attr('font-size', layout.idFontSize)
-      .attr('fill', 'var(--skip-contrast-dim-color)')
-      .text(item => item.bus.id);
-
-    merged.select('text.ac-mode')
-      .attr('x', layout.metaLeftX)
-      .attr('y', layout.metaY)
-      .attr('font-size', layout.metaFontSize)
-      .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.modeText ?? '');
-
-    merged.select('text.ac-bus')
-      .attr('x', layout.metaRightX)
-      .attr('y', layout.metaY)
-      .attr('text-anchor', 'end')
-      .attr('font-size', layout.metaFontSize)
-      .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.busText ?? '');
-
-    merged.select('text.ac-metrics-1')
-      .attr('x', layout.lineOneX)
-      .attr('y', layout.lineOneY)
-      .attr('font-size', layout.lineOneFontSize)
-      .attr('fill', item => snapshot.displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-      .text(item => snapshot.displayModels[item.key]?.metricsLineOne ?? '');
-
-    merged.select('text.ac-metrics-2')
-      .attr('x', layout.lineTwoX)
-      .attr('y', layout.lineTwoY)
-      .attr('font-size', layout.lineTwoFontSize)
-      .attr('opacity', 0.85)
-      .attr('fill', item => snapshot.displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-      .text(item => snapshot.displayModels[item.key]?.metricsLineTwo ?? '');
-
-    selection.exit().remove();
+    drawDirectCards<AcSnapshot>({
+      svg: this.svg,
+      layer: this.layer,
+      entities: snapshot.buses,
+      displayModels: snapshot.displayModels,
+      widgetColors: snapshot.widgetColors,
+      compact: this.isCompactCardMode(),
+      descriptor: {
+        classPrefix: 'ac',
+        includeCardBg: false,
+        titleFallback: entity => this.resolveTitleText(entity)
+      }
+    });
   }
 
   private displayName(bus: AcSnapshot): string {
