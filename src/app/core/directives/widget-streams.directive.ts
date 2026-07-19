@@ -2,7 +2,7 @@ import { Directive, DestroyRef, OnDestroy, inject, signal } from '@angular/core'
 import { DataService, IPathUpdate } from '../services/data.service';
 import { UnitsService } from '../services/units.service';
 import { IWidgetSvcConfig } from '../interfaces/widgets-interface';
-import { Observable, Observer, Subject, delayWhen, filter, map, retryWhen, sampleTime, tap, throwError, timeout, timer, takeUntil, take, merge, Subscription } from 'rxjs';
+import { Observable, Observer, Subject, delayWhen, filter, map, retryWhen, sampleTime, tap, throwError, timeout, timer, takeUntil, take, merge, combineLatest, distinctUntilChanged, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Directive({
@@ -113,7 +113,7 @@ export class WidgetStreamsDirective implements OnDestroy {
   }
 
   /** Create (or reuse) base observable, assemble pipeline, and subscribe with diff-aware replacement. */
-  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; sampleTime?: number; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }, subField?: string): void {
+  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; sampleTime?: number; convertUnitTo?: string; showConvertUnitTo?: boolean; source?: string; suppressBootstrapNull?: boolean }, subField?: string): void {
     const normalizedPath = this.normalizePath(pathCfg.path);
     if (!normalizedPath) {
       const existing = this.subscriptions.get(pathName);
@@ -149,11 +149,15 @@ export class WidgetStreamsDirective implements OnDestroy {
     const retryErrorMsg = `[Widget] ${cfg.displayName} - Retrying in ${retryDelay / 1000} seconds`;
 
     const pathType = pathCfg.pathType;
-    const convert = pathCfg.convertUnitTo;
     const suppressBootstrapNull = !!pathCfg.suppressBootstrapNull;
     let sample = Number(pathCfg.sampleTime);
     if (!Number.isFinite(sample) || sample <= 0) sample = 1000;
-    const toUnit = (val: number) => convert ? this.unitsService.convertToUnit(convert, val) : val;
+    // Structural paths keep their widget-owned fixed unit; display paths follow the server's
+    // resolved measure (which can change when displayUnits meta arrives after first subscribe).
+    const isStructural = pathCfg.showConvertUnitTo === false;
+    const structuralMeasure = pathCfg.convertUnitTo;
+    const convertWith = (measure: string | undefined, val: number): number | null =>
+      measure ? this.unitsService.convertToUnit(measure, val) : val;
 
     let data$: Observable<IPathUpdate> = base$;
     if (subField) {
@@ -180,15 +184,38 @@ export class WidgetStreamsDirective implements OnDestroy {
     const sampled$ = data$.pipe(sampleTime(sample));
     data$ = merge(initial$, sampled$);
     if (pathType === 'number') {
-      data$ = data$.pipe(
-        map(x => ({
-          data: {
-            value: x.data.value == null ? null : toUnit(x.data.value as number),
-            timestamp: x.data.timestamp
-          },
-          state: x.state
-        } as IPathUpdate))
-      );
+      if (isStructural) {
+        data$ = data$.pipe(
+          map(x => ({
+            data: {
+              value: x.data.value == null ? null : convertWith(structuralMeasure, x.data.value as number),
+              timestamp: x.data.timestamp,
+              measure: structuralMeasure
+            },
+            state: x.state
+          } as IPathUpdate))
+        );
+      } else {
+        // Display path: the applied measure is reactive. Re-emit the last value whenever the
+        // resolved measure changes (e.g. the server's displayUnits meta lands after this
+        // subscription was built), so the value and the widget's unit label stay in lock-step.
+        // combineLatest tears down with the outer pipeline, so no separate meta-subscription
+        // bookkeeping is needed.
+        const measure$ = this.dataService.getPathMetaObservable(normalizedPath).pipe(
+          map(() => this.unitsService.resolvePathMeasure(normalizedPath)),
+          distinctUntilChanged()
+        );
+        data$ = combineLatest([data$, measure$]).pipe(
+          map(([x, measure]) => ({
+            data: {
+              value: x.data.value == null ? null : convertWith(measure, x.data.value as number),
+              timestamp: x.data.timestamp,
+              measure
+            },
+            state: x.state
+          } as IPathUpdate))
+        );
+      }
     }
     if (enableTimeout) {
       data$ = data$.pipe(

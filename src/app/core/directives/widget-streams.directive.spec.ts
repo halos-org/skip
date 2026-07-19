@@ -5,6 +5,7 @@ import { WidgetStreamsDirective } from './widget-streams.directive';
 import { DataService, IPathUpdate } from '../services/data.service';
 import { UnitsService } from '../services/units.service';
 import { IWidgetSvcConfig, IWidgetPath } from '../interfaces/widgets-interface';
+import { ISkMetadata } from '../interfaces/signalk-interfaces';
 
 class FakeDataService {
     calls: {
@@ -16,6 +17,7 @@ class FakeDataService {
         source: string;
     }[] = [];
     subjects = new Map<string, Subject<IPathUpdate>>();
+    metaSubjects = new Map<string, BehaviorSubject<ISkMetadata | null>>();
     timeoutCalls: {
         path: string;
         source: string;
@@ -50,13 +52,25 @@ class FakeDataService {
     timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
         this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
     }
+
+    getPathMetaObservable(path: string): Observable<ISkMetadata | null> {
+        if (!this.metaSubjects.has(path)) {
+            this.metaSubjects.set(path, new BehaviorSubject<ISkMetadata | null>(null));
+        }
+        return this.metaSubjects.get(path)!.asObservable();
+    }
 }
 
 class FakeUnitsService {
+    /** Per-path resolved measure a display path follows; defaults to an identity measure ('kn'). */
+    pathMeasures = new Map<string, string>();
     convertToUnit(unit: string, value: number): number {
         if (unit === 'x10')
             return value * 10;
         return value;
+    }
+    resolvePathMeasure(path: string): string {
+        return this.pathMeasures.get(path) ?? 'kn';
     }
 }
 
@@ -66,6 +80,7 @@ function makeCfg(opts: {
     pathType?: 'number' | 'string' | 'Date' | 'boolean';
     sampleTime?: number;
     convertUnitTo?: string | null;
+    showConvertUnitTo?: boolean;
     source?: string | null;
     suppressBootstrapNull?: boolean;
     displayName?: string;
@@ -85,6 +100,7 @@ function makeCfg(opts: {
             showPathSkUnitsFilter: false,
             pathSkUnitsFilter: null,
             convertUnitTo: (opts.convertUnitTo ?? undefined) as unknown as string,
+            showConvertUnitTo: opts.showConvertUnitTo,
             sampleTime: opts.sampleTime ?? 1000,
             supportsPut: false
         }
@@ -132,6 +148,7 @@ function heldBaseCount(directive: WidgetStreamsDirective): number {
 describe('WidgetStreamsDirective', () => {
     let directive: WidgetStreamsDirective;
     let dataSvc: FakeDataService;
+    let unitsSvc: FakeUnitsService;
 
     beforeEach(() => {
         TestBed.configureTestingModule({
@@ -143,6 +160,7 @@ describe('WidgetStreamsDirective', () => {
         });
         directive = TestBed.inject(WidgetStreamsDirective);
         dataSvc = TestBed.inject(DataService) as unknown as FakeDataService;
+        unitsSvc = TestBed.inject(UnitsService) as unknown as FakeUnitsService;
     });
 
     afterEach(() => {
@@ -182,7 +200,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('applies unit conversion to the extracted sub-field (extraction precedes conversion)', () => {
-        const cfg = makeCfg({ path: 'navigation.attitude', source: null, pathType: 'number', convertUnitTo: 'x10', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'navigation.attitude', source: null, pathType: 'number', convertUnitTo: 'x10', showConvertUnitTo: false, sampleTime: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: unknown[] = [];
@@ -350,8 +368,8 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('rewires pipeline on signature change (convertUnitTo) while reusing base stream', () => {
-        // Initial config: number path, no conversion
-        const cfg1 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', sampleTime: 50 });
+        // Initial config: structural number path, no conversion (convertUnitTo drives the value).
+        const cfg1 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', showConvertUnitTo: false, sampleTime: 50 });
         directive.setStreamsConfig(cfg1);
 
         const hits: number[] = [];
@@ -366,7 +384,7 @@ describe('WidgetStreamsDirective', () => {
         expect(hits).toEqual([2]);
 
         // Change only convertUnitTo (part of signature), keep base identity (path+source) the same
-        const cfg2 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', convertUnitTo: 'x10', sampleTime: 50 });
+        const cfg2 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', convertUnitTo: 'x10', showConvertUnitTo: false, sampleTime: 50 });
         directive.applyStreamsConfigDiff(cfg2);
 
         // DataService should NOT have been called again (base reused)
@@ -484,9 +502,9 @@ describe('WidgetStreamsDirective', () => {
         expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'n2k-1', pathType: 'string', dataTimeoutMs: 0.02 * 1000 });
     });
 
-    it('applies convertUnitTo to numeric values (initial + sampled)', async () => {
+    it('applies a structural convertUnitTo to numeric values (initial + sampled)', async () => {
         vi.useFakeTimers();
-        const cfg = makeCfg({ path: 'env.units', source: null, pathType: 'number', sampleTime: 50, convertUnitTo: 'x10' });
+        const cfg = makeCfg({ path: 'env.units', source: null, pathType: 'number', sampleTime: 50, convertUnitTo: 'x10', showConvertUnitTo: false });
         directive.setStreamsConfig(cfg);
 
         const hits: number[] = [];
@@ -500,6 +518,40 @@ describe('WidgetStreamsDirective', () => {
         subj.next({ data: { value: 3, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
         await vi.advanceTimersByTimeAsync(60);
         expect(hits).toEqual([10, 30]);
+    });
+
+    it('applies the server-resolved measure to a display path and tags the value with it', () => {
+        unitsSvc.pathMeasures.set('env.disp', 'x10');
+        // Stored convertUnitTo is ignored for a display path (no showConvertUnitTo:false); the
+        // server-resolved measure wins for BOTH the conversion and the value's measure tag.
+        const cfg = makeCfg({ path: 'env.disp', source: null, pathType: 'number', convertUnitTo: 'noop', sampleTime: 50 });
+        directive.setStreamsConfig(cfg);
+
+        const received: IPathUpdate[] = [];
+        directive.observe('p', u => received.push(u));
+
+        dataSvc.subjects.get('env.disp|default')!.next({ data: { value: 4, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        expect(received.at(-1)?.data.value).toBe(40); // resolved 'x10', not stored 'noop'
+        expect(received.at(-1)?.data.measure).toBe('x10');
+    });
+
+    it('re-emits the last value in the new unit when the resolved measure changes (late meta)', () => {
+        unitsSvc.pathMeasures.set('env.late', 'noop'); // starts as an identity measure
+        const cfg = makeCfg({ path: 'env.late', source: null, pathType: 'number', sampleTime: 50 });
+        directive.setStreamsConfig(cfg);
+
+        const values: unknown[] = [];
+        directive.observe('p', u => values.push(u?.data?.value));
+
+        dataSvc.subjects.get('env.late|default')!.next({ data: { value: 5, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+        expect(values.at(-1)).toBe(5); // identity measure
+
+        // Server displayUnits meta arrives after subscribe -> resolved measure becomes 'x10'.
+        // No new data delta: the last value must re-emit, re-converted, so label and value agree.
+        unitsSvc.pathMeasures.set('env.late', 'x10');
+        dataSvc.metaSubjects.get('env.late')!.next({} as ISkMetadata);
+        expect(values.at(-1)).toBe(50);
     });
 
     it('supports observer-level min/max compounding with sampling', async () => {
@@ -712,10 +764,18 @@ describe('WidgetStreamsDirective', () => {
  */
 class TtlFakeDataService {
     subjects = new Map<string, BehaviorSubject<IPathUpdate>>();
+    metaSubjects = new Map<string, BehaviorSubject<ISkMetadata | null>>();
     timeoutCalls: { path: string; source: string; pathType: string; dataTimeoutMs: number }[] = [];
 
     private keyFor(path: string, source?: string): string {
         return `${path}|${source?.trim() || 'default'}`;
+    }
+
+    getPathMetaObservable(path: string): Observable<ISkMetadata | null> {
+        if (!this.metaSubjects.has(path)) {
+            this.metaSubjects.set(path, new BehaviorSubject<ISkMetadata | null>(null));
+        }
+        return this.metaSubjects.get(path)!.asObservable();
     }
 
     subscribePath(path: string, source?: string): Observable<IPathUpdate> {
