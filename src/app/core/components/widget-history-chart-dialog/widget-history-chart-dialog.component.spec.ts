@@ -22,6 +22,8 @@ describe('WidgetHistoryChartDialogComponent', () => {
     mapValuesToChartDatapoints: Mock;
   };
   let convertToUnitMock: Mock;
+  let resolvePathMeasureMock: Mock;
+  let getUnitDisplaySymbolMock: Mock;
 
   const theme = {
     green: '#11aa44',
@@ -88,6 +90,8 @@ describe('WidgetHistoryChartDialogComponent', () => {
     };
 
     convertToUnitMock = vi.fn().mockImplementation((_unit: string, value: number) => value);
+    resolvePathMeasureMock = vi.fn().mockReturnValue('unitless');
+    getUnitDisplaySymbolMock = vi.fn().mockImplementation((measure: string | null | undefined) => measure ?? '');
 
     await TestBed.configureTestingModule({
       imports: [WidgetHistoryChartDialogComponent],
@@ -111,7 +115,9 @@ describe('WidgetHistoryChartDialogComponent', () => {
         {
           provide: UnitsService,
           useValue: {
-            convertToUnit: convertToUnitMock
+            convertToUnit: convertToUnitMock,
+            resolvePathMeasure: resolvePathMeasureMock,
+            getUnitDisplaySymbol: getUnitDisplaySymbolMock
           }
         }
       ]
@@ -914,5 +920,156 @@ describe('WidgetHistoryChartDialogComponent', () => {
 
       expect(historyApiClientMock.getPaths).toHaveBeenCalledWith(expect.objectContaining({ duration: 'PT86400S' }));
     }
+  });
+
+  it('converts a display path with the server-resolved measure, not the stored convertUnitTo', async () => {
+    resolvePathMeasureMock.mockReturnValue('knots');
+    convertToUnitMock.mockImplementation((unit: string, value: number) => unit === 'knots' ? value * 2 : value);
+
+    const displaySeries: ISkipSeriesDefinition = {
+      seriesId: 'widget-numeric-1:speed:default',
+      datasetUuid: 'widget-numeric-1:speed:default',
+      ownerWidgetUuid: 'widget-numeric-1',
+      ownerWidgetSelector: 'widget-numeric',
+      path: 'self.navigation.speedThroughWater',
+      enabled: true
+    };
+
+    (component as unknown as {
+      data: {
+        title: string;
+        widget: IWidget;
+        seriesDefinitions: ISkipSeriesDefinition[];
+      };
+    }).data = {
+      title: 'Speed History',
+      widget: {
+        uuid: 'widget-numeric-1',
+        type: 'widget-numeric',
+        config: {
+          displayName: 'Speed',
+          paths: {
+            numericPath: {
+              description: 'Numeric Data',
+              path: 'self.navigation.speedThroughWater',
+              source: null,
+              pathType: 'number',
+              isPathConfigurable: true,
+              convertUnitTo: 'kph',
+              showConvertUnitTo: true,
+              sampleTime: 500
+            }
+          }
+        }
+      } as IWidget,
+      seriesDefinitions: [displaySeries]
+    };
+
+    const dataset = await (component as unknown as {
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
+        data: { x: number; y: number }[];
+      } | null>;
+    }).buildDatasetForSeries(displaySeries, 0);
+
+    expect(resolvePathMeasureMock).toHaveBeenCalledWith('self.navigation.speedThroughWater');
+    expect(convertToUnitMock).toHaveBeenCalledWith('knots', 14.5);
+    expect(convertToUnitMock).not.toHaveBeenCalledWith('kph', 14.5);
+    expect(dataset?.data[0].y).toBe(29);
+  });
+
+  it('labels the primary axis from the server-resolved measure symbol', () => {
+    resolvePathMeasureMock.mockReturnValue('knots');
+    getUnitDisplaySymbolMock.mockImplementation((measure: string) => measure === 'knots' ? 'kn' : measure);
+
+    (component as unknown as {
+      data: {
+        title: string;
+        widget: IWidget;
+        seriesDefinitions: ISkipSeriesDefinition[];
+      };
+    }).data = {
+      title: 'Speed History',
+      widget: {
+        uuid: 'widget-numeric-1',
+        type: 'widget-numeric',
+        config: {
+          displayName: 'Speed',
+          paths: {
+            numericPath: {
+              description: 'Numeric Data',
+              path: 'self.navigation.speedThroughWater',
+              source: null,
+              pathType: 'number',
+              isPathConfigurable: true,
+              convertUnitTo: 'kph',
+              showConvertUnitTo: true,
+              sampleTime: 500
+            }
+          }
+        }
+      } as IWidget,
+      seriesDefinitions: []
+    };
+
+    const label = (component as unknown as {
+      getPrimaryAxisUnitLabel: () => string;
+    }).getPrimaryAxisUnitLabel();
+
+    expect(resolvePathMeasureMock).toHaveBeenCalledWith('self.navigation.speedThroughWater');
+    expect(getUnitDisplaySymbolMock).toHaveBeenCalledWith('knots');
+    expect(label).toBe('kn');
+  });
+
+  it('keeps the stored convertUnitTo for a structural path and never resolves a server measure', async () => {
+    convertToUnitMock.mockImplementation((_unit: string, value: number) => value);
+
+    const structuralSeries: ISkipSeriesDefinition = {
+      seriesId: 'widget-numeric-1:cog:default',
+      datasetUuid: 'widget-numeric-1:cog:default',
+      ownerWidgetUuid: 'widget-numeric-1',
+      ownerWidgetSelector: 'widget-numeric',
+      path: 'self.navigation.courseOverGroundTrue',
+      enabled: true
+    };
+
+    (component as unknown as {
+      data: {
+        title: string;
+        widget: IWidget;
+        seriesDefinitions: ISkipSeriesDefinition[];
+      };
+    }).data = {
+      title: 'Course History',
+      widget: {
+        uuid: 'widget-numeric-1',
+        type: 'widget-numeric',
+        config: {
+          displayName: 'Course',
+          paths: {
+            numericPath: {
+              description: 'Numeric Data',
+              path: 'self.navigation.courseOverGroundTrue',
+              source: null,
+              pathType: 'number',
+              isPathConfigurable: true,
+              convertUnitTo: 'deg',
+              showConvertUnitTo: false,
+              sampleTime: 500
+            }
+          }
+        }
+      } as IWidget,
+      seriesDefinitions: [structuralSeries]
+    };
+
+    const dataset = await (component as unknown as {
+      buildDatasetForSeries: (series: ISkipSeriesDefinition, index: number) => Promise<{
+        data: { x: number; y: number }[];
+      } | null>;
+    }).buildDatasetForSeries(structuralSeries, 0);
+
+    expect(resolvePathMeasureMock).not.toHaveBeenCalled();
+    expect(convertToUnitMock).toHaveBeenCalledWith('deg', 14.5);
+    expect(dataset?.data[0].y).toBe(14.5);
   });
 });

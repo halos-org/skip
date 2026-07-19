@@ -5,7 +5,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Chart, ChartConfiguration, ChartDataset, Color, LegendItem } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { registerChartComponents } from '../../utils/chart-registration.util';
-import { IWidget } from '../../interfaces/widgets-interface';
+import { IWidget, IWidgetPath } from '../../interfaces/widgets-interface';
 import { ISkipSeriesDefinition } from '../../contracts/skip-series-contract';
 import { isSkipTemplateSeriesDefinition, type ISkipConcreteSeriesDefinition, type ISkipTemplateSeriesDefinition } from '../../contracts/skip-series-contract';
 import {
@@ -201,7 +201,10 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
     const dualAxisSeries = this.describeDualAxisSeries(rawPath);
     let chartPoints: ChartPoint[] = [];
     let labelPath = this.normalizeHistoryPath(rawPath);
-    const convertUnitTo = this.resolveConvertUnitTo(rawPath);
+    // Dual-axis metrics are converted by their contract transform (below), never by a unit measure, so
+    // they need no effective measure. Single-axis paths mirror the live tile: display paths follow the
+    // server-resolved measure, structural paths keep the widget's stored convertUnitTo.
+    const convertUnitTo = dualAxisSeries ? null : this.resolveEffectiveMeasure(rawPath);
 
     for (const candidate of requestCandidates) {
       // A transient failure (network/5xx/timeout) now throws; treat it like an empty result so this
@@ -630,9 +633,48 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
   }
 
   private getPrimaryAxisUnitLabel(): string {
-    const convertUnitTo = this.resolveConvertUnitTo();
+    const measure = this.resolveEffectiveMeasure();
 
-    return this.units.getUnitDisplaySymbol(convertUnitTo);
+    return this.units.getUnitDisplaySymbol(measure);
+  }
+
+  /**
+   * The measure the dialog converts a series' history values to, and labels its axis with — mirroring
+   * the live tile. Structural (fixed-unit) paths keep the widget's stored convertUnitTo; display paths
+   * follow the server-resolved measure (UnitsService.resolvePathMeasure) so the dialog and the tile
+   * stay in lock-step when the server's displayUnits preference differs from the stored default.
+   */
+  private resolveEffectiveMeasure(rawPath?: string): string | null {
+    const pathCfg = this.findPathConfig(rawPath);
+    if (pathCfg?.showConvertUnitTo === false) {
+      return this.resolveConvertUnitTo(rawPath);
+    }
+
+    const measurePath = pathCfg?.path ?? rawPath;
+    return measurePath ? this.units.resolvePathMeasure(measurePath) : this.resolveConvertUnitTo(rawPath);
+  }
+
+  /**
+   * Locate the widget path configuration a series' path maps to (matched on the stored path, else the
+   * first configured path), used to classify a path as structural vs. display for measure resolution.
+   */
+  private findPathConfig(rawPath?: string): IWidgetPath | undefined {
+    const widgetConfig = this.data.widget?.config;
+    if (!widgetConfig?.paths || typeof widgetConfig.paths !== 'object') {
+      return undefined;
+    }
+
+    if (rawPath) {
+      for (const key of Object.keys(widgetConfig.paths)) {
+        const pathCfg = widgetConfig.paths[key];
+        if (pathCfg?.path === rawPath) {
+          return pathCfg;
+        }
+      }
+    }
+
+    const firstPathKey = Object.keys(widgetConfig.paths)[0];
+    return firstPathKey ? widgetConfig.paths[firstPathKey] : undefined;
   }
 
   private resolveConvertUnitTo(rawPath?: string): string | null {

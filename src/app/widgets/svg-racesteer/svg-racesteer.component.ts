@@ -43,6 +43,7 @@ export class SvgRacesteerComponent implements OnDestroy {
   protected readonly trueWindMidHistoric = input<number | undefined>(undefined);
   protected readonly trueWindMaxHistoric = input<number | undefined>(undefined);
   protected readonly gradianColor = input.required<{ start: string; stop: string }>();
+  protected readonly speedUnitSymbol = input<string>('');
 
   protected compass: ISVGRotationObject = { oldValue: 0, newValue: 0 };
   protected twa: ISVGRotationObject = { oldValue: 0, newValue: 0 };

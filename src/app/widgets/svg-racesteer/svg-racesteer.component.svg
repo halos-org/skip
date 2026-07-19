@@ -445,13 +445,13 @@
         class="wind-vmg-value"
         [style.fill]="targetVMGOffsetRatioColor()"
         x="610"
-        y="850">{{ targetVMG() }}<tspan style="font-weight:normal;font-size:30px;"> kts</tspan></text>
+        y="850">{{ targetVMG() }}<tspan style="font-weight:normal;font-size:30px;"> {{ speedUnitSymbol() }}</tspan></text>
       <text
         xml:space="preserve"
         class="wind-vmg-offset"
         [style.fill]="targetVMGOffsetRatioColor()"
         x="610"
-        y="890">{{ targetVMGOffset() }}<tspan style="font-weight:normal;font-size:30px;"> kts</tspan></text>
+        y="890">{{ targetVMGOffset() }}<tspan style="font-weight:normal;font-size:30px;"> {{ speedUnitSymbol() }}</tspan></text>
     </g>
     <g id="waypointCounter">
       <text
@@ -470,7 +470,7 @@
         xml:space="preserve"
         class="waypoint-value"
         x="1060"
-        y="1100"><tspan class="tack-label">VMG: </tspan>{{ vmgToWaypoint() }}<tspan style="font-weight:normal;font-size:30px;"> kts</tspan></text>
+        y="1100"><tspan class="tack-label">VMG: </tspan>{{ vmgToWaypoint() }}<tspan style="font-weight:normal;font-size:30px;"> {{ speedUnitSymbol() }}</tspan></text>
       <text
         xml:space="preserve"
         class="waypoint-value"

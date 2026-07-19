@@ -117,7 +117,7 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (!cfg?.datachartPath) {
       return undefined;
     }
-    return [cfg.datachartPath, cfg.convertUnitTo, cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
+    return [cfg.datachartPath, this.unitsService.resolvePathMeasure(cfg.datachartPath), cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
   });
   private previousPathSignature: string | undefined = undefined;
 
@@ -815,21 +815,21 @@ export class WidgetDataChartComponent implements OnDestroy {
   }
 
   private applyTitleAndAnnotationValues(point: IDatasetServiceDatapoint, cfg: IWidgetSvcConfig): void {
-    const unit = cfg.convertUnitTo ?? '';
+    const measure = this.unitsService.resolvePathMeasure(cfg.datachartPath ?? '');
     const trackValue: number = cfg.trackAgainstAverage ? (point.data.sma ?? point.data.value) : point.data.value;
-    const convertedTrack = this.unitsService.convertToUnit(unit, trackValue);
+    const convertedTrack = this.unitsService.convertToUnit(measure, trackValue);
     if (convertedTrack !== null && Number.isFinite(convertedTrack)) {
       const titlePlugin = this.chart.options.plugins?.title;
       if (titlePlugin) {
-        titlePlugin.text = `${convertedTrack.toFixed(cfg.numDecimal)} ${this.unitsService.getUnitDisplaySymbol(unit)} `;
+        titlePlugin.text = `${convertedTrack.toFixed(cfg.numDecimal)} ${this.unitsService.getUnitDisplaySymbol(measure)} `;
       }
     }
 
     // A missing rolling stat (insufficient history yet) converts like the pre-existing code's
     // implicit `+undefined` did: NaN in, NaN out, so the finite-checks below skip it exactly as before.
-    const lastAverage = this.unitsService.convertToUnit(unit, point.data.lastAverage ?? NaN);
-    const lastMinimum = this.unitsService.convertToUnit(unit, point.data.lastMinimum ?? NaN);
-    const lastMaximum = this.unitsService.convertToUnit(unit, point.data.lastMaximum ?? NaN);
+    const lastAverage = this.unitsService.convertToUnit(measure, point.data.lastAverage ?? NaN);
+    const lastMinimum = this.unitsService.convertToUnit(measure, point.data.lastMinimum ?? NaN);
+    const lastMaximum = this.unitsService.convertToUnit(measure, point.data.lastMaximum ?? NaN);
 
     if (lastAverage !== null && Number.isFinite(lastAverage)) this.lastAverageValue = lastAverage;
     if (lastMinimum !== null && Number.isFinite(lastMinimum)) this.lastMinimumValue = lastMinimum;
@@ -841,7 +841,8 @@ export class WidgetDataChartComponent implements OnDestroy {
   private transformDatasetRows(rows: IDatasetServiceDatapoint[], datasetType): IDataSetRow[] {
     const cfg = this.runtime.options();
     if (!cfg) return [];
-    const convert = (v: number) => this.unitsService.convertToUnit(cfg.convertUnitTo ?? '', v);
+    const measure = this.unitsService.resolvePathMeasure(cfg.datachartPath ?? '');
+    const convert = (v: number) => this.unitsService.convertToUnit(measure, v);
     const verticalChart = cfg.verticalChart;
     const avgKey = cfg.datasetAverageArray ?? 'sma';
 
