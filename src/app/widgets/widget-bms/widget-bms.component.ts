@@ -78,15 +78,17 @@ export class WidgetBmsComponent implements AfterViewInit {
     }
   };
 
-  private static readonly VIEWBOX_WIDTH = ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH;
+  // Getters, not fields: read the shared layout constants at access time. A
+  // class-def-time capture reads undefined in combined test bundles (#360).
+  private static get VIEWBOX_WIDTH(): number { return ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH; }
   private static readonly MIN_VIEWBOX_HEIGHT = 1;
-  private static readonly BANK_CARD_WIDTH = ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH;
+  private static get BANK_CARD_WIDTH(): number { return ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH; }
   private static readonly BATTERY_CARD_HEIGHT = 50;
   private static readonly BATTERY_CARD_WIDTH = 200;
   private static readonly CARD_GAP = 8;
   private static readonly BANK_HEADER_HEIGHT = 80;
   private static readonly BANK_MIN_HEIGHT = 75;
-  private static readonly SINGLE_ROW_BANK_HEIGHT = ELECTRICAL_DIRECT_CARD_HEIGHT;
+  private static get SINGLE_ROW_BANK_HEIGHT(): number { return ELECTRICAL_DIRECT_CARD_HEIGHT; }
   private static readonly IN_BANK_COLUMNS = 2;
   private static readonly IN_BANK_COLUMN_GAP = 5;
   private static readonly IN_BANK_PADDING_X = 0;

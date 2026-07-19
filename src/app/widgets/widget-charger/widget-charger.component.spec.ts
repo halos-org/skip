@@ -430,4 +430,27 @@ describe('WidgetChargerComponent', () => {
     const map = (component as unknown as { chargersByKey: () => Record<string, unknown> }).chargersByKey();
     expect(map['c9']).toBeUndefined();
   });
+
+  // Guards #360: the layout-constant getters must yield well-formed geometry. The
+  // NaN only appears when >=2 electrical specs share a test bundle, so this bites
+  // in the full suite, not when this spec runs alone.
+  it('renders well-formed geometry (no NaN/undefined viewBox)', async () => {
+    vi.useFakeTimers();
+    try {
+      await setup([
+        makeUpdate('self.electrical.chargers.c1.voltage', 27.5),
+        makeUpdate('self.electrical.chargers.c2.voltage', 28.1)
+      ]);
+      await vi.runAllTimersAsync();
+      fixture.detectChanges();
+      await vi.runAllTimersAsync();
+      const svg = fixture.nativeElement.querySelector('svg') as SVGSVGElement | null;
+      const viewBox = svg?.getAttribute('viewBox') ?? '';
+      expect(viewBox).not.toBe('');
+      expect(viewBox).not.toContain('NaN');
+      expect(viewBox).not.toContain('undefined');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
