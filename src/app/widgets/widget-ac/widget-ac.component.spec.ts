@@ -427,4 +427,26 @@ describe('WidgetAcComponent', () => {
     const map = (component as unknown as { busesByKey: () => Record<string, unknown> }).busesByKey();
     expect(map.c1).toBeUndefined();
   });
+
+  it('golden DOM: renders a stable SVG for a multi-device seed', async () => {
+    vi.useFakeTimers();
+    await setup([
+      makeUpdate('self.electrical.ac.bus1.line1.voltage', 230),
+      makeUpdate('self.electrical.ac.bus1.line1.current', 5),
+      makeUpdate('self.electrical.ac.bus1.line1.frequency', 50),
+      makeUpdate('self.electrical.ac.bus2.line1.voltage', 231),
+      makeUpdate('self.electrical.ac.bus2.line1.current', 3)
+    ]);
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+
+    const svg = fixture.nativeElement.querySelector('svg') as SVGSVGElement | null;
+    expect(svg).toBeTruthy();
+    expect(svg?.querySelectorAll('g.ac-card').length).toBe(2);
+    // Strip Angular's view-encapsulation attrs (hash can churn on unrelated .ts edits);
+    // the d3-drawn content carries none, so this leaves the meaningful draw intact.
+    const normalized = (svg?.outerHTML ?? '').replace(/ _ng(content|host)-[a-z0-9-]+=""/g, '');
+    expect(normalized).toMatchSnapshot();
+  });
 });

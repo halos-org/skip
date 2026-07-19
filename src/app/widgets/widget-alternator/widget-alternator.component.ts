@@ -1,5 +1,5 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { select, type Selection } from 'd3-selection';
+import type { Selection } from 'd3-selection';
 import { DataService } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import type { ITheme } from '../../core/services/app-service';
@@ -9,20 +9,13 @@ import { UnitsService } from '../../core/services/units.service';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
-import {
-  ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT,
-  ELECTRICAL_DIRECT_CARD_FULL_LAYOUT,
-  ELECTRICAL_DIRECT_CARD_GAP,
-  ELECTRICAL_DIRECT_CARD_HEIGHT,
-  ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH,
-  ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT
-} from '../shared/electrical-card-layout.constants';
 import type { AlternatorDisplayModel, AlternatorSnapshot, AlternatorWidgetConfig, ElectricalCardModeConfig } from './widget-alternator.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
 import { setValue, setMetricValue, toStringValue, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import { ElectricalTopologyStore, type ElectricalTopologyEntry } from '../shared/electrical-topology-store';
+import { drawDirectCards, initDirectCardSvg } from '../shared/electrical-direct-card-draw';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -50,10 +43,6 @@ export class WidgetAlternatorComponent implements AfterViewInit {
   })();
   private static readonly ROOT_PATTERN = `${WidgetAlternatorComponent.SELF_ROOT_PATH}.*`;
   private static readonly PATH_REGEX = new RegExp(`^${escapeRegex(WidgetAlternatorComponent.SELF_ROOT_PATH)}\\.([^.]+)\\.(.+)$`);
-  private static readonly VIEWBOX_WIDTH = ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH;
-  private static readonly CARD_HEIGHT = ELECTRICAL_DIRECT_CARD_HEIGHT;
-  private static readonly COMPACT_CARD_HEIGHT = ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT;
-  private static readonly CARD_GAP = ELECTRICAL_DIRECT_CARD_GAP;
   private static readonly PATH_BATCH_WINDOW_MS = 500;
 
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -237,14 +226,12 @@ export class WidgetAlternatorComponent implements AfterViewInit {
   }
 
   private initializeSvg(): void {
-    this.svg = select(this.svgRef().nativeElement);
-    this.svg
-      .attr('viewBox', `0 0 ${WidgetAlternatorComponent.VIEWBOX_WIDTH} ${WidgetAlternatorComponent.CARD_HEIGHT}`)
-      .attr('preserveAspectRatio', 'xMidYMid meet')
-      .attr('role', 'img')
-      .attr('aria-label', 'Alternator View');
-
-    this.layer = this.svg.append('g').attr('class', 'alternator-layer');
+    const { svg, layer } = initDirectCardSvg(this.svgRef().nativeElement, {
+      ariaLabel: 'Alternator View',
+      classPrefix: 'alternator'
+    });
+    this.svg = svg;
+    this.layer = layer;
   }
 
   private applyConfig(cfg: IWidgetSvcConfig): void {
@@ -362,110 +349,19 @@ export class WidgetAlternatorComponent implements AfterViewInit {
       return;
     }
 
-    const compact = this.isCompactCardMode();
-    const layout = compact ? ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT : ELECTRICAL_DIRECT_CARD_FULL_LAYOUT;
-    const cardHeight = compact ? WidgetAlternatorComponent.COMPACT_CARD_HEIGHT : WidgetAlternatorComponent.CARD_HEIGHT;
-    const cards = snapshot.alternators.map((alternator, index) => ({
-      key: alternator.deviceKey ?? alternator.id,
-      alternator,
-      y: index * (cardHeight + WidgetAlternatorComponent.CARD_GAP)
-    }));
-
-    const contentHeight = cards.length
-      ? cards[cards.length - 1].y + cardHeight
-      : cardHeight;
-
-    this.svg.attr('viewBox', `0 0 ${WidgetAlternatorComponent.VIEWBOX_WIDTH} ${contentHeight}`);
-
-    const selection = this.layer
-      .selectAll<SVGGElement, { key: string; alternator: AlternatorSnapshot; y: number }>('g.alternator-card')
-      .data(cards, item => item.key);
-
-    const enter = selection.enter().append('g').attr('class', 'alternator-card');
-    enter.append('rect').attr('class', 'alternator-card-bg');
-    enter.append('rect').attr('class', 'alternator-state-bar');
-    enter.append('text').attr('class', 'alternator-title');
-    enter.append('text').attr('class', 'alternator-id');
-    enter.append('text').attr('class', 'alternator-mode');
-    enter.append('text').attr('class', 'alternator-bus');
-    enter.append('text').attr('class', 'alternator-metrics-1');
-    enter.append('text').attr('class', 'alternator-metrics-2');
-
-    const merged = enter.merge(selection as Selection<SVGGElement, { key: string; alternator: AlternatorSnapshot; y: number }, SVGGElement, unknown>);
-
-    merged.attr('transform', item => `translate(0, ${item.y})`);
-    merged.select('rect.alternator-card-bg')
-      .attr('x', 0.5)
-      .attr('y', 0.5)
-      .attr('rx', layout.cardCornerRadius)
-      .attr('ry', layout.cardCornerRadius)
-      .attr('width', WidgetAlternatorComponent.VIEWBOX_WIDTH - 1)
-      .attr('height', cardHeight - 1)
-      .attr('stroke', 'var(--mat-sys-outline-variant)')
-      .attr('stroke-width', 0.5)
-      .attr('fill', 'none');
-
-    merged.select('rect.alternator-state-bar')
-      .attr('x', 1.5)
-      .attr('y', 1.5)
-      .attr('rx', layout.stateBarCornerRadius)
-      .attr('ry', layout.stateBarCornerRadius)
-      .attr('width', 3)
-      .attr('height', cardHeight - 3)
-      .attr('fill', item => snapshot.displayModels[item.key]?.stateBarColor ?? snapshot.widgetColors.dim);
-
-    if (snapshot.alternators.length > 1) {
-      merged.select('text.alternator-title')
-        .attr('x', layout.titleX)
-        .attr('y', layout.titleY)
-        .attr('font-size', layout.titleFontSize)
-        .attr('fill', item => snapshot.displayModels[item.key]?.titleTextColor ?? 'var(--skip-contrast-color)')
-        .text(item => snapshot.displayModels[item.key]?.titleText ?? this.resolveTitleText(item.alternator));
-    } else {
-      merged.select('text.alternator-title').text('');
-    }
-
-    merged.select('text.alternator-id')
-      .attr('x', layout.idX)
-      .attr('y', layout.idY)
-      .attr('text-anchor', 'end')
-      .attr('font-size', layout.idFontSize)
-      .attr('fill', 'var(--skip-contrast-dim-color)')
-      .text(item => item.alternator.id);
-
-    merged.select('text.alternator-mode')
-      .attr('x', layout.metaLeftX)
-      .attr('y', layout.metaY)
-      .attr('font-size', layout.metaFontSize)
-      .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.modeText ?? '');
-
-    merged.select('text.alternator-bus')
-      .attr('x', layout.metaRightX)
-      .attr('y', layout.metaY)
-      .attr('text-anchor', 'end')
-      .attr('font-size', layout.metaFontSize)
-      .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.busText ?? '');
-
-    merged.select('text.alternator-metrics-1')
-      .attr('x', layout.lineOneX)
-      .attr('y', layout.lineOneY)
-      .attr('font-size', layout.lineOneFontSize)
-      .attr('fill', item => snapshot.displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-      .text(item => snapshot.displayModels[item.key]?.metricsLineOne ?? '');
-
-    merged.select('text.alternator-metrics-2')
-      .attr('x', layout.lineTwoX)
-      .attr('y', layout.lineTwoY)
-      .attr('font-size', layout.lineTwoFontSize)
-      .attr('opacity', 0.85)
-      .attr('fill', item => snapshot.displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-      .text(item => snapshot.displayModels[item.key]?.metricsLineTwo ?? '');
-
-    selection.exit().remove();
+    drawDirectCards<AlternatorSnapshot>({
+      svg: this.svg,
+      layer: this.layer,
+      entities: snapshot.alternators,
+      displayModels: snapshot.displayModels,
+      widgetColors: snapshot.widgetColors,
+      compact: this.isCompactCardMode(),
+      descriptor: {
+        classPrefix: 'alternator',
+        includeCardBg: true,
+        titleFallback: entity => this.resolveTitleText(entity)
+      }
+    });
   }
 
   private displayName(alternator: AlternatorSnapshot): string {

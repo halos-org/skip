@@ -301,4 +301,28 @@ describe('WidgetAlternatorComponent', () => {
     const map = (component as unknown as { alternatorsByKey: () => Record<string, unknown> }).alternatorsByKey();
     expect(map.c1).toBeUndefined();
   });
+
+  it('golden DOM: renders a stable SVG for a multi-device seed', async () => {
+    vi.useFakeTimers();
+    await setup([
+      makeUpdate('self.electrical.alternators.a1.name', 'Alt One'),
+      makeUpdate('self.electrical.alternators.a1.voltage', 14.2),
+      makeUpdate('self.electrical.alternators.a1.current', 45),
+      makeUpdate('self.electrical.alternators.a1.revolutions', 1800),
+      makeUpdate('self.electrical.alternators.a2.name', 'Alt Two'),
+      makeUpdate('self.electrical.alternators.a2.voltage', 13.8),
+      makeUpdate('self.electrical.alternators.a2.current', 30)
+    ]);
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+
+    const svg = fixture.nativeElement.querySelector('svg') as SVGSVGElement | null;
+    expect(svg).toBeTruthy();
+    expect(svg?.querySelectorAll('g.alternator-card').length).toBe(2);
+    // Strip Angular's view-encapsulation attrs (hash can churn on unrelated .ts edits);
+    // the d3-drawn content carries none, so this leaves the meaningful draw intact.
+    const normalized = (svg?.outerHTML ?? '').replace(/ _ng(content|host)-[a-z0-9-]+=""/g, '');
+    expect(normalized).toMatchSnapshot();
+  });
 });

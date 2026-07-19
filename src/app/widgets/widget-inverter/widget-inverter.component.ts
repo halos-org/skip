@@ -1,5 +1,5 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { select, type Selection } from 'd3-selection';
+import type { Selection } from 'd3-selection';
 import { DataService } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import type { ITheme } from '../../core/services/app-service';
@@ -9,20 +9,13 @@ import { UnitsService } from '../../core/services/units.service';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
-import {
-  ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT,
-  ELECTRICAL_DIRECT_CARD_FULL_LAYOUT,
-  ELECTRICAL_DIRECT_CARD_GAP,
-  ELECTRICAL_DIRECT_CARD_HEIGHT,
-  ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH,
-  ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT
-} from '../shared/electrical-card-layout.constants';
 import type { InverterDisplayModel, InverterSnapshot, InverterWidgetConfig, ElectricalCardModeConfig } from './widget-inverter.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
 import { setValue, setMetricValue, toStringValue, toBoolean, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import { ElectricalTopologyStore, type ElectricalTopologyEntry } from '../shared/electrical-topology-store';
+import { drawDirectCards, initDirectCardSvg } from '../shared/electrical-direct-card-draw';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -50,10 +43,6 @@ export class WidgetInverterComponent implements AfterViewInit {
   })();
   private static readonly ROOT_PATTERN = `${WidgetInverterComponent.SELF_ROOT_PATH}.*`;
   private static readonly PATH_REGEX = new RegExp(`^${escapeRegex(WidgetInverterComponent.SELF_ROOT_PATH)}\\.([^.]+)\\.(.+)$`);
-  private static readonly VIEWBOX_WIDTH = ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH;
-  private static readonly CARD_HEIGHT = ELECTRICAL_DIRECT_CARD_HEIGHT;
-  private static readonly COMPACT_CARD_HEIGHT = ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT;
-  private static readonly CARD_GAP = ELECTRICAL_DIRECT_CARD_GAP;
   private static readonly PATH_BATCH_WINDOW_MS = 500;
 
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -226,13 +215,12 @@ export class WidgetInverterComponent implements AfterViewInit {
   }
 
   private initializeSvg(): void {
-    this.svg = select(this.svgRef().nativeElement);
-    this.svg
-      .attr('viewBox', `0 0 ${WidgetInverterComponent.VIEWBOX_WIDTH} ${WidgetInverterComponent.CARD_HEIGHT}`)
-      .attr('preserveAspectRatio', 'xMidYMid meet')
-      .attr('role', 'img')
-      .attr('aria-label', 'Inverter View');
-    this.layer = this.svg.append('g').attr('class', 'inverter-layer');
+    const { svg, layer } = initDirectCardSvg(this.svgRef().nativeElement, {
+      ariaLabel: 'Inverter View',
+      classPrefix: 'inverter'
+    });
+    this.svg = svg;
+    this.layer = layer;
   }
 
   private applyConfig(cfg: IWidgetSvcConfig): void {
@@ -321,84 +309,19 @@ export class WidgetInverterComponent implements AfterViewInit {
   private render(snapshot: InverterRenderSnapshot): void {
     if (!this.layer || !this.svg) return;
 
-    const compact = this.isCompactCardMode();
-    const layout = compact ? ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT : ELECTRICAL_DIRECT_CARD_FULL_LAYOUT;
-    const cardHeight = compact ? WidgetInverterComponent.COMPACT_CARD_HEIGHT : WidgetInverterComponent.CARD_HEIGHT;
-    const cards = snapshot.inverters.map((inverter, index) => ({
-      key: inverter.deviceKey ?? inverter.id,
-      inverter,
-      y: index * (cardHeight + WidgetInverterComponent.CARD_GAP)
-    }));
-
-    const contentHeight = cards.length ? cards[cards.length - 1].y + cardHeight : cardHeight;
-    this.svg.attr('viewBox', `0 0 ${WidgetInverterComponent.VIEWBOX_WIDTH} ${contentHeight}`);
-
-    const selection = this.layer
-      .selectAll<SVGGElement, { key: string; inverter: InverterSnapshot; y: number }>('g.inverter-card')
-      .data(cards, item => item.key);
-
-    const enter = selection.enter().append('g').attr('class', 'inverter-card');
-    enter.append('rect').attr('class', 'inverter-card-bg');
-    enter.append('rect').attr('class', 'inverter-state-bar');
-    enter.append('text').attr('class', 'inverter-title');
-    enter.append('text').attr('class', 'inverter-id');
-    enter.append('text').attr('class', 'inverter-mode');
-    enter.append('text').attr('class', 'inverter-bus');
-    enter.append('text').attr('class', 'inverter-metrics-1');
-    enter.append('text').attr('class', 'inverter-metrics-2');
-
-    const merged = enter.merge(selection as Selection<SVGGElement, { key: string; inverter: InverterSnapshot; y: number }, SVGGElement, unknown>);
-
-    merged.attr('transform', item => `translate(0, ${item.y})`);
-
-    merged.select('rect.inverter-card-bg')
-      .attr('x', 0.5).attr('y', 0.5).attr('rx', layout.cardCornerRadius).attr('ry', layout.cardCornerRadius)
-      .attr('width', WidgetInverterComponent.VIEWBOX_WIDTH - 1).attr('height', cardHeight - 1)
-      .attr('stroke', 'var(--mat-sys-outline-variant)').attr('stroke-width', 0.5).attr('fill', 'none');
-
-    merged.select('rect.inverter-state-bar')
-      .attr('x', 1.5).attr('y', 1.5).attr('rx', layout.stateBarCornerRadius).attr('ry', layout.stateBarCornerRadius)
-      .attr('width', 3).attr('height', cardHeight - 3)
-      .attr('fill', item => snapshot.displayModels[item.key]?.stateBarColor ?? snapshot.widgetColors.dim);
-
-    if (snapshot.inverters.length > 1) {
-      merged.select('text.inverter-title')
-        .attr('x', layout.titleX).attr('y', layout.titleY).attr('font-size', layout.titleFontSize)
-        .attr('fill', item => snapshot.displayModels[item.key]?.titleTextColor ?? 'var(--skip-contrast-color)')
-        .text(item => snapshot.displayModels[item.key]?.titleText ?? this.resolveTitleText(item.inverter));
-    } else {
-      merged.select('text.inverter-title').text('');
-    }
-
-    merged.select('text.inverter-id')
-      .attr('x', layout.idX).attr('y', layout.idY).attr('text-anchor', 'end').attr('font-size', layout.idFontSize)
-      .attr('fill', 'var(--skip-contrast-dim-color)')
-      .text(item => item.inverter.id);
-
-    merged.select('text.inverter-mode')
-      .attr('x', layout.metaLeftX).attr('y', layout.metaY).attr('font-size', layout.metaFontSize)
-      .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.modeText ?? '');
-
-    merged.select('text.inverter-bus')
-      .attr('x', layout.metaRightX).attr('y', layout.metaY).attr('text-anchor', 'end').attr('font-size', layout.metaFontSize)
-      .attr('opacity', 0.8)
-      .attr('fill', item => snapshot.displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.busText ?? '');
-
-    merged.select('text.inverter-metrics-1')
-      .attr('x', layout.lineOneX).attr('y', layout.lineOneY).attr('font-size', layout.lineOneFontSize)
-      .attr('fill', item => snapshot.displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-      .text(item => snapshot.displayModels[item.key]?.metricsLineOne ?? '');
-
-    merged.select('text.inverter-metrics-2')
-      .attr('x', layout.lineTwoX).attr('y', layout.lineTwoY).attr('font-size', layout.lineTwoFontSize)
-      .attr('opacity', 0.85)
-      .attr('fill', item => snapshot.displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-      .text(item => snapshot.displayModels[item.key]?.metricsLineTwo ?? '');
-
-    selection.exit().remove();
+    drawDirectCards<InverterSnapshot>({
+      svg: this.svg,
+      layer: this.layer,
+      entities: snapshot.inverters,
+      displayModels: snapshot.displayModels,
+      widgetColors: snapshot.widgetColors,
+      compact: this.isCompactCardMode(),
+      descriptor: {
+        classPrefix: 'inverter',
+        includeCardBg: true,
+        titleFallback: entity => this.resolveTitleText(entity)
+      }
+    });
   }
 
   private displayName(inverter: InverterSnapshot): string {

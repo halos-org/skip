@@ -302,4 +302,28 @@ describe('WidgetInverterComponent', () => {
     const map = (component as unknown as { invertersByKey: () => Record<string, unknown> }).invertersByKey();
     expect(map['c1']).toBeUndefined();
   });
+
+  it('golden DOM: renders a stable SVG for a multi-device seed', async () => {
+    vi.useFakeTimers();
+    await setup([
+      makeUpdate('self.electrical.inverters.i1.name', 'Inv One'),
+      makeUpdate('self.electrical.inverters.i1.dc.voltage', 48.2),
+      makeUpdate('self.electrical.inverters.i1.dc.current', 20),
+      makeUpdate('self.electrical.inverters.i1.ac.voltage', 230),
+      makeUpdate('self.electrical.inverters.i1.ac.frequency', 50),
+      makeUpdate('self.electrical.inverters.i2.name', 'Inv Two'),
+      makeUpdate('self.electrical.inverters.i2.dc.voltage', 47.8)
+    ]);
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+
+    const svg = fixture.nativeElement.querySelector('svg') as SVGSVGElement | null;
+    expect(svg).toBeTruthy();
+    expect(svg?.querySelectorAll('g.inverter-card').length).toBe(2);
+    // Strip Angular's view-encapsulation attrs (hash can churn on unrelated .ts edits);
+    // the d3-drawn content carries none, so this leaves the meaningful draw intact.
+    const normalized = (svg?.outerHTML ?? '').replace(/ _ng(content|host)-[a-z0-9-]+=""/g, '');
+    expect(normalized).toMatchSnapshot();
+  });
 });
