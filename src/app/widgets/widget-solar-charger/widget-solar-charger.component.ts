@@ -12,7 +12,7 @@ import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electr
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
-import { setValue } from '../shared/electrical-apply.util';
+import { setValue, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import type { ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
@@ -202,7 +202,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         theme,
         ignoreZones
       );
-      const chargerMetaState = this.resolveMostSevereState(
+      const chargerMetaState = resolveMostSevereState(
         solar.voltageState ?? null,
         solar.temperatureState ?? null
       );
@@ -212,7 +212,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         theme,
         ignoreZones
       );
-      const panelValuesState = this.resolveMostSevereState(
+      const panelValuesState = resolveMostSevereState(
         solar.panelCurrentState ?? null,
         solar.panelVoltageState ?? null,
         solar.panelTemperatureState ?? null
@@ -977,27 +977,6 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     if (value === null) return '--';
     if (value === undefined) return '';
     return `${value.toFixed(2)}`;
-  }
-
-  private resolveMostSevereState(...states: (TState | null | undefined)[]): TState | null {
-    let current: TState | null = null;
-    const rank: Record<TState, number> = {
-      [States.Normal]: 0,
-      [States.Nominal]: 1,
-      [States.Alert]: 2,
-      [States.Warn]: 3,
-      [States.Alarm]: 4,
-      [States.Emergency]: 5
-    };
-
-    for (const state of states) {
-      if (!state) continue;
-      if (!current || rank[state] > rank[current]) {
-        current = state;
-      }
-    }
-
-    return current;
   }
 
   private debugSolarLayout(id: string, gaugeProgress: number): void {
