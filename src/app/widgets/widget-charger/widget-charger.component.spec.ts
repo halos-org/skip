@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { WidgetChargerComponent } from './widget-charger.component';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
@@ -39,10 +39,22 @@ describe('WidgetChargerComponent', () => {
   let component: WidgetChargerComponent;
   let liveSubject: Subject<IPathUpdateWithPath>;
 
-  const dataServiceMock = { subscribePathTreeWithInitial: vi.fn() };
+  const dataServiceMock = {
+    subscribePathTreeWithInitial: vi.fn(),
+    // The scheduler subscribes to each temperature path's meta so a late displayUnits change repaints.
+    getPathMetaObservable: vi.fn(() => new BehaviorSubject(null).asObservable())
+  };
   const runtimeMock = { options: vi.fn() };
+  // Faithful K->measure conversion: production stores raw Kelvin and converts at display,
+  // so an identity stub would let a Kelvin-vs-Celsius mixup pass unnoticed. The 'K' ingest
+  // hint (Kelvin->Kelvin) and non-temperature units (V/A/W) fall through to identity.
   const unitsMock = {
-    convertToUnit: (_unit: string, value: unknown) => value,
+    convertToUnit: (unit: string, value: unknown) => {
+      if (typeof value !== 'number') return value;
+      if (unit === 'celsius') return value - 273.15;
+      if (unit === 'fahrenheit') return value * 9 / 5 - 459.67;
+      return value;
+    },
     resolvePathMeasure: () => 'celsius',
     getUnitDisplaySymbol: (measure: string) => (measure === 'celsius' ? '°C' : measure === 'fahrenheit' ? '°F' : measure)
   };
@@ -322,6 +334,22 @@ describe('WidgetChargerComponent', () => {
     expect(models['c1']?.voltageText).toBeTruthy();
     expect(models['c1']?.currentText).toBeTruthy();
     expect(models['c1']?.titleText).toBeTruthy();
+  });
+
+  it('renders the temperature converted from Kelvin with its unit symbol from one source', async () => {
+    // Production ingests raw Kelvin; 293.15 K must render as 20 °C, pinning that the value and
+    // the '°C' symbol come from the same resolved measure (resolvePathMeasure -> 'celsius').
+    await setup([
+      makeUpdate('self.electrical.chargers.c1.voltage', 27.5),
+      makeUpdate('self.electrical.chargers.c1.temperature', 293.15)
+    ]);
+
+    const models = (component as unknown as {
+      displayModels: () => Record<string, { temperatureText: string; temperatureUnit: string }>;
+    }).displayModels();
+
+    expect(models['c1']?.temperatureText).toContain('20');
+    expect(models['c1']?.temperatureUnit).toBe('°C');
   });
 
   it('maps extended charger key paths including nested output/input and mode/error/state fields', async () => {

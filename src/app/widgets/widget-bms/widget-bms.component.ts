@@ -124,12 +124,15 @@ export class WidgetBmsComponent implements AfterViewInit {
     metrics: []
   });
   protected readonly batteries = signal<Record<string, BmsBatterySnapshot>>({});
+  private readonly metaVersion = signal(0);
 
   private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, BmsRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetBmsComponent.ROOT_PATTERN,
     batchWindowMs: WidgetBmsComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const match = this.parseBatteryPath(update.path);
       if (!match) return null;
@@ -202,6 +205,7 @@ export class WidgetBmsComponent implements AfterViewInit {
   });
 
   protected readonly batteryDisplayModels = computed<Record<string, BmsBatteryDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const batteries = this.visibleBatteries();
     const theme = this.theme();
     const widgetColors = this.widgetColors();

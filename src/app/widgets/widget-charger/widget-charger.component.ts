@@ -79,12 +79,15 @@ export class WidgetChargerComponent implements AfterViewInit {
   protected readonly discoveredChargerIds = signal<string[]>([]);
   protected readonly trackedDevices = signal<ElectricalTrackedDevice[]>([]);
   protected readonly chargersByKey = signal<Record<string, ChargerSnapshot>>({});
+  private readonly metaVersion = signal(0);
 
   private readonly scheduler = new ElectricalIngestScheduler<{ id: string; key: string; source: string | null; value: unknown; state: TState | null }, ChargerRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetChargerComponent.ROOT_PATTERN,
     batchWindowMs: WidgetChargerComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const parsed = this.parsePath(update.path);
       if (!parsed) return null;
@@ -173,6 +176,7 @@ export class WidgetChargerComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, ChargerDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const chargers = this.visibleChargers();
 
     const idCount = new Map<string, number>();

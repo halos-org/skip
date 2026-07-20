@@ -104,12 +104,15 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     metrics: ['panelVoltage', 'panelCurrent', 'voltage', 'current']
   });
   protected readonly chargersByKey = signal<Record<string, SolarChargerSnapshot>>({});
+  private readonly metaVersion = signal(0);
 
   private readonly scheduler = new ElectricalIngestScheduler<SolarTopologyEntry, SolarRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetSolarChargerComponent.ROOT_PATTERN,
     batchWindowMs: WidgetSolarChargerComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const match = this.parseSolarPath(update.path);
       if (!match) return null;
@@ -164,6 +167,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, SolarChargerDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const solarUnits = this.visibleSolarUnits();
     const options = this.optionsById();
     const theme = this.theme();

@@ -74,11 +74,15 @@ export class WidgetAlternatorComponent implements AfterViewInit {
     derive: snapshot => this.derivePower(snapshot)
   });
 
+  private readonly metaVersion = signal(0);
+
   private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, AlternatorRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetAlternatorComponent.ROOT_PATTERN,
     batchWindowMs: WidgetAlternatorComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature') || update.path.endsWith('.regulatorTemperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const parsed = this.parsePath(update.path);
       if (!parsed) return null;
@@ -142,6 +146,7 @@ export class WidgetAlternatorComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, AlternatorDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const alternators = this.visibleAlternators();
     const theme = this.theme();
     const widgetColors = this.widgetColors();

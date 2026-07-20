@@ -74,11 +74,15 @@ export class WidgetInverterComponent implements AfterViewInit {
     derive: snapshot => this.deriveDcPower(snapshot)
   });
 
+  private readonly metaVersion = signal(0);
+
   private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, InverterRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetInverterComponent.ROOT_PATTERN,
     batchWindowMs: WidgetInverterComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const parsed = this.parsePath(update.path);
       if (!parsed) return null;
@@ -142,6 +146,7 @@ export class WidgetInverterComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, InverterDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const inverters = this.visibleInverters();
     const theme = this.theme();
     const widgetColors = this.widgetColors();

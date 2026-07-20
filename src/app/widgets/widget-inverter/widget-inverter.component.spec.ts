@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { WidgetInverterComponent } from './widget-inverter.component';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
@@ -37,7 +37,11 @@ describe('WidgetInverterComponent', () => {
   let component: WidgetInverterComponent;
   let liveSubject: Subject<IPathUpdateWithPath>;
 
-  const dataServiceMock = { subscribePathTreeWithInitial: vi.fn() };
+  const dataServiceMock = {
+    subscribePathTreeWithInitial: vi.fn(),
+    // The scheduler subscribes to each temperature path's meta so a late displayUnits change repaints.
+    getPathMetaObservable: vi.fn(() => new BehaviorSubject(null).asObservable())
+  };
   const runtimeMock = { options: vi.fn() };
   const unitsMock = {
     convertToUnit: (_unit: string, value: unknown) => value,

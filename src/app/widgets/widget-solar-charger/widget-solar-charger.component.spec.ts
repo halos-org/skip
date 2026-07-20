@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { cloneDeep, merge } from 'lodash-es';
 import { WidgetSolarChargerComponent } from './widget-solar-charger.component';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
@@ -24,16 +24,33 @@ describe('WidgetSolarChargerComponent', () => {
   };
 
   const dataServiceMock = {
-    subscribePathTreeWithInitial: vi.fn()
+    subscribePathTreeWithInitial: vi.fn(),
+    // The scheduler subscribes to each temperature path's meta so a late displayUnits change repaints.
+    getPathMetaObservable: vi.fn(() => new BehaviorSubject(null).asObservable())
   };
 
   const runtimeMock = {
     options: () => runtimeOptions
   };
 
+  // Records every path resolvePathMeasure is asked for, so a test can pin that the panel vs
+  // charger temperature are threaded through their own real SK paths (reset per test below).
+  const resolvePathMeasureCalls: string[] = [];
+
+  // Faithful K->measure conversion: production stores raw Kelvin and converts at display, so an
+  // identity stub would let a Kelvin-vs-Celsius mixup pass. The 'K' ingest hint (Kelvin->Kelvin)
+  // and non-temperature units (V/A/W) fall through to identity.
   const unitsMock = {
-    convertToUnit: (_unit: string, value: unknown) => value,
-    resolvePathMeasure: () => 'celsius',
+    convertToUnit: (unit: string, value: unknown) => {
+      if (typeof value !== 'number') return value;
+      if (unit === 'celsius') return value - 273.15;
+      if (unit === 'fahrenheit') return value * 9 / 5 - 459.67;
+      return value;
+    },
+    resolvePathMeasure: (path: string) => {
+      resolvePathMeasureCalls.push(path);
+      return 'celsius';
+    },
     getUnitDisplaySymbol: (measure: string) => (measure === 'celsius' ? '°C' : measure === 'fahrenheit' ? '°F' : measure)
   };
 
@@ -61,6 +78,7 @@ describe('WidgetSolarChargerComponent', () => {
   });
 
   beforeEach(async () => {
+    resolvePathMeasureCalls.length = 0;
     liveSubject = new Subject<IPathUpdateWithPath>();
     runtimeOptions = {
       solarCharger: {
@@ -201,10 +219,12 @@ describe('WidgetSolarChargerComponent', () => {
         makeUpdate('self.electrical.solar.sc1.controllerMode', 'bulk'),
         makeUpdate('self.electrical.solar.sc1.current', 0),
         makeUpdate('self.electrical.solar.sc1.voltage', 0),
-        makeUpdate('self.electrical.solar.sc1.temperature', 0),
+        // 273.15 K == 0.0 °C: the temperature is fed as raw Kelvin (as production does),
+        // so the '0.0 °C' assertions below are what the widget actually renders.
+        makeUpdate('self.electrical.solar.sc1.temperature', 273.15),
         makeUpdate('self.electrical.solar.sc1.panelVoltage', 0),
         makeUpdate('self.electrical.solar.sc1.panelCurrent', 0),
-        makeUpdate('self.electrical.solar.sc1.panelTemperature', 0),
+        makeUpdate('self.electrical.solar.sc1.panelTemperature', 273.15),
         makeUpdate('self.electrical.solar.sc1.load', false),
         makeUpdate('self.electrical.solar.sc1.loadCurrent', 0)
       ],
@@ -383,7 +403,7 @@ describe('WidgetSolarChargerComponent', () => {
   it('normalizes controller.* sub-path prefix so nested Signal K paths apply metric values correctly', () => {
     dataServiceMock.subscribePathTreeWithInitial.mockReturnValue({
       initial: [
-        makeUpdate('self.electrical.solar.bimini.controller.temperature', 38.5),
+        makeUpdate('self.electrical.solar.bimini.controller.temperature', 311.65), // 38.5 °C in raw Kelvin
         makeUpdate('self.electrical.solar.bimini.controller.panelVoltage', 24.1),
         makeUpdate('self.electrical.solar.bimini.controller.panelCurrent', 8.3),
         makeUpdate('self.electrical.solar.bimini.controller.voltage', 13.8),
@@ -416,6 +436,39 @@ describe('WidgetSolarChargerComponent', () => {
     expect(model.chargerSectionCurrent).toContain('12.0');
     expect(model.chargerSectionMetadata).toContain('13.8V');
     expect(model.chargerSectionMetadata).toContain('38.5 °C');
+  });
+
+  it('threads the charger vs panel temperature through their own real SK paths', () => {
+    // The panel temperature (solar.temperature -> panelTemperature) and the charger temperature
+    // must each resolve their measure against their own raw SK path. A dropped/swapped path would
+    // silently apply the wrong path's display-unit preference; this pins the real paths.
+    dataServiceMock.subscribePathTreeWithInitial.mockReturnValue({
+      initial: [
+        makeUpdate('self.electrical.solar.sc1.temperature', 311.65),       // charger temp -> 38.5 °C
+        makeUpdate('self.electrical.solar.sc1.solar.temperature', 293.15)  // panel temp -> 20.0 °C
+      ],
+      live$: liveSubject.asObservable()
+    });
+
+    fixture = TestBed.createComponent(WidgetSolarChargerComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('id', 'w-solar-paths');
+    fixture.componentRef.setInput('type', 'widget-solar-charger');
+    fixture.componentRef.setInput('theme', themeMock);
+
+    resolvePathMeasureCalls.length = 0;
+    fixture.detectChanges();
+
+    const model = (component as unknown as {
+      displayModels: () => Record<string, { gaugeSectionText: string; chargerSectionMetadata: string }>;
+    }).displayModels()['sc1'];
+
+    expect(resolvePathMeasureCalls).toContain('self.electrical.solar.sc1.temperature');
+    expect(resolvePathMeasureCalls).toContain('self.electrical.solar.sc1.solar.temperature');
+
+    // Each converts under its own resolved path: 38.5 °C for the charger, 20.0 °C for the panel.
+    expect(model.chargerSectionMetadata).toContain('38.5 °C');
+    expect(model.gaugeSectionText).toContain('20.0 °C');
   });
 
   it('maps solar.power nested paths to panel power when available', () => {
