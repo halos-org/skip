@@ -61,7 +61,8 @@ interface BmsRenderSnapshot {
 })
 export class WidgetBmsComponent implements AfterViewInit {
   private static readonly BMS_DESCRIPTOR = getElectricalWidgetFamilyDescriptor('widget-bms');
-  private static readonly ROOT_PATTERN = `${WidgetBmsComponent.BMS_DESCRIPTOR?.selfRootPath ?? 'self.electrical.batteries'}.*`;
+  private static readonly SELF_ROOT_PATH = WidgetBmsComponent.BMS_DESCRIPTOR?.selfRootPath ?? 'self.electrical.batteries';
+  private static readonly ROOT_PATTERN = `${WidgetBmsComponent.SELF_ROOT_PATH}.*`;
 
   public id = input.required<string>();
   public type = input.required<string>();
@@ -242,8 +243,8 @@ export class WidgetBmsComponent implements AfterViewInit {
         currentTextColorCompact,
         currentTextColorRegular,
         currentText: `${this.formatCurrent(battery.current)}`.trim(),
-        detailLineCompact: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature)}`,
-        detailLineRegular: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatPower(battery.power)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature)}`.trim(),
+        detailLineCompact: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature, `${WidgetBmsComponent.SELF_ROOT_PATH}.${battery.id}.temperature`)}`,
+        detailLineRegular: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatPower(battery.power)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature, `${WidgetBmsComponent.SELF_ROOT_PATH}.${battery.id}.temperature`)}`.trim(),
         socText: this.formatSoc(battery.stateOfCharge),
         socGlowEnabled: !ignoreZones && (
           battery.stateOfChargeState === States.Warn
@@ -1144,13 +1145,13 @@ export class WidgetBmsComponent implements AfterViewInit {
     return typeof converted === 'string' ? converted : `${converted}`;
   }
 
-  private formatTemperature(value: unknown): string {
+  private formatTemperature(value: unknown, path: string): string {
     if (value == null) return '';
     if (typeof value !== 'number') return '';
-    const displayUnit = this.units.getDefaults().Temperature;
-    const converted = this.units.convertToUnit(displayUnit, value);
+    const measure = this.units.resolvePathMeasure(path);
+    const converted = this.units.convertToUnit(measure, value);
     if (converted === null) return '';
-    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(displayUnit)}`;
+    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(measure)}`;
   }
 
   private splitMetricText(rawText: string, unitSuffix: string): { valueText: string; unitText: string } {

@@ -290,7 +290,7 @@ export class WidgetInverterComponent implements AfterViewInit {
       case 'inverterModeNumber': return setMetricValue(snapshot, 'inverterModeNumber', 'inverterModeNumberState', this.toNumber(value, ''), state);
       case 'preferRenewableEnergy': return setMetricValue(snapshot, 'preferRenewableEnergy', 'preferRenewableEnergyState', toBoolean(value), state);
       case 'preferRenewableEnergyActive': return setMetricValue(snapshot, 'preferRenewableEnergyActive', 'preferRenewableEnergyActiveState', toBoolean(value), state);
-      case 'temperature': return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+      case 'temperature': return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, 'K'), state);
       default: return false;
     }
   }
@@ -376,7 +376,7 @@ export class WidgetInverterComponent implements AfterViewInit {
       case 'acOutPower': return `ACout P ${this.formatValue(inverter.acOutPower, 'W')}`;
       case 'acIn1CurrentLimit': return `ACin1 Lim ${this.formatValue(inverter.acIn1CurrentLimit, 'A')}`;
       case 'acInCurrentLimit': return `ACin Lim ${this.formatValue(inverter.acInCurrentLimit, 'A')}`;
-      case 'temperature': return `T ${this.formatTemperature(inverter.temperature)}`;
+      case 'temperature': return `T ${this.formatTemperature(inverter.temperature, `${WidgetInverterComponent.SELF_ROOT_PATH}.${inverter.id}.temperature`)}`;
       case 'inverterModeNumber': return `Mode# ${inverter.inverterModeNumber?.toString() ?? '-'}`;
       default: return null;
     }
@@ -387,9 +387,12 @@ export class WidgetInverterComponent implements AfterViewInit {
     return `${value.toFixed(1)} ${unit}`;
   }
 
-  private formatTemperature(value: number | null | undefined): string {
+  private formatTemperature(value: number | null | undefined, path: string): string {
     if (value == null || Number.isNaN(value)) return '-';
-    return `${value.toFixed(1)} ${this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature)}`;
+    const measure = this.units.resolvePathMeasure(path);
+    const converted = this.units.convertToUnit(measure, value);
+    if (converted == null || !Number.isFinite(converted)) return '-';
+    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(measure)}`;
   }
 
   private toNumber(value: unknown, unitHint: string): number | null {

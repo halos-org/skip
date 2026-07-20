@@ -59,4 +59,5 @@ export interface ChargerDisplayModel {
   currentText: string;
   powerText: string;
   temperatureText: string;
+  temperatureUnit: string;
 }
