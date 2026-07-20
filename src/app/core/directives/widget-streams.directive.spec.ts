@@ -554,6 +554,22 @@ describe('WidgetStreamsDirective', () => {
         expect(values.at(-1)).toBe(50);
     });
 
+    it('falls back to the stored unit for a display path while the resolved measure is still unitless', () => {
+        unitsSvc.pathMeasures.set('env.pre', 'unitless'); // no unit meta resolved yet
+        const cfg = makeCfg({ path: 'env.pre', source: null, pathType: 'number', convertUnitTo: 'x10', sampleTime: 50 });
+        directive.setStreamsConfig(cfg);
+
+        const received: IPathUpdate[] = [];
+        directive.observe('p', u => received.push(u));
+
+        dataSvc.subjects.get('env.pre|default')!.next({ data: { value: 4, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        // Resolved 'unitless' -> convert with the stored 'x10' (not raw), and tag with that unit,
+        // so a pre-meta value matches the widget's stored-unit scale/label instead of raw SI.
+        expect(received.at(-1)?.data.value).toBe(40);
+        expect(received.at(-1)?.data.measure).toBe('x10');
+    });
+
     it('supports observer-level min/max compounding with sampling', async () => {
         vi.useFakeTimers();
         const cfg = makeCfg({ path: 'env.stats', source: null, pathType: 'number', sampleTime: 40 });

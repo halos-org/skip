@@ -202,7 +202,14 @@ export class WidgetStreamsDirective implements OnDestroy {
         // combineLatest tears down with the outer pipeline, so no separate meta-subscription
         // bookkeeping is needed.
         const measure$ = this.dataService.getPathMetaObservable(normalizedPath).pipe(
-          map(() => this.unitsService.resolvePathMeasure(normalizedPath)),
+          map(() => {
+            const resolved = this.unitsService.resolvePathMeasure(normalizedPath);
+            // Before any unit meta resolves, resolvePathMeasure returns 'unitless' and the value would
+            // pass through as raw SI — mismatched against a widget's stored-unit scale/label (a gauge
+            // needle can peg for a frame). Fall back to the widget's stored unit until a real measure
+            // resolves, so the pre-meta value is converted in a unit that matches its scale and label.
+            return resolved === 'unitless' && structuralMeasure ? structuralMeasure : resolved;
+          }),
           distinctUntilChanged()
         );
         data$ = combineLatest([data$, measure$]).pipe(

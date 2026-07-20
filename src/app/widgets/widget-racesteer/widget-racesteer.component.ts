@@ -80,10 +80,14 @@ export class WidgetRacesteerComponent implements OnDestroy {
   protected readonly optimalWindAngle = signal(0);
   protected readonly targetVMG = signal(0);
   protected readonly VMG = signal(0);
-  // Server-resolved measure applied to the VMG speed paths (tagged by the streams directive).
+  // Server-resolved measure tagged onto each speed path by the streams directive. Kept per readout
+  // group so a path the server resolves to a different unit labels its own value instead of the last
+  // writer clobbering a shared symbol. targetVMG's measure also labels the derived targetVMG offset.
   // '' is the boot placeholder: no symbol drawn until the first update carries a measure.
-  private readonly speedUnit = signal<string>('');
-  protected readonly vmgSpeedUnitSymbol = computed(() => this.unitsService.getUnitDisplaySymbol(this.speedUnit()));
+  private readonly targetVmgUnit = signal<string>('');
+  private readonly vmgToWaypointUnit = signal<string>('');
+  protected readonly targetVmgSpeedUnitSymbol = computed(() => this.unitsService.getUnitDisplaySymbol(this.targetVmgUnit()));
+  protected readonly vmgToWaypointSpeedUnitSymbol = computed(() => this.unitsService.getUnitDisplaySymbol(this.vmgToWaypointUnit()));
   protected readonly gradianColor = signal<{ start: string; stop: string }>({ start: '#3298ff', stop: '#15af00' });
   protected readonly trueWindMinHistoric = signal<number>(0);
   protected readonly trueWindMidHistoric = signal<number>(0);
@@ -245,7 +249,7 @@ export class WidgetRacesteerComponent implements OnDestroy {
         const v = pkt?.data?.value as number | null;
         const rounded = v == null ? 0 : Math.round(v * 10) / 10;
         this.targetVMG.set(rounded);
-        this.speedUnit.set(pkt?.data?.measure ?? '');
+        this.targetVmgUnit.set(pkt?.data?.measure ?? '');
       }));
     });
 
@@ -260,7 +264,6 @@ export class WidgetRacesteerComponent implements OnDestroy {
         const v = pkt?.data?.value as number | null;
         const rounded = v == null ? 0 : Math.round(v * 10) / 10;
         this.VMG.set(rounded);
-        this.speedUnit.set(pkt?.data?.measure ?? '');
       }));
     });
 
@@ -275,7 +278,7 @@ export class WidgetRacesteerComponent implements OnDestroy {
         const v = pkt?.data?.value as number | null;
         const rounded = v == null ? null : Math.round(v * 10) / 10;
         this.vmgToWaypoint.set(rounded);
-        this.speedUnit.set(pkt?.data?.measure ?? '');
+        this.vmgToWaypointUnit.set(pkt?.data?.measure ?? '');
       }));
     });
 

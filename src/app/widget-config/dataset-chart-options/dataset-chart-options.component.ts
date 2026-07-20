@@ -2,13 +2,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
-import { UnitsService } from './../../core/services/units.service';
 import { Component, OnInit, input, inject, signal, computed, DestroyRef } from '@angular/core';
 import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { DataService } from '../../core/services/data.service';
-import { IUnitGroup } from '../../core/services/units.service';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatInputModule } from '@angular/material/input';
 import { IPathMetaData, ISkPathData } from '../../core/interfaces/app-interfaces';
@@ -55,12 +53,10 @@ export class DatasetChartOptionsComponent implements OnInit {
   public period = input.required<FormControl<number>>()
 
   private readonly data = inject(DataService);
-  private readonly units = inject(UnitsService);
   private readonly _destroyRef = inject(DestroyRef);
 
   protected numericPaths = signal<IPathMetaData[]>([]);
   protected filteredNumericPaths = signal<IPathMetaData[]>([]);
-  protected unitList = signal<{default?: string, conversions?: IUnitGroup[] }>({});
   protected pathSources = signal<string[]>([]);
   protected maxDuration = computed<number>(() => this.timeScale().value === 'day' ? 365 : 60);
 
@@ -84,7 +80,6 @@ export class DatasetChartOptionsComponent implements OnInit {
       if (pathObject) {
         this.setPathSources(pathObject);
       }
-      this.unitList.set(this.units.getConversionsForPath(currentPath));
     }
     this.setInitFormState();
   }
@@ -159,11 +154,9 @@ export class DatasetChartOptionsComponent implements OnInit {
 
   private setPathUnits(path?: string): void {
     if (path) {
-      this.unitList.set(this.units.getConversionsForPath(path));
       this.convertUnitTo().reset();
       this.convertUnitTo()?.enable();
     } else {
-      this.unitList.set(this.units.getConversionsForPath(''));
       this.convertUnitTo().reset();
       this.convertUnitTo()?.disable();
     }

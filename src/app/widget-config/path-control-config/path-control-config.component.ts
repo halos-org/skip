@@ -6,7 +6,7 @@ import { UntypedFormGroup, UntypedFormControl, Validators, ValidatorFn, Abstract
 import { debounce, map, startWith } from 'rxjs/operators';
 import { BehaviorSubject, timer } from 'rxjs'
 import { MatSelect } from '@angular/material/select';
-import { MatOption, MatOptgroup } from '@angular/material/core';
+import { MatOption } from '@angular/material/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInput } from '@angular/material/input';
@@ -48,7 +48,7 @@ function pathRequiredOrValidMatch(getPaths: () => IPathMetaData[]): ValidatorFn 
     selector: 'path-control-config',
     templateUrl: './path-control-config.component.html',
     styleUrls: ['./path-control-config.component.scss'],
-    imports: [FormsModule, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatAutocompleteModule, MatIconButton, MatSuffix, MatOption, MatError, MatSelect, MatOptgroup, AsyncPipe, MatIconModule, MatHint]
+    imports: [FormsModule, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatAutocompleteModule, MatIconButton, MatSuffix, MatOption, MatError, MatSelect, AsyncPipe, MatIconModule, MatHint]
 })
 export class PathControlConfigComponent implements OnInit, OnChanges {
   private readonly _data = inject(DataService);

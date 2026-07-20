@@ -683,23 +683,7 @@ export class WidgetHistoryChartDialogComponent implements OnInit, AfterViewInit,
       return null;
     }
 
-    if (widgetConfig.paths && typeof widgetConfig.paths === 'object') {
-      if (rawPath) {
-        for (const key of Object.keys(widgetConfig.paths)) {
-          const pathCfg = widgetConfig.paths[key];
-          if (pathCfg?.path === rawPath && pathCfg.convertUnitTo) {
-            return pathCfg.convertUnitTo;
-          }
-        }
-      }
-
-      const firstPathKey = Object.keys(widgetConfig.paths)[0];
-      if (firstPathKey && widgetConfig.paths[firstPathKey]?.convertUnitTo) {
-        return widgetConfig.paths[firstPathKey].convertUnitTo;
-      }
-    }
-
-    return widgetConfig.convertUnitTo ?? null;
+    return this.findPathConfig(rawPath)?.convertUnitTo ?? widgetConfig.convertUnitTo ?? null;
   }
 
   private buildYScales(unitLabel: string): NonNullable<NonNullable<ChartConfiguration<'line'>['options']>['scales']> {

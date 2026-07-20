@@ -2,8 +2,10 @@ import { IDatasetServiceDatasetConfig, TimeScaleFormat } from '../../core/interf
 import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { IDatasetServiceDatapoint, IDatasetServiceDataSourceInfo } from '../../core/interfaces/dataset.interfaces';
-import { Subscription } from 'rxjs';
+import { Subscription, distinctUntilChanged, map, of, switchMap } from 'rxjs';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { CanvasService } from '../../core/services/canvas.service';
+import { DataService } from '../../core/services/data.service';
 import { UnitsService } from '../../core/services/units.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { ITheme } from '../../core/services/app-service';
@@ -55,6 +57,7 @@ export class WidgetDataChartComponent implements OnDestroy {
   private readonly ngZone = inject(NgZone);
   private readonly canvasService = inject(CanvasService);
   private readonly unitsService = inject(UnitsService);
+  private readonly dataService = inject(DataService);
   private readonly historyStream = inject(HistoryChartStreamService);
   readonly widgetDataChart = viewChild('widgetDataChart', { read: ElementRef });
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -112,12 +115,26 @@ export class WidgetDataChartComponent implements OnDestroy {
   // True when no history provider is available, so the widget shows the
   // "history unavailable" empty state instead of a blank chart (no recorder live-only fallback).
   protected historyUnavailable = signal<boolean>(false);
+  private datachartPath = computed<string | null>(() => this.runtime.options()?.datachartPath ?? null);
+  // Reactive resolved measure: resolvePathMeasure() reads a non-signal meta cache, so it is folded
+  // through the path's meta subject here to re-emit when the server's units/displayUnits land late or
+  // change. distinctUntilChanged gates the pathSignature (and thus the rebuild effect) to genuine
+  // measure changes; switchMap re-tracks meta when the configured path changes. Mirrors the live
+  // tiles' reactive-measure tick in WidgetStreamsDirective.
+  private pathMeasure = toSignal(
+    toObservable(this.datachartPath).pipe(
+      switchMap(path => path
+        ? this.dataService.getPathMetaObservable(path).pipe(map(() => this.unitsService.resolvePathMeasure(path)))
+        : of<string | undefined>(undefined)),
+      distinctUntilChanged()
+    )
+  );
   private pathSignature = computed<string | undefined>(() => {
     const cfg = this.runtime.options();
     if (!cfg?.datachartPath) {
       return undefined;
     }
-    return [cfg.datachartPath, this.unitsService.resolvePathMeasure(cfg.datachartPath), cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
+    return [cfg.datachartPath, this.pathMeasure(), cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
   });
   private previousPathSignature: string | undefined = undefined;
 
