@@ -33,14 +33,13 @@ export class ActionMenuComponent {
 
   public open(x: number, y: number): void {
     if (this._breakpoint.isMatched(PHONE_QUERY)) {
-      // Linux Firefox ghost-clicks the backdrop right after the opening tap and
-      // would auto-dismiss the drawer; disable backdrop-close there (the always
-      // present Cancel row is the exit).
-      const isLinuxFirefox = typeof navigator !== 'undefined' &&
-        /Linux/.test(navigator.platform) && /Firefox/.test(navigator.userAgent);
+      // A long-press opens this sheet; the same gesture's trailing tap/click ghost-hits the backdrop
+      // and immediately dismisses it on touch devices (first seen on Linux Firefox, but real mobile
+      // browsers do it too — the drawer vanishes the instant it opens). Disable backdrop-close on the
+      // phone path; the always-present Cancel row is the exit.
       this._bottomSheet.open(WidgetHostBottomSheetComponent, {
         data: { items: this.items() },
-        ...(isLinuxFirefox ? { disableClose: true } : {}),
+        disableClose: true,
       })
         .afterDismissed()
         .subscribe((id?: string) => {
