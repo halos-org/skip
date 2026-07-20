@@ -4,12 +4,10 @@ import { filter } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { cloneDeep } from 'lodash-es';
 
-import { IUnitDefaults } from './units.service';
 import { UUID } from '../utils/uuid.util';
 
 import { IConfig, IAppConfig, IConnectionConfig, IThemeConfig, INotificationConfig, ISignalKUrl } from "../interfaces/app-settings.interfaces";
 import { DefaultAppConfig, DefaultConnectionConfig as DefaultConnectionConfig, DefaultThemeConfig } from '../../../default-config/config.blank.const';
-import { DefaultUnitsConfig } from '../../../default-config/config.blank.units.const'
 import { DefaultNotificationConfig } from '../../../default-config/config.blank.notification.const';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -32,7 +30,6 @@ export class SettingsService {
   private readonly embedMode = inject(EmbedModeService);
 
   // Source-of-truth signals for the profile/app-scope settings and the per-device identity.
-  private readonly _unitDefaults = signal<IUnitDefaults>({});
   private readonly _themeName = signal<string>(defaultTheme);
   private readonly _notificationConfig = signal<INotificationConfig>(DefaultNotificationConfig);
   private readonly _autoNightMode = signal<boolean>(false);
@@ -42,7 +39,6 @@ export class SettingsService {
   private readonly _instanceName = signal<string>('');
   private readonly _browserTabTitle = signal<string>('Skip');
 
-  public readonly unitDefaults = this._unitDefaults.asReadonly();
   public readonly themeName = this._themeName.asReadonly();
   public readonly notificationConfig = this._notificationConfig.asReadonly();
   public readonly autoNightMode = this._autoNightMode.asReadonly();
@@ -229,7 +225,6 @@ export class SettingsService {
     if (this.activeConfig.theme) {
       this._themeName.set(this.activeConfig.theme.themeName);
     }
-    this.applyUnitDefaults(app.unitDefaults);
     this.applyNotificationConfig(app.notificationConfig);
 
     // Hydrate every app-config holder from stored state (defaults for absent fields) BEFORE any persist.
@@ -251,10 +246,6 @@ export class SettingsService {
     }
   }
 
-  private applyUnitDefaults(value: IUnitDefaults): void {
-    this._unitDefaults.set(value);
-  }
-
   private applyNotificationConfig(value: INotificationConfig): void {
     this._notificationConfig.set(value);
   }
@@ -270,15 +261,6 @@ export class SettingsService {
   /** Single write path for granular (sub-app-scope) profile saves. */
   private saveConfigSection(objType: TConfigObjectType, value: unknown): void {
     this.storage.patchConfig(objType, value);
-  }
-
-  //UnitDefaults
-  public getDefaultUnits(): IUnitDefaults {
-    return this.unitDefaults();
-  }
-  public setDefaultUnits(newDefaults: IUnitDefaults) {
-    this.applyUnitDefaults(newDefaults);
-    this.saveConfigSection('Array<IUnitDefaults>', newDefaults);
   }
 
   // Configuration version
@@ -515,7 +497,6 @@ export class SettingsService {
       autoNightMode: this.autoNightMode(),
       redNightMode: this.redNightMode(),
       nightModeBrightness: this.nightModeBrightness(),
-      unitDefaults: this.unitDefaults(),
       notificationConfig: this.notificationConfig(),
       browserTabTitle: this.browserTabTitle()
     }
@@ -572,7 +553,6 @@ export class SettingsService {
   private getDefaultAppConfig(): IAppConfig {
     const config: IAppConfig = cloneDeep(DefaultAppConfig);
     config.notificationConfig = cloneDeep(DefaultNotificationConfig);
-    config.unitDefaults = cloneDeep(DefaultUnitsConfig);
     config.configVersion = LATEST_APP_CONFIG_VERSION;
     return config;
   }

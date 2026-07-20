@@ -1,8 +1,6 @@
 import { DataService } from './data.service';
-import { Injectable, effect, inject } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import Qty from 'js-quantities';
-
-import { SettingsService } from './settings.service';
 
 /**
  * All valid Signal K numeric units supported by Skip.
@@ -72,11 +70,6 @@ export interface IUnit {
 }
 
 /**
- * Interface for defaults Units per unit Groups to be applied
- */
-export type IUnitDefaults = Record<string, string>;
-
-/**
  * Interface for supported path value units provided by Signal K (schema v 1.7)
  * See: https://github.com/SignalK/specification/blob/master/schemas/definitions.json
  */
@@ -105,7 +98,7 @@ type UnitConverter = (v: any) => any;
  * time emits `hour`), NOT the plugin's internal preset/definition keys. Server targets that already
  * equal a Skip measure (A, V, W, J, mbar, liter, percent, rpm, Ah, deg/s, ...) need no entry — an
  * unmapped target is used as-is and, when it is not a resolvable conversion for the path's group,
- * the caller degrades gracefully to Skip's own default. Extend as other presets/units are adopted.
+ * the caller degrades gracefully to 'unitless'. Extend as other presets/units are adopted.
  */
 const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
   kn: 'knots',
@@ -118,7 +111,6 @@ const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
 @Injectable()
 
 export class UnitsService {
-  private SettingsService = inject(SettingsService);
   private data = inject(DataService);
 
 
@@ -466,17 +458,6 @@ export class UnitsService {
       }
     ];
 
-  private _defaultUnits: IUnitDefaults = {};
-
-  constructor() {
-    // Seed synchronously (the former BehaviorSubject replayed its value on subscribe), then keep
-    // it current. The effect's initial run re-assigns the same value, which is a harmless no-op.
-    this._defaultUnits = this.SettingsService.unitDefaults();
-    effect(() => {
-      this._defaultUnits = this.SettingsService.unitDefaults();
-    });
-  }
-
   private unitConversionFunctions: Record<string, UnitConverter> = {
 
     'unitless': function(v) { return v; },
@@ -690,21 +671,6 @@ export class UnitsService {
   }
 
   /**
-   * Returns the list Skip configured preferred unit conversion settings.
-   * as configured by user in Skip's Units configuration.
-   *
-   * Ex: If a Signal K path's meta Units is set to 'm/s', Skip can automatically
-   * convert to a given unit, says 'knots'. Received Signal K data is always
-   * in SI units.
-   *
-   * @return {*}  {IUnitDefaults}
-   * @memberof UnitsService
-   */
-  public getDefaults(): IUnitDefaults {
-    return this._defaultUnits;
-  }
-
-  /**
    * Resolves the display-only label for a measure (the on-screen unit symbol), falling back to the
    * measure key itself when no dedicated symbol is defined. This is the single seam every render site
    * uses so units are labelled consistently (no spelled-out words), independent of the internal key.
@@ -747,7 +713,6 @@ export class UnitsService {
   public getConversionsForPath(path: string): IConversionPathList {
     const pathUnitType = this.data.getPathUnitType(path);
     const UNITLESS = 'unitless';
-    let defaultUnit = "unitless";
 
     if (pathUnitType === null || pathUnitType === 'RFC 3339 (UTC)') {
       return { base: UNITLESS, conversions: this._conversionList };
@@ -759,7 +724,6 @@ export class UnitsService {
 
         const unitExists = unitGroup.units.find(unit => unit.measure == pathUnitType);
         if (unitExists) {
-          defaultUnit = this._defaultUnits[unitGroup.group];
           return true;
         }
 
@@ -768,7 +732,7 @@ export class UnitsService {
 
       if (groupList.length > 0) {
         const serverDefault = this.resolveServerDefaultMeasure(path, groupList);
-        return { base: serverDefault ?? defaultUnit, conversions: groupList };
+        return { base: serverDefault ?? UNITLESS, conversions: groupList };
       }
 
       console.log("[Units Service] Unit type: " + pathUnitType + ", found for path: " + path + "\nbut Skip does not support it.");
@@ -780,8 +744,8 @@ export class UnitsService {
    * The measure Skip applies to a path's value — the single source of BOTH the conversion
    * (convertToUnit) and its display symbol (getUnitDisplaySymbol), so the rendered label always
    * matches the applied conversion. Resolves to the server's honourable displayUnits preference when
-   * present, else Skip's per-group default, else 'unitless'. This is the Phase-2 seam (#347) that
-   * display widgets and the streams directive read in place of a stored per-widget convertUnitTo;
+   * present, else 'unitless' (Skip owns no client-side unit default). This is the Phase-2 seam (#347)
+   * that display widgets and the streams directive read in place of a stored per-widget convertUnitTo;
    * structural (fixed-unit) paths bypass it and keep their widget-owned unit.
    */
   public resolvePathMeasure(path: string): string {
@@ -799,7 +763,7 @@ export class UnitsService {
    * to a Skip measure that is valid for the path's own conversion group — so the resolved measure
    * drives BOTH the conversion and the label from one source (the "label matches conversion"
    * invariant). Undefined when there is no server preference or it is not honourable (unit-less path,
-   * or an unmapped/unsupported target), in which case the caller falls back to Skip's group default.
+   * or an unmapped/unsupported target), in which case the caller falls back to 'unitless'.
    * Per-widget overrides are unaffected: this only supplies the default a fresh path selection seeds.
    */
   private resolveServerDefaultMeasure(path: string, groupList: IUnitGroup[]): string | undefined {

@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TabsComponent } from './tabs.component';
-import { UnitsService } from '../../../services/units.service';
 
 describe('SettingsTabsComponent', () => {
   let component: TabsComponent;
@@ -10,14 +9,6 @@ describe('SettingsTabsComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [TabsComponent],
-      providers: [
-        {
-          provide: UnitsService,
-          useValue: {
-            getConversions: () => [],
-          },
-        },
-      ],
     })
       .compileComponents();
   });

@@ -1,4 +1,3 @@
-import { IUnitDefaults } from '../services/units.service';
 import { Dashboard } from './../services/dashboard.service';
 
 export interface IConnectionConfig {
@@ -25,7 +24,6 @@ export interface IAppConfig {
   autoNightMode: boolean;
   redNightMode: boolean;
   nightModeBrightness: number;
-  unitDefaults: IUnitDefaults;
   notificationConfig: INotificationConfig;
   browserTabTitle?: string;
 }

@@ -375,15 +375,6 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     req.flush(null);
   });
 
-  it('patchConfig maps a granular ObjType to its app sub-path', () => {
-    const { service } = setup();
-    service.patchConfig('Array<IUnitDefaults>', [{ group: 'speed' }]);
-    const req = http.expectOne(`${ENDPOINT}user/skip/11`);
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual([{ op: 'replace', path: '/cockpit/app/unitDefaults', value: [{ group: 'speed' }] }]);
-    req.flush(null);
-  });
-
   it('patchConfig maps INotificationConfig to the app/notificationConfig sub-path', () => {
     const { service } = setup();
     service.patchConfig('INotificationConfig', { disableNotifications: true });

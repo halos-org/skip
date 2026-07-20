@@ -43,7 +43,6 @@ describe('WidgetChargerComponent', () => {
   const runtimeMock = { options: vi.fn() };
   const unitsMock = {
     convertToUnit: (_unit: string, value: unknown) => value,
-    getDefaults: () => ({ Temperature: 'celsius' }),
     resolvePathMeasure: () => 'celsius',
     getUnitDisplaySymbol: (measure: string) => (measure === 'celsius' ? '°C' : measure === 'fahrenheit' ? '°F' : measure)
   };
