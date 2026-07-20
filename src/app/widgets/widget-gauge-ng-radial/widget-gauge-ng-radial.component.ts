@@ -95,16 +95,26 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
   private gaugeBootstrapped = signal(false);
   /** Enables smooth transitions only after the first static frame. */
   private animationEnabled = computed(() => this.gaugeBootstrapped());
+  /** Skip measure the streams directive tagged the latest gaugePath value with; '' until the first update (boot placeholder). */
+  private effectiveUnit = signal<string>('');
+  /** Measure used to reinterpret scale/zones/clamp: the tagged measure, falling back to the stored config unit before the first update. */
+  private effectiveMeasure = computed<string>(() =>
+    this.effectiveUnit() || (this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo ?? 'unitless')
+  );
   private adjustedScale = computed<IScale>(() => {
     const cfg = this.runtime.options();
     if (!cfg) return { min: 0, max: 100, majorTicks: [] };
+    const fromUnit = cfg.paths?.['gaugePath']?.convertUnitTo ?? 'unitless';
+    const toMeasure = this.effectiveMeasure();
+    const lower = this.unitsService.convertBetweenMeasures(fromUnit, toMeasure, cfg.displayScale?.lower ?? 0);
+    const upper = this.unitsService.convertBetweenMeasures(fromUnit, toMeasure, cfg.displayScale?.upper ?? 100);
     if (cfg.gauge?.subType === 'capacity') {
-      return { min: cfg.displayScale?.lower ?? 0, max: cfg.displayScale?.upper ?? 100, majorTicks: [] };
+      return { min: lower, max: upper, majorTicks: [] };
     }
     // measuring
     return adjustLinearScaleAndMajorTicks(
-      cfg.displayScale?.lower ?? 0,
-      cfg.displayScale?.upper ?? 100,
+      lower,
+      upper,
       cfg.gauge?.barStartPosition === 'right'
     );
   });
@@ -118,10 +128,9 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     if (cfg.ignoreZones) return [];
     if (cfg.gauge?.subType !== 'measuring') return []; // only measuring subtype shows bands
 
-    const pathCfg = cfg.paths?.['gaugePath'];
     const scale = this.adjustedScale();
     const invert = cfg.gauge?.barStartPosition === 'right';
-    return getHighlights(zones, theme, pathCfg.convertUnitTo, this.unitsService, scale.min, scale.max, invert);
+    return getHighlights(zones, theme, this.effectiveMeasure(), this.unitsService, scale.min, scale.max, invert);
   });
   protected displayName = computed(() => this.runtime.options()?.displayName);
   private pathDataState = signal<States | null>(null);
@@ -141,13 +150,18 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
           this.pathDataState.set((path.state as States) || null);
         }
 
+        const measure = path.data.measure ?? '';
+        this.effectiveUnit.set(measure);
+        const fromUnit = cfg.paths?.['gaugePath']?.convertUnitTo ?? 'unitless';
+        const toMeasure = measure || fromUnit;
+        const lower = this.unitsService.convertBetweenMeasures(fromUnit, toMeasure, cfg.displayScale?.lower ?? 0);
+        const upper = this.unitsService.convertBetweenMeasures(fromUnit, toMeasure, cfg.displayScale?.upper ?? 100);
+
         const raw = (path?.data?.value as number) ?? null;
         if (raw == null) {
-          this.value.set(cfg.displayScale?.lower ?? 0);
+          this.value.set(lower);
           this.textValue.set('--');
         } else {
-          const lower = cfg.displayScale?.lower ?? 0;
-          const upper = cfg.displayScale?.upper ?? 100;
           // clamp
           const clamped = Math.min(Math.max(raw, lower), upper);
           this.value.set(clamped);
@@ -185,6 +199,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       const theme = this.theme();
       // include scale dependency so options rebuild on scale recompute
       const scale = this.adjustedScale(); // reading for dependency
+      this.effectiveUnit(); // rebuild the units label when the applied measure changes
 
       untracked(() => {
         const cfg = this.runtime.options();
@@ -285,7 +300,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     g.title = this.displayName();
     g.minValue = scale.min;
     g.maxValue = scale.max;
-    g.units = this.unitsService.getUnitDisplaySymbol(cfg.paths?.['gaugePath']?.convertUnitTo);
+    g.units = this.unitsService.getUnitDisplaySymbol(this.effectiveUnit());
     g.highlights = [];
     // Include initial highlights if already available (after view init effect will re-apply).
     const initialHl = this.highlights();

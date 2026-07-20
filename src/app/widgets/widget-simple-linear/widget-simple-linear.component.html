@@ -8,7 +8,7 @@
     [barColor]="barColor()"
     [barColorGradient]="barColorGradient()"
     [barColorBackground]="barColorBackground()"
-    [gaugeMaxValue]="cfg?.displayScale?.upper ?? 15"
-    [gaugeMinValue]="cfg?.displayScale?.lower ?? 0"
+    [gaugeMaxValue]="displayUpper()"
+    [gaugeMinValue]="displayLower()"
     [highlights]="highlights()"
   ></svg-simple-linear-gauge>

@@ -304,11 +304,14 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
       this.pendingStructuralRebuild = true;
       this.startGauge(true); // radial geometry change
     }
-    if(changes.minValue) {
-      this.gauge.setMinValue(changes.minValue.currentValue);
-    }
-    if(changes.maxValue) {
-      this.gauge.setMaxValue(changes.maxValue.currentValue);
+    if (changes.units || changes.minValue || changes.maxValue) {
+      // Zone sections are converted with `units` and clamped to [minValue, maxValue]. When the
+      // server-resolved measure lands (units) or the reinterpreted scale bounds move (min/max), the
+      // sections must be rebuilt, not just the axis, or the bands desync from the scale and value.
+      // startGauge(true) applies the new min/max via buildOptions and recomputes the sections in one
+      // pass; a rebuild while units is still '' (boot) self-corrects when the first value sets it.
+      this.pendingStructuralRebuild = true;
+      this.startGauge(true);
     }
   }
 

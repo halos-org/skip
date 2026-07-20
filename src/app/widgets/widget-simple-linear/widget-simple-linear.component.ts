@@ -56,12 +56,35 @@ export class WidgetSimpleLinearComponent {
   private readonly unitsService = inject(UnitsService);
 
   // Signals (presentation state)
-  protected readonly unitsLabel = signal<string>('');
+  private readonly effectiveUnit = signal<string>('');
+  // Unit SYMBOL derives from the measure the streams directive applied to the value (server-resolved
+  // for this display path), never the stored convertUnitTo, so the label and value cannot drift. An
+  // empty measure yields an empty symbol — the neutral boot placeholder until displayUnits resolves.
+  protected readonly unitsLabel = computed<string>(() => {
+    const cfg = this.runtime.options();
+    // Symbols are already compact; only truncate longer ones in 'abr' mode so short symbols that
+    // share a first character (°C/°F, kn) stay distinct.
+    const symbol = this.unitsService.getUnitDisplaySymbol(this.effectiveUnit());
+    return cfg?.gauge?.unitLabelFormat === 'abr' && symbol.length > 2 ? symbol.substring(0, 1) : symbol;
+  });
   protected readonly dataLabelValue = signal<string>('0');
   protected readonly dataValue = signal<number | null>(null);
   protected readonly barColor = signal<string>('');
   protected readonly barColorGradient = signal<string>('');
   protected readonly barColorBackground = signal<string>('');
+
+  // Reinterpret the stored displayScale bounds (entered in the widget's stored convertUnitTo) into the
+  // effective server-resolved measure, so the gauge scale, zone highlights and the converted value the
+  // streams directive delivers all share one unit. A no-op when the measure equals the stored unit or
+  // has not resolved yet (empty measure => bound returned unchanged).
+  private reinterpretScaleBound(bound: number): number {
+    const stored = this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo ?? '';
+    return this.unitsService.convertBetweenMeasures(stored, this.effectiveUnit(), bound);
+  }
+  protected readonly displayLower = computed<number>(() =>
+    this.reinterpretScaleBound(this.runtime.options()?.displayScale?.lower ?? 0));
+  protected readonly displayUpper = computed<number>(() =>
+    this.reinterpretScaleBound(this.runtime.options()?.displayScale?.upper ?? 15));
 
   // Computed signal for highlights (zones)
   protected highlights = computed<IDataHighlight[]>(() => {
@@ -72,10 +95,11 @@ export class WidgetSimpleLinearComponent {
     const zones = this.metadata.zones();
     if (!zones?.length) return [];
 
-    const unit = cfg.paths?.['gaugePath'].convertUnitTo;
-    const min = cfg.displayScale?.lower ?? 0;
-    const max = cfg.displayScale?.upper ?? 15;
-    return getHighlights(zones, theme, unit, this.unitsService, min, max);
+    // Zones (base SI units) convert to the effective measure; bounds are reinterpreted to match.
+    // Before the measure resolves, fall back to the stored unit (like the ng gauges) so bands render
+    // in the same unit as the still-stored-unit boot scale instead of vanishing until the first value.
+    const zoneUnit = this.effectiveUnit() || (cfg.paths?.['gaugePath']?.convertUnitTo ?? '');
+    return getHighlights(zones, theme, zoneUnit, this.unitsService, this.displayLower(), this.displayUpper());
   });
   private lastState: States | null = null; // simple cache to avoid redundant color sets
 
@@ -89,14 +113,15 @@ export class WidgetSimpleLinearComponent {
         this.streams.observe('gaugePath', pkt => {
           const theme = this.theme();
           if (!cfg || !theme) return;
+          this.effectiveUnit.set(pkt?.data?.measure ?? '');
           const raw = pkt?.data?.value as number | null;
             // Clamp & label formatting
           if (raw == null) {
-            this.dataValue.set(cfg.displayScale?.lower ?? 0);
+            this.dataValue.set(this.displayLower());
             this.dataLabelValue.set('--');
           } else {
-            const lower = cfg.displayScale?.lower ?? 0;
-            const upper = cfg.displayScale?.upper ?? 15;
+            const lower = this.displayLower();
+            const upper = this.displayUpper();
             const clamped = Math.min(Math.max(raw, lower), upper);
             this.dataValue.set(clamped);
             this.dataLabelValue.set(clamped.toFixed(cfg.numDecimal));
@@ -116,16 +141,10 @@ export class WidgetSimpleLinearComponent {
             }
           }
         });
-
-        // Unit label (abr|full)
-        const unit = this.unitsService.getUnitDisplaySymbol(cfg.paths?.['gaugePath'].convertUnitTo);
-        // Symbols are already compact; only truncate longer ones in 'abr' mode so short symbols that
-        // share a first character (°C/°F, kn) stay distinct.
-        this.unitsLabel.set(cfg.gauge?.unitLabelFormat === 'abr' && unit.length > 2 ? unit.substring(0,1) : unit);
       });
     });
 
-    // Theme + base colors + unit label
+    // Theme + base colors
     effect(() => {
       const cfg = this.runtime.options();
       const theme = this.theme();

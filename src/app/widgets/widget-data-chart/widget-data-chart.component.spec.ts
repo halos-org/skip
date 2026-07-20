@@ -53,7 +53,7 @@ describe('WidgetDataChartComponent', () => {
 
   const runtimeMock = { options: vi.fn() };
   const historyMock = { getBackfillThenLive: vi.fn() };
-  const unitsMock = { convertToUnit: (_unit: string, value: number) => value, getUnitDisplaySymbol: (measure: string) => measure };
+  const unitsMock = { convertToUnit: (_unit: string, value: number) => value, getUnitDisplaySymbol: (measure: string) => measure, resolvePathMeasure: () => 'knots' };
   const canvasMock = { releaseCanvas: vi.fn() };
 
   const setup = async (config: IWidgetSvcConfig): Promise<void> => {
@@ -158,5 +158,28 @@ describe('WidgetDataChartComponent', () => {
     expect(averageLine?.display).toBe(true);
     expect(averageLine?.label?.display).toBe(true);
     expect(averageLine?.label?.content).toBe('5.0');
+  });
+
+  const readTitle = (): string | undefined =>
+    (fixture.componentInstance.lineChartOptions.plugins as unknown as {
+      title?: { text?: string };
+    }).title?.text;
+
+  it('labels the value from the path-resolved measure, not the stored convertUnitTo', async () => {
+    const emissions$ = new Subject<IDatasetServiceDatapoint>();
+    historyMock.getBackfillThenLive.mockReturnValue(emissions$);
+
+    // Stored convertUnitTo is stale; the server-resolved measure for the path is the single source of
+    // both the conversion and its display symbol, so the label must follow resolvePathMeasure.
+    const resolveSpy = vi.spyOn(unitsMock, 'resolvePathMeasure').mockReturnValue('knots');
+
+    await setup(makeConfig({ convertUnitTo: 'celsius', numDecimal: 1 }));
+
+    emissions$.next({ timestamp: 1000, data: { value: 5 } });
+
+    expect(resolveSpy).toHaveBeenCalledWith('self.navigation.speedOverGround');
+    const title = readTitle();
+    expect(title).toContain('knots');
+    expect(title).not.toContain('celsius');
   });
 });

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, inject, ChangeDetectionStrategy, input, effect, untracked, signal } from '@angular/core';
+import { Component, OnDestroy, inject, ChangeDetectionStrategy, input, effect, untracked, signal, computed } from '@angular/core';
 import { Subscription, interval } from 'rxjs';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { SvgWindsteerComponent } from '../svg-windsteer/svg-windsteer.component';
@@ -179,11 +179,13 @@ export class WidgetWindComponent implements OnDestroy {
   protected courseOverGroundAngle = signal(0);
   protected appWindAngle = signal(0);
   protected appWindSpeed = signal(0);
-  protected appWindSpeedUnit = signal('');
+  private appWindSpeedMeasure = signal('');
+  protected appWindSpeedUnit = computed(() => this.speedUnitSymbol(this.appWindSpeedMeasure()));
   protected trueWindAngle = signal(0);
   protected trueWindActive = signal(false);
   protected trueWindSpeed = signal(0);
-  protected trueWindSpeedUnit = signal('');
+  private trueWindSpeedMeasure = signal('');
+  protected trueWindSpeedUnit = computed(() => this.speedUnitSymbol(this.trueWindSpeedMeasure()));
   protected driftFlow = signal(0);
   protected driftSet = signal(0);
   protected waypointAngle = signal(0);
@@ -210,8 +212,6 @@ export class WidgetWindComponent implements OnDestroy {
       const cfg = this.runtime.options();
       if (!cfg) return;
       untracked(() => {
-        this.appWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths?.['appWindSpeed']?.convertUnitTo));
-        this.trueWindSpeedUnit.set(this.unitsService.getUnitDisplaySymbol(cfg.paths?.['trueWindSpeed']?.convertUnitTo));
         this.registerStreams();
         this.stopWindSectors();
         this.startWindSectors();
@@ -273,6 +273,7 @@ export class WidgetWindComponent implements OnDestroy {
     const next = u.data.value;
     if (!this.hasAWS || Math.abs(this.appWindSpeed() - next) >= this.SPEED_EPSILON) {
       this.appWindSpeed.set(next); this.hasAWS = true;
+      this.appWindSpeedMeasure.set(u.data.measure ?? '');
     }
   };
   private onTrueWindSpeed = (u: IPathUpdate) => {
@@ -280,6 +281,7 @@ export class WidgetWindComponent implements OnDestroy {
     const next = u.data.value;
     if (!this.hasTWS || Math.abs(this.trueWindSpeed() - next) >= this.SPEED_EPSILON) {
       this.trueWindSpeed.set(next); this.hasTWS = true;
+      this.trueWindSpeedMeasure.set(u.data.measure ?? '');
     }
   };
   private onTrueWindAngle = (u: IPathUpdate) => {
@@ -428,6 +430,14 @@ export class WidgetWindComponent implements OnDestroy {
 
   private normalizeAngle(a: number): number { return ((a % 360) + 360) % 360; }
   private angleDelta(from: number, to: number): number { const d = ((to - from + 540) % 360) - 180; return Math.abs(d); }
+
+  // The speed readouts derive their unit symbol from the measure the streams directive tagged the
+  // value with (server-resolved for these display paths), never the stored convertUnitTo. An empty
+  // or still-unitless measure (meta not yet resolved) renders no symbol rather than a wrong one, so
+  // the label always matches the value.
+  private speedUnitSymbol(measure: string): string {
+    return measure && measure !== 'unitless' ? this.unitsService.getUnitDisplaySymbol(measure) : '';
+  }
 
 }
 

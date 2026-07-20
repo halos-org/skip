@@ -72,6 +72,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private backgroundBitmapText: string | null = null;
 
   private dataValue: number | null = null;
+  private effectiveUnit = signal<string>('');
   private maxValue: number | null = null;
   private minValue: number | null = null;
   private valueColor: string | undefined = undefined;
@@ -103,6 +104,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private onNumericValue = (newValue: IPathUpdate) => {
     const dataValue = newValue.data.value as number | null;
     this.dataValue = dataValue;
+    this.effectiveUnit.set(newValue.data.measure ?? '');
     const minMax = reduceMinMax(this.minValue, this.maxValue, dataValue);
     this.minValue = minMax.min;
     this.maxValue = minMax.max;
@@ -159,6 +161,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
         this.maxValue = null;
         this.dataValue = null;
         this.pathDataState = null;
+        this.effectiveUnit.set('');
         this.lastSubscriptionSignature = sig;
 
         if (sig) {
@@ -174,11 +177,12 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
       const chart = this.miniChart();
       const cfg = this.runtime?.options();
       const pathInfo = cfg?.paths?.['numericPath'];
+      const effUnit = this.effectiveUnit();
       const miniChartSignature = [
         cfg?.showMiniChart ? '1' : '0',
         pathInfo?.path ?? '',
         pathInfo?.source ?? 'default',
-        pathInfo?.convertUnitTo ?? '',
+        effUnit,
         cfg?.numDecimal ?? '',
         cfg?.yScaleMin ?? '',
         cfg?.yScaleMax ?? '',
@@ -239,7 +243,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     chart.dataPath = pathInfo?.path ?? null;
     chart.dataSource = pathInfo?.source ?? 'default';
     chart.color = cfg.color ?? 'contrast';
-    chart.convertUnitTo = pathInfo?.convertUnitTo;
+    chart.convertUnitTo = this.effectiveUnit();
     chart.numDecimal = cfg.numDecimal ?? 1;
     chart.yScaleMin = cfg.yScaleMin ?? 0;
     chart.yScaleMax = cfg.yScaleMax ?? 10;
@@ -262,11 +266,11 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!ctx) return;
     const cfg = this.runtime.options();
     if (!cfg) return;
-    const unit = cfg.paths?.['numericPath']?.convertUnitTo;
+    const unit = this.effectiveUnit();
     const marginX = 10 * this.canvas.scaleFactor;
     const marginY = 5 * this.canvas.scaleFactor;
     const displayName = cfg.displayName ?? 'Gauge Label';
-    const bgText = displayName + '|' + (unit ?? '');
+    const bgText = displayName + '|' + unit;
 
     if (!this.backgroundBitmap ||
         this.backgroundBitmap.width !== this.canvasElement.width ||
@@ -286,7 +290,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
             this.cssHeight,
             0.1
           );
-          if (unit !== undefined && !['unitless', 'percent', 'percentraw', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
+          if (unit && !['unitless', 'percent', 'percentraw', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
             this.canvas.drawText(
               bitmapCtx,
               this.unitsService.getUnitDisplaySymbol(unit),
@@ -334,8 +338,12 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     const dataValue = this.dataValue;
     if (dataValue === null) return "--";
     const cfg = this.runtime.options();
-    const cUnit = cfg?.paths?.['numericPath']?.convertUnitTo;
-    if (cUnit !== undefined && ['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'].includes(cUnit)) {
+    // The format decision must follow the measure the value was actually converted to (the tagged
+    // effective measure), not the stored convertUnitTo: a display path's resolved measure can differ,
+    // and a position/duration format measure arrives as a pre-formatted string — testing the stored
+    // unit here would call toFixed() on that string (crash) or print a raw number for a format measure.
+    const measure = this.effectiveUnit();
+    if (['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'].includes(measure)) {
       return dataValue.toString();
     }
     return this.applyDecorations(dataValue.toFixed(cfg?.numDecimal));
@@ -370,7 +378,9 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private applyDecorations(txtValue: string): string {
-    switch (this.runtime.options()?.paths?.['numericPath']?.convertUnitTo) {
+    // Percent decoration follows the applied measure, not the stored convertUnitTo — same reason as
+    // getValueText: a display path's value is scaled per the resolved measure, so the '%' must too.
+    switch (this.effectiveUnit()) {
       case 'percent':
       case 'percentraw':
         txtValue += '%';

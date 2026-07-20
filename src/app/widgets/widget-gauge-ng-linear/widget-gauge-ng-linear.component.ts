@@ -90,12 +90,18 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
   /** Enables smooth transitions only after the first static frame. */
   private animationEnabled = computed(() => this.gaugeBootstrapped());
   private currentState = signal<string>(States.Normal);
+  /** Measure the incoming value was converted to (server-resolved for this display path). '' = boot placeholder. */
+  private effectiveUnit = signal<string>('');
 
   private adjustedScale = computed<IScale>(() => {
     const cfg = this.runtime.options();
     if (!cfg) return { min: 0, max: 100, majorTicks: [] };
-    const lower = cfg.displayScale?.lower ?? 0;
-    const upper = cfg.displayScale?.upper ?? 100;
+    // displayScale bounds are stored in the user-picked convertUnitTo; re-express them in the
+    // effective (server-resolved) measure so the scale lines up with the converted value.
+    const stored = cfg.paths?.['gaugePath']?.convertUnitTo ?? 'unitless';
+    const effective = this.effectiveUnit();
+    const lower = this.unitsService.convertBetweenMeasures(stored, effective, cfg.displayScale?.lower ?? 0);
+    const upper = this.unitsService.convertBetweenMeasures(stored, effective, cfg.displayScale?.upper ?? 100);
     if (cfg.gauge?.enableTicks) {
       return adjustLinearScaleAndMajorTicks(lower, upper);
     }
@@ -111,7 +117,10 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     if (cfg.ignoreZones) return [];
 
     if (!cfg.paths?.['gaugePath']) return [];
-    return getHighlights(zones, theme, cfg.paths['gaugePath'].convertUnitTo, this.unitsService, this.adjustedScale().min, this.adjustedScale().max);
+    // Zones are in SI base; convert them to the effective measure so the bands align with the
+    // converted value and the reinterpreted scale. Fall back to the stored unit before first data.
+    const effective = this.effectiveUnit() || (cfg.paths['gaugePath'].convertUnitTo ?? 'unitless');
+    return getHighlights(zones, theme, effective, this.unitsService, this.adjustedScale().min, this.adjustedScale().max);
   });
   protected displayName = computed(() => this.runtime.options()?.displayName || 'Gauge Label');
 
@@ -123,22 +132,31 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       if (!cfg || !theme) return;
       if (!cfg.paths?.['gaugePath'].path) return;
 
-      untracked(() => this.streams.observe('gaugePath', path => {
-        const raw = (path?.data?.value as number) ?? null;
-        const lower = cfg.displayScale?.lower ?? 0;
-        const upper = cfg.displayScale?.upper ?? 100;
-        if (raw == null) {
-          this.value.set(lower);
-          this.textValue.set('--');
-        } else {
-          const clamped = Math.min(Math.max(raw, lower), upper);
-          this.value.set(clamped);
-          if (this.textValue() === '--') this.textValue.set('');
-        }
-        if (path.state !== this.currentState()) {
-          this.currentState.set(path.state);
-        }
-      }));
+      untracked(() => {
+        // Reset the tagged measure so a stale unit never paints the new subscription's value.
+        this.effectiveUnit.set('');
+        this.streams.observe('gaugePath', path => {
+          const raw = (path?.data?.value as number) ?? null;
+          const measure = path.data.measure ?? '';
+          this.effectiveUnit.set(measure);
+          // Clamp against the stored displayScale bounds re-expressed in the effective measure,
+          // so the (already-converted) value and the reinterpreted scale share one unit space.
+          const stored = cfg.paths?.['gaugePath']?.convertUnitTo ?? 'unitless';
+          const lower = this.unitsService.convertBetweenMeasures(stored, measure, cfg.displayScale?.lower ?? 0);
+          const upper = this.unitsService.convertBetweenMeasures(stored, measure, cfg.displayScale?.upper ?? 100);
+          if (raw == null) {
+            this.value.set(lower);
+            this.textValue.set('--');
+          } else {
+            const clamped = Math.min(Math.max(raw, lower), upper);
+            this.value.set(clamped);
+            if (this.textValue() === '--') this.textValue.set('');
+          }
+          if (path.state !== this.currentState()) {
+            this.currentState.set(path.state);
+          }
+        });
+      });
     });
 
     // Metadata observation
@@ -168,13 +186,14 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     // Build / update gauge options when config/theme/scale change
     effect(() => {
       const theme = this.theme();
-      // include scale dependency so options rebuild on scale recompute
+      // include scale + effective-measure dependencies so options rebuild on scale or unit change
       const scale = this.adjustedScale();
+      const effective = this.effectiveUnit();
 
       untracked(() => {
         const cfg = this.runtime.options();
         if (!cfg || !theme) return;
-        this.buildGaugeOptions(cfg, theme, scale);
+        this.buildGaugeOptions(cfg, theme, scale, effective);
         if (this.viewReady()) {
           try {
             this.ngGauge()?.update(this.gaugeOptions);
@@ -254,7 +273,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     });
   }
 
-  private buildGaugeOptions(cfg: IWidgetSvcConfig, theme: ITheme, scale: IScale) {
+  private buildGaugeOptions(cfg: IWidgetSvcConfig, theme: ITheme, scale: IScale, effectiveUnit: string) {
     const opt = this.gaugeOptions = {} as LinearGaugeOptions;
     const isVertical = cfg.gauge?.subType === 'vertical';
     const enableNeedle = cfg.gauge?.enableNeedle;
@@ -272,7 +291,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     opt.needleStart = enableNeedle ? (isVertical ? 200 : 155) : -45;
     opt.needleEnd = enableNeedle ? (isVertical ? 175 : 180) : 55;
     opt.needleShadow = true; opt.needleSide = 'both';
-    opt.units = this.unitsService.getUnitDisplaySymbol(cfg.paths?.['gaugePath']?.convertUnitTo); opt.fontUnits = 'Roboto'; opt.fontUnitsWeight = 'normal';
+    opt.units = this.unitsService.getUnitDisplaySymbol(effectiveUnit); opt.fontUnits = 'Roboto'; opt.fontUnitsWeight = 'normal';
     opt.borders = false; opt.borderOuterWidth = 0; opt.borderMiddleWidth = 0; opt.borderInnerWidth = 0; opt.borderShadowWidth = 0; opt.borderRadius = 0;
     // Value box
     opt.valueBox = true; opt.valueBoxWidth = 35; opt.valueBoxStroke = 0; opt.valueBoxBorderRadius = 10;

@@ -62,26 +62,6 @@
         </mat-select>
       </mat-form-field>
     </div>
-    <div class="flex-field-50">
-      <mat-form-field class="full-width">
-        <mat-label>Display Format</mat-label>
-        <mat-select
-          placeholder="Select unit..."
-          [formControl]="convertUnitTo()"
-          name="convertUnitTo"
-          required>
-          @for (group of unitList().conversions; track $index) {
-            <mat-optgroup [label]="group.group">
-              @for (unit of group.units; track $index) {
-                <mat-option [value]="unit.measure">
-                  {{unit.description}}
-                </mat-option>
-              }
-            </mat-optgroup>
-          }
-        </mat-select>
-      </mat-form-field>
-    </div>
   </div>
   @if (datachartAngleRange(); as angleRangeCtrl) {
     <mat-form-field class="full-width">

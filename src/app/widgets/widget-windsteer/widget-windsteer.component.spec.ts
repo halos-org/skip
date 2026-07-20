@@ -152,3 +152,61 @@ describe('WidgetWindComponent true-wind sector source', () => {
     expect(active()).toBe(false); // explicit null -> laylines hide
   });
 });
+
+/**
+ * The apparent/true wind speed readouts are DISPLAY paths: the streams directive tags each
+ * numeric update with the server-resolved measure the value was converted to. The unit symbol
+ * must derive from that tagged measure, not from the stored convertUnitTo ('knots'), so the
+ * label always matches the value's actual unit and neutrals out until data arrives.
+ */
+describe('WidgetWindComponent speed unit symbol source', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const makeConfig = (): IWidgetSvcConfig => ({ ...WidgetWindComponent.DEFAULT_CONFIG });
+  const speedUpdate = (value: number, measure?: string): IPathUpdate =>
+    ({ data: { value, timestamp: null, measure }, state: 'normal' });
+  const awsUnit = (): string => (component as unknown as { appWindSpeedUnit: () => string }).appWindSpeedUnit();
+  const twsUnit = (): string => (component as unknown as { trueWindSpeedUnit: () => string }).trueWindSpeedUnit();
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>(makeConfig());
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
+      ]
+    });
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick();
+  });
+
+  it('renders a neutral label before any update (boot placeholder)', () => {
+    expect(awsUnit()).toBe('');
+    expect(twsUnit()).toBe('');
+  });
+
+  it('derives each speed unit symbol from the update measure, not the stored convertUnitTo', () => {
+    // both paths store convertUnitTo: 'knots' but the server-resolved measure differs
+    callbacks.get('appWindSpeed')!(speedUpdate(10, 'm/s'));
+    callbacks.get('trueWindSpeed')!(speedUpdate(8, 'kph'));
+    expect(awsUnit()).toBe('m/s');
+    expect(twsUnit()).toBe('kph');
+  });
+
+  it('keeps a neutral label when an update carries no measure', () => {
+    callbacks.get('appWindSpeed')!(speedUpdate(10));
+    expect(awsUnit()).toBe('');
+  });
+
+  it('keeps a neutral label while the measure is still unitless (meta unresolved)', () => {
+    callbacks.get('appWindSpeed')!(speedUpdate(10, 'unitless'));
+    expect(awsUnit()).toBe('');
+  });
+});

@@ -5,6 +5,7 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IWidgetSvcConfig, IPathArray } from '../../core/interfaces/widgets-interface';
 import { ITheme } from '../../core/services/app-service';
+import { UnitsService } from '../../core/services/units.service';
 import { interval, Subscription } from 'rxjs';
 
 interface IWindDirSample { timestamp: number; windDirection: number; }
@@ -60,16 +61,15 @@ export class WidgetRacesteerComponent implements OnDestroy {
   // Injected directives
   protected readonly runtime = inject(WidgetRuntimeDirective);
   private readonly streams = inject(WidgetStreamsDirective);
+  private readonly unitsService = inject(UnitsService);
 
   // Signals for display state
   protected readonly currentHeading = signal(0);
   protected readonly courseOverGroundAngle = signal(0);
   protected readonly appWindAngle = signal(0);
   protected readonly appWindSpeed = signal(0);
-  protected readonly appWindSpeedUnit = signal('knots');
   protected readonly trueWindAngle = signal(0);
   protected readonly trueWindSpeed = signal(0);
-  protected readonly trueWindSpeedUnit = signal('knots');
   protected readonly driftFlow = signal(0);
   protected readonly driftSet = signal(0);
   protected readonly waypointAngle = signal(0);
@@ -80,6 +80,14 @@ export class WidgetRacesteerComponent implements OnDestroy {
   protected readonly optimalWindAngle = signal(0);
   protected readonly targetVMG = signal(0);
   protected readonly VMG = signal(0);
+  // Server-resolved measure tagged onto each speed path by the streams directive. Kept per readout
+  // group so a path the server resolves to a different unit labels its own value instead of the last
+  // writer clobbering a shared symbol. targetVMG's measure also labels the derived targetVMG offset.
+  // '' is the boot placeholder: no symbol drawn until the first update carries a measure.
+  private readonly targetVmgUnit = signal<string>('');
+  private readonly vmgToWaypointUnit = signal<string>('');
+  protected readonly targetVmgSpeedUnitSymbol = computed(() => this.unitsService.getUnitDisplaySymbol(this.targetVmgUnit()));
+  protected readonly vmgToWaypointSpeedUnitSymbol = computed(() => this.unitsService.getUnitDisplaySymbol(this.vmgToWaypointUnit()));
   protected readonly gradianColor = signal<{ start: string; stop: string }>({ start: '#3298ff', stop: '#15af00' });
   protected readonly trueWindMinHistoric = signal<number>(0);
   protected readonly trueWindMidHistoric = signal<number>(0);
@@ -241,6 +249,7 @@ export class WidgetRacesteerComponent implements OnDestroy {
         const v = pkt?.data?.value as number | null;
         const rounded = v == null ? 0 : Math.round(v * 10) / 10;
         this.targetVMG.set(rounded);
+        this.targetVmgUnit.set(pkt?.data?.measure ?? '');
       }));
     });
 
@@ -269,6 +278,7 @@ export class WidgetRacesteerComponent implements OnDestroy {
         const v = pkt?.data?.value as number | null;
         const rounded = v == null ? null : Math.round(v * 10) / 10;
         this.vmgToWaypoint.set(rounded);
+        this.vmgToWaypointUnit.set(pkt?.data?.measure ?? '');
       }));
     });
 

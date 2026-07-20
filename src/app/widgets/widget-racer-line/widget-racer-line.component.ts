@@ -167,6 +167,9 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private biasValue: number | null = null;
   private ttlValue: number | null = null;
   private ttbValue: number | null = null;
+  private dtsUnit = signal<string>('');
+  private lineLengthUnit = signal<string>('');
+  private lineBiasUnit = signal<string>('');
   protected labelColor = signal<string>('');
   private valueColor = '';
   private dtsColor = '';
@@ -201,6 +204,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       if (!pathCfg?.path) return;
       untracked(() => this.streams.observe('dtsPath', pkt => {
         this.dtsValue = pkt?.data?.value ?? null;
+        this.dtsUnit.set(pkt?.data?.measure ?? '');
         this.updateDtsColor();
         this.draw();
       }));
@@ -213,6 +217,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       if (!pathCfg?.path) return;
       untracked(() => this.streams.observe('lineLengthPath', pkt => {
         this.lengthValue = pkt?.data?.value ?? null;
+        this.lineLengthUnit.set(pkt?.data?.measure ?? '');
         this.setLenBias();
         this.draw();
       }));
@@ -225,6 +230,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       if (!pathCfg?.path) return;
       untracked(() => this.streams.observe('lineBiasPath', pkt => {
         this.biasValue = pkt?.data?.value ?? null;
+        this.lineBiasUnit.set(pkt?.data?.measure ?? '');
         this.setLenBias();
       }));
     });
@@ -400,7 +406,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
 
     this.canvas.drawText(
       this.ctx,
-      this.unitsService.getUnitDisplaySymbol((this.runtime.options()?.paths as IPathArray | undefined)?.['dtsPath']?.convertUnitTo || 'm'),
+      this.unitsService.getUnitDisplaySymbol(this.dtsUnit()),
       Math.floor(this.cssWidth * 0.975),
       Math.floor(this.cssHeight * 0.60),
       Math.floor(this.cssWidth * 0.95),
@@ -495,13 +501,13 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private setLenBias(): void {
     const cfg = this.runtime.options(); if (!cfg) return;
     if ((cfg.paths as IPathArray)['lineLengthPath'].path && this.lengthValue != null) {
-      const rawUnit = (cfg.paths as IPathArray)['lineLengthPath'].convertUnitTo;
-      const unit = rawUnit === 'feet' ? '′' : this.unitsService.getUnitDisplaySymbol(rawUnit);
+      const measure = this.lineLengthUnit();
+      const unit = measure === 'feet' ? '′' : this.unitsService.getUnitDisplaySymbol(measure);
       this.lineLengthValue.set(`―${this.applyDecorations(this.lengthValue.toFixed(cfg.numDecimal))}${unit}―`);
     }
     if ((cfg.paths as IPathArray)['lineBiasPath'].path && this.biasValue != null) {
-      const rawUnit = (cfg.paths as IPathArray)['lineBiasPath'].convertUnitTo;
-      const unit = rawUnit === 'feet' ? '′' : this.unitsService.getUnitDisplaySymbol(rawUnit);
+      const measure = this.lineBiasUnit();
+      const unit = measure === 'feet' ? '′' : this.unitsService.getUnitDisplaySymbol(measure);
       if (this.biasValue < 0) {
         this.portBiasValue.set('+' + (-this.biasValue).toFixed(cfg.numDecimal) + unit);
         this.stbBiasValue.set(this.biasValue.toFixed(cfg.numDecimal) + unit);
@@ -526,10 +532,13 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     const theme = this.theme(); const cfg = this.runtime.options();
     if (!theme || !cfg) return;
     if (cfg.ignoreZones) {
+      const measure = this.dtsUnit();
+      const warnThreshold = this.unitsService.convertToUnit(measure, 10) ?? 10;
+      const alertThreshold = this.unitsService.convertToUnit(measure, 20) ?? 20;
       if (!this.dtsValue) this.dtsColor = this.valueColor;
       else if (this.dtsValue < 0) this.dtsColor = theme.zoneAlarm;
-      else if (this.dtsValue < 10) this.dtsColor = theme.zoneWarn;
-      else if (this.dtsValue < 20) this.dtsColor = theme.zoneAlert;
+      else if (this.dtsValue < warnThreshold) this.dtsColor = theme.zoneWarn;
+      else if (this.dtsValue < alertThreshold) this.dtsColor = theme.zoneAlert;
       else this.dtsColor = this.valueColor;
     } else {
       // Placeholder for potential state-driven colors (legacy used path states)

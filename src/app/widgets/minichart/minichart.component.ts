@@ -43,7 +43,8 @@ export class MinichartComponent implements OnDestroy {
   public color = '';
   public dataPath: string | null = null;
   public dataSource = '';
-  /** No unit conversion configured is a normal state (parent passes this through unfallbacked). */
+  /** Effective (server-resolved) measure the parent applied to the readout value; the sparkline
+   * converts to the SAME measure so it tracks the readout. Empty/null until the measure resolves. */
   public convertUnitTo: string | null | undefined = null;
   public numDecimal = 0;
   public yScaleMin = 0;
