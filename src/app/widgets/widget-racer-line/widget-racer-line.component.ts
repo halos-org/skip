@@ -54,8 +54,6 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     displayName: 'DTS',
     filterSelfPaths: true,
     playBeeps: true,
-    convertUnitTo: 'm',
-    convertUnitToGroup: 'Length',
     numDecimal: 0,
     ignoreZones: true,
     color: 'contrast',
