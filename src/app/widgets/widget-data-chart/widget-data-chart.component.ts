@@ -67,7 +67,6 @@ export class WidgetDataChartComponent implements OnDestroy {
     datachartPath: null,
     datachartSource: null,
     datachartAngleRange: null,
-    convertUnitTo: null,
     timeScale: 'minute', // second | minute | hour
     period: 10,
     numDecimal: 1,

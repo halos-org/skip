@@ -16,6 +16,7 @@ export interface SolarChargerSnapshot extends IElectricalTopologySnapshotCore {
   rawBatteryPower?: number | null;
   temperature?: number | null;
   temperatureState?: TState | null;
+  temperaturePath?: string;
   chargingAlgorithm?: string | null;
   chargerRole?: string | null;
   chargingMode?: string | null;
@@ -33,6 +34,7 @@ export interface SolarChargerSnapshot extends IElectricalTopologySnapshotCore {
   yieldYesterday?: number | null;
   panelTemperature?: number | null;
   panelTemperatureState?: TState | null;
+  panelTemperaturePath?: string;
   load?: string | number | boolean | null;
   loadCurrent?: number | null;
   loadCurrentState?: TState | null;

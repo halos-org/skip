@@ -1,5 +1,6 @@
 import { DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { skip } from 'rxjs';
 import type { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
 
 /**
@@ -27,6 +28,17 @@ export interface ElectricalIngestConfig<TEntry, TRender> {
   /** Process a drained batch of buffered entries (the store layer). */
   onFlush: (entries: TEntry[]) => void;
   /**
+   * Predicate selecting which incoming paths carry a display unit sourced from the
+   * server's per-path `displayUnits` meta (e.g. the family's temperature paths). The
+   * value stream never re-emits on a meta-only change, so the scheduler subscribes to
+   * each selected path's meta and calls {@link onMetaChange} when it lands late or
+   * changes at runtime — mirroring how the streams directive folds resolvePathMeasure
+   * through getPathMetaObservable. Requires {@link onMetaChange} to take effect.
+   */
+  watchMeta?: (update: IPathUpdateWithPath) => boolean;
+  /** Invoked when a {@link watchMeta}-selected path's meta changes after subscription. */
+  onMetaChange?: () => void;
+  /**
    * Resolve the snapshot to draw for a render request: apply the widget's
    * readiness guard and return the explicit snapshot, a freshly built default,
    * or null when the widget is not ready to render.
@@ -38,6 +50,7 @@ export interface ElectricalIngestConfig<TEntry, TRender> {
 
 export class ElectricalIngestScheduler<TEntry, TRender> {
   private readonly pending = new Map<string, TEntry>();
+  private readonly metaWatched = new Set<string>();
   private batchTimerId: number | null = null;
   private initialPaintDone = false;
   private frameId: number | null = null;
@@ -87,6 +100,8 @@ export class ElectricalIngestScheduler<TEntry, TRender> {
   }
 
   private enqueue(update: IPathUpdateWithPath, fromInitial: boolean): void {
+    this.watchMeta(update);
+
     const parsed = this.cfg.parseUpdate(update);
     if (!parsed) {
       return;
@@ -112,6 +127,24 @@ export class ElectricalIngestScheduler<TEntry, TRender> {
       this.batchTimerId = null;
       this.flush();
     }, this.cfg.batchWindowMs);
+  }
+
+  /**
+   * Subscribe once to a selected path's meta so a late/changed server displayUnits
+   * preference triggers a re-resolve+repaint. The initial replay is skipped: the
+   * current meta is already reflected by the render that reads it.
+   */
+  private watchMeta(update: IPathUpdateWithPath): void {
+    if (!this.cfg.watchMeta || !this.cfg.onMetaChange) {
+      return;
+    }
+    if (this.metaWatched.has(update.path) || !this.cfg.watchMeta(update)) {
+      return;
+    }
+    this.metaWatched.add(update.path);
+    this.cfg.data.getPathMetaObservable(update.path)
+      .pipe(skip(1), takeUntilDestroyed(this.cfg.destroyRef))
+      .subscribe(() => this.cfg.onMetaChange?.());
   }
 
   private flush(): void {

@@ -1,7 +1,6 @@
 import { IConfig ,IAppConfig, IConnectionConfig, IThemeConfig } from "../app/core/interfaces/app-settings.interfaces"
 import { LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION } from "../app/core/constants/config-versions.const";
 import { DefaultNotificationConfig } from './config.blank.notification.const';
-import { DefaultUnitsConfig } from "./config.blank.units.const";
 import { UUID } from "../app/core/utils/uuid.util";
 
 // Immutable defaults: the settings getters and profile-import validation read these as a shared
@@ -11,7 +10,6 @@ export const DefaultAppConfig: Readonly<IAppConfig> = {
   "autoNightMode": true,
   "redNightMode": false,
   "nightModeBrightness": 0.27,
-  "unitDefaults": DefaultUnitsConfig,
   "notificationConfig": DefaultNotificationConfig,
   "browserTabTitle": "Skip"
 }

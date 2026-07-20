@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import type { DestroyRef } from '@angular/core';
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { ElectricalIngestScheduler } from './electrical-ingest-scheduler';
@@ -38,6 +38,11 @@ const makeDestroyRef = (): { ref: DestroyRef; destroy: () => void } => {
   return { ref, destroy: () => callbacks.slice().forEach(cb => cb()) };
 };
 
+interface MetaConfig {
+  watchMeta: (update: IPathUpdateWithPath) => boolean;
+  onMetaChange: () => void;
+}
+
 interface Harness {
   scheduler: ElectricalIngestScheduler<TestEntry, TestSnapshot>;
   onFlush: ReturnType<typeof vi.fn>;
@@ -45,12 +50,23 @@ interface Harness {
   live: Subject<IPathUpdateWithPath>;
   destroy: () => void;
   setReady: (ready: boolean) => void;
+  emitMeta: (path: string, value: unknown) => void;
 }
 
-const setup = (initial: IPathUpdateWithPath[] = []): Harness => {
+const setup = (initial: IPathUpdateWithPath[] = [], meta?: MetaConfig): Harness => {
   const live = new Subject<IPathUpdateWithPath>();
+  const metaSubjects = new Map<string, BehaviorSubject<unknown>>();
+  const getMetaSubject = (path: string): BehaviorSubject<unknown> => {
+    let subject = metaSubjects.get(path);
+    if (!subject) {
+      subject = new BehaviorSubject<unknown>(null); // seeds the replay the scheduler skips
+      metaSubjects.set(path, subject);
+    }
+    return subject;
+  };
   const data = {
-    subscribePathTreeWithInitial: vi.fn().mockReturnValue({ initial, live$: live.asObservable() })
+    subscribePathTreeWithInitial: vi.fn().mockReturnValue({ initial, live$: live.asObservable() }),
+    getPathMetaObservable: vi.fn((path: string) => getMetaSubject(path).asObservable())
   } as unknown as DataService;
   const { ref, destroy } = makeDestroyRef();
   const onFlush = vi.fn();
@@ -64,11 +80,21 @@ const setup = (initial: IPathUpdateWithPath[] = []): Harness => {
     batchWindowMs: 500,
     parseUpdate,
     onFlush,
+    watchMeta: meta?.watchMeta,
+    onMetaChange: meta?.onMetaChange,
     resolveRenderSnapshot: explicit => (ready ? (explicit ?? { tag: 'default' }) : null),
     draw
   });
 
-  return { scheduler, onFlush, draw, live, destroy, setReady: value => { ready = value; } };
+  return {
+    scheduler,
+    onFlush,
+    draw,
+    live,
+    destroy,
+    setReady: value => { ready = value; },
+    emitMeta: (path, value) => getMetaSubject(path).next(value)
+  };
 };
 
 describe('ElectricalIngestScheduler', () => {
@@ -166,5 +192,26 @@ describe('ElectricalIngestScheduler', () => {
     live.next(makeUpdate('self.electrical.x.a1.current', 3)); // stream torn down
     await vi.advanceTimersByTimeAsync(500);
     expect(onFlush).not.toHaveBeenCalled();
+  });
+
+  it('repaints on a later meta change of a watchMeta-selected path, but not for unwatched paths', () => {
+    vi.useFakeTimers();
+    const onMetaChange = vi.fn();
+    const { live, emitMeta } = setup([], {
+      watchMeta: update => update.path.endsWith('.temperature'),
+      onMetaChange
+    });
+
+    // A watched path arrives → the scheduler subscribes to its meta and skips the initial replay.
+    live.next(makeUpdate('self.electrical.x.a1.temperature', 300));
+    expect(onMetaChange).not.toHaveBeenCalled();
+
+    // An unwatched path never gets a meta subscription, so its changes are inert.
+    emitMeta('self.electrical.x.a1.voltage', { targetUnit: 'V' });
+    expect(onMetaChange).not.toHaveBeenCalled();
+
+    // A later meta change on the watched path triggers exactly one repaint.
+    emitMeta('self.electrical.x.a1.temperature', { targetUnit: 'celsius' });
+    expect(onMetaChange).toHaveBeenCalledTimes(1);
   });
 });

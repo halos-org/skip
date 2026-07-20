@@ -1,5 +1,4 @@
 import { Component } from '@angular/core';
-import { SettingsUnitsComponent } from '../units/units.component';
 import { SettingsNotificationsComponent } from '../notifications/notifications.component';
 import { SettingsSignalkComponent } from '../signalk/signalk.component';
 import { SettingsDisplayComponent } from '../display/display.component';
@@ -16,7 +15,6 @@ import { SettingsConfigComponent } from '../configuration/config.component';
       MatTab,
       SettingsSignalkComponent,
       SettingsNotificationsComponent,
-      SettingsUnitsComponent,
       SettingsDisplayComponent,
       SettingsNotificationsComponent,
       SettingsConfigComponent,

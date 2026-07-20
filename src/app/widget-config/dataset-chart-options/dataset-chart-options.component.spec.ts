@@ -39,7 +39,6 @@ describe('DatasetChartOptionsComponent', () => {
     fixture = TestBed.createComponent(DatasetChartOptionsComponent);
     component = fixture.componentInstance;
     const set = fixture.componentRef.setInput.bind(fixture.componentRef) as (k: string, v: unknown) => void;
-    set('convertUnitTo', new UntypedFormControl(''));
     set('filterSelfPaths', new UntypedFormControl(false));
     set('datachartPath', new UntypedFormControl(''));
     set('datachartSource', new UntypedFormControl({ value: '', disabled: true }));

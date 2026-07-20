@@ -79,12 +79,15 @@ export class WidgetChargerComponent implements AfterViewInit {
   protected readonly discoveredChargerIds = signal<string[]>([]);
   protected readonly trackedDevices = signal<ElectricalTrackedDevice[]>([]);
   protected readonly chargersByKey = signal<Record<string, ChargerSnapshot>>({});
+  private readonly metaVersion = signal(0);
 
   private readonly scheduler = new ElectricalIngestScheduler<{ id: string; key: string; source: string | null; value: unknown; state: TState | null }, ChargerRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetChargerComponent.ROOT_PATTERN,
     batchWindowMs: WidgetChargerComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const parsed = this.parsePath(update.path);
       if (!parsed) return null;
@@ -173,6 +176,7 @@ export class WidgetChargerComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, ChargerDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const chargers = this.visibleChargers();
 
     const idCount = new Map<string, number>();
@@ -185,7 +189,8 @@ export class WidgetChargerComponent implements AfterViewInit {
     for (const charger of chargers) {
       const modelKey = charger.deviceKey ?? charger.id;
       const showSource = !!charger.source && duplicateIds.has(charger.id);
-      const [voltageText, currentText, powerText, temperatureText] = this.buildMetricRows(charger);
+      const temperatureMeasure = this.units.resolvePathMeasure(`${WidgetChargerComponent.SELF_ROOT_PATH}.${charger.id}.temperature`);
+      const [voltageText, currentText, powerText, temperatureText] = this.buildMetricRows(charger, temperatureMeasure);
 
       models[modelKey] = {
         id: charger.id,
@@ -196,7 +201,8 @@ export class WidgetChargerComponent implements AfterViewInit {
         voltageText,
         currentText,
         powerText,
-        temperatureText
+        temperatureText,
+        temperatureUnit: this.units.getUnitDisplaySymbol(temperatureMeasure)
       };
     }
 
@@ -419,7 +425,7 @@ export class WidgetChargerComponent implements AfterViewInit {
       case 'power':
         return setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
       case 'temperature':
-        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, 'K'), state);
       case 'leds.absorption':
         return setMetricValue(snapshot, 'ledsAbsorption', 'ledsAbsorptionState', toBoolean(value), state);
       case 'leds.bulk':
@@ -657,7 +663,7 @@ export class WidgetChargerComponent implements AfterViewInit {
       .attr('dx', 1)
       .attr('font-size', 6)
       .attr('fill', 'var(--skip-contrast-dim-color)')
-      .text(this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature));
+      .text(item => snapshot.displayModels[item.key]?.temperatureUnit ?? '');
 
     merged.select('text.charger-mode')
       .attr('x', 5)
@@ -722,20 +728,20 @@ export class WidgetChargerComponent implements AfterViewInit {
     return mode === expected || mode.includes(expected);
   }
 
-  private buildMetricRows(charger: ChargerSnapshot): [string, string, string, string] {
+  private buildMetricRows(charger: ChargerSnapshot, temperatureMeasure: string): [string, string, string, string] {
     if (this.renderMode() === 'full' || this.renderMode() === null) {
       return [
         `${this.formatValue(charger.voltage, 1)}`,
         `${this.formatValue(charger.current, 1)}`,
         `Power: ${this.formatValue(charger.power, 0)}`,
-        `Temp: ${this.formatTemperature(charger.temperature)}`
+        `Temp: ${this.formatTemperature(charger.temperature, temperatureMeasure)}`
       ];
     } else {
       return [
         `${this.formatValue(charger.voltage, 1)}`,
         `${this.formatValue(charger.current, 1)}`,
         `P: ${this.formatValue(charger.power, 0)}`,
-        `T: ${this.formatTemperature(charger.temperature)}`
+        `T: ${this.formatTemperature(charger.temperature, temperatureMeasure)}`
       ];
     }
   }
@@ -748,12 +754,17 @@ export class WidgetChargerComponent implements AfterViewInit {
     return `${value.toFixed(decimal)}`;
   }
 
-  private formatTemperature(value: number | null | undefined): string {
+  private formatTemperature(value: number | null | undefined, measure: string): string {
     if (value == null || Number.isNaN(value)) {
       return '-';
     }
 
-    return `${value.toFixed(0)}`;
+    const converted = this.units.convertToUnit(measure, value);
+    if (converted == null || !Number.isFinite(converted)) {
+      return '-';
+    }
+
+    return `${converted.toFixed(0)}`;
   }
 
   private toNumber(value: unknown, unitHint: string): number | null {

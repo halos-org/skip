@@ -40,8 +40,7 @@ describe('WidgetAcComponent', () => {
   const dataServiceMock = { subscribePathTreeWithInitial: vi.fn() };
   const runtimeMock = { options: vi.fn() };
   const unitsMock = {
-    convertToUnit: (_unit: string, value: unknown) => value,
-    getDefaults: () => ({ Temperature: 'celsius' })
+    convertToUnit: (_unit: string, value: unknown) => value
   };
 
   const setup = async (

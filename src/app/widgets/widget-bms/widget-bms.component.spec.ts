@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { of, Subject } from 'rxjs';
+import { BehaviorSubject, of, Subject } from 'rxjs';
 import { MatIconRegistry } from '@angular/material/icon';
 import { WidgetBmsComponent } from './widget-bms.component';
 import { DataService, IPathUpdateWithPath } from '../../core/services/data.service';
@@ -28,7 +28,9 @@ describe('WidgetBmsComponent', () => {
     };
 
     const dataServiceMock = {
-        subscribePathTreeWithInitial: vi.fn()
+        subscribePathTreeWithInitial: vi.fn(),
+        // The scheduler subscribes to each temperature path's meta so a late displayUnits change repaints.
+        getPathMetaObservable: vi.fn(() => new BehaviorSubject(null).asObservable())
     };
 
     const runtimeMock = {
@@ -42,7 +44,8 @@ describe('WidgetBmsComponent', () => {
             }
             return value;
         },
-        getDefaults: () => ({ Temperature: 'celsius' })
+        resolvePathMeasure: () => 'celsius',
+        getUnitDisplaySymbol: (measure: string) => (measure === 'celsius' ? '°C' : measure === 'fahrenheit' ? '°F' : measure)
     };
 
     const iconRegistryMock = {

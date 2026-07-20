@@ -1061,7 +1061,6 @@
       "componentClassName": "WidgetDataChartComponent",
       "defaultConfig": {
         "color": "contrast",
-        "convertUnitTo": null,
         "datachartAngleRange": null,
         "datachartPath": null,
         "datachartSource": null,
@@ -1831,8 +1830,6 @@
       "componentClassName": "WidgetRacerLineComponent",
       "defaultConfig": {
         "color": "contrast",
-        "convertUnitTo": "m",
-        "convertUnitToGroup": "Length",
         "dataTimeout": 5,
         "displayName": "DTS",
         "enableTimeout": false,

@@ -61,7 +61,8 @@ interface BmsRenderSnapshot {
 })
 export class WidgetBmsComponent implements AfterViewInit {
   private static readonly BMS_DESCRIPTOR = getElectricalWidgetFamilyDescriptor('widget-bms');
-  private static readonly ROOT_PATTERN = `${WidgetBmsComponent.BMS_DESCRIPTOR?.selfRootPath ?? 'self.electrical.batteries'}.*`;
+  private static readonly SELF_ROOT_PATH = WidgetBmsComponent.BMS_DESCRIPTOR?.selfRootPath ?? 'self.electrical.batteries';
+  private static readonly ROOT_PATTERN = `${WidgetBmsComponent.SELF_ROOT_PATH}.*`;
 
   public id = input.required<string>();
   public type = input.required<string>();
@@ -123,12 +124,15 @@ export class WidgetBmsComponent implements AfterViewInit {
     metrics: []
   });
   protected readonly batteries = signal<Record<string, BmsBatterySnapshot>>({});
+  private readonly metaVersion = signal(0);
 
   private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, BmsRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetBmsComponent.ROOT_PATTERN,
     batchWindowMs: WidgetBmsComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const match = this.parseBatteryPath(update.path);
       if (!match) return null;
@@ -201,6 +205,7 @@ export class WidgetBmsComponent implements AfterViewInit {
   });
 
   protected readonly batteryDisplayModels = computed<Record<string, BmsBatteryDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const batteries = this.visibleBatteries();
     const theme = this.theme();
     const widgetColors = this.widgetColors();
@@ -242,8 +247,8 @@ export class WidgetBmsComponent implements AfterViewInit {
         currentTextColorCompact,
         currentTextColorRegular,
         currentText: `${this.formatCurrent(battery.current)}`.trim(),
-        detailLineCompact: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature)}`,
-        detailLineRegular: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatPower(battery.power)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature)}`.trim(),
+        detailLineCompact: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature, `${WidgetBmsComponent.SELF_ROOT_PATH}.${battery.id}.temperature`)}`,
+        detailLineRegular: `${this.formatVoltage(battery.voltage)}\u00A0\u00A0\u00A0\u00A0${this.formatPower(battery.power)}\u00A0\u00A0\u00A0\u00A0${this.formatTemperature(battery.temperature, `${WidgetBmsComponent.SELF_ROOT_PATH}.${battery.id}.temperature`)}`.trim(),
         socText: this.formatSoc(battery.stateOfCharge),
         socGlowEnabled: !ignoreZones && (
           battery.stateOfChargeState === States.Warn
@@ -1144,13 +1149,13 @@ export class WidgetBmsComponent implements AfterViewInit {
     return typeof converted === 'string' ? converted : `${converted}`;
   }
 
-  private formatTemperature(value: unknown): string {
+  private formatTemperature(value: unknown, path: string): string {
     if (value == null) return '';
     if (typeof value !== 'number') return '';
-    const displayUnit = this.units.getDefaults().Temperature;
-    const converted = this.units.convertToUnit(displayUnit, value);
+    const measure = this.units.resolvePathMeasure(path);
+    const converted = this.units.convertToUnit(measure, value);
     if (converted === null) return '';
-    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(displayUnit)}`;
+    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(measure)}`;
   }
 
   private splitMetricText(rawText: string, unitSuffix: string): { valueText: string; unitText: string } {

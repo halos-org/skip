@@ -13,14 +13,6 @@
  */
 export const SELF_URN = 'vessels.urn:mrn:signalk:uuid:11111111-1111-4111-8111-111111111111';
 
-const DEFAULT_UNITS = {
-  Unitless: 'unitless', Speed: 'knots', Flow: 'l/h', Temperature: 'celsius', Length: 'm',
-  Volume: 'liter', Current: 'A', Potential: 'V', Charge: 'C', Power: 'W', Energy: 'J',
-  Pressure: 'mmHg', 'Fuel Distance': 'nm/l', 'Energy Distance': 'nm/kWh', Density: 'kg/m3',
-  Time: 'Hours', 'Angular Velocity': 'deg/min', Angle: 'deg', Frequency: 'Hz', Ratio: 'ratio',
-  Resistance: 'ohm',
-};
-
 const DEFAULT_NOTIF = {
   disableNotifications: false, menuGrouping: true,
   security: { disableSecurity: true },
@@ -36,7 +28,7 @@ export function appConfig(extra = {}) {
   // the boot triggers an upgrade+reload and the boot-assert fails.
   return {
     configVersion: 14, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
-    widgetHistoryDisabled: false, unitDefaults: DEFAULT_UNITS,
+    widgetHistoryDisabled: false,
     notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'Skip', ...extra,
   };
 }

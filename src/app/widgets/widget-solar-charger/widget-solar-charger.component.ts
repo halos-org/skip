@@ -23,6 +23,10 @@ interface SolarRenderSnapshot {
   widgetColors: ReturnType<typeof getColors>;
 }
 
+// normalizeSolarMetricKey strips 'controller.' and remaps solar.temperature -> panelTemperature,
+// so the real SK path is not reconstructable from id + key; carry it through the ingest pipeline.
+type SolarTopologyEntry = ElectricalTopologyEntry & { path: string };
+
 @Component({
   selector: 'widget-solar-charger',
   templateUrl: './widget-solar-charger.component.html',
@@ -100,12 +104,15 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     metrics: ['panelVoltage', 'panelCurrent', 'voltage', 'current']
   });
   protected readonly chargersByKey = signal<Record<string, SolarChargerSnapshot>>({});
+  private readonly metaVersion = signal(0);
 
-  private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, SolarRenderSnapshot>({
+  private readonly scheduler = new ElectricalIngestScheduler<SolarTopologyEntry, SolarRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetSolarChargerComponent.ROOT_PATTERN,
     batchWindowMs: WidgetSolarChargerComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const match = this.parseSolarPath(update.path);
       if (!match) return null;
@@ -114,6 +121,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         entry: {
           id: match.id,
           key: match.key,
+          path: update.path,
           value: update.update?.data?.value ?? null,
           state: update.update?.state ?? null
         }
@@ -159,6 +167,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, SolarChargerDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const solarUnits = this.visibleSolarUnits();
     const options = this.optionsById();
     const theme = this.theme();
@@ -248,12 +257,12 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         panelValuesTextColor,
         panelValuesGlowEnabled,
         gaugeProgress: progress,
-        gaugeSectionText: `${this.formatVoltage(solar.panelVoltage)}` + (solar.panelCurrent != null ? `, ${this.formatCurrent(solar.panelCurrent)}` : '') + (solar.panelTemperature != null ? `, ${this.formatTemperature(solar.panelTemperature)}` : ''),
+        gaugeSectionText: `${this.formatVoltage(solar.panelVoltage)}` + (solar.panelCurrent != null ? `, ${this.formatCurrent(solar.panelCurrent)}` : '') + (solar.panelTemperature != null ? `, ${this.formatTemperature(solar.panelTemperature, solar.panelTemperaturePath)}` : ''),
         yieldTodayText,
         yieldYesterdayText,
         chargerSectionCurrent: `${this.formatCurrent(solar.current)}`,
         chargerMode: `${mode.charAt(0).toUpperCase() + mode.slice(1)} mode`,
-        chargerSectionMetadata: `${solar.voltage != null ? this.formatVoltage(solar.voltage) : ''}\u00A0\u00A0\u00A0\u00A0${solar.temperature != null ? this.formatTemperature(solar.temperature) : ''}`.trim(),
+        chargerSectionMetadata: `${solar.voltage != null ? this.formatVoltage(solar.voltage) : ''}\u00A0\u00A0\u00A0\u00A0${solar.temperature != null ? this.formatTemperature(solar.temperature, solar.temperaturePath) : ''}`.trim(),
         relaySectionVisible,
         relaySectionText,
         relayValuesTextColor
@@ -452,7 +461,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     return next;
   }
 
-  private processBatch(entries: ElectricalTopologyEntry[]): void {
+  private processBatch(entries: SolarTopologyEntry[]): void {
     const uniqueIds = new Set(entries.map(update => update.id));
     uniqueIds.forEach(id => this.trackDiscoveredSolar(id));
 
@@ -484,7 +493,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
             deviceKey: hasTracked ? targetKey : undefined
           } as SolarChargerSnapshot;
           const next = { ...existing } as SolarChargerSnapshot;
-          const changed = this.applyChargerValue(next, update.key, update.value, update.state);
+          const changed = this.applyChargerValue(next, update.key, update.value, update.state, update.path);
 
           let derivedChanged = false;
           const batteryPower = this.resolvePowerValue(next.rawBatteryPower, next.voltage, next.current);
@@ -553,7 +562,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     this.discoveredSolarIds.set([...ids, id].sort());
   }
 
-  private applyChargerValue(charger: SolarChargerSnapshot, key: string, value: unknown, state: TState | null): boolean {
+  private applyChargerValue(charger: SolarChargerSnapshot, key: string, value: unknown, state: TState | null, path: string): boolean {
     switch (key) {
       case 'name': return setValue(charger, 'name', this.toStringValue(value));
       case 'location': return setValue(charger, 'location', this.toStringValue(value));
@@ -576,8 +585,9 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       }
       case 'power': return this.setPowerPathValue(charger, 'rawBatteryPower', value);
       case 'temperature': {
-        const nextValue = this.toNumber(value, this.units.getDefaults().Temperature);
+        const nextValue = this.toNumber(value, 'K');
         const stateChanged = !Object.is(charger.temperatureState ?? null, state ?? null);
+        charger.temperaturePath = path;
         if (Object.is(charger.temperature, nextValue) && !stateChanged) return false;
         charger.temperature = nextValue;
         charger.temperatureState = state;
@@ -616,8 +626,9 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       case 'yieldToday': return setValue(charger, 'yieldToday', this.toNumber(value, 'kWh'));
       case 'yieldYesterday': return setValue(charger, 'yieldYesterday', this.toNumber(value, 'kWh'));
       case 'panelTemperature': {
-        const nextValue = this.toNumber(value, this.units.getDefaults().Temperature);
+        const nextValue = this.toNumber(value, 'K');
         const stateChanged = !Object.is(charger.panelTemperatureState ?? null, state ?? null);
+        charger.panelTemperaturePath = path;
         if (Object.is(charger.panelTemperature, nextValue) && !stateChanged) return false;
         charger.panelTemperature = nextValue;
         charger.panelTemperatureState = state;
@@ -935,10 +946,13 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     return `${value.toFixed(1)}`;
   }
 
-  private formatTemperature(value: number | null | undefined): string {
+  private formatTemperature(value: number | null | undefined, path: string | undefined): string {
     if (value === null) return '--';
     if (value === undefined) return '';
-    return `${value.toFixed(1)} ${this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature)}`;
+    const measure = this.units.resolvePathMeasure(path ?? '');
+    const converted = this.units.convertToUnit(measure, value);
+    if (converted == null || !Number.isFinite(converted)) return '--';
+    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(measure)}`;
   }
 
   private formatRelayState(value: string | number | boolean | null | undefined): string {

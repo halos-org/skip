@@ -519,7 +519,6 @@ describe('AppComponent — embed boot performs zero server-config writes (#216 E
       initConfig: {
         app: {
           configVersion: LATEST_APP_CONFIG_VERSION,
-          unitDefaults: {},
           notificationConfig: {
             disableNotifications: false,
             menuGrouping: true,

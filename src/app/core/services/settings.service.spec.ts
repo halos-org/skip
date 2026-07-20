@@ -39,7 +39,6 @@ function seedConfig(opts: SeedOpts = {}): void {
     autoNightMode: false,
     redNightMode: false,
     nightModeBrightness: 1,
-    unitDefaults: {},
     notificationConfig: {
       disableNotifications: true,
       menuGrouping: false,
@@ -92,7 +91,6 @@ function loadedAppConfig(omit: string[] = []): Record<string, unknown> {
     autoNightMode: true,
     redNightMode: true,
     nightModeBrightness: 0.65,
-    unitDefaults: { Speed: 'knots' },
     notificationConfig: fullNotificationConfig(),
     browserTabTitle: 'My Boat'
   };
@@ -181,7 +179,7 @@ describe('SettingsService — storage routing (server applicationData only)', ()
   // server's applicationData.
   function setup() {
     seedConnectionConfig();
-    localStorage.setItem('skip.appConfig', JSON.stringify({ configVersion: 13, unitDefaults: {}, notificationConfig: {} }));
+    localStorage.setItem('skip.appConfig', JSON.stringify({ configVersion: 13, notificationConfig: {} }));
     localStorage.setItem('skip.dashboardsConfig', JSON.stringify([]));
     localStorage.setItem('skip.themeConfig', JSON.stringify({ themeName: '' }));
     TestBed.configureTestingModule({ providers: [SettingsService, StorageService] });
@@ -373,7 +371,7 @@ describe('SettingsService — default config isolation', () => {
 describe('SettingsService — hydration (pushSettings) characterization', () => {
   const APP_CONFIG_KEYS = [
     'autoNightMode', 'browserTabTitle', 'configVersion',
-    'nightModeBrightness', 'notificationConfig', 'redNightMode', 'unitDefaults'
+    'nightModeBrightness', 'notificationConfig', 'redNightMode'
   ];
 
   it('a fully-populated loaded config hydrates state with zero bootstrap writes', () => {
@@ -389,7 +387,6 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
     expect(service.getNightModeBrightness()).toBe(0.65);
     expect(service.getBrowserTabTitle()).toBe('My Boat');
     expect(service.getThemeName()).toBe('dark');
-    expect(service.getDefaultUnits()).toEqual({ Speed: 'knots' });
     expect(service.getNotificationConfig()).toEqual(fullNotificationConfig());
     expect(service.getDashboardConfig()).toEqual([{ id: 'd1' }]);
     expect(service.getConfigVersion()).toBe(LOADED_CONFIG_VERSION);
@@ -416,7 +413,6 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
       expect(Object.keys(blob).sort()).toEqual(APP_CONFIG_KEYS);
       // ...that preserves the loaded configVersion, with the already-hydrated fields riding along.
       expect(blob.configVersion).toBe(LOADED_CONFIG_VERSION);
-      expect(blob.unitDefaults).toEqual({ Speed: 'knots' });
       expect(blob.notificationConfig).toEqual(fullNotificationConfig());
       expect(read(service)).toBe(bootstrapDefault);
       // The write for THIS absent field must not revert a sibling (#170, symmetric across all three): every
@@ -492,9 +488,6 @@ describe('SettingsService — app-config version preservation on every write pat
   it('granular setters send only their own payload — no configVersion is stamped anywhere', () => {
     const { service, storage, patchSpy } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
     storage.storageServiceReady$.next(true); // saveDashboards gates its patch on readiness
-
-    service.setDefaultUnits({ Speed: 'kph' });
-    expect(patchSpy).toHaveBeenLastCalledWith('Array<IUnitDefaults>', { Speed: 'kph' });
 
     const notif = fullNotificationConfig();
     service.setNotificationConfig(notif);
@@ -688,21 +681,17 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
   });
 });
 
-describe('SettingsService — units/notifications reactive signals', () => {
-  // The remaining .subscribe() consumers (units.service, notifications.service) read these signals
-  // directly (#79 retired the observable bridges), so the write path must keep them current.
-  it('exposes the hydrated units and notification config via signals', () => {
+describe('SettingsService — notifications reactive signal', () => {
+  // The remaining signal consumer (notifications.service) reads this directly (#79 retired the
+  // observable bridges), so the write path must keep it current.
+  it('exposes the hydrated notification config via a signal', () => {
     const { service } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
 
-    expect(service.unitDefaults()).toEqual({ Speed: 'knots' });
     expect(service.notificationConfig()).toEqual(fullNotificationConfig());
   });
 
-  it('the write path updates the units and notification signals', () => {
+  it('the write path updates the notification signal', () => {
     const { service } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
-
-    service.setDefaultUnits({ Speed: 'kph' });
-    expect(service.unitDefaults()).toEqual({ Speed: 'kph' });
 
     const updated = { ...fullNotificationConfig(), menuGrouping: false };
     service.setNotificationConfig(updated);

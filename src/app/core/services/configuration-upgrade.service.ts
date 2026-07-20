@@ -245,7 +245,7 @@ export class ConfigurationUpgradeService {
         theme: this._settings.loadConfigFromLocalStorage('themeConfig')
       };
 
-      const transformedApp = this.transformApp(localStorageConfig.app as IAppConfig);
+      const transformedApp = this.transformApp(localStorageConfig.app as unknown as IAppConfig);
       const transformedTheme = this.transformTheme(localStorageConfig.theme);
       const rootSplits = localStorageConfig.layout?.rootSplits || [];
       const splitSets = localStorageConfig.layout?.splitSets || [];
@@ -376,7 +376,7 @@ export class ConfigurationUpgradeService {
       this.pushError(`[Upgrade Service] ${rootConfig.scope}/${rootConfig.name} is not an upgradable version ${this.legacyConfigVersion} config. Skipping.`);
       return null;
     }
-    const transformedApp = this.transformApp(config.app as IAppConfig);
+    const transformedApp = this.transformApp(config.app as unknown as IAppConfig);
     const transformedTheme = this.transformTheme(config.theme);
     const rootSplits = config.layout?.rootSplits || [];
     const splitSets = config.layout?.splitSets || [];

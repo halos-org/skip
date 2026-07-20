@@ -13,7 +13,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { BooleanMultiControlOptionsComponent, IAddNewPathObject } from '../boolean-multicontrol-options/boolean-multicontrol-options.component';
 import { DisplayChartOptionsComponent } from '../display-chart-options/display-chart-options.component';
 import { DatasetChartOptionsComponent } from '../dataset-chart-options/dataset-chart-options.component';
-import { IUnitGroup, UnitsService } from '../../core/services/units.service';
 import { AppService } from '../../core/services/app-service';
 import type { ElectricalTrackedDevice, IDynamicControl, IDynamicControlGroup, IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { PathsOptionsComponent } from '../paths-options/paths-options.component';
@@ -49,7 +48,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
   private static readonly KEY_CONVERT_UNIT_TO = 'convertUnitTo';
   private dialogRef = inject<MatDialogRef<RootModalWidgetConfigComponent>>(MatDialogRef);
   private fb = inject(UntypedFormBuilder);
-  private units = inject(UnitsService);
   private app = inject(AppService);
   private readonly destroyRef = inject(DestroyRef);
   protected widgetConfig = inject<IWidgetSvcConfig & { widgetName?: string }>(MAT_DIALOG_DATA);
@@ -58,7 +56,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
     ? `${this.widgetConfig.widgetName} — Widget Settings`
     : "Widget Settings";
   public formMaster: UntypedFormGroup;
-  public unitList: { default?: string, conversions?: IUnitGroup[] } = {};
   public isPathArray = false;
   public addPathEvent: IAddNewPathObject;
   public delPathEvent: string;
@@ -73,7 +70,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
       this.dialogRef.close();
       return;
     }
-    this.unitList = this.units.getConversionsForPath(''); // array of Group or Groups: "angle", "speed", etc...
     // widgetName is a dialog-title hint carried on the data payload, not a persisted config field.
     const formConfig = { ...this.widgetConfig };
     delete formConfig.widgetName;
@@ -286,10 +282,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
 
   get datachartSourceControl(): FormControl<string | null> {
     return this.configControl('datachartSource') as FormControl<string | null>;
-  }
-
-  get convertUnitToControl(): FormControl<string | null> {
-    return this.configControl('convertUnitTo') as FormControl<string | null>;
   }
 
   get datachartAngleRangeControl(): FormControl<'signed' | 'direction' | null> {

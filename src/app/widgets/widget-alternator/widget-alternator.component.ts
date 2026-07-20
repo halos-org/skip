@@ -74,11 +74,15 @@ export class WidgetAlternatorComponent implements AfterViewInit {
     derive: snapshot => this.derivePower(snapshot)
   });
 
+  private readonly metaVersion = signal(0);
+
   private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, AlternatorRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetAlternatorComponent.ROOT_PATTERN,
     batchWindowMs: WidgetAlternatorComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature') || update.path.endsWith('.regulatorTemperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const parsed = this.parsePath(update.path);
       if (!parsed) return null;
@@ -142,6 +146,7 @@ export class WidgetAlternatorComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, AlternatorDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const alternators = this.visibleAlternators();
     const theme = this.theme();
     const widgetColors = this.widgetColors();
@@ -313,13 +318,13 @@ export class WidgetAlternatorComponent implements AfterViewInit {
       case 'realPower':
         return setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
       case 'temperature':
-        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, 'K'), state);
       case 'revolutions':
         return setMetricValue(snapshot, 'revolutions', 'revolutionsState', this.toNumber(value, 'Hz'), state);
       case 'fieldDrive':
         return setMetricValue(snapshot, 'fieldDrive', 'fieldDriveState', this.toNumber(value, '%'), state);
       case 'regulatorTemperature':
-        return setMetricValue(snapshot, 'regulatorTemperature', 'regulatorTemperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+        return setMetricValue(snapshot, 'regulatorTemperature', 'regulatorTemperatureState', this.toNumber(value, 'K'), state);
       case 'setpointVoltage':
         return setMetricValue(snapshot, 'setpointVoltage', 'setpointVoltageState', this.toNumber(value, 'V'), state);
       case 'setpointCurrent':
@@ -415,13 +420,13 @@ export class WidgetAlternatorComponent implements AfterViewInit {
       case 'power':
         return `P ${this.formatValue(alternator.power, 'W')}`;
       case 'temperature':
-        return `T ${this.formatTemperature(alternator.temperature)}`;
+        return `T ${this.formatTemperature(alternator.temperature, `${WidgetAlternatorComponent.SELF_ROOT_PATH}.${alternator.id}.temperature`)}`;
       case 'revolutions':
         return `RPM ${this.formatRevolutions(alternator.revolutions)}`;
       case 'fieldDrive':
         return `FD ${this.formatPercent(alternator.fieldDrive)}`;
       case 'regulatorTemperature':
-        return `RT ${this.formatTemperature(alternator.regulatorTemperature)}`;
+        return `RT ${this.formatTemperature(alternator.regulatorTemperature, `${WidgetAlternatorComponent.SELF_ROOT_PATH}.${alternator.id}.regulatorTemperature`)}`;
       default:
         return null;
     }
@@ -435,12 +440,18 @@ export class WidgetAlternatorComponent implements AfterViewInit {
     return `${value.toFixed(1)} ${unit}`;
   }
 
-  private formatTemperature(value: number | null | undefined): string {
+  private formatTemperature(value: number | null | undefined, path: string): string {
     if (value == null || Number.isNaN(value)) {
       return '-';
     }
 
-    return `${value.toFixed(1)} ${this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature)}`;
+    const measure = this.units.resolvePathMeasure(path);
+    const converted = this.units.convertToUnit(measure, value);
+    if (converted == null || !Number.isFinite(converted)) {
+      return '-';
+    }
+
+    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(measure)}`;
   }
 
   private formatRevolutions(value: number | null | undefined): string {

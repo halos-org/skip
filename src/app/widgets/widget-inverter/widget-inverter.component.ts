@@ -74,11 +74,15 @@ export class WidgetInverterComponent implements AfterViewInit {
     derive: snapshot => this.deriveDcPower(snapshot)
   });
 
+  private readonly metaVersion = signal(0);
+
   private readonly scheduler = new ElectricalIngestScheduler<ElectricalTopologyEntry, InverterRenderSnapshot>({
     data: this.data,
     destroyRef: this.destroyRef,
     rootPattern: WidgetInverterComponent.ROOT_PATTERN,
     batchWindowMs: WidgetInverterComponent.PATH_BATCH_WINDOW_MS,
+    watchMeta: update => update.path.endsWith('.temperature'),
+    onMetaChange: () => this.metaVersion.update(v => v + 1),
     parseUpdate: update => {
       const parsed = this.parsePath(update.path);
       if (!parsed) return null;
@@ -142,6 +146,7 @@ export class WidgetInverterComponent implements AfterViewInit {
   });
 
   protected readonly displayModels = computed<Record<string, InverterDisplayModel>>(() => {
+    this.metaVersion(); // re-resolve when a watched path's displayUnits meta lands late/changes
     const inverters = this.visibleInverters();
     const theme = this.theme();
     const widgetColors = this.widgetColors();
@@ -290,7 +295,7 @@ export class WidgetInverterComponent implements AfterViewInit {
       case 'inverterModeNumber': return setMetricValue(snapshot, 'inverterModeNumber', 'inverterModeNumberState', this.toNumber(value, ''), state);
       case 'preferRenewableEnergy': return setMetricValue(snapshot, 'preferRenewableEnergy', 'preferRenewableEnergyState', toBoolean(value), state);
       case 'preferRenewableEnergyActive': return setMetricValue(snapshot, 'preferRenewableEnergyActive', 'preferRenewableEnergyActiveState', toBoolean(value), state);
-      case 'temperature': return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, this.units.getDefaults().Temperature), state);
+      case 'temperature': return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, 'K'), state);
       default: return false;
     }
   }
@@ -376,7 +381,7 @@ export class WidgetInverterComponent implements AfterViewInit {
       case 'acOutPower': return `ACout P ${this.formatValue(inverter.acOutPower, 'W')}`;
       case 'acIn1CurrentLimit': return `ACin1 Lim ${this.formatValue(inverter.acIn1CurrentLimit, 'A')}`;
       case 'acInCurrentLimit': return `ACin Lim ${this.formatValue(inverter.acInCurrentLimit, 'A')}`;
-      case 'temperature': return `T ${this.formatTemperature(inverter.temperature)}`;
+      case 'temperature': return `T ${this.formatTemperature(inverter.temperature, `${WidgetInverterComponent.SELF_ROOT_PATH}.${inverter.id}.temperature`)}`;
       case 'inverterModeNumber': return `Mode# ${inverter.inverterModeNumber?.toString() ?? '-'}`;
       default: return null;
     }
@@ -387,9 +392,12 @@ export class WidgetInverterComponent implements AfterViewInit {
     return `${value.toFixed(1)} ${unit}`;
   }
 
-  private formatTemperature(value: number | null | undefined): string {
+  private formatTemperature(value: number | null | undefined, path: string): string {
     if (value == null || Number.isNaN(value)) return '-';
-    return `${value.toFixed(1)} ${this.units.getUnitDisplaySymbol(this.units.getDefaults().Temperature)}`;
+    const measure = this.units.resolvePathMeasure(path);
+    const converted = this.units.convertToUnit(measure, value);
+    if (converted == null || !Number.isFinite(converted)) return '-';
+    return `${converted.toFixed(1)} ${this.units.getUnitDisplaySymbol(measure)}`;
   }
 
   private toNumber(value: unknown, unitHint: string): number | null {

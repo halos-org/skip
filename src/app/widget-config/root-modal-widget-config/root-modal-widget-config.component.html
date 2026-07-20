@@ -28,13 +28,11 @@
             [filterSelfPaths]="filterSelfPathsToControl"
             [datachartPath]="datachartPathControl"
             [datachartSource]="datachartSourceControl"
-            [convertUnitTo]="convertUnitToControl"
             [datachartAngleRange]="datachartAngleRangeControl"
             [timeScale]="timeScaleControl"
             [period]="periodControl" />
           <config-display-chart-options
             class="tab-content"
-            [convertUnitTo]="convertUnitToControl"
             [showDataPoints]="showDataPointsToControl"
             [showAverageData]="showAverageDataToControl"
             [trackAgainstAverage]="trackAgainstAverageToControl"
@@ -200,29 +198,6 @@
                     name="nextDashboard"
                     formControlName="nextDashboard"
                   />
-                </mat-form-field>
-              }
-              @if ((widgetConfig?.convertUnitTo !== undefined)) {
-                <mat-form-field class="fields">
-                  <mat-label>Display Units</mat-label>
-                  <mat-select
-                    placeholder="Select unit"
-                    formControlName="convertUnitTo"
-                    required
-                  >
-                    @for (group of unitList.conversions; track $index) { @if
-                    (!widgetConfig.convertUnitToGroup ||
-                    widgetConfig.convertUnitToGroup === '' ||
-                    widgetConfig.convertUnitToGroup === group.group) {
-                    <mat-optgroup [label]="group.group">
-                      @for (unit of group.units; track $index) {
-                      <mat-option [value]="unit.measure">
-                        {{ unit.description }}
-                      </mat-option>
-                      }
-                    </mat-optgroup>
-                    } }
-                  </mat-select>
                 </mat-form-field>
               }
               @if (widgetConfig?.playBeeps !== undefined) {

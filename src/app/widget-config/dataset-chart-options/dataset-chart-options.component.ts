@@ -44,7 +44,6 @@ function pathRequiredOrValidMatch(getPaths: () => IPathMetaData[]): ValidatorFn 
   styleUrl: './dataset-chart-options.component.scss'
 })
 export class DatasetChartOptionsComponent implements OnInit {
-  public convertUnitTo = input.required<FormControl<string | null>>();
   public datachartAngleRange = input<FormControl<'signed' | 'direction' | null> | undefined>(undefined);
   public filterSelfPaths = input.required<FormControl<boolean>>()
   public datachartPath = input.required<FormControl<string | null>>()
@@ -92,13 +91,6 @@ export class DatasetChartOptionsComponent implements OnInit {
       this.datachartSource().disable();
     }
 
-    if ((this.convertUnitTo().value)  && !reset) {
-      this.convertUnitTo().enable();
-    } else {
-      this.convertUnitTo().reset();
-      this.convertUnitTo().disable();
-    }
-
     if (this.timeScale().value) {
       this.timeScale().enable();
     } else {
@@ -127,9 +119,6 @@ export class DatasetChartOptionsComponent implements OnInit {
       this.pathSources.set([]);
       this.datachartSource().reset();
       this.datachartSource().disable();
-      this.convertUnitTo().reset();
-      this.convertUnitTo().disable();
-      this.setPathUnits();
       return;
     }
     // A freshly chosen path must not carry over the previous path's concrete
@@ -138,7 +127,6 @@ export class DatasetChartOptionsComponent implements OnInit {
     // the saved selection.
     this.datachartSource().reset();
     this.setPathSources(pathObject);
-    this.setPathUnits(pathObject.path);
   }
 
   private setPathSources(pathObject: ISkPathData): void {
@@ -150,15 +138,5 @@ export class DatasetChartOptionsComponent implements OnInit {
       this.datachartSource().setValue('default');
     }
     this.datachartSource().enable();
-  }
-
-  private setPathUnits(path?: string): void {
-    if (path) {
-      this.convertUnitTo().reset();
-      this.convertUnitTo()?.enable();
-    } else {
-      this.convertUnitTo().reset();
-      this.convertUnitTo()?.disable();
-    }
   }
 }
