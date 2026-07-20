@@ -689,9 +689,9 @@ export class UnitsService {
   }
 
   /**
-   * Return the list of possible conversions matrix by unit groups. Useful
-   * to present possible conversion or select a conversation units that are
-   * related.
+   * Accessor for the full conversion-group table (`_conversionList`) — every unit group
+   * and its member measures. Used by the conversion-table integrity test and the
+   * data-inspector to enumerate the measures Skip knows how to convert.
    *
    * @return {*}  {IUnitGroup[]} an array of units by groups
    * @memberof UnitsService
@@ -773,7 +773,7 @@ export class UnitsService {
     // Honour the server preference only when the mapped measure is a member of the path's group.
     // Every conversion-list measure has a conversion function (pinned by a table-integrity test), so a
     // group-valid measure is guaranteed to drive both a real conversion and a matching symbol — the
-    // label-matches-conversion invariant. Anything else degrades gracefully to Skip's group default.
+    // label-matches-conversion invariant. Anything else degrades gracefully to 'unitless'.
     return groupList.some(group => group.units.some(unit => unit.measure === measure)) ? measure : undefined;
   }
 
