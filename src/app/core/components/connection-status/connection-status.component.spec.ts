@@ -1,25 +1,25 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SettingsSignalkComponent } from './signalk.component';
-import { EndpointStatus, SignalKConnectionService } from '../../../services/signalk-connection.service';
-import { SignalKDeltaService, StreamStatus } from '../../../services/signalk-delta.service';
+import { ConnectionStatusComponent } from './connection-status.component';
+import { EndpointStatus, SignalKConnectionService } from '../../services/signalk-connection.service';
+import { SignalKDeltaService, StreamStatus } from '../../services/signalk-delta.service';
 
-describe('SettingsSignalkComponent', () => {
-  let component: SettingsSignalkComponent;
-  let fixture: ComponentFixture<SettingsSignalkComponent>;
+describe('ConnectionStatusComponent', () => {
+  let component: ConnectionStatusComponent;
+  let fixture: ComponentFixture<ConnectionStatusComponent>;
 
   const statusText = (): string =>
     (fixture.nativeElement as HTMLElement).querySelector('pre')?.textContent ?? '';
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SettingsSignalkComponent]
+      imports: [ConnectionStatusComponent]
     })
       .compileComponents();
   });
 
   beforeEach(() => {
-    fixture = TestBed.createComponent(SettingsSignalkComponent);
+    fixture = TestBed.createComponent(ConnectionStatusComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

@@ -36,6 +36,9 @@ export class ActionsComponent {
       case 'remotecontrol':
         this._router.navigate(['/remote']);
         break;
+      case 'connection':
+        this._router.navigate(['/connection']);
+        break;
       case 'settings':
         this._router.navigate(['/settings']);
         break;

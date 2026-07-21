@@ -1,71 +1,51 @@
-import { ElementRef, Component, OnInit, OnDestroy, AfterViewInit, viewChild, inject, DestroyRef, computed, signal, ChangeDetectionStrategy } from '@angular/core';
+import { ElementRef, Component, OnDestroy, AfterViewInit, viewChild, inject, DestroyRef, computed, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { AppService } from '../../../services/app-service';
-import { ToastService } from '../../../services/toast.service';
-import { SettingsService } from '../../../services/settings.service';
-import { IConnectionConfig } from "../../../interfaces/app-settings.interfaces";
-import { SignalKConnectionService } from '../../../services/signalk-connection.service';
-import { IDeltaUpdate, DataService } from '../../../services/data.service';
-import { SignalKDeltaService } from '../../../services/signalk-delta.service';
-import { AuthenticationService } from '../../../services/authentication.service';
-import { SsoRedirectService } from '../../../services/sso-redirect.service';
-import { ConnectionStateMachine } from '../../../services/connection-state-machine.service';
-import { MatCheckbox } from '@angular/material/checkbox';
+import { AppService } from '../../services/app-service';
+import { SignalKConnectionService } from '../../services/signalk-connection.service';
+import { IDeltaUpdate, DataService } from '../../services/data.service';
+import { SignalKDeltaService } from '../../services/signalk-delta.service';
+import { AuthenticationService } from '../../services/authentication.service';
+import { SsoRedirectService } from '../../services/sso-redirect.service';
 import { MatButton } from '@angular/material/button';
-import { MatInput } from '@angular/material/input';
-import { MatFormField, MatLabel, MatError } from '@angular/material/form-field';
-import { FormsModule } from '@angular/forms';
 import { Chart } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import { CanvasService } from '../../../services/canvas.service';
-import { InternetReachabilityService } from '../../../services/internet-reachability.service';
-import { registerChartComponents } from '../../../utils/chart-registration.util';
+import { CanvasService } from '../../services/canvas.service';
+import { InternetReachabilityService } from '../../services/internet-reachability.service';
+import { registerChartComponents } from '../../utils/chart-registration.util';
 
 registerChartComponents();
 
 /**
- * Signal K settings component for managing server connection configuration.
- * Handles URL validation, connection establishment, and real-time monitoring
- * of connection status and data stream statistics. Skip authenticates only through
- * the server's same-origin session (SSO); it has no credential entry of its own.
+ * Connection status and diagnostics: server session identity (SSO), server/stream state, versions,
+ * internet reachability, and a live delta-throughput chart. Read-only — the connection itself is
+ * auto-configured (same-origin, server-discovered endpoints), so there is nothing to edit here.
+ * Skip authenticates only through the server's same-origin session (SSO); it has no credential
+ * entry of its own.
  */
 @Component({
-  selector: 'settings-signalk',
-  templateUrl: './signalk.component.html',
-  styleUrls: ['./signalk.component.scss'],
+  selector: 'connection-status',
+  templateUrl: './connection-status.component.html',
+  styleUrls: ['./connection-status.component.scss'],
   imports: [
-    FormsModule,
-    MatFormField,
-    MatLabel,
-    MatInput,
-    MatError,
-    MatCheckbox,
     MatButton
   ],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 
-export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestroy {
-  private readonly settings = inject(SettingsService);
+export class ConnectionStatusComponent implements AfterViewInit, OnDestroy {
   protected readonly app = inject(AppService);
-  protected readonly toast = inject(ToastService);
   private readonly DataService = inject(DataService);
   private readonly signalKConnectionService = inject(SignalKConnectionService);
   private readonly deltaService = inject(SignalKDeltaService);
-  private readonly connectionStateMachine = inject(ConnectionStateMachine);
   private readonly internetReachability = inject(InternetReachabilityService);
   protected readonly auth = inject(AuthenticationService);
   private readonly ssoRedirect = inject(SsoRedirectService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly canvasService = inject(CanvasService);
 
-
   protected readonly activityGraph = viewChild<ElementRef<HTMLCanvasElement>>('activityGraph');
 
-  public connectionConfig: IConnectionConfig;
-  protected readonly isConnecting = signal(false); // Loading state for connect button
-
-  // The Connectivity tab shows the server session identity (SSO). These drive that identity block.
+  // The server session identity (SSO). These drive the identity block.
   protected readonly loginStatus = toSignal(this.auth.loginStatus$, { initialValue: null });
   protected readonly isUserSession = toSignal(this.auth.isUserSession$, { initialValue: false });
   protected readonly canWriteUserData = toSignal(this.auth.canWriteUserData$, { initialValue: false });
@@ -99,14 +79,8 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
     return 'Unknown';
   });
 
-
   private _chart: Chart | null = null;
   private textColor: string; // Store the computed text color for chart styling
-
-  ngOnInit() {
-    // get Signal K connection configuration
-    this.connectionConfig = this.settings.getConnectionConfig();
-  }
 
   ngAfterViewInit(): void {
     const canvas = this.activityGraph()?.nativeElement;
@@ -127,46 +101,6 @@ export class SettingsSignalkComponent implements OnInit, AfterViewInit, OnDestro
       }
       chart.update("none");
     });
-  }
-
-  /**
-   * Validates the Signal K server URL and establishes connection.
-   * Handles the complete connection workflow including validation,
-   * configuration saving, connection cleanup, and app reload. The same-origin
-   * session cookie authenticates after reload — no in-app credential step.
-   */
-  public async connectToServer() {
-    // Start loading state
-    this.isConnecting.set(true);
-
-    try {
-      console.log('[Settings-SignalK] Validating Signal K server before connecting...');
-
-      // Step 1: Validate the URL before proceeding
-      await this.signalKConnectionService.validateSignalKUrl(this.connectionConfig.signalKUrl ?? '');
-
-      console.log('[Settings-SignalK] Validation successful - proceeding with connection');
-
-      // Step 2: Persist the now-validated configuration to localStorage.
-      this.settings.setConnectionConfig(this.connectionConfig);
-
-      // Step 3: Properly close WebSocket and HTTP connections
-      this.connectionStateMachine.shutdown('Configuration changed - restarting app');
-
-      // Step 4: Reload immediately - APP_INITIALIZER will handle connection and authentication with new URL
-      // Skip during unit tests to avoid breaking the test connection
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (!(window as any).__SKIP_TEST__) {
-        location.reload();
-      }
-
-    } catch (error: unknown) {
-      // Validation failed - show error and stay on current page
-      this.isConnecting.set(false);
-      const errorMessage = (error as Error)?.message || 'Unknown validation error';
-      console.error('[Settings-SignalK] Server validation failed:', errorMessage);
-      this.toast.show(`${errorMessage}`, 0, false, 'error');
-    }
   }
 
   /**

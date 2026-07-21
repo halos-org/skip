@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
 import { SettingsNotificationsComponent } from '../notifications/notifications.component';
-import { SettingsSignalkComponent } from '../signalk/signalk.component';
 import { SettingsDisplayComponent } from '../display/display.component';
 import { MatTabGroup, MatTab } from '@angular/material/tabs';
 import { PageHeaderComponent } from '../../page-header/page-header.component';
@@ -13,7 +12,6 @@ import { SettingsConfigComponent } from '../configuration/config.component';
     imports: [
       MatTabGroup,
       MatTab,
-      SettingsSignalkComponent,
       SettingsNotificationsComponent,
       SettingsDisplayComponent,
       SettingsNotificationsComponent,
