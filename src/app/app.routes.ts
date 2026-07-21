@@ -46,6 +46,12 @@ export const routes: Routes = [
     title: 'Skip - Remote Control'
   },
   {
+    path: 'connection',
+    canActivate: [embedBlockedGuard],
+    loadComponent: () => import('./core/components/connection-status/connection-status.component').then(m => m.ConnectionStatusComponent),
+    title: 'Skip - Connection'
+  },
+  {
     path: 'help/:page',
     loadComponent: () => import('./core/components/app-help/app-help.component').then(m => m.AppHelpComponent),
     title: 'Skip - Help'

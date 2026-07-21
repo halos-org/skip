@@ -72,7 +72,7 @@ Control which page is shown on another Skip instance (for example: a mast displa
 
 ### Requirements
 - Both devices must be connected to the same Signal K server.
-- You must be signed in (authenticated) to the Signal K server on both devices (Connectivity tab → Sign in).
+- You must be signed in (authenticated) to the Signal K server on both devices (Actions > Connection → Sign in).
 - The target device must explicitly allow remote control (Display tab → Remote Control option group).
 
 ### Good Naming Practice

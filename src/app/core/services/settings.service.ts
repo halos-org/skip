@@ -50,6 +50,9 @@ export class SettingsService {
   public readonly instanceName = this._instanceName.asReadonly();
   public readonly browserTabTitle = this._browserTabTitle.asReadonly();
 
+  // Persisted for config-version compatibility but no longer read by connection setup: routing always
+  // serves the server's discovered API path from the app's own origin and the stream subscribes to
+  // all contexts. #386 will repurpose signalKSubscribeAll to gate subscription on widget demand.
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
   private sharedConfigName = 'default';
@@ -278,15 +281,6 @@ export class SettingsService {
 
   public getConnectionConfig(): IConnectionConfig {
     return this.buildConnectionStorageObject();
-  }
-
-  public setConnectionConfig(value: IConnectionConfig) {
-    this.proxyEnabled = value.proxyEnabled;
-    this.signalKSubscribeAll = value.signalKSubscribeAll;
-    if (this.signalkUrl) {
-      this.signalkUrl.url = value.signalKUrl ?? '';
-    }
-    this.saveConnectionConfigToLocalStorage();
   }
 
   public getDashboardConfig(): Dashboard[] {

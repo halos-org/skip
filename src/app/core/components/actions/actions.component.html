@@ -12,6 +12,11 @@
         (keydown.enter)="onActionItem('remotecontrol')"
         (keydown.space)="onActionItem('remotecontrol')" />
       <tile-large-icon [class]="`${isPhonePortrait() ? 'no-label' : 'with-label'}`"
+        [iconOnly]="isPhonePortrait()" [compact]="true" svgIcon="cloud" [iconSize]="48" label="Connection"
+        (click)="onActionItem('connection')"
+        (keydown.enter)="onActionItem('connection')"
+        (keydown.space)="onActionItem('connection')" />
+      <tile-large-icon [class]="`${isPhonePortrait() ? 'no-label' : 'with-label'}`"
         [iconOnly]="isPhonePortrait()" [compact]="true" svgIcon="help-center" [iconSize]="48" label="Help"
         (click)="onActionItem('help')"
         (keydown.enter)="onActionItem('help')"

@@ -1,31 +1,40 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { SettingsSignalkComponent } from './signalk.component';
-import { EndpointStatus, SignalKConnectionService } from '../../../services/signalk-connection.service';
-import { SignalKDeltaService, StreamStatus } from '../../../services/signalk-delta.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ConnectionStatusComponent } from './connection-status.component';
+import { EndpointStatus, SignalKConnectionService } from '../../services/signalk-connection.service';
+import { SignalKDeltaService, StreamStatus } from '../../services/signalk-delta.service';
+import { SsoRedirectService } from '../../services/sso-redirect.service';
 
-describe('SettingsSignalkComponent', () => {
-  let component: SettingsSignalkComponent;
-  let fixture: ComponentFixture<SettingsSignalkComponent>;
+describe('ConnectionStatusComponent', () => {
+  let component: ConnectionStatusComponent;
+  let fixture: ComponentFixture<ConnectionStatusComponent>;
 
   const statusText = (): string =>
     (fixture.nativeElement as HTMLElement).querySelector('pre')?.textContent ?? '';
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SettingsSignalkComponent]
+      imports: [ConnectionStatusComponent]
     })
       .compileComponents();
   });
 
   beforeEach(() => {
-    fixture = TestBed.createComponent(SettingsSignalkComponent);
+    fixture = TestBed.createComponent(ConnectionStatusComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
   it('should be created', () => {
     expect(component).toBeTruthy();
+  });
+
+  // This component is the sole sign-in entry point after the Connectivity tab was retired.
+  it('routes Sign in through the SSO redirect service', () => {
+    const sso = TestBed.inject(SsoRedirectService);
+    const spy = vi.spyOn(sso, 'manualSignIn').mockImplementation(() => undefined);
+    (component as unknown as { signIn: () => void }).signIn();
+    expect(spy).toHaveBeenCalled();
   });
 
   // The connection and delta services both re-emit the SAME mutated status object on each update.
