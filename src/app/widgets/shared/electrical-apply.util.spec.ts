@@ -1,11 +1,18 @@
 import { States } from '../../core/interfaces/signalk-interfaces';
+import type { UnitsService } from '../../core/services/units.service';
 import {
   resolveMostSevereState,
   setMetricValue,
   setValue,
   toBoolean,
+  toFiniteNumber,
+  toNumber,
   toStringValue
 } from './electrical-apply.util';
+
+function unitsWith(convert: (unit: string, value: number) => number | null): UnitsService {
+  return { convertToUnit: convert } as unknown as UnitsService;
+}
 
 interface TestSnapshot {
   voltage: number | null;
@@ -61,6 +68,54 @@ describe('electrical-apply.util', () => {
       s.voltage = 12.4;
       s.voltageState = States.Normal;
       expect(setMetricValue(s, 'voltage', 'voltageState', 12.4, States.Normal)).toBe(false);
+    });
+  });
+
+  describe('toFiniteNumber', () => {
+    it('passes finite numbers through', () => {
+      expect(toFiniteNumber(12.4)).toBe(12.4);
+      expect(toFiniteNumber(0)).toBe(0);
+    });
+
+    it('returns null for non-numbers, NaN and infinities (no string coercion)', () => {
+      expect(toFiniteNumber('12')).toBeNull();
+      expect(toFiniteNumber(NaN)).toBeNull();
+      expect(toFiniteNumber(Infinity)).toBeNull();
+      expect(toFiniteNumber(true)).toBeNull();
+      expect(toFiniteNumber(null)).toBeNull();
+      expect(toFiniteNumber(undefined)).toBeNull();
+    });
+  });
+
+  describe('toNumber', () => {
+    it('applies the unit conversion to a finite number', () => {
+      const units = unitsWith((unit, value) => (unit === 'K' ? value + 273.15 : value));
+      expect(toNumber(units, 300, 'K')).toBe(573.15);
+    });
+
+    it('coerces genuine numeric strings before converting', () => {
+      const units = unitsWith((unit, value) => (unit === 'K' ? value + 273.15 : value));
+      expect(toNumber(units, '300', 'K')).toBe(573.15);
+    });
+
+    it('rejects blank/non-numeric strings, booleans, null and NaN without converting', () => {
+      let called = false;
+      const units = unitsWith(() => {
+        called = true;
+        return 0;
+      });
+      expect(toNumber(units, '', 'K')).toBeNull();
+      expect(toNumber(units, '   ', 'K')).toBeNull();
+      expect(toNumber(units, 'abc', 'K')).toBeNull();
+      expect(toNumber(units, true, 'K')).toBeNull();
+      expect(toNumber(units, null, 'K')).toBeNull();
+      expect(toNumber(units, NaN, 'K')).toBeNull();
+      expect(called).toBe(false);
+    });
+
+    it('falls back to the raw number when the conversion is non-finite', () => {
+      expect(toNumber(unitsWith(() => NaN), 42, 'V')).toBe(42);
+      expect(toNumber(unitsWith(() => null), 42, 'V')).toBe(42);
     });
   });
 

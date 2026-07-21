@@ -2,11 +2,12 @@ import type { ElectricalTrackedDevice } from '../../core/interfaces/widgets-inte
 
 /**
  * Shared configuration/device normalizers for the electrical widget family
- * (charger, alternator, inverter, ac, and the parts of solar-charger/bms that
- * share the object-based device model). Each widget previously carried its own
- * verbatim copy of these; solar-charger and bms keep their own divergent
- * `normalizeTrackedDevices`, and ac keeps `normalizeAcTrackedDevices` (a
- * reserved-aggregate-id guard) — all behaviorally distinct, see #351.
+ * (charger, alternator, inverter, ac, solar-charger, bms). `normalizeTrackedDevices`
+ * is the family's canonical device normalizer: it accepts object items only,
+ * defaults a missing or blank `source` to `'default'` (matching what the widget
+ * config modal writes at save time), drops only items without a usable `id`, and
+ * dedupes by `key`. ac keeps `normalizeAcTrackedDevices` (a reserved-aggregate-id
+ * guard) — a distinct AC-phase variant, see #351.
  */
 
 export function normalizeOptionalString(value: unknown): string | null {
@@ -51,11 +52,11 @@ export function normalizeTrackedDevices(value: unknown): ElectricalTrackedDevice
 
     const candidate = item as { id?: unknown; source?: unknown; key?: unknown };
     const id = normalizeOptionalString(candidate.id);
-    const source = normalizeOptionalString(candidate.source);
-    if (!id || !source) {
+    if (!id) {
       return;
     }
 
+    const source = normalizeOptionalString(candidate.source) ?? 'default';
     const key = normalizeOptionalString(candidate.key) ?? `${id}||${source}`;
     devices.set(key, { id, source, key });
   });
