@@ -97,7 +97,7 @@ export class ToolbarComponent implements OnDestroy {
   }
 
   protected openSettings(): void {
-    this.router.navigate(['/settings']);
+    this.router.navigate(['/actions']);
   }
 
   protected enterEdit(): void {

@@ -81,10 +81,10 @@ describe('ToolbarComponent', () => {
 
   const byLabel = (label: string) => el.querySelector<HTMLElement>(`[aria-label="${label}"]`);
 
-  it('opens Settings via the router', () => {
+  it('opens the actions view via the router', () => {
     init();
     byLabel('Settings')!.click();
-    expect(router.navigate).toHaveBeenCalledWith(['/settings']);
+    expect(router.navigate).toHaveBeenCalledWith(['/actions']);
   });
 
   it('toggles fullscreen and night mode', () => {

@@ -25,6 +25,9 @@ describe('app.routes default-page normalization', () => {
       if (route.path === 'page/:id') {
         return { ...route, component: TestRouteTargetComponent };
       }
+      if (route.path === 'actions' || route.path === 'settings') {
+        return { path: route.path, component: TestRouteTargetComponent };
+      }
       return route;
     });
 
@@ -66,5 +69,15 @@ describe('app.routes default-page normalization', () => {
   it('redirects an unknown URL (including a stale /chartplotter link) to /page/0', async () => {
     await router.navigateByUrl('/chartplotter/2');
     expect(router.url).toBe('/page/0');
+  });
+
+  it('resolves /actions (the renamed hub) instead of falling through to the wildcard', async () => {
+    await router.navigateByUrl('/actions');
+    expect(router.url).toBe('/actions');
+  });
+
+  it('resolves /settings (the renamed config page) instead of falling through to the wildcard', async () => {
+    await router.navigateByUrl('/settings');
+    expect(router.url).toBe('/settings');
   });
 });
