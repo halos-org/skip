@@ -51,6 +51,21 @@ describe('DatasetChartOptionsComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('does not crash on init when a configured path has no resolvable data (#329)', () => {
+    // A saved config references a path whose data has not (yet) arrived in _skData,
+    // so getPathObject returns null. ngOnInit must skip setPathSources, not deref null.
+    pathObject = null;
+    const fx = TestBed.createComponent(DatasetChartOptionsComponent);
+    const set = fx.componentRef.setInput.bind(fx.componentRef) as (k: string, v: unknown) => void;
+    set('filterSelfPaths', new UntypedFormControl(false));
+    set('datachartPath', new UntypedFormControl('self.navigation.speedOverGround'));
+    set('datachartSource', new UntypedFormControl({ value: '', disabled: true }));
+    set('timeScale', new UntypedFormControl(''));
+    set('period', new UntypedFormControl(''));
+    expect(() => fx.detectChanges()).not.toThrow();
+    expect(fx.componentInstance).toBeTruthy();
+  });
+
   const setPathSources = (obj: Pick<ISkPathData, 'sources'>) =>
     (component as unknown as { setPathSources: (p: unknown) => void }).setPathSources(obj);
   const changePath = (path: string) =>
