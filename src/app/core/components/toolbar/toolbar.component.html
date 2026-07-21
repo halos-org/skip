@@ -24,8 +24,8 @@
       @if (isEditing()) {
         <span class="editing-label"><mat-icon>edit</mat-icon>Editing layout</span>
       } @else {
-        <button mat-icon-button aria-label="Actions" (click)="openActions()">
-          <mat-icon>apps</mat-icon>
+        <button mat-icon-button aria-label="Open menu" [matMenuTriggerFor]="appMenu">
+          <mat-icon>menu</mat-icon>
         </button>
         @if (fullscreenSupported()) {
           <button
@@ -81,3 +81,25 @@
     </div>
   </div>
 </div>
+
+<mat-menu #appMenu="matMenu">
+  <button mat-menu-item (click)="openSettings()">
+    <mat-icon svgIcon="settings"></mat-icon>
+    <span>Settings</span>
+  </button>
+  <button mat-menu-item (click)="openConnection()">
+    <mat-icon svgIcon="cloud"></mat-icon>
+    <span>Connection</span>
+  </button>
+  <button mat-menu-item (click)="openRemote()">
+    <mat-icon svgIcon="remote-control"></mat-icon>
+    <span>Remote Control</span>
+  </button>
+  <button mat-menu-item (click)="openHelp()">
+    <mat-icon svgIcon="help-center"></mat-icon>
+    <span>Help</span>
+  </button>
+  <div
+    style="padding: 6px 16px; font-size: 0.78em; opacity: 0.6; white-space: nowrap; pointer-events: none;"
+  >Skip v{{ appVersion() }} · {{ host }}</div>
+</mat-menu>

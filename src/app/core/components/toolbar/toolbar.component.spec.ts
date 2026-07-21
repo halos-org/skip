@@ -37,7 +37,7 @@ const uiEvent = {
   fullscreenSupported: signal(true),
   fullscreenStatus: signal(false),
 };
-const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn() };
+const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn(), appVersion: signal('4.8.0') };
 const settings = { autoNightMode: signal(false) };
 const dialog = { openNotifications: vi.fn() };
 const router = { navigate: vi.fn() };
@@ -91,10 +91,25 @@ describe('ToolbarComponent', () => {
 
   const byLabel = (label: string) => el.querySelector<HTMLElement>(`[aria-label="${label}"]`);
 
-  it('opens the actions view via the router', () => {
+  it('exposes the app menu trigger (no direct /actions navigation)', () => {
     init();
-    byLabel('Actions')!.click();
-    expect(router.navigate).toHaveBeenCalledWith(['/actions']);
+    expect(byLabel('Open menu')).not.toBeNull();
+    expect(byLabel('Actions')).toBeNull();
+  });
+
+  it('navigates to each destination from the app menu', () => {
+    init();
+    const c = fixture.componentInstance as unknown as {
+      openSettings: () => void; openConnection: () => void; openRemote: () => void; openHelp: () => void;
+    };
+    c.openSettings();
+    expect(router.navigate).toHaveBeenCalledWith(['/settings']);
+    c.openConnection();
+    expect(router.navigate).toHaveBeenCalledWith(['/connection']);
+    c.openRemote();
+    expect(router.navigate).toHaveBeenCalledWith(['/remote']);
+    c.openHelp();
+    expect(router.navigate).toHaveBeenCalledWith(['/help']);
   });
 
   it('toggles fullscreen and night mode', () => {
