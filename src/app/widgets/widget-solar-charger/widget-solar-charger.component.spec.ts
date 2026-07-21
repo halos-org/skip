@@ -201,6 +201,64 @@ describe('WidgetSolarChargerComponent', () => {
     expect(visible.map(item => item.id).sort()).toEqual(['sc1', 'sc2']);
   });
 
+  it('renders no duplicate card for a charger tracked, untracked, then seen again (#354)', () => {
+    runtimeOptions.solarCharger = {
+      trackedDevices: [{ id: 'sc1', source: 'victron.0', key: 'sc1||victron.0' }],
+      optionsById: {}
+    };
+    fixture.detectChanges();
+
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      processBatch: (entries: { id: string; key: string; value: unknown; state: States; path: string }[]) => void;
+      visibleSolarUnits: () => { id: string; deviceKey?: string }[];
+    };
+    const readSc1 = () => probe.visibleSolarUnits().filter(unit => unit.id === 'sc1');
+
+    expect(readSc1()).toHaveLength(1);
+    expect(readSc1()[0]?.deviceKey).toBe('sc1||victron.0');
+
+    runtimeOptions.solarCharger = { trackedDevices: [], optionsById: {} };
+    probe.applyConfig({ solarCharger: runtimeOptions.solarCharger });
+
+    // the untracked charger is preserved as a discovered plain-id card
+    expect(readSc1()).toHaveLength(1);
+    expect(readSc1()[0]?.deviceKey).toBeUndefined();
+
+    // a fresh live delta arrives for the previously-tracked id: still one card
+    probe.processBatch([
+      { id: 'sc1', key: 'voltage', value: 14.9, state: States.Normal, path: 'self.electrical.solar.sc1.voltage' }
+    ]);
+
+    const sc1Cards = readSc1();
+    expect(sc1Cards).toHaveLength(1);
+    expect(sc1Cards[0]?.deviceKey).toBeUndefined();
+  });
+
+  it('collapses multiple sources of one charger to a single discovered card on full untrack (#354)', () => {
+    runtimeOptions.solarCharger = {
+      trackedDevices: [
+        { id: 'sc1', source: 'sourceA', key: 'sc1||sourceA' },
+        { id: 'sc1', source: 'sourceB', key: 'sc1||sourceB' }
+      ],
+      optionsById: {}
+    };
+    fixture.detectChanges();
+
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      visibleSolarUnits: () => { id: string; deviceKey?: string }[];
+    };
+    expect(probe.visibleSolarUnits().filter(unit => unit.id === 'sc1')).toHaveLength(2);
+
+    runtimeOptions.solarCharger = { trackedDevices: [], optionsById: {} };
+    probe.applyConfig({ solarCharger: runtimeOptions.solarCharger });
+
+    const sc1Cards = probe.visibleSolarUnits().filter(unit => unit.id === 'sc1');
+    expect(sc1Cards).toHaveLength(1);
+    expect(sc1Cards[0]?.deviceKey).toBeUndefined();
+  });
+
   it('uses runtime-provided colorRole and ignoreZones values', () => {
     runtimeOptions.color = 'contrast';
     runtimeOptions.ignoreZones = false;

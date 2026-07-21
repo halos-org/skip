@@ -355,18 +355,20 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
   }
 
   private reprojectSnapshotsToDeviceKeys(devices: ElectricalTrackedDevice[]): void {
-    if (!devices.length) return;
-
     const idToKeys = new Map<string, string[]>();
     devices.forEach(device => {
       const existing = idToKeys.get(device.id) ?? [];
       existing.push(device.key);
       idToKeys.set(device.id, existing);
     });
+    const trackedKeys = new Set(devices.map(device => device.key));
 
     this.chargersByKey.update(current => {
       let next = current;
       let changed = false;
+      const forkStore = (): void => {
+        if (!changed) { next = { ...current }; changed = true; }
+      };
 
       idToKeys.forEach((keys, id) => {
         const sourceSnapshot = current[id];
@@ -375,14 +377,30 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         for (const deviceKey of keys) {
           if (current[deviceKey]) continue;
           const trackedDevice = devices.find(device => device.key === deviceKey);
-          if (!changed) { next = { ...current }; changed = true; }
+          forkStore();
           next[deviceKey] = { ...sourceSnapshot, source: trackedDevice?.source ?? null, deviceKey };
         }
-
-        if (changed && next[id]?.deviceKey === undefined) {
-          delete next[id];
-        }
       });
+
+      for (const key of Object.keys(current)) {
+        const snapshot = current[key];
+        if (!snapshot) continue;
+
+        if (snapshot.deviceKey === undefined) {
+          if (idToKeys.has(snapshot.id)) {
+            forkStore();
+            delete next[key];
+          }
+          continue;
+        }
+        if (!trackedKeys.has(key)) {
+          forkStore();
+          delete next[key];
+          if (!idToKeys.has(snapshot.id) && !next[snapshot.id]) {
+            next[snapshot.id] = { ...snapshot, source: null, deviceKey: undefined };
+          }
+        }
+      }
 
       return changed ? next : current;
     });
