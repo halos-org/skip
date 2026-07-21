@@ -690,8 +690,8 @@ export class UnitsService {
 
   /**
    * Accessor for the full conversion-group table (`_conversionList`) — every unit group
-   * and its member measures. Used by the conversion-table integrity test and the
-   * data-inspector to enumerate the measures Skip knows how to convert.
+   * and its member measures. Used by the conversion-table integrity test to enumerate
+   * the measures Skip knows how to convert.
    *
    * @return {*}  {IUnitGroup[]} an array of units by groups
    * @memberof UnitsService

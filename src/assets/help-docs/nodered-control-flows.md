@@ -36,7 +36,7 @@ Where to find it:
 Check these basics first:
 
 1. Skip is connected and authenticated to Signal K.
-2. You can see your target path in Data Inspector, unless you plan to create a new path with your flow.
+2. You can see your target path in the Signal K Data Browser, unless you plan to create a new path with your flow.
 3. The path type matches your widget type.
 4. Your Node-RED environment can access target hardware (GPIO, relay board, Web Service, etc.).
 
@@ -45,7 +45,7 @@ Check these basics first:
 Always test with non-critical outputs first.
 
 - Start with a debug/test path or non-critical device before controlling live systems.
-- Validate expected behavior in Data Browser and Data Inspector before switching real loads.
+- Validate expected behavior in the Signal K Data Browser before switching real loads.
 - Add safe defaults so outputs stay in a known state on startup/restart.
 
 ## 5-Minute First Success
@@ -57,7 +57,7 @@ Goal: prove the full command path works end-to-end (Skip → Signal K PUT → No
 3. Open the imported **put handler** node and note the path it listens to (default example: `self.red.autoLights.state`).  
    Leave defaults unchanged for this first test.
 4. Click **Deploy**.
-5. In Skip **Data Inspector**, search for `self.red.autoLights.state`.
+5. In the **Signal K Data Browser**, search for `self.red.autoLights.state`.
    - Confirm the path exists.
    - Confirm **PUT Support** is enabled.
 6. In Skip, add a **Switch Panel** widget:
@@ -66,7 +66,7 @@ Goal: prove the full command path works end-to-end (Skip → Signal K PUT → No
    - Save/apply widget settings.
 7. Toggle ON/OFF in Skip and verify:
    - The widget changes state without error notifications.
-   - The value updates in both Signal K Admin Data Browser and Skip Data Inspector.
+   - The value updates in the Signal K Admin Data Browser.
    - The updated value is visible in Node-RED under the **send autoLights** node (green status dot, e.g. **State: 1**).
 
 Note that this example flow uses numeric `1/0` path values. For ON/OFF control, the preferred value type is `boolean` (`true/false`).
@@ -102,7 +102,7 @@ Build in this order to keep setup simple.
 1. Start with one boolean switch end-to-end.
 2. Add one numeric slider flow.
 3. Add one multi-state mode flow.
-4. After each step, confirm path value in Data Inspector and physical result on hardware.
+4. After each step, confirm path value in the Signal K Data Browser and physical result on hardware.
 
 ## Glossary (Beginner)
 
@@ -121,5 +121,4 @@ Use these guides next as needed.
 
 - SignalK signalk-node-red: [Show and tell](https://github.com/SignalK/signalk-node-red/discussions/categories/show-and-tell)
 - Path requirements and widget compatibility: [Digital Switching and PUT Path Setup](#/help/putcontrols.md)
-- Finding paths and checking PUT support: [Data Inspector](#/help/datainspector.md)
 - Adding and configuring widgets: [Pages and Layout](#/help/dashboards.md)

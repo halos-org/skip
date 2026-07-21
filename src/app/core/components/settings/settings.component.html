@@ -7,11 +7,6 @@
         (keydown.enter)="onActionItem('options')"
         (keydown.space)="onActionItem('options')" />
       <tile-large-icon [class]="`${isPhonePortrait() ? 'no-label' : 'with-label'}`"
-        [iconOnly]="isPhonePortrait()" [compact]="true" svgIcon="troubleshoot" [iconSize]="48" label="Data Inspector"
-        (click)="onActionItem('datainspector')"
-        (keydown.enter)="onActionItem('datainspector')"
-        (keydown.space)="onActionItem('datainspector')" />
-      <tile-large-icon [class]="`${isPhonePortrait() ? 'no-label' : 'with-label'}`"
         [iconOnly]="isPhonePortrait()" [compact]="true" svgIcon="remote-control" [iconSize]="48" label="Remote Control"
         (click)="onActionItem('remotecontrol')"
         (keydown.enter)="onActionItem('remotecontrol')"

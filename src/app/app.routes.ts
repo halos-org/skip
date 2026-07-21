@@ -56,11 +56,6 @@ export const routes: Routes = [
     title: 'Skip - Help'
   },
   {
-    path: 'data',
-    loadComponent: () => import('./core/components/data-inspector/data-inspector.component').then(m => m.DataInspectorComponent),
-    title: 'Skip - Data Inspector'
-  },
-  {
     path: 'login',
     loadComponent: () => import('./widgets/widget-login/widget-login.component').then(m => m.WidgetLoginComponent),
     title: 'Login'

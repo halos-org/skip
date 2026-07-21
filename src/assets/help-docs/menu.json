@@ -2,7 +2,6 @@
   { "title": "The basics", "file": "welcome.md" },
   { "title": "Login & Configurations", "file": "configuration.md" },
   { "title": "Pages and Layout", "file": "dashboards.md" },
-  { "title": "Data Inspector", "file": "datainspector.md" },
   { "title": "Zones, Notifications and Highlights", "file": "zones.md" },
   { "title": "Digital Switching and PUT", "file": "putcontrols.md" },
   { "title": "Historical Widget Data", "file": "time-series.md" },
