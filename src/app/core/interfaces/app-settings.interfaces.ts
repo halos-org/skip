@@ -26,6 +26,7 @@ export interface IAppConfig {
   nightModeBrightness: number;
   notificationConfig: INotificationConfig;
   browserTabTitle?: string;
+  keepScreenAwake?: boolean;
 }
 
 export interface IThemeConfig {

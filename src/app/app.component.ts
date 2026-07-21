@@ -91,6 +91,11 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       this._titleService.setTitle(resolveBrowserTabTitle(this._browserTabTitle()));
     });
 
+    // Hold the screen wake lock per the keepScreenAwake setting, regardless of install/PWA context (#359).
+    effect(() => {
+      this._uiEvent.setKeepAwake(this.settings.keepScreenAwake());
+    });
+
     effect(() => {
       // Embed is strictly read-only: never run the config migration (it writes every user slot and
       // reloads the app), nor surface the manual upgrade-instructions dialog. Defer both to a

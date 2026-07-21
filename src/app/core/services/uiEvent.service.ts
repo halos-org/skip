@@ -16,13 +16,6 @@ export class uiEventService implements OnDestroy {
   private hotkeyListeners = new Map<(key: string, event: KeyboardEvent) => void, EventListener>();
   private readonly fullscreenChangeHandler = () => {
     this.fullscreenStatus.set(screenfull.isFullscreen);
-    if (!screenfull.isFullscreen) {
-      // On exit, disable NoSleep if we enabled it purely for fullscreen
-      if (this.noSleep && this.noSleepStatus()) {
-        try { this.noSleep.disable(); } catch { /* ignore disable errors */ }
-        this.noSleepStatus.set(false);
-      }
-    }
   };
 
   constructor() {
@@ -43,9 +36,8 @@ export class uiEventService implements OnDestroy {
       }
 
       this.checkNoSleepSupport();
-      if (this.checkPwaMode() && this.noSleepSupported() && !this.noSleepStatus()) {
-        this.toggleNoSleep();
-      }
+      // The screen wake lock is driven by the keepScreenAwake setting (applied from app.component),
+      // never by install/PWA/standalone detection — so it holds in a plain browser tab too (#359).
     } else {
       // In tests mark features unsupported to short-circuit code paths gracefully
       this.fullscreenSupported.set(false);
@@ -68,23 +60,22 @@ export class uiEventService implements OnDestroy {
     }
   }
 
-  private checkPwaMode(): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone !== undefined;
-    console.log('[UI Event Service] PWA mode:', isStandalone);
-    return isStandalone;
-  }
-
-  private toggleNoSleep(): void {
-    if (this.noSleepSupported()) {
-      if (!this.noSleepStatus()) {
+  /** Enable or disable the screen wake lock. Driven by the keepScreenAwake setting; no-ops when unsupported. */
+  public setKeepAwake(enabled: boolean): void {
+    if (!this.noSleepSupported() || enabled === this.noSleepStatus()) {
+      return;
+    }
+    try {
+      if (enabled) {
         if (!this.noSleep) this.checkNoSleepSupport();
-        try { this.noSleep?.enable(); } catch (e) { console.warn('[UI Event Service] Failed to enable NoSleep:', e); }
+        this.noSleep?.enable();
       } else {
-        try { this.noSleep?.disable(); } catch { /* ignore */ }
+        this.noSleep?.disable();
       }
-      this.noSleepStatus.set(!this.noSleepStatus());
-      console.log('[UI Event Service] NoSleep active:', this.noSleepStatus());
+      this.noSleepStatus.set(enabled);
+      console.log('[UI Event Service] Screen wake lock active:', enabled);
+    } catch (e) {
+      console.warn('[UI Event Service] Failed to toggle screen wake lock:', e);
     }
   }
 
@@ -96,15 +87,8 @@ export class uiEventService implements OnDestroy {
     if (screenfull.isEnabled) {
       if (!this.fullscreenStatus()) {
         screenfull.request();
-        if (!this.noSleepStatus()) {
-          if (!this.noSleep) this.checkNoSleepSupport();
-          try { this.noSleep?.enable(); this.noSleepStatus.set(true); } catch { /* enable failed */ }
-        }
-      } else {
-        if (screenfull.isFullscreen) {
-          screenfull.exit();
-        }
-        if (this.noSleepStatus()) { try { this.noSleep?.disable(); } catch { /* ignore */ } this.noSleepStatus.set(false); }
+      } else if (screenfull.isFullscreen) {
+        screenfull.exit();
       }
       this.fullscreenStatus.set(!this.fullscreenStatus());
     } else {
