@@ -3,7 +3,7 @@ Pages let you group widgets by task—navigation, engines, energy, weather, raci
 
 
 ## Pages Panel
-Reveal the toolbar and select Settings.
+Reveal the toolbar and select Actions.
 
 Here you can:
 - Add a new page (+ button)
@@ -99,7 +99,7 @@ Skip widgets turn Signal K data into readable visuals and controls. Available wi
 - Favor clarity over cramming: leave space around high‑priority values
 - Group related widgets (navigation, energy, engines, environment)
 - Use consistent units per page (e.g. all speeds in knots, all temps in °C or °F—don’t mix)
-- For night pages, adjust brightness or use the all‑red theme in Settings → Options → Display
+- For night pages, adjust brightness or use the all‑red theme in Actions → Settings → Display
 - Duplicate a working layout before making major changes (easy rollback)
 - Keep sampling intervals modest (1000 ms+) unless fast reaction is essential
 - Know your device’s hardware limits and adjust widget count per page accordingly

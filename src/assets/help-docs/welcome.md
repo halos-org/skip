@@ -20,7 +20,7 @@ Skip supports touch, mouse, and keyboard input across devices.
 Skip has no permanent navigation bar. A toolbar sits hidden at the top of the page and slides down when you need it — swipe down from the top, scroll up, or tap the thin strip that peeks at the top edge. It hides again when you scroll back, tap elsewhere, or leave it idle.
 
 The toolbar holds:
-1. Settings
+1. Actions — opens Settings, Remote Control, Help, and dashboard editing
 2. *Fullscreen toggle
 3. **Night-mode toggle
 4. Page navigator — one icon per page; tap a page’s icon to jump to it
@@ -31,7 +31,7 @@ When an alarm is active, a notification badge also appears in the lower-left cor
 
 *Only visible if the mode is supported.
 
-**Only visible if automatic day and night is not enabled. See <Home / Settings / Display>.
+**Only visible if automatic day and night is not enabled. See <Actions / Settings / Display>.
 
 ## Loading Skip on Phones, Tablets, Raspberry Pi, and Computers
 Simply navigate to `http://<Signal K Server URL>:<port>/@halos-org/skip/` to load Skip and enjoy its features remotely on any device.
@@ -78,11 +78,11 @@ If multiple devices log in with the same Signal K user to share configuration, t
 
 ### Setup
 1. On the device you want to control (Target Skip)
-  - Open: Options → Display → Remote Control.
+  - Open: Settings → Display → Remote Control.
   - Enable: Allow this Skip dashboard to be managed remotely.
   - Set: Instance Name (this is what will appear in the controller list).
 2. On the controlling device
-  - Open: reveal the toolbar → Settings → Remote Control.
+  - Open: reveal the toolbar → Actions → Remote Control.
   - Select the target device by its Instance Name.
   - Click / tap a page tile to activate it on the target device.
 
