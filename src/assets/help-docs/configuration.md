@@ -9,7 +9,7 @@ Skip keeps your setup in two separate places:
 
 Skip signs in through your Signal K server's session (single sign-on). It **never asks you for a Signal K username or password directly** and never stores credentials — the sign-in happens on the server, and Skip only holds the resulting session.
 
-Open **Actions > Connection**:
+Open **Menu > Connection**:
 
 - If the server requires sign-in and you are not signed in yet, a **Sign in** button appears. It sends you to the Signal K server's login and returns you to Skip once you are authenticated.
 - When signed in, the Connection page shows the account you are signed in as.
@@ -28,7 +28,7 @@ To sign in, your Signal K server needs a user account. To create one:
 4. Assign **Read/Write** permissions so the account can store configuration. A **Read-only** account can view configuration but not change it.
 5. Click **Apply** to save the new user.
 
-Then sign in to that account from Skip via **Actions > Connection > Sign in**.
+Then sign in to that account from Skip via **Menu > Connection > Sign in**.
 
 ## Profiles
 

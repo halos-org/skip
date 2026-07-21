@@ -22,18 +22,19 @@ Skip has no permanent navigation bar. A toolbar sits hidden at the top of the pa
 <img src="assets/help-docs/img/toolbar.png" alt="The Skip toolbar with numbered callouts, left to right" title="The Skip toolbar" width="100%">
 
 The toolbar holds, from left to right:
-1. Actions — opens Settings, Remote Control, Help, and dashboard editing
+1. Menu — opens Settings, Connection, Remote Control, and Help
 2. *Fullscreen toggle
 3. **Night-mode toggle
 4. Page navigator — one icon per page; tap a page’s icon to jump to it
-5. Notifications
-6. Edit button — unlock the current page to change its layout
+5. Manage pages — add, reorder, rename, duplicate, or delete pages
+6. Notifications
+7. Edit button — unlock the current page to change its layout
 
 When an alarm is active, a notification badge also appears in the lower-left corner and stays there until the alarm clears. It is the one piece of always-on chrome, for safety. Tap it to see the alarms.
 
 *Only visible if the mode is supported.
 
-**Only visible if automatic day and night is not enabled. See <Actions / Settings / Display>.
+**Only visible if automatic day and night is not enabled. See <Menu / Settings / Display>.
 
 ## Loading Skip on Phones, Tablets, Raspberry Pi, and Computers
 Simply navigate to `http://<Signal K Server URL>:<port>/@halos-org/skip/` to load Skip and enjoy its features remotely on any device.
@@ -72,7 +73,7 @@ Control which page is shown on another Skip instance (for example: a mast displa
 
 ### Requirements
 - Both devices must be connected to the same Signal K server.
-- You must be signed in (authenticated) to the Signal K server on both devices (Actions > Connection → Sign in).
+- You must be signed in (authenticated) to the Signal K server on both devices (Menu > Connection → Sign in).
 - The target device must explicitly allow remote control (Display tab → Remote Control option group).
 
 ### Good Naming Practice
@@ -84,7 +85,7 @@ If multiple devices log in with the same Signal K user to share configuration, t
   - Enable: Allow this Skip dashboard to be managed remotely.
   - Set: Instance Name (this is what will appear in the controller list).
 2. On the controlling device
-  - Open: reveal the toolbar → Actions → Remote Control.
+  - Open: reveal the toolbar → Menu → Remote Control.
   - Select the target device by its Instance Name.
   - Click / tap a page tile to activate it on the target device.
 
