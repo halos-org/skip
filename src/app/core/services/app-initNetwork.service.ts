@@ -126,11 +126,12 @@ export class AppNetworkInitService implements OnDestroy {
 
     try {
       if (this.config?.signalKUrl !== undefined && this.config.signalKUrl !== null) {
-        // Use SignalKConnectionService to initialize connection with the configured URL
+        // Routing always trusts the server's own discovered endpoints (no proxy rewrite), and the
+        // stream subscribes to all contexts unconditionally. Neither is user-configurable.
         await this.connection.initializeConnection(
           {url: this.config.signalKUrl, new: false},
-          this.config.proxyEnabled,
-          this.config.signalKSubscribeAll
+          false,
+          true
         );
       }
 
