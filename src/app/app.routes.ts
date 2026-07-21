@@ -28,15 +28,15 @@ export const routes: Routes = [
     redirectTo: route => `/page/${route.params['id']}`
   },
   {
-    path: 'settings',
+    path: 'actions',
     canActivate: [embedBlockedGuard],
-    loadComponent: () => import('./core/components/settings/settings.component').then(m => m.SettingsComponent),
-    title: 'Skip - Settings'
+    loadComponent: () => import('./core/components/actions/actions.component').then(m => m.ActionsComponent),
+    title: 'Skip - Actions'
   },
   {
-    path: 'options',
+    path: 'settings',
     canActivate: [embedBlockedGuard],
-    loadComponent: () => import('./core/components/options/tabs/tabs.component').then(m => m.TabsComponent),
+    loadComponent: () => import('./core/components/settings/tabs/tabs.component').then(m => m.TabsComponent),
     title: 'Skip - Settings'
   },
   {

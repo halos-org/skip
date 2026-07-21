@@ -16,7 +16,7 @@ export class PageHeaderComponent {
   private _router = inject(Router);
 
   protected backPage() {
-    this._router.navigate(['/settings']);
+    this._router.navigate(['/actions']);
   }
 
   protected closePage() {

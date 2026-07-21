@@ -126,7 +126,7 @@ export class AppHelpComponent {
   }
 
   protected backPage() {
-    this._router.navigate(['/settings']);
+    this._router.navigate(['/actions']);
   }
 
   protected closePage(): void {

@@ -10,12 +10,12 @@ import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
-  selector: 'settings',
+  selector: 'actions',
   imports: [MatIconModule, MatButtonModule, TileLargeIconComponent, MatDividerModule, DashboardsEditorComponent, DashboardsEditorComponent],
-  templateUrl: './settings.component.html',
-  styleUrl: './settings.component.scss'
+  templateUrl: './actions.component.html',
+  styleUrl: './actions.component.scss'
 })
-export class SettingsComponent {
+export class ActionsComponent {
   private readonly _router = inject(Router);
   protected readonly app = inject(AppService);
   private readonly _responsive = inject(BreakpointObserver);
@@ -36,8 +36,8 @@ export class SettingsComponent {
       case 'remotecontrol':
         this._router.navigate(['/remote']);
         break;
-      case 'options':
-        this._router.navigate(['/options']);
+      case 'settings':
+        this._router.navigate(['/settings']);
         break;
       default:
         break;
