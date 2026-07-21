@@ -59,7 +59,8 @@
 
 // While a layout edit is active the peek strip is persistently visible and accent-coloured,
 // so the "reveal for Done/Cancel" affordance never fully disappears behind the auto-hide.
-// Only when the full toolbar is hidden — revealed, its own edit contents are the affordance.
+// The accent applies only while the toolbar is hidden (:not(.revealed)); once revealed, its
+// own Done/Cancel contents are the affordance.
 .toolbar-host.editing:not(.revealed) .peek-strip {
   background: var(--mat-sys-primary, #6ea8fe);
   box-shadow: 0 1px 8px 0 var(--mat-sys-primary, #6ea8fe);
