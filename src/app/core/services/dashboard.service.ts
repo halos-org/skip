@@ -47,6 +47,12 @@ export class DashboardService {
   public readonly layoutEditSaved = signal<number>(0);
   public readonly layoutEditCanceled = signal<number>(0);
 
+  // Inbound request channel: chrome outside the dashboard (the toolbar's edit-mode
+  // Done/Cancel) asks the mounted DashboardComponent — the only holder of the grid —
+  // to commit or discard. Counters, mirroring the layoutEdit{Saved,Canceled} notifications.
+  public readonly layoutEditSaveRequested = signal<number>(0);
+  public readonly layoutEditCancelRequested = signal<number>(0);
+
   /** True while a page-transition animation is in flight; blocks re-entrant navigation (#194). */
   public readonly isPageTransitioning = signal<boolean>(false);
   /** Travel direction of the pending navigation, set (wrap-aware) by the navigate* methods
@@ -507,5 +513,15 @@ export class DashboardService {
 
   public notifyLayoutEditCanceled(): void {
     this.layoutEditCanceled.update(v => v + 1);
+  }
+
+  /** Ask the mounted DashboardComponent to commit the current page's layout edit (toolbar Done). */
+  public requestLayoutEditSave(): void {
+    this.layoutEditSaveRequested.update(v => v + 1);
+  }
+
+  /** Ask the mounted DashboardComponent to discard the current page's layout edit (toolbar Cancel). */
+  public requestLayoutEditCancel(): void {
+    this.layoutEditCancelRequested.update(v => v + 1);
   }
 }
