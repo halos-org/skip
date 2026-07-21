@@ -1,4 +1,9 @@
-<div class="toolbar-host" [class.revealed]="chrome.revealed()" [class.peeking]="chrome.peeking()">
+<div
+  class="toolbar-host"
+  [class.revealed]="chrome.revealed()"
+  [class.peeking]="chrome.peeking()"
+  [class.editing]="isEditing()"
+>
   <button
     type="button"
     class="peek-strip"
@@ -16,26 +21,30 @@
     (mouseleave)="onPointerLeave()"
   >
     <div class="toolbar-group toolbar-start">
-      <button mat-icon-button aria-label="Actions" (click)="openActions()">
-        <mat-icon>apps</mat-icon>
-      </button>
-      @if (fullscreenSupported()) {
-        <button
-          mat-icon-button
-          [attr.aria-label]="fullscreenStatus() ? 'Exit fullscreen' : 'Enter fullscreen'"
-          (click)="toggleFullScreen()"
-        >
-          <mat-icon>{{ fullscreenStatus() ? 'close_fullscreen' : 'fullscreen' }}</mat-icon>
+      @if (isEditing()) {
+        <span class="editing-label"><mat-icon>edit</mat-icon>Editing layout</span>
+      } @else {
+        <button mat-icon-button aria-label="Actions" (click)="openActions()">
+          <mat-icon>apps</mat-icon>
         </button>
-      }
-      @if (!autoNightMode()) {
-        <button
-          mat-icon-button
-          [attr.aria-label]="isNightMode() ? 'Day mode' : 'Night mode'"
-          (click)="toggleNightMode()"
-        >
-          <mat-icon>{{ isNightMode() ? 'light_mode' : 'mode_night' }}</mat-icon>
-        </button>
+        @if (fullscreenSupported()) {
+          <button
+            mat-icon-button
+            [attr.aria-label]="fullscreenStatus() ? 'Exit fullscreen' : 'Enter fullscreen'"
+            (click)="toggleFullScreen()"
+          >
+            <mat-icon>{{ fullscreenStatus() ? 'close_fullscreen' : 'fullscreen' }}</mat-icon>
+          </button>
+        }
+        @if (!autoNightMode()) {
+          <button
+            mat-icon-button
+            [attr.aria-label]="isNightMode() ? 'Day mode' : 'Night mode'"
+            (click)="toggleNightMode()"
+          >
+            <mat-icon>{{ isNightMode() ? 'light_mode' : 'mode_night' }}</mat-icon>
+          </button>
+        }
       }
     </div>
 
@@ -44,17 +53,29 @@
     </div>
 
     <div class="toolbar-group toolbar-end">
-      <button mat-icon-button aria-label="Notifications" (click)="openNotifications()">
-        <mat-icon
-          [matBadge]="alarmCount()"
-          [matBadgeHidden]="!alarmCount()"
-          matBadgeSize="small"
-          matBadgeColor="warn"
-        >notifications</mat-icon>
-      </button>
-      <button mat-icon-button aria-label="Edit page" (click)="enterEdit()">
-        <mat-icon>lock_open</mat-icon>
-      </button>
+      @if (isEditing()) {
+        <button mat-icon-button aria-label="Manage pages" (click)="openPageManager()">
+          <mat-icon>dashboard_customize</mat-icon>
+        </button>
+        <button mat-icon-button aria-label="Cancel editing" (click)="cancelEdit()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <button mat-icon-button aria-label="Done editing" (click)="doneEdit()">
+          <mat-icon>done</mat-icon>
+        </button>
+      } @else {
+        <button mat-icon-button aria-label="Notifications" (click)="openNotifications()">
+          <mat-icon
+            [matBadge]="alarmCount()"
+            [matBadgeHidden]="!alarmCount()"
+            matBadgeSize="small"
+            matBadgeColor="warn"
+          >notifications</mat-icon>
+        </button>
+        <button mat-icon-button aria-label="Edit page" (click)="enterEdit()">
+          <mat-icon>lock_open</mat-icon>
+        </button>
+      }
     </div>
   </div>
 </div>

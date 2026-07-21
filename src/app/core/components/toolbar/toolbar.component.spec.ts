@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppService } from '../../services/app-service';
@@ -10,6 +11,7 @@ import { DialogService } from '../../services/dialog.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { SettingsService } from '../../services/settings.service';
 import { uiEventService } from '../../services/uiEvent.service';
+import { PageManagerBottomSheetComponent } from '../page-manager-bottom-sheet/page-manager-bottom-sheet.component';
 import { ToolbarComponent } from './toolbar.component';
 
 const chrome = {
@@ -22,9 +24,13 @@ const chrome = {
 const dashboard = {
   dashboards: signal([{ id: 'a', name: 'Nav', icon: 'ic' }]),
   activeDashboard: signal(0),
+  isDashboardStatic: signal(true),
   navigateTo: vi.fn(),
   setStaticDashboard: vi.fn(),
+  requestLayoutEditSave: vi.fn(),
+  requestLayoutEditCancel: vi.fn(),
 };
+const bottomSheet = { open: vi.fn() };
 const uiEvent = {
   toggleFullScreen: vi.fn(),
   fullscreenSupported: signal(true),
@@ -48,10 +54,12 @@ describe('ToolbarComponent', () => {
     for (const spy of [
       chrome.reveal, chrome.suppressHide, chrome.allowHide,
       dashboard.navigateTo, dashboard.setStaticDashboard,
+      dashboard.requestLayoutEditSave, dashboard.requestLayoutEditCancel, bottomSheet.open,
       uiEvent.toggleFullScreen, app.toggleDayNightMode, app.toggleNightMode, dialog.openNotifications, router.navigate,
     ]) spy.mockClear();
     chrome.revealed.set(false);
     chrome.peeking.set(false);
+    dashboard.isDashboardStatic.set(true);
     uiEvent.fullscreenSupported.set(true);
     uiEvent.fullscreenStatus.set(false);
     app.isNightMode.set(false);
@@ -69,6 +77,7 @@ describe('ToolbarComponent', () => {
         { provide: DialogService, useValue: dialog },
         { provide: NotificationsService, useValue: notifications },
         { provide: Router, useValue: router },
+        { provide: MatBottomSheet, useValue: bottomSheet },
       ],
     });
   });
@@ -101,6 +110,46 @@ describe('ToolbarComponent', () => {
     expect(dashboard.setStaticDashboard).toHaveBeenCalledWith(false);
     byLabel('Notifications')!.click();
     expect(dialog.openNotifications).toHaveBeenCalled();
+  });
+
+  describe('edit-mode toolbar swap', () => {
+    it('swaps normal nav controls for edit contents while the dashboard is non-static', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      // Normal controls are gone…
+      expect(byLabel('Actions')).toBeNull();
+      expect(byLabel('Notifications')).toBeNull();
+      expect(byLabel('Edit page')).toBeNull();
+      // …replaced by the edit contents.
+      expect(el.querySelector('.editing-label')).not.toBeNull();
+      expect(byLabel('Manage pages')).not.toBeNull();
+      expect(byLabel('Cancel editing')).not.toBeNull();
+      expect(byLabel('Done editing')).not.toBeNull();
+      // The page dots stay put for switching pages mid-edit.
+      expect(el.querySelector('page-nav-control')).not.toBeNull();
+    });
+
+    it('marks the host as editing so the peek strip renders accent', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      expect(el.querySelector('.toolbar-host')!.classList.contains('editing')).toBe(true);
+    });
+
+    it('Done requests a save and Cancel requests a cancel', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      byLabel('Done editing')!.click();
+      expect(dashboard.requestLayoutEditSave).toHaveBeenCalledTimes(1);
+      byLabel('Cancel editing')!.click();
+      expect(dashboard.requestLayoutEditCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('Manage pages opens the page-manager bottom sheet', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      byLabel('Manage pages')!.click();
+      expect(bottomSheet.open).toHaveBeenCalledWith(PageManagerBottomSheetComponent);
+    });
   });
 
   it('reveals on peek-strip click and suppresses/resumes hide on hover', () => {
