@@ -126,11 +126,12 @@ export class AppNetworkInitService implements OnDestroy {
 
     try {
       if (this.config?.signalKUrl !== undefined && this.config.signalKUrl !== null) {
-        // Routing always trusts the server's own discovered endpoints (no proxy rewrite), and the
-        // stream subscribes to all contexts unconditionally. Neither is user-configurable.
+        // Routing always serves the server's discovered API path from the app's own origin, so the
+        // same-origin session cookie always applies; the stream subscribes to all contexts
+        // unconditionally. Neither is user-configurable.
         await this.connection.initializeConnection(
           {url: this.config.signalKUrl, new: false},
-          false,
+          true,
           true
         );
       }

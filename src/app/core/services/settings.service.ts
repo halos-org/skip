@@ -51,8 +51,8 @@ export class SettingsService {
   public readonly browserTabTitle = this._browserTabTitle.asReadonly();
 
   // Persisted for config-version compatibility but no longer read by connection setup: routing always
-  // trusts the server's discovered endpoints and the stream subscribes to all contexts. #386 will
-  // repurpose signalKSubscribeAll to gate subscription on widget demand.
+  // serves the server's discovered API path from the app's own origin and the stream subscribes to
+  // all contexts. #386 will repurpose signalKSubscribeAll to gate subscription on widget demand.
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
   private sharedConfigName = 'default';

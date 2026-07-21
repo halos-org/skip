@@ -143,11 +143,11 @@ describe('AppNetworkInitService', () => {
     }
 
     describe('connection initialization (fixed routing and subscription)', () => {
-        it('always trusts server endpoints (no proxy) and subscribes to all contexts, ignoring stored flags', async () => {
+        it('always routes to the app origin and subscribes to all contexts, ignoring stored flags', async () => {
             // Stored flags are the OPPOSITE of the fixed behavior, proving they are no longer read.
             localStorage.setItem('skip.connectionConfig', JSON.stringify({
                 configVersion: 13, skipUUID: 'test-uuid', signalKUrl: 'http://localhost',
-                proxyEnabled: true, signalKSubscribeAll: false, sharedConfigName: 'default',
+                proxyEnabled: false, signalKSubscribeAll: false, sharedConfigName: 'default',
                 isRemoteControl: false, instanceName: ''
             }));
             mockConnection.initializeConnection.mockClear();
@@ -155,7 +155,7 @@ describe('AppNetworkInitService', () => {
             await service.initNetworkServices();
 
             expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
-                { url: 'http://localhost', new: false }, false, true
+                { url: 'http://localhost', new: false }, true, true
             );
         });
     });
