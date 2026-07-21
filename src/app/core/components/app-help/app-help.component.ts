@@ -125,10 +125,6 @@ export class AppHelpComponent {
     this._router.navigate(['/help', this.toPageSegment(file)]);
   }
 
-  protected backPage() {
-    this._router.navigate(['/actions']);
-  }
-
   protected closePage(): void {
     this._router.navigate(['/page']);
   }
