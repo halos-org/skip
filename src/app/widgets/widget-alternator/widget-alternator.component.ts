@@ -12,7 +12,7 @@ import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-
 import type { AlternatorDisplayModel, AlternatorSnapshot, AlternatorWidgetConfig, ElectricalCardModeConfig } from './widget-alternator.types';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
-import { setValue, setMetricValue, toStringValue, resolveMostSevereState } from '../shared/electrical-apply.util';
+import { setValue, setMetricValue, toStringValue, toNumber, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import { ElectricalTopologyStore, type ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import { drawDirectCards, initDirectCardSvg } from '../shared/electrical-direct-card-draw';
@@ -311,24 +311,24 @@ export class WidgetAlternatorComponent implements AfterViewInit {
       case 'chargingMode':
         return setMetricValue(snapshot, 'chargingMode', 'chargingModeState', toStringValue(value), state);
       case 'voltage':
-        return setMetricValue(snapshot, 'voltage', 'voltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'voltage', 'voltageState', toNumber(this.units, value, 'V'), state);
       case 'current':
-        return setMetricValue(snapshot, 'current', 'currentState', this.toNumber(value, 'A'), state);
+        return setMetricValue(snapshot, 'current', 'currentState', toNumber(this.units, value, 'A'), state);
       case 'power':
       case 'realPower':
-        return setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
+        return setMetricValue(snapshot, 'rawPower', 'powerState', toNumber(this.units, value, 'W'), state);
       case 'temperature':
-        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, 'K'), state);
+        return setMetricValue(snapshot, 'temperature', 'temperatureState', toNumber(this.units, value, 'K'), state);
       case 'revolutions':
-        return setMetricValue(snapshot, 'revolutions', 'revolutionsState', this.toNumber(value, 'Hz'), state);
+        return setMetricValue(snapshot, 'revolutions', 'revolutionsState', toNumber(this.units, value, 'Hz'), state);
       case 'fieldDrive':
-        return setMetricValue(snapshot, 'fieldDrive', 'fieldDriveState', this.toNumber(value, '%'), state);
+        return setMetricValue(snapshot, 'fieldDrive', 'fieldDriveState', toNumber(this.units, value, '%'), state);
       case 'regulatorTemperature':
-        return setMetricValue(snapshot, 'regulatorTemperature', 'regulatorTemperatureState', this.toNumber(value, 'K'), state);
+        return setMetricValue(snapshot, 'regulatorTemperature', 'regulatorTemperatureState', toNumber(this.units, value, 'K'), state);
       case 'setpointVoltage':
-        return setMetricValue(snapshot, 'setpointVoltage', 'setpointVoltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'setpointVoltage', 'setpointVoltageState', toNumber(this.units, value, 'V'), state);
       case 'setpointCurrent':
-        return setMetricValue(snapshot, 'setpointCurrent', 'setpointCurrentState', this.toNumber(value, 'A'), state);
+        return setMetricValue(snapshot, 'setpointCurrent', 'setpointCurrentState', toNumber(this.units, value, 'A'), state);
       default:
         return false;
     }
@@ -468,19 +468,5 @@ export class WidgetAlternatorComponent implements AfterViewInit {
     }
 
     return `${value.toFixed(0)} %`;
-  }
-
-  private toNumber(value: unknown, unitHint: string): number | null {
-    if (value == null || typeof value === 'boolean') {
-      return null;
-    }
-
-    const rawNumber = typeof value === 'number' ? value : Number(value);
-    if (!Number.isFinite(rawNumber)) {
-      return null;
-    }
-
-    const converted = this.units.convertToUnit(unitHint, rawNumber);
-    return Number.isFinite(converted) ? converted : rawNumber;
   }
 }

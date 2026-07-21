@@ -40,14 +40,25 @@ describe('electrical-config.util', () => {
       expect(normalizeTrackedDevices(undefined)).toEqual([]);
     });
 
-    it('drops items missing id or source and skips non-objects', () => {
+    it('drops only items without a usable id and skips non-objects', () => {
       const result = normalizeTrackedDevices([
         'plain-string',
-        { id: 'a' },
         { source: 'x' },
+        { id: '   ' },
         { id: 'a', source: 'x' }
       ]);
       expect(result).toEqual([{ id: 'a', source: 'x', key: 'a||x' }]);
+    });
+
+    it('defaults a missing or blank source to "default" and keeps the item', () => {
+      const result = normalizeTrackedDevices([
+        { id: 'a' },
+        { id: 'b', source: '   ' }
+      ]);
+      expect(result).toEqual([
+        { id: 'a', source: 'default', key: 'a||default' },
+        { id: 'b', source: 'default', key: 'b||default' }
+      ]);
     });
 
     it('synthesizes a key from id and source when key is absent', () => {

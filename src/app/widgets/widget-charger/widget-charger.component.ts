@@ -12,7 +12,7 @@ import type { ITheme } from '../../core/services/app-service';
 import type { ChargerDisplayModel, ChargerSnapshot } from './widget-charger.types';
 import { ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
-import { setValue, setMetricValue, toStringValue, toBoolean, resolveMostSevereState } from '../shared/electrical-apply.util';
+import { setValue, setMetricValue, toStringValue, toBoolean, toNumber, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
 
@@ -405,27 +405,27 @@ export class WidgetChargerComponent implements AfterViewInit {
       case 'modeState':
         return setMetricValue(snapshot, 'mode', 'modeState', toStringValue(value), state);
       case 'modeNumber':
-        return setMetricValue(snapshot, 'modeNumber', 'modeNumberState', this.toNumber(value, ''), state);
+        return setMetricValue(snapshot, 'modeNumber', 'modeNumberState', toNumber(this.units, value, ''), state);
       case 'chargingMode':
         return setMetricValue(snapshot, 'chargingMode', 'chargingModeState', toStringValue(value), state);
       case 'chargingModeNumber':
-        return setMetricValue(snapshot, 'chargingModeNumber', 'chargingModeNumberState', this.toNumber(value, ''), state);
+        return setMetricValue(snapshot, 'chargingModeNumber', 'chargingModeNumberState', toNumber(this.units, value, ''), state);
       case 'output.voltage': {
-        const nextVoltage = this.toNumber(value, 'V');
+        const nextVoltage = toNumber(this.units, value, 'V');
         const outputChanged = setMetricValue(snapshot, 'outputVoltage', 'outputVoltageState', nextVoltage, state);
         const voltageChanged = setMetricValue(snapshot, 'voltage', 'voltageState', nextVoltage, state);
         return outputChanged || voltageChanged;
       }
       case 'input.voltage':
-        return setMetricValue(snapshot, 'inputVoltage', 'inputVoltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'inputVoltage', 'inputVoltageState', toNumber(this.units, value, 'V'), state);
       case 'voltage':
-        return setMetricValue(snapshot, 'voltage', 'voltageState', this.toNumber(value, 'V'), state);
+        return setMetricValue(snapshot, 'voltage', 'voltageState', toNumber(this.units, value, 'V'), state);
       case 'current':
-        return setMetricValue(snapshot, 'current', 'currentState', this.toNumber(value, 'A'), state);
+        return setMetricValue(snapshot, 'current', 'currentState', toNumber(this.units, value, 'A'), state);
       case 'power':
-        return setMetricValue(snapshot, 'rawPower', 'powerState', this.toNumber(value, 'W'), state);
+        return setMetricValue(snapshot, 'rawPower', 'powerState', toNumber(this.units, value, 'W'), state);
       case 'temperature':
-        return setMetricValue(snapshot, 'temperature', 'temperatureState', this.toNumber(value, 'K'), state);
+        return setMetricValue(snapshot, 'temperature', 'temperatureState', toNumber(this.units, value, 'K'), state);
       case 'leds.absorption':
         return setMetricValue(snapshot, 'ledsAbsorption', 'ledsAbsorptionState', toBoolean(value), state);
       case 'leds.bulk':
@@ -765,19 +765,5 @@ export class WidgetChargerComponent implements AfterViewInit {
     }
 
     return `${converted.toFixed(0)}`;
-  }
-
-  private toNumber(value: unknown, unitHint: string): number | null {
-    if (value == null || typeof value === 'boolean') {
-      return null;
-    }
-
-    const rawNumber = typeof value === 'number' ? value : Number(value);
-    if (!Number.isFinite(rawNumber)) {
-      return null;
-    }
-
-    const converted = this.units.convertToUnit(unitHint, rawNumber);
-    return Number.isFinite(converted) ? converted : rawNumber;
   }
 }

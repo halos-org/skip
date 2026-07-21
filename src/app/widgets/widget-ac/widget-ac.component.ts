@@ -10,7 +10,7 @@ import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.u
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
-import { setValue, setMetricValue, toStringValue, resolveMostSevereState } from '../shared/electrical-apply.util';
+import { setValue, setMetricValue, toStringValue, toNumber, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import { ElectricalTopologyStore, type ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import { drawDirectCards, initDirectCardSvg } from '../shared/electrical-direct-card-draw';
@@ -345,22 +345,22 @@ export class WidgetAcComponent implements AfterViewInit {
       case 'associatedBus': return setValue(snapshot, 'associatedBus', toStringValue(value));
       case 'mode': return setMetricValue(snapshot, 'mode', 'modeState', toStringValue(value), state);
       // Backward-compatible flat AC keys map to line 1 when source data is single-phase per id.
-      case 'voltage': return setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', this.toNumber(value, 'V'), state);
-      case 'current': return setMetricValue(snapshot, 'line1Current', 'line1CurrentState', this.toNumber(value, 'A'), state);
-      case 'frequency': return setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line1.voltage': return setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', this.toNumber(value, 'V'), state);
-      case 'line1.current': return setMetricValue(snapshot, 'line1Current', 'line1CurrentState', this.toNumber(value, 'A'), state);
-      case 'line1.frequency': return setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line1.realPower': return setMetricValue(snapshot, 'power', 'line1CurrentState', this.toNumber(value, 'W'), state);
-      case 'line2.voltage': return setMetricValue(snapshot, 'line2Voltage', 'line2VoltageState', this.toNumber(value, 'V'), state);
-      case 'line2.current': return setMetricValue(snapshot, 'line2Current', 'line2CurrentState', this.toNumber(value, 'A'), state);
-      case 'line2.frequency': return setMetricValue(snapshot, 'line2Frequency', 'line2FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line2.realPower': return setMetricValue(snapshot, 'power', 'line2CurrentState', this.toNumber(value, 'W'), state);
-      case 'line3.voltage': return setMetricValue(snapshot, 'line3Voltage', 'line3VoltageState', this.toNumber(value, 'V'), state);
-      case 'line3.current': return setMetricValue(snapshot, 'line3Current', 'line3CurrentState', this.toNumber(value, 'A'), state);
-      case 'line3.frequency': return setMetricValue(snapshot, 'line3Frequency', 'line3FrequencyState', this.toNumber(value, 'Hz'), state);
-      case 'line3.realPower': return setMetricValue(snapshot, 'power', 'line3CurrentState', this.toNumber(value, 'W'), state);
-      case 'power': return setMetricValue(snapshot, 'power', 'line1CurrentState', this.toNumber(value, 'W'), state);
+      case 'voltage': return setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', toNumber(this.units, value, 'V'), state);
+      case 'current': return setMetricValue(snapshot, 'line1Current', 'line1CurrentState', toNumber(this.units, value, 'A'), state);
+      case 'frequency': return setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', toNumber(this.units, value, 'Hz'), state);
+      case 'line1.voltage': return setMetricValue(snapshot, 'line1Voltage', 'line1VoltageState', toNumber(this.units, value, 'V'), state);
+      case 'line1.current': return setMetricValue(snapshot, 'line1Current', 'line1CurrentState', toNumber(this.units, value, 'A'), state);
+      case 'line1.frequency': return setMetricValue(snapshot, 'line1Frequency', 'line1FrequencyState', toNumber(this.units, value, 'Hz'), state);
+      case 'line1.realPower': return setMetricValue(snapshot, 'power', 'line1CurrentState', toNumber(this.units, value, 'W'), state);
+      case 'line2.voltage': return setMetricValue(snapshot, 'line2Voltage', 'line2VoltageState', toNumber(this.units, value, 'V'), state);
+      case 'line2.current': return setMetricValue(snapshot, 'line2Current', 'line2CurrentState', toNumber(this.units, value, 'A'), state);
+      case 'line2.frequency': return setMetricValue(snapshot, 'line2Frequency', 'line2FrequencyState', toNumber(this.units, value, 'Hz'), state);
+      case 'line2.realPower': return setMetricValue(snapshot, 'power', 'line2CurrentState', toNumber(this.units, value, 'W'), state);
+      case 'line3.voltage': return setMetricValue(snapshot, 'line3Voltage', 'line3VoltageState', toNumber(this.units, value, 'V'), state);
+      case 'line3.current': return setMetricValue(snapshot, 'line3Current', 'line3CurrentState', toNumber(this.units, value, 'A'), state);
+      case 'line3.frequency': return setMetricValue(snapshot, 'line3Frequency', 'line3FrequencyState', toNumber(this.units, value, 'Hz'), state);
+      case 'line3.realPower': return setMetricValue(snapshot, 'power', 'line3CurrentState', toNumber(this.units, value, 'W'), state);
+      case 'power': return setMetricValue(snapshot, 'power', 'line1CurrentState', toNumber(this.units, value, 'W'), state);
       default:
         return false;
     }
@@ -430,15 +430,5 @@ export class WidgetAcComponent implements AfterViewInit {
   private formatValue(value: number | null | undefined, unit: string): string {
     if (value == null || Number.isNaN(value)) return '-';
     return `${value.toFixed(1)} ${unit}`;
-  }
-
-  private toNumber(value: unknown, unitHint: string): number | null {
-    if (value == null || typeof value === 'boolean') return null;
-
-    const rawNumber = typeof value === 'number' ? value : Number(value);
-    if (!Number.isFinite(rawNumber)) return null;
-
-    const converted = this.units.convertToUnit(unitHint, rawNumber);
-    return typeof converted === 'number' && Number.isFinite(converted) ? converted : null;
   }
 }

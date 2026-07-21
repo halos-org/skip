@@ -11,8 +11,8 @@ import type { ElectricalCardModeConfig, ElectricalTrackedDevice, SolarChargerDis
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT } from '../shared/electrical-card-layout.constants';
-import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
-import { setValue, resolveMostSevereState } from '../shared/electrical-apply.util';
+import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
+import { setValue, toNumber, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import type { ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
@@ -344,7 +344,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
 
   private resolveSolarConfig(cfg: IWidgetSvcConfig): SolarWidgetConfig {
     const solar = cfg.solarCharger;
-    const trackedDevices = this.normalizeTrackedDevices(solar?.trackedDevices);
+    const trackedDevices = normalizeTrackedDevices(solar?.trackedDevices);
     const optionsById = this.normalizeOptionsById(solar?.optionsById);
 
     return {
@@ -352,42 +352,6 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       optionsById,
       cardMode: this.normalizeCardMode(solar?.cardMode)
     };
-  }
-
-  private normalizeTrackedDevices(value: unknown): ElectricalTrackedDevice[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const devices = new Map<string, ElectricalTrackedDevice>();
-    value.forEach(item => {
-      if (typeof item === 'string') {
-        const id = item.trim();
-        if (!id) return;
-        const key = `${id}||default`;
-        devices.set(key, { id, source: 'default', key });
-        return;
-      }
-
-      if (!item || typeof item !== 'object') {
-        return;
-      }
-
-      const candidate = item as { id?: unknown; source?: unknown; key?: unknown };
-      const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
-      const source = typeof candidate.source === 'string' ? candidate.source.trim() : 'default';
-      if (!id || !source) {
-        return;
-      }
-
-      const key = typeof candidate.key === 'string' && candidate.key.trim().length > 0
-        ? candidate.key.trim()
-        : `${id}||${source}`;
-
-      devices.set(key, { id, source, key });
-    });
-
-    return [...devices.values()].sort((left, right) => left.key.localeCompare(right.key));
   }
 
   private reprojectSnapshotsToDeviceKeys(devices: ElectricalTrackedDevice[]): void {
@@ -568,7 +532,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       case 'location': return setValue(charger, 'location', this.toStringValue(value));
       case 'associatedBus': return setValue(charger, 'associatedBus', this.toStringValue(value));
       case 'voltage': {
-        const nextValue = this.toNumber(value, 'V');
+        const nextValue = toNumber(this.units, value, 'V');
         const stateChanged = !Object.is(charger.voltageState ?? null, state ?? null);
         if (Object.is(charger.voltage, nextValue) && !stateChanged) return false;
         charger.voltage = nextValue;
@@ -576,7 +540,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         return true;
       }
       case 'current': {
-        const nextValue = this.toNumber(value, 'A');
+        const nextValue = toNumber(this.units, value, 'A');
         const stateChanged = !Object.is(charger.currentState ?? null, state ?? null);
         if (Object.is(charger.current, nextValue) && !stateChanged) return false;
         charger.current = nextValue;
@@ -585,7 +549,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       }
       case 'power': return this.setPowerPathValue(charger, 'rawBatteryPower', value);
       case 'temperature': {
-        const nextValue = this.toNumber(value, 'K');
+        const nextValue = toNumber(this.units, value, 'K');
         const stateChanged = !Object.is(charger.temperatureState ?? null, state ?? null);
         charger.temperaturePath = path;
         if (Object.is(charger.temperature, nextValue) && !stateChanged) return false;
@@ -596,11 +560,11 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       case 'chargingAlgorithm': return setValue(charger, 'chargingAlgorithm', this.toStringValue(value));
       case 'chargerRole': return setValue(charger, 'chargerRole', this.toStringValue(value));
       case 'chargingMode': return setValue(charger, 'chargingMode', this.toStringValue(value));
-      case 'setpointVoltage': return setValue(charger, 'setpointVoltage', this.toNumber(value, 'V'));
-      case 'setpointCurrent': return setValue(charger, 'setpointCurrent', this.toNumber(value, 'A'));
+      case 'setpointVoltage': return setValue(charger, 'setpointVoltage', toNumber(this.units, value, 'V'));
+      case 'setpointCurrent': return setValue(charger, 'setpointCurrent', toNumber(this.units, value, 'A'));
       case 'controllerMode': return setValue(charger, 'controllerMode', this.toStringValue(value));
       case 'panelVoltage': {
-        const nextValue = this.toNumber(value, 'V');
+        const nextValue = toNumber(this.units, value, 'V');
         const stateChanged = !Object.is(charger.panelVoltageState ?? null, state ?? null);
         if (Object.is(charger.panelVoltage, nextValue) && !stateChanged) return false;
         charger.panelVoltage = nextValue;
@@ -608,7 +572,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         return true;
       }
       case 'panelCurrent': {
-        const nextValue = this.toNumber(value, 'A');
+        const nextValue = toNumber(this.units, value, 'A');
         const stateChanged = !Object.is(charger.panelCurrentState ?? null, state ?? null);
         if (Object.is(charger.panelCurrent, nextValue) && !stateChanged) return false;
         charger.panelCurrent = nextValue;
@@ -616,17 +580,17 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
         return true;
       }
       case 'panelPower': {
-        const nextValue = this.toNumber(value, 'W');
+        const nextValue = toNumber(this.units, value, 'W');
         const stateChanged = !Object.is(charger.panelPowerState ?? null, state ?? null);
         if (Object.is(charger.rawPanelPower, nextValue) && !stateChanged) return false;
         charger.rawPanelPower = nextValue;
         charger.panelPowerState = state;
         return true;
       }
-      case 'yieldToday': return setValue(charger, 'yieldToday', this.toNumber(value, 'kWh'));
-      case 'yieldYesterday': return setValue(charger, 'yieldYesterday', this.toNumber(value, 'kWh'));
+      case 'yieldToday': return setValue(charger, 'yieldToday', toNumber(this.units, value, 'kWh'));
+      case 'yieldYesterday': return setValue(charger, 'yieldYesterday', toNumber(this.units, value, 'kWh'));
       case 'panelTemperature': {
-        const nextValue = this.toNumber(value, 'K');
+        const nextValue = toNumber(this.units, value, 'K');
         const stateChanged = !Object.is(charger.panelTemperatureState ?? null, state ?? null);
         charger.panelTemperaturePath = path;
         if (Object.is(charger.panelTemperature, nextValue) && !stateChanged) return false;
@@ -639,7 +603,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       case 'load.state':
         return setValue(charger, 'load', value as string | number | boolean | null);
       case 'loadCurrent': {
-        const nextValue = this.toNumber(value, 'A');
+        const nextValue = toNumber(this.units, value, 'A');
         const stateChanged = !Object.is(charger.loadCurrentState ?? null, state ?? null);
         if (Object.is(charger.loadCurrent, nextValue) && !stateChanged) return false;
         charger.loadCurrent = nextValue;
@@ -652,7 +616,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
   }
 
   private setPowerPathValue(charger: SolarChargerSnapshot, key: 'rawBatteryPower' | 'rawPanelPower', value: unknown): boolean {
-    const parsedValue = this.toNumber(value, 'W');
+    const parsedValue = toNumber(this.units, value, 'W');
     return setValue(charger, key, parsedValue);
   }
 
@@ -904,11 +868,6 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
 
   private resolveTitleText(solar: SolarChargerSnapshot): string {
     return solar.name || `Solar ${solar.id}`;
-  }
-
-  private toNumber(value: unknown, unit: string): number | null {
-    if (value == null || typeof value !== 'number') return null;
-    return this.units.convertToUnit(unit, value) ?? value;
   }
 
   private isRelayActive(value: string | number | boolean | null | undefined): boolean {

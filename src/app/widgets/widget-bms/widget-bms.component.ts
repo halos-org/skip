@@ -3,7 +3,7 @@ import { select, type Selection } from 'd3-selection';
 import { arc } from 'd3-shape';
 import { take } from 'rxjs/operators';
 import { getColors, resolveZoneAwareColor } from '../../core/utils/themeColors.utils';
-import { BmsBankConfig, BmsBankConnectionMode, BmsWidgetConfig, ElectricalCardModeConfig, ElectricalTrackedDevice, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+import { BmsBankConfig, BmsBankConnectionMode, BmsWidgetConfig, ElectricalCardModeConfig, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { DataService } from '../../core/services/data.service';
 import { UnitsService } from '../../core/services/units.service';
@@ -14,7 +14,8 @@ import type { BmsBankDisplayModel, BmsBankSummary, BmsBatteryDisplayModel, BmsBa
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import type { ITheme } from '../../core/services/app-service';
 import { ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH } from '../shared/electrical-card-layout.constants';
-import { normalizeOptionalString, normalizeStringList } from '../shared/electrical-config.util';
+import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
+import { toFiniteNumber } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
 import type { ElectricalTopologyEntry } from '../shared/electrical-topology-store';
 import { WidgetTitleComponent } from '../../core/components/widget-title/widget-title.component';
@@ -392,7 +393,7 @@ export class WidgetBmsComponent implements AfterViewInit {
 
   private resolveBmsConfig(cfg: IWidgetSvcConfig): BmsWidgetConfig {
     const bms = cfg.bms;
-    const trackedDevices = this.normalizeTrackedDevices(bms?.trackedDevices);
+    const trackedDevices = normalizeTrackedDevices(bms?.trackedDevices);
     const groupBanks = this.normalizeBanksFromGroups(bms?.groups);
     const legacyBanks = this.normalizeBanksFromLegacy(bms?.banks);
 
@@ -402,33 +403,6 @@ export class WidgetBmsComponent implements AfterViewInit {
       banks: groupBanks.length > 0 ? groupBanks : legacyBanks,
       cardMode: this.normalizeCardMode(bms?.cardMode)
     };
-  }
-
-  private normalizeTrackedDevices(value: unknown): ElectricalTrackedDevice[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const devices = new Map<string, ElectricalTrackedDevice>();
-    value.forEach(item => {
-      if (!item || typeof item !== 'object') {
-        return;
-      }
-
-      const candidate = item as Partial<ElectricalTrackedDevice>;
-      const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
-      const source = typeof candidate.source === 'string' ? candidate.source.trim() : 'default';
-      if (!id || !source) {
-        return;
-      }
-
-      const key = typeof candidate.key === 'string' && candidate.key.trim().length > 0
-        ? candidate.key.trim()
-        : `${id}||${source}`;
-      devices.set(key, { id, source, key });
-    });
-
-    return [...devices.values()].sort((left, right) => left.key.localeCompare(right.key));
   }
 
   private normalizeCardMode(value: unknown): ElectricalCardModeConfig {
@@ -565,13 +539,13 @@ export class WidgetBmsComponent implements AfterViewInit {
         return true;
       }
       case 'voltage': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         if (Object.is(battery.voltage, nextValue)) return false;
         battery.voltage = nextValue;
         return true;
       }
       case 'current': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         const stateChanged = !Object.is(battery.currentState ?? null, state ?? null);
         if (Object.is(battery.current, nextValue) && !stateChanged) return false;
         battery.current = nextValue;
@@ -579,31 +553,31 @@ export class WidgetBmsComponent implements AfterViewInit {
         return true;
       }
       case 'temperature': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         if (Object.is(battery.temperature, nextValue)) return false;
         battery.temperature = nextValue;
         return true;
       }
       case 'capacity.nominal': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         if (Object.is(battery.capacityNominal, nextValue)) return false;
         battery.capacityNominal = nextValue;
         return true;
       }
       case 'capacity.actual': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         if (Object.is(battery.capacityActual, nextValue)) return false;
         battery.capacityActual = nextValue;
         return true;
       }
       case 'capacity.remaining': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         if (Object.is(battery.capacityRemaining, nextValue)) return false;
         battery.capacityRemaining = nextValue;
         return true;
       }
       case 'capacity.stateOfCharge': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         const stateChanged = !Object.is(battery.stateOfChargeState ?? null, state ?? null);
         if (Object.is(battery.stateOfCharge, nextValue) && !stateChanged) return false;
         battery.stateOfCharge = nextValue;
@@ -611,7 +585,7 @@ export class WidgetBmsComponent implements AfterViewInit {
         return true;
       }
       case 'capacity.timeRemaining': {
-        const nextValue = this.toNumber(value);
+        const nextValue = toFiniteNumber(value);
         if (Object.is(battery.timeRemaining, nextValue)) return false;
         battery.timeRemaining = nextValue;
         return true;
@@ -1192,12 +1166,6 @@ export class WidgetBmsComponent implements AfterViewInit {
     const filtered = values.filter((value): value is number => typeof value === 'number');
     if (!filtered.length) return null;
     return Math.min(...filtered);
-  }
-
-  private toNumber(value: unknown): number | null {
-    if (value == null) return null;
-    if (typeof value !== 'number') return null;
-    return value;
   }
 
   private buildSemiGaugeArcPath(radius: number, ratio: number | null | undefined): string {
