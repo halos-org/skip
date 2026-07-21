@@ -60,6 +60,8 @@ describe('DashboardComponent', () => {
             setStaticDashboard: vi.fn().mockName("DashboardService.setStaticDashboard"),
             notifyLayoutEditSaved: vi.fn().mockName("DashboardService.notifyLayoutEditSaved"),
             notifyLayoutEditCanceled: vi.fn().mockName("DashboardService.notifyLayoutEditCanceled"),
+            layoutEditSaveRequested: signal(0),
+            layoutEditCancelRequested: signal(0),
             navigateToNextDashboard: vi.fn().mockName("DashboardService.navigateToNextDashboard"),
             navigateToPreviousDashboard: vi.fn().mockName("DashboardService.navigateToPreviousDashboard"),
             consumePendingPageDirection: vi.fn().mockName("DashboardService.consumePendingPageDirection").mockReturnValue(null),
@@ -181,6 +183,38 @@ describe('DashboardComponent', () => {
             mockDashboardService.isDashboardStatic.set(false);
             vi.spyOn(component as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            expect(mockDashboardService.notifyLayoutEditCanceled).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('toolbar-driven layout edit requests', () => {
+        function stubLoad(): void {
+            vi.spyOn(component as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);
+        }
+
+        it('ignores the initial (zero) request tick', () => {
+            fixture.detectChanges();
+            expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
+            expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
+        });
+
+        it('commits the edit when the toolbar requests a save', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            fixture.detectChanges();
+            mockDashboardService.layoutEditSaveRequested.set(1);
+            fixture.detectChanges();
+            expect(privateApi._gridstack().grid.save).toHaveBeenCalledWith(false, false);
+            expect(mockDashboardService.setStaticDashboard).toHaveBeenCalledWith(true);
+            expect(mockDashboardService.notifyLayoutEditSaved).toHaveBeenCalledTimes(1);
+        });
+
+        it('discards the edit when the toolbar requests a cancel', () => {
+            stubLoad();
+            mockDashboardService.isDashboardStatic.set(false);
+            fixture.detectChanges();
+            mockDashboardService.layoutEditCancelRequested.set(1);
+            fixture.detectChanges();
+            expect(mockDashboardService.setStaticDashboard).toHaveBeenCalledWith(true);
             expect(mockDashboardService.notifyLayoutEditCanceled).toHaveBeenCalledTimes(1);
         });
     });
@@ -542,6 +576,8 @@ describe('DashboardComponent — embed mode empty state', () => {
             setStaticDashboard: vi.fn(),
             notifyLayoutEditSaved: vi.fn(),
             notifyLayoutEditCanceled: vi.fn(),
+            layoutEditSaveRequested: signal(0),
+            layoutEditCancelRequested: signal(0),
             navigateToNextDashboard: vi.fn(),
             navigateToPreviousDashboard: vi.fn(),
             consumePendingPageDirection: vi.fn().mockReturnValue(null),

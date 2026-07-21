@@ -35,28 +35,6 @@
   }
 }
 
-.edit-layout-close-icon {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  cursor: pointer;
-  z-index: 100;
-}
-.cancel {
-  @include mat.fab-overrides((
-    container-color: var(--mat-sys-primary),
-    foreground-color: var(--mat-sys-background),
-  ));
-}
-
-.save {
-  @include mat.fab-overrides((
-    container-color: var(--mat-sys-primary-fixed),
-    foreground-color: var(--mat-sys-background),
-
-  ));
-}
-
 /* Empty Dashboard State Styles */
 .dashboard-empty-state-container {
   position: absolute; /* detach from normal flow so it cannot change grid height */

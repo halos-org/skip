@@ -137,6 +137,21 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         void this.runPageChange();
       });
     });
+
+    // Done/Cancel now live on the toolbar (outside this component). They reach the grid
+    // through these request counters; the transactional save/cancel logic stays here,
+    // the only holder of the gridstack instance.
+    effect(() => {
+      const tick = this.dashboard.layoutEditSaveRequested();
+      if (!tick) return;
+      untracked(() => this.saveLayoutChanges());
+    });
+
+    effect(() => {
+      const tick = this.dashboard.layoutEditCancelRequested();
+      if (!tick) return;
+      untracked(() => this.cancelLayoutChanges());
+    });
   }
 
   ngAfterViewInit(): void {
