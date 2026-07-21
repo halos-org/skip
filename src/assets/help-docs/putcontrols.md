@@ -30,7 +30,7 @@ Check these basics first:
 
 Use this quick check before widget setup:
 
-1. Open **Data Inspector**.
+1. Open the **Signal K Data Browser**.
 2. Search for your candidate path (for example `self.electrical.switches.bank.0.1.state`).
 3. Confirm the path data type and whether **PUT Support** is enabled (a handler is registered).
 4. For Multi State controls, confirm the path metadata includes possible values (use the Signal K Data Browser).
@@ -54,10 +54,10 @@ Follow these steps in order:
 1. Install the required plugin or configure a Node-RED flow.
 2. If you installed a new plugin, restart the server. If you created a Node-RED flow, make sure the flow is Deployed.
 3. If using Node-RED, include a Signal K **put handler** node in your flow so widget commands are received.
-4. Confirm path exists in Data Inspector.
+4. Confirm path exists in the Signal K Data Browser.
 5. Confirm type and PUT support are compatible with widget/control type.
 6. Configure the widget in Skip.
-7. Trigger the control and verify the value changes in Data Inspector.
+7. Trigger the control and verify the value changes in the Signal K Data Browser.
 8. Validate the server-side handler executes the expected real-world action.
 
 ## Popular Digital Switching Plugins
@@ -97,5 +97,4 @@ If something does not work, check these first.
 Use these guides next as needed.
 
 - **Node-RED beginners:** [Node-RED Control Flows for Skip Widgets (Beginner Guide)](#/help/nodered-control-flows.md)
-- **Path discovery and validation:** [Data Inspector](#/help/datainspector.md)
 - **Widget overview and placement:** [Pages and Layout](#/help/dashboards.md)

@@ -109,7 +109,7 @@ Skip widgets turn Signal K data into readable visuals and controls. Available wi
 ## Troubleshooting
 | Issue                  | Possible Cause                        | Fix                                                                 |
 |------------------------|---------------------------------------|---------------------------------------------------------------------|
-| Data shows “—” or blank| Path missing/not configured/null value | Open widget config, verify Signal K path exists and updates. Use Data Inspector and Signal K Data Browser to view raw data from the server. |
+| Data shows “—” or blank| Path missing/not configured/null value | Open widget config, verify Signal K path exists and updates. Use the Signal K Data Browser to view raw data from the server. |
 | Wrong units            | Default convert unit used              | Edit widget config paths and set the desired target unit.            |
 | Slow page switching    | Excessive data sampling/too many widgets| Increase sample times; remove unused widgets. Split widgets into separate pages. Optimize system resource usage. |
 | Embedded page blank    | Cross‑origin blocked                   | See "Embed Page Viewer" help section.                               |
