@@ -6,9 +6,11 @@ import { States, type TState } from '../../core/interfaces/signalk-interfaces';
  * parsed Signal K value is written onto a widget's snapshot. Extracted from the
  * verbatim copies the charger/alternator/inverter/ac widgets carried.
  *
- * solar-charger keeps its own `toStringValue` (which stringifies non-strings)
- * and `resolveMostSevereState` (rank-based ordering); bms uses a different
- * write path entirely. Those variants are behaviorally distinct — see #351.
+ * `resolveMostSevereState` is the family's canonical severity fold: it ranks
+ * TState by the Signal K severity order (normal < nominal < alert < warn <
+ * alarm < emergency) and returns the highest present. solar-charger keeps its
+ * own `toStringValue` (which stringifies non-strings); bms uses a different
+ * write path entirely.
  */
 
 export function setValue<T, K extends keyof T>(target: T, key: K, nextValue: T[K]): boolean {
@@ -62,9 +64,22 @@ export function toBoolean(value: unknown): boolean | null {
 }
 
 export function resolveMostSevereState(...states: (TState | null | undefined)[]): TState | null {
-  if (states.some(state => state === States.Alert)) return States.Alert;
-  if (states.some(state => state === States.Alarm)) return States.Alarm;
-  if (states.some(state => state === States.Warn)) return States.Warn;
-  if (states.some(state => state === States.Normal)) return States.Normal;
-  return null;
+  const rank: Record<TState, number> = {
+    [States.Normal]: 0,
+    [States.Nominal]: 1,
+    [States.Alert]: 2,
+    [States.Warn]: 3,
+    [States.Alarm]: 4,
+    [States.Emergency]: 5
+  };
+
+  let current: TState | null = null;
+  for (const state of states) {
+    if (!state) continue;
+    if (!current || rank[state] > rank[current]) {
+      current = state;
+    }
+  }
+
+  return current;
 }

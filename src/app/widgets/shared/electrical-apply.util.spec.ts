@@ -101,10 +101,14 @@ describe('electrical-apply.util', () => {
   });
 
   describe('resolveMostSevereState', () => {
-    it('applies Alert > Alarm > Warn > Normal priority', () => {
-      expect(resolveMostSevereState(States.Normal, States.Alarm, States.Alert)).toBe(States.Alert);
+    it('returns the highest-ranked state by Signal K severity order', () => {
+      // normal < nominal < alert < warn < alarm < emergency
+      expect(resolveMostSevereState(States.Normal, States.Alarm, States.Alert)).toBe(States.Alarm);
+      expect(resolveMostSevereState(States.Alert, States.Warn)).toBe(States.Warn);
       expect(resolveMostSevereState(States.Normal, States.Alarm)).toBe(States.Alarm);
       expect(resolveMostSevereState(States.Warn, States.Normal)).toBe(States.Warn);
+      expect(resolveMostSevereState(States.Nominal, States.Normal)).toBe(States.Nominal);
+      expect(resolveMostSevereState(States.Alarm, States.Emergency)).toBe(States.Emergency);
       expect(resolveMostSevereState(States.Normal, null)).toBe(States.Normal);
     });
 
