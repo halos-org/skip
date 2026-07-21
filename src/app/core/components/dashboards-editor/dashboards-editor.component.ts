@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, viewChild } from '@angular/core';
 import { GestureDirective } from '../../directives/gesture.directive';
 import { Dashboard, DashboardService } from '../../services/dashboard.service';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,12 +16,17 @@ import { ActionMenuItem } from '../action-menu/action-menu-item';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatButtonModule, MatIconModule, CdkDropList, CdkDrag, MatRippleModule, GestureDirective, ActionMenuComponent],
   templateUrl: './dashboards-editor.component.html',
-  styleUrl: './dashboards-editor.component.scss'
+  styleUrl: './dashboards-editor.component.scss',
+  host: { '[class.compact]': 'compact()' }
 })
 export class DashboardsEditorComponent {
   protected _dashboard = inject(DashboardService);
   private _uiEvent = inject(uiEventService);
   private _dialog = inject(DialogService);
+
+  /** Compact single-row layout for the page-manager bottom sheet; full tiled grid otherwise. */
+  public readonly compact = input<boolean>(false);
+  protected readonly iconSizePx = computed(() => this.compact() ? 40 : 72);
 
   private readonly _actionMenu = viewChild.required(ActionMenuComponent);
   /** The tile whose action menu is currently open. */
