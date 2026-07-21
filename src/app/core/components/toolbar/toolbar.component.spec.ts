@@ -83,7 +83,7 @@ describe('ToolbarComponent', () => {
 
   it('opens the actions view via the router', () => {
     init();
-    byLabel('Settings')!.click();
+    byLabel('Actions')!.click();
     expect(router.navigate).toHaveBeenCalledWith(['/actions']);
   });
 
