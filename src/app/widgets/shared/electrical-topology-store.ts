@@ -25,8 +25,10 @@ export interface ElectricalTopologyConfig<TSnapshot extends IElectricalTopologyS
  * Source-blind keyed-snapshot store shared by the electrical widget family
  * (alternator, inverter, ac, solar). Owns the by-key snapshot store, the
  * discovered-id and tracked-device signals, the batch-apply flush body,
- * reproject (re-key id-arrived-before-config snapshots onto configured device
- * keys), and the tracked-else-discovered visible selection. Per-widget metric
+ * reproject (reconcile snapshots to the tracked set: re-key id-arrived-before-config
+ * snapshots onto configured device keys, and re-key an untracked device's snapshot
+ * back to a discovered plain-id so no stale device-key card lingers), and the
+ * tracked-else-discovered visible selection. Per-widget metric
  * mapping and derivation are injected seams. Charger's source-qualified variant
  * and bms's id-only store compose their own paths (Stage 2b/2d).
  */
@@ -111,43 +113,59 @@ export class ElectricalTopologyStore<TSnapshot extends IElectricalTopologySnapsh
   }
 
   private reproject(devices: ElectricalTrackedDevice[]): void {
-    if (!devices.length) {
-      return;
-    }
-
     const idToKeys = new Map<string, string[]>();
     devices.forEach(device => {
       const existing = idToKeys.get(device.id) ?? [];
       existing.push(device.key);
       idToKeys.set(device.id, existing);
     });
+    const trackedKeys = new Set(devices.map(device => device.key));
 
     this._store.update(current => {
       let next = current;
       let changed = false;
+      const forkStore = (): void => {
+        if (!changed) {
+          next = { ...current };
+          changed = true;
+        }
+      };
 
       idToKeys.forEach((keys, id) => {
         const sourceSnapshot = current[id];
         if (!sourceSnapshot) {
           return;
         }
-
         for (const deviceKey of keys) {
           if (current[deviceKey]) {
             continue;
           }
           const trackedDevice = devices.find(device => device.key === deviceKey);
-          if (!changed) {
-            next = { ...current };
-            changed = true;
-          }
+          forkStore();
           next[deviceKey] = { ...sourceSnapshot, source: trackedDevice?.source ?? null, deviceKey };
         }
-
-        if (changed && next[id]?.deviceKey === undefined) {
-          delete next[id];
-        }
       });
+
+      for (const key of Object.keys(current)) {
+        const snapshot = current[key];
+        if (!snapshot) {
+          continue;
+        }
+        if (snapshot.deviceKey === undefined) {
+          if (idToKeys.has(snapshot.id)) {
+            forkStore();
+            delete next[key];
+          }
+          continue;
+        }
+        if (!trackedKeys.has(key)) {
+          forkStore();
+          delete next[key];
+          if (!idToKeys.has(snapshot.id) && !next[snapshot.id]) {
+            next[snapshot.id] = { ...snapshot, source: null, deviceKey: undefined };
+          }
+        }
+      }
 
       return changed ? next : current;
     });
