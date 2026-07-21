@@ -138,11 +138,6 @@ export class WidgetFreeboardskComponent implements AfterViewInit, OnDestroy {
           break;
       }
     }
-    if (event.data.type === 'keydown' && event.data.keyEventData?.instanceId === instanceId) {
-      const { key, ctrlKey, shiftKey } = event.data.keyEventData;
-      const keyboardEvent = new KeyboardEvent('keydown', { key, ctrlKey, shiftKey, bubbles: true, cancelable: true });
-      document.dispatchEvent(keyboardEvent);
-    }
   };
 
   private getExpectedIframeOrigin(): string | null {

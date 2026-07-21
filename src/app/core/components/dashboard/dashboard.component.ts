@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, inject, OnDestroy, viewChild, ElementRef, computed, effect, untracked, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, HostListener, inject, OnDestroy, viewChild, ElementRef, computed, effect, untracked, signal } from '@angular/core';
 import { GestureDirective } from '../../directives/gesture.directive';
 import { GridstackComponent, NgGridStackWidget, NgGridStackOptions, } from 'gridstack/dist/angular';
 import { GridItemHTMLElement, GridStackOptions } from 'gridstack';
@@ -11,6 +11,7 @@ import { DialogService } from '../../services/dialog.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 import { uiEventService } from '../../services/uiEvent.service';
+import { isBlockingOverlayOpen } from '../../utils/hotkey-target.util';
 import { WidgetDescription } from '../../services/widget.service';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { Router } from '@angular/router';
@@ -370,6 +371,19 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.loadDashboard(this.dashboard.activeDashboard());
     this.dashboard.setStaticDashboard(true);
     this.dashboard.notifyLayoutEditCanceled();
+  }
+
+  /**
+   * Esc cancels an in-progress layout edit. If an overlay (dialog / menu /
+   * select) is open, its own Esc handling wins — a later bare Esc, with
+   * nothing open, then cancels the edit.
+   */
+  @HostListener('document:keydown.escape')
+  protected onEscapeKey(): void {
+    if (this.dashboard.isDashboardStatic()) return;
+    if (this._uiEvent.isDragging()) return;
+    if (isBlockingOverlayOpen()) return;
+    this.cancelLayoutChanges();
   }
 
   protected onEmptyAreaTap(e: Event | CustomEvent): void {

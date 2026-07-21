@@ -61,12 +61,5 @@ export function generateSwipeScript(config: SwipeScriptConfig): string {
     document.addEventListener('pointermove', track, {passive:true});
     document.addEventListener('pointerup', onUp, {passive:true});
     document.addEventListener('pointercancel', onCancel, {passive:true});
-    document.addEventListener('keydown', (event) => {
-      const pageNav = event.ctrlKey && !event.shiftKey && ['ArrowLeft','ArrowRight'].includes(event.key);
-      const action = event.ctrlKey && event.shiftKey && ['E','F','N'].includes(event.key);
-      if (pageNav || action) {
-        window.parent.postMessage({ type:'keydown', keyEventData:{ key:event.key, ctrlKey:event.ctrlKey, shiftKey:event.shiftKey, instanceId }}, '*');
-      }
-    });
   })();`;
 }

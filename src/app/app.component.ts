@@ -28,6 +28,7 @@ import { SsoRedirectService } from './core/services/sso-redirect.service';
 import { NotificationOverlayService } from './core/services/notification-overlay.service';
 import { DialogService } from './core/services/dialog.service';
 import { resolveBrowserTabTitle } from './core/utils/browser-tab-title.util';
+import { HOTKEY_KEYS, isInteractiveKeyTarget, isBlockingOverlayOpen } from './core/utils/hotkey-target.util';
 
 const MOUSE_PEEK_THROTTLE_MS = 250;
 
@@ -235,40 +236,58 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    // Single hotkey registration for the whole shell (always mounted):
-    // Ctrl+←/→ page nav, Ctrl+Shift+E/F/N edit/fullscreen/night. Shift
-    // disambiguates the two groups within the one keydown listener.
+    // Single hotkey registration for the whole shell (always mounted).
+    // Bare keys guarded by focus (see handleKeyDown): ←/→ page nav,
+    // e/f/n edit/fullscreen/night. No modifiers, so nothing clashes with a
+    // browser shortcut.
     this._uiEvent.addHotkeyListener(
       this._hotkeyHandler,
-      { ctrlKey: true, keys: ['arrowright', 'arrowleft', 'e', 'f', 'n'] }
+      { keys: HOTKEY_KEYS.map((key) => key.toLowerCase()) }
     );
   }
 
   private handleKeyDown(key: string, event: KeyboardEvent): void {
+    // Bare keys only: a modifier means the user is invoking a browser/OS
+    // shortcut, not a Skip hotkey.
+    if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+    // Yield to a focused control that consumes the keystroke, or to an open
+    // modal (dialog/menu/select) that owns the keyboard.
+    if (isInteractiveKeyTarget(event.target) || isBlockingOverlayOpen()) return;
     switch (key) {
       case 'arrowright':
-        if (!event.shiftKey) this.pageNav('next');
+        if (this.pageNav('next')) event.preventDefault();
         break;
       case 'arrowleft':
-        if (!event.shiftKey) this.pageNav('prev');
+        if (this.pageNav('prev')) event.preventDefault();
         break;
       case 'e':
-        if (event.shiftKey) this._dashboard.setStaticDashboard(false);
+        // Edit is dashboard-scoped: don't unlock a dashboard that isn't showing.
+        if (this.dashboardVisible()) {
+          this._dashboard.setStaticDashboard(false);
+          event.preventDefault();
+        }
         break;
       case 'f':
-        if (event.shiftKey) this._uiEvent.toggleFullScreen();
+        this._uiEvent.toggleFullScreen();
+        event.preventDefault();
         break;
       case 'n':
-        if (event.shiftKey) this._app.toggleNightMode();
+        this._app.toggleNightMode();
+        event.preventDefault();
         break;
     }
   }
 
-  /** Navigate pages, honoring locked mode and suppressing during a drag. */
-  protected pageNav(direction: PageNavDirection): void {
-    if (!this.dashboardVisible() || !this._dashboard.isDashboardStatic() || this._uiEvent.isDragging()) return;
+  /**
+   * Navigate pages, honoring locked mode and suppressing during a drag.
+   * Returns whether the key was consumed, so the caller can preventDefault
+   * only when a page actually changed (bare arrows otherwise scroll).
+   */
+  protected pageNav(direction: PageNavDirection): boolean {
+    if (!this.dashboardVisible() || !this._dashboard.isDashboardStatic() || this._uiEvent.isDragging()) return false;
     if (direction === 'next') this._dashboard.navigateToNextDashboard();
     else this._dashboard.navigateToPreviousDashboard();
+    return true;
   }
 
   protected onChromeIntent(intent: ChromeIntent): void {

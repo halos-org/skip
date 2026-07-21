@@ -19,10 +19,20 @@ import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
 import { IConfig } from './core/interfaces/app-settings.interfaces';
 import { LATEST_APP_CONFIG_VERSION } from './core/constants/config-versions.const';
 
+// A minimal stand-in for the KeyboardEvent fields the handler reads.
+interface HotkeyTestEvent {
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+  target?: EventTarget | null;
+  preventDefault?: ReturnType<typeof vi.fn>;
+}
+
 // Access the component's private surface without widening the class API.
 interface AppComponentHotkeyApi {
   dashboardVisible: { set: (v: boolean) => void };
-  handleKeyDown: (key: string, event: { shiftKey: boolean }) => void;
+  handleKeyDown: (key: string, event: HotkeyTestEvent) => void;
   onShellPointerDown: (event: { target: { closest: (sel: string) => unknown } }) => void;
 }
 
@@ -202,53 +212,123 @@ describe('AppComponent', () => {
     });
   });
 
-  describe('consolidated hotkeys', () => {
-    it('Ctrl+Arrow navigates pages when static, visible and not dragging', () => {
+  describe('bare-key hotkeys', () => {
+    function keyEvent(overrides: Partial<HotkeyTestEvent> = {}): HotkeyTestEvent {
+      return {
+        ctrlKey: false, altKey: false, metaKey: false, shiftKey: false,
+        target: document.body, preventDefault: vi.fn(),
+        ...overrides,
+      };
+    }
+
+    it('bare arrows navigate pages when static, visible and not dragging, and preventDefault', () => {
       const app = create();
       app.dashboardVisible.set(true);
-      app.handleKeyDown('arrowright', { shiftKey: false });
-      app.handleKeyDown('arrowleft', { shiftKey: false });
+      const right = keyEvent();
+      const left = keyEvent();
+      app.handleKeyDown('arrowright', right);
+      app.handleKeyDown('arrowleft', left);
       expect(dashboard.navigateToNextDashboard).toHaveBeenCalledTimes(1);
       expect(dashboard.navigateToPreviousDashboard).toHaveBeenCalledTimes(1);
+      expect(right.preventDefault).toHaveBeenCalledTimes(1);
+      expect(left.preventDefault).toHaveBeenCalledTimes(1);
     });
 
-    it('Ctrl+Shift+Arrow does not navigate (Shift is reserved for actions)', () => {
+    it('any modifier suppresses the hotkey (bare keys only)', () => {
       const app = create();
       app.dashboardVisible.set(true);
-      app.handleKeyDown('arrowright', { shiftKey: true });
+      app.handleKeyDown('arrowright', keyEvent({ ctrlKey: true }));
+      app.handleKeyDown('arrowright', keyEvent({ shiftKey: true }));
+      app.handleKeyDown('n', keyEvent({ metaKey: true }));
+      app.handleKeyDown('f', keyEvent({ altKey: true }));
       expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+      expect(appService.toggleNightMode).not.toHaveBeenCalled();
+      expect(uiEvent.toggleFullScreen).not.toHaveBeenCalled();
     });
 
-    it('page nav is a no-op while the dashboard is unlocked (edit mode)', () => {
+    it('an editable / interactive focus target suppresses the hotkey and does not preventDefault', () => {
+      const app = create();
+      app.dashboardVisible.set(true);
+      const input = document.createElement('input');
+      const nightEv = keyEvent({ target: input });
+      const arrowEv = keyEvent({ target: input });
+      app.handleKeyDown('n', nightEv);
+      app.handleKeyDown('arrowright', arrowEv);
+      expect(appService.toggleNightMode).not.toHaveBeenCalled();
+      expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+      expect(nightEv.preventDefault).not.toHaveBeenCalled();
+      expect(arrowEv.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('page nav is a no-op — and does not preventDefault — while the dashboard is unlocked', () => {
       const app = create();
       app.dashboardVisible.set(true);
       dashboard.isDashboardStatic.set(false);
-      app.handleKeyDown('arrowright', { shiftKey: false });
+      const ev = keyEvent();
+      app.handleKeyDown('arrowright', ev);
       expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+      expect(ev.preventDefault).not.toHaveBeenCalled();
     });
 
     it('page nav is a no-op off a dashboard route', () => {
       const app = create();
       app.dashboardVisible.set(false);
-      app.handleKeyDown('arrowright', { shiftKey: false });
+      app.handleKeyDown('arrowright', keyEvent());
       expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
     });
 
-    it('Ctrl+Shift+E/F/N trigger edit / fullscreen / night; the unshifted keys do not', () => {
+    it('bare e/f/n enter edit / toggle fullscreen / toggle night, and preventDefault', () => {
       const app = create();
-      app.handleKeyDown('e', { shiftKey: true });
-      app.handleKeyDown('f', { shiftKey: true });
-      app.handleKeyDown('n', { shiftKey: true });
+      app.dashboardVisible.set(true);
+      const e = keyEvent();
+      const f = keyEvent();
+      const n = keyEvent();
+      app.handleKeyDown('e', e);
+      app.handleKeyDown('f', f);
+      app.handleKeyDown('n', n);
       expect(dashboard.setStaticDashboard).toHaveBeenCalledWith(false);
       expect(uiEvent.toggleFullScreen).toHaveBeenCalledTimes(1);
       expect(appService.toggleNightMode).toHaveBeenCalledTimes(1);
+      expect(e.preventDefault).toHaveBeenCalledTimes(1);
+      expect(f.preventDefault).toHaveBeenCalledTimes(1);
+      expect(n.preventDefault).toHaveBeenCalledTimes(1);
+    });
 
-      app.handleKeyDown('e', { shiftKey: false });
-      app.handleKeyDown('f', { shiftKey: false });
-      app.handleKeyDown('n', { shiftKey: false });
-      expect(dashboard.setStaticDashboard).toHaveBeenCalledTimes(1);
-      expect(uiEvent.toggleFullScreen).toHaveBeenCalledTimes(1);
-      expect(appService.toggleNightMode).toHaveBeenCalledTimes(1);
+    it('bare e does not enter edit off a dashboard route', () => {
+      const app = create();
+      app.dashboardVisible.set(false);
+      const e = keyEvent();
+      app.handleKeyDown('e', e);
+      expect(dashboard.setStaticDashboard).not.toHaveBeenCalled();
+      expect(e.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('suppresses hotkeys while a modal overlay (dialog/menu/select) is open', () => {
+      const app = create();
+      app.dashboardVisible.set(true);
+      const backdrop = document.createElement('div');
+      backdrop.className = 'cdk-overlay-backdrop';
+      document.body.appendChild(backdrop);
+      try {
+        const n = keyEvent();
+        const right = keyEvent();
+        app.handleKeyDown('n', n);
+        app.handleKeyDown('arrowright', right);
+        expect(appService.toggleNightMode).not.toHaveBeenCalled();
+        expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+        expect(n.preventDefault).not.toHaveBeenCalled();
+      } finally {
+        backdrop.remove();
+      }
+    });
+
+    it('registers the bare hotkey set with no modifier filter', () => {
+      const app = create() as unknown as { ngAfterViewInit: () => void };
+      app.ngAfterViewInit();
+      expect(uiEvent.addHotkeyListener).toHaveBeenCalledWith(
+        expect.any(Function),
+        { keys: ['arrowleft', 'arrowright', 'e', 'f', 'n'] }
+      );
     });
   });
 

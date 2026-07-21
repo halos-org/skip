@@ -8,20 +8,14 @@ describe('generateSwipeScript', () => {
     expect(script).toContain("instanceId='abc-123'");
   });
 
-  it('forwards Ctrl+Arrow (no Shift) as page navigation', () => {
-    expect(script).toContain("['ArrowLeft','ArrowRight'].includes(event.key)");
-    // page-nav arrows must be gated to NOT-shift so they stay distinct from the
-    // Ctrl+Shift+E/F/N actions the parent handler disambiguates on Shift.
-    expect(script).toContain('!event.shiftKey');
+  it('detects swipes and forwards them to the parent', () => {
+    expect(script).toContain('window.parent.postMessage');
+    expect(script).toContain('swipeleft');
+    expect(script).toContain('swiperight');
   });
 
-  it('forwards Ctrl+Shift+E/F/N as actions', () => {
-    expect(script).toContain("['E','F','N'].includes(event.key)");
-    expect(script).toContain('event.ctrlKey && event.shiftKey');
-  });
-
-  it('no longer forwards the retired vertical arrow hotkeys', () => {
-    expect(script).not.toContain('ArrowUp');
-    expect(script).not.toContain('ArrowDown');
+  it('does not forward keyboard events — embeds own their keyboard', () => {
+    expect(script).not.toContain('keydown');
+    expect(script).not.toContain('keyEventData');
   });
 });

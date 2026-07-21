@@ -4,14 +4,17 @@ Skip supports touch, mouse, and keyboard input across devices.
 | Action               | Touch                        | Mouse / wheel                         | Keyboard                                          |
 |----------------------|------------------------------|---------------------------------------|---------------------------------------------------|
 | Show the toolbar     | Swipe down from the top      | Scroll up, or tap the top peek strip  | —                                                 |
-| Move between pages   | Swipe left or right          | Scroll horizontally                   | <kbd>Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd> (Left/Right Arrow) |
+| Move between pages   | Swipe left or right          | Scroll horizontally                   | <kbd>←</kbd>/<kbd>→</kbd> (Left/Right Arrow)       |
 | Jump to a page       | Tap its icon in the toolbar  | Click its icon in the toolbar         | —                                                 |
-| Enter page edit mode | Tap the edit button          | Click the edit button                 | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>E</kbd>  |
-| Toggle Fullscreen    | —                            | Click the fullscreen button           | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>F</kbd>  |
-| Toggle Night mode    | Tap the night-mode button    | Click the night-mode button           | <kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>N</kbd>  |
+| Enter page edit mode | Tap the edit button          | Click the edit button                 | <kbd>E</kbd>                                       |
+| Cancel page edit     | Tap the Cancel button        | Click the Cancel button               | <kbd>Esc</kbd>                                     |
+| Toggle Fullscreen    | —                            | Click the fullscreen button           | <kbd>F</kbd>                                       |
+| Toggle Night mode    | Tap the night-mode button    | Click the night-mode button           | <kbd>N</kbd>                                       |
 | Open notifications   | Tap the notifications button (or alarm badge) | Click the notifications button (or alarm badge) | —                                |
 
 > Note that the words Touch and Tap are synonymous with mouse click.
+
+> Keyboard shortcuts are single keys with no modifier, and are ignored while you are typing in a text field or adjusting a control.
 
 ## The Toolbar
 Skip has no permanent navigation bar. A toolbar sits hidden at the top of the page and slides down when you need it — swipe down from the top, scroll up, or tap the thin strip that peeks at the top edge. It hides again when you scroll back, tap elsewhere, or leave it idle.

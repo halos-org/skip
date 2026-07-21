@@ -24,6 +24,11 @@ interface DashboardComponentPrivateApi {
     };
 }
 
+interface DashboardEscApi {
+    onEscapeKey: () => void;
+    loadDashboard: (id: number | null) => void;
+}
+
 describe('DashboardComponent', () => {
     let fixture: ComponentFixture<DashboardComponent>;
     let component: DashboardComponent;
@@ -129,6 +134,55 @@ describe('DashboardComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    describe('Esc cancels layout edit', () => {
+        function escApi(): DashboardEscApi {
+            const api = component as unknown as DashboardEscApi;
+            vi.spyOn(api, 'loadDashboard').mockImplementation(() => undefined);
+            return api;
+        }
+
+        it('cancels the edit (reloads + re-locks) when editing and no overlay is open', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            escApi().onEscapeKey();
+            expect(mockDashboardService.setStaticDashboard).toHaveBeenCalledWith(true);
+            expect(mockDashboardService.notifyLayoutEditCanceled).toHaveBeenCalledTimes(1);
+        });
+
+        it('does nothing when the dashboard is not in edit mode', () => {
+            mockDashboardService.isDashboardStatic.set(true);
+            escApi().onEscapeKey();
+            expect(mockDashboardService.setStaticDashboard).not.toHaveBeenCalled();
+            expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
+        });
+
+        it('yields to an open modal overlay (dialog / menu / select) so its own Esc wins', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            const backdrop = document.createElement('div');
+            backdrop.className = 'cdk-overlay-backdrop';
+            document.body.appendChild(backdrop);
+            try {
+                escApi().onEscapeKey();
+                expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
+            } finally {
+                backdrop.remove();
+            }
+        });
+
+        it('does not cancel while a widget drag is in progress', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            (TestBed.inject(uiEventService) as unknown as { isDragging: { set: (v: boolean) => void } }).isDragging.set(true);
+            escApi().onEscapeKey();
+            expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
+        });
+
+        it('cancels via a real Escape keydown (HostListener wiring)', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            vi.spyOn(component as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            expect(mockDashboardService.notifyLayoutEditCanceled).toHaveBeenCalledTimes(1);
+        });
     });
 
     it('should save dashboard configuration', () => {

@@ -99,7 +99,7 @@ export class WidgetIframeComponent implements AfterViewInit, OnDestroy {
     const expectedOrigin = this.getExpectedIframeOrigin();
     if (expectedOrigin && event.origin !== expectedOrigin) return;
 
-    const instanceId = event.data?.eventData?.instanceId || event.data?.keyEventData?.instanceId;
+    const instanceId = event.data?.eventData?.instanceId;
     if (!instanceId || instanceId !== this.id()) return;
 
     // Handle gestures
@@ -120,12 +120,6 @@ export class WidgetIframeComponent implements AfterViewInit, OnDestroy {
         default:
           break;
       }
-    }
-    // Handle keydown events
-    if (event.data.type === 'keydown' && event.data.keyEventData) {
-      const { key, ctrlKey, shiftKey } = event.data.keyEventData;
-      const keyboardEvent = new KeyboardEvent('keydown', { key, ctrlKey, shiftKey, bubbles: true, cancelable: true });
-      document.dispatchEvent(keyboardEvent);
     }
   };
 
