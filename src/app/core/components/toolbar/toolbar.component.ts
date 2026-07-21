@@ -96,7 +96,7 @@ export class ToolbarComponent implements OnDestroy {
     this.app.toggleNightMode();
   }
 
-  protected openSettings(): void {
+  protected openActions(): void {
     this.router.navigate(['/actions']);
   }
 

@@ -16,8 +16,8 @@
     (mouseleave)="onPointerLeave()"
   >
     <div class="toolbar-group toolbar-start">
-      <button mat-icon-button aria-label="Settings" (click)="openSettings()">
-        <mat-icon svgIcon="skip" />
+      <button mat-icon-button aria-label="Actions" (click)="openActions()">
+        <mat-icon>apps</mat-icon>
       </button>
       @if (fullscreenSupported()) {
         <button
