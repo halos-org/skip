@@ -19,7 +19,9 @@ Skip supports touch, mouse, and keyboard input across devices.
 ## The Toolbar
 Skip has no permanent navigation bar. A toolbar sits hidden at the top of the page and slides down when you need it — swipe down from the top, scroll up, or tap the thin strip that peeks at the top edge. It hides again when you scroll back, tap elsewhere, or leave it idle.
 
-The toolbar holds:
+<img src="assets/help-docs/img/toolbar.png" alt="The Skip toolbar with numbered callouts, left to right" title="The Skip toolbar" width="100%">
+
+The toolbar holds, from left to right:
 1. Actions — opens Settings, Remote Control, Help, and dashboard editing
 2. *Fullscreen toggle
 3. **Night-mode toggle
