@@ -1,3 +1,5 @@
+<page-header pageTitle="Connection" svgIconId="cloud" />
+
 <div class="sso-identity" aria-live="polite">
   @if (isUserSession()) {
     <span>Signed in@if (loginStatus()?.oidcProviderName) { via {{ loginStatus()?.oidcProviderName }}}@if (loginStatus()?.username) { as {{ loginStatus()?.username }}}.</span>

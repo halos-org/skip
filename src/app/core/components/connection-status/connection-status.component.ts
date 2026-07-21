@@ -7,6 +7,7 @@ import { SignalKDeltaService } from '../../services/signalk-delta.service';
 import { AuthenticationService } from '../../services/authentication.service';
 import { SsoRedirectService } from '../../services/sso-redirect.service';
 import { MatButton } from '@angular/material/button';
+import { PageHeaderComponent } from '../page-header/page-header.component';
 import { Chart } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { CanvasService } from '../../services/canvas.service';
@@ -27,7 +28,8 @@ registerChartComponents();
   templateUrl: './connection-status.component.html',
   styleUrls: ['./connection-status.component.scss'],
   imports: [
-    MatButton
+    MatButton,
+    PageHeaderComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
