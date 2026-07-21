@@ -370,7 +370,7 @@ describe('SettingsService — default config isolation', () => {
 
 describe('SettingsService — hydration (pushSettings) characterization', () => {
   const APP_CONFIG_KEYS = [
-    'autoNightMode', 'browserTabTitle', 'configVersion',
+    'autoNightMode', 'browserTabTitle', 'configVersion', 'keepScreenAwake',
     'nightModeBrightness', 'notificationConfig', 'redNightMode'
   ];
 
@@ -390,6 +390,16 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
     expect(service.getNotificationConfig()).toEqual(fullNotificationConfig());
     expect(service.getDashboardConfig()).toEqual([{ id: 'd1' }]);
     expect(service.getConfigVersion()).toBe(LOADED_CONFIG_VERSION);
+  });
+
+  it('hydrates keepScreenAwake to true when the stored config omits it (#359)', () => {
+    const { service } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
+    expect(service.getKeepScreenAwake()).toBe(true);
+  });
+
+  it('honors a stored keepScreenAwake=false (#359)', () => {
+    const { service } = setupHydrated({ app: { ...loadedAppConfig(), keepScreenAwake: false }, theme: null, dashboards: [] });
+    expect(service.getKeepScreenAwake()).toBe(false);
   });
 
   // The persist-on-missing bootstrap fields: exactly these three (widgetHistoryDisabled was

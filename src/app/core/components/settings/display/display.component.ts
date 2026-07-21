@@ -4,6 +4,7 @@ import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/l
 import { AppService } from '../../../services/app-service';
 import { ToastService } from '../../../services/toast.service';
 import { SettingsService } from '../../../services/settings.service';
+import { uiEventService } from '../../../services/uiEvent.service';
 import { PluginConfigClientService } from '../../../services/plugin-config-client.service';
 import { IPluginApiFailure, ISignalkPlugin } from '../../../interfaces/signalk-plugin-config.interfaces';
 import { FormsModule, NgForm } from '@angular/forms';
@@ -36,6 +37,7 @@ export class SettingsDisplayComponent implements OnInit {
   private readonly app = inject(AppService);
   private readonly toast = inject(ToastService);
   private readonly settings = inject(SettingsService);
+  protected readonly uiEvent = inject(uiEventService);
   private readonly responsive = inject(BreakpointObserver);
   private readonly pluginConfig = inject(PluginConfigClientService);
   protected isPhonePortrait: Signal<BreakpointState>;
@@ -47,6 +49,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected instanceName = model<string>('');
   protected browserTabTitle = model<string>('Skip');
   protected isPathValidationDisabled = model<boolean>(this.settings.getDisablePathValidation());
+  protected keepScreenAwake = model<boolean>(true);
   // Guards concurrent plugin enable checks to avoid stale promise handlers mutating state
   private _pluginCheckSeq = 0;
 
@@ -62,6 +65,7 @@ export class SettingsDisplayComponent implements OnInit {
     this.isRemoteControl.set(this.settings.getIsRemoteControl());
     this.instanceName.set(this.settings.getInstanceName());
     this.browserTabTitle.set(this.settings.getBrowserTabTitle());
+    this.keepScreenAwake.set(this.settings.getKeepScreenAwake());
   }
 
   protected saveAllSettings():void {
@@ -104,6 +108,7 @@ export class SettingsDisplayComponent implements OnInit {
     }
     this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());
+    this.settings.setKeepScreenAwake(this.keepScreenAwake());
     this.displayForm()?.form.markAsPristine();
     this.toast.show("Configuration saved", 1000, true, 'message');
   }

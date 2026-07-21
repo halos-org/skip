@@ -60,6 +60,7 @@ describe('AppComponent', () => {
     addHotkeyListener: ReturnType<typeof vi.fn>;
     removeHotkeyListener: ReturnType<typeof vi.fn>;
     toggleFullScreen: ReturnType<typeof vi.fn>;
+    setKeepAwake: ReturnType<typeof vi.fn>;
   };
   let appService: { toggleNightMode: ReturnType<typeof vi.fn> };
   let chrome: {
@@ -86,6 +87,7 @@ describe('AppComponent', () => {
       addHotkeyListener: vi.fn(),
       removeHotkeyListener: vi.fn(),
       toggleFullScreen: vi.fn(),
+      setKeepAwake: vi.fn(),
     };
     appService = { toggleNightMode: vi.fn() };
     chrome = { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() };
@@ -424,6 +426,7 @@ describe('AppComponent — embed mode chrome', () => {
       addHotkeyListener: vi.fn(),
       removeHotkeyListener: vi.fn(),
       toggleFullScreen: vi.fn(),
+      setKeepAwake: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -487,6 +490,7 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
       addHotkeyListener: vi.fn(),
       removeHotkeyListener: vi.fn(),
       toggleFullScreen: vi.fn(),
+      setKeepAwake: vi.fn(),
     };
     const toast = { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) };
 
@@ -571,6 +575,7 @@ describe('AppComponent — embed boot performs zero server-config writes (#216 E
       addHotkeyListener: vi.fn(),
       removeHotkeyListener: vi.fn(),
       toggleFullScreen: vi.fn(),
+      setKeepAwake: vi.fn(),
     };
 
     TestBed.configureTestingModule({

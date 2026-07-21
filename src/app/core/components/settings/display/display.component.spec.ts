@@ -39,6 +39,7 @@ class SettingsServiceMock {
     public getInstanceName() { return ''; }
     public getBrowserTabTitle() { return 'Skip'; }
     public getDisablePathValidation() { return false; }
+    public getKeepScreenAwake() { return true; }
     public setAutoNightMode(): void { }
     public setRedNightMode(): void { }
     public setNightModeBrightness(): void { }
@@ -47,6 +48,7 @@ class SettingsServiceMock {
     public setThemeName(): void { }
     public setBrowserTabTitle(): void { }
     public setDisablePathValidation(): void { }
+    public setKeepScreenAwake(): void { }
 }
 
 class PluginConfigClientServiceMock {

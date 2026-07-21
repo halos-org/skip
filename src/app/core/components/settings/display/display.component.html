@@ -106,6 +106,32 @@
           }
         </mat-form-field>
       </mat-expansion-panel>
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Screen
+          </mat-panel-title>
+          @if (!isPhonePortrait().matches) {
+            <mat-panel-description [hidden]="isPhonePortrait().matches">
+              Keep the display on while Skip is in the foreground.
+            </mat-panel-description>
+          }
+        </mat-expansion-panel-header>
+        <mat-slide-toggle class="full-width sliders"
+          [(ngModel)]="keepScreenAwake"
+          name="keepScreenAwake"
+          [disabled]="!uiEvent.noSleepSupported()"
+          aria-describedby="keep-awake-helper">
+          Keep screen awake
+        </mat-slide-toggle>
+        <p id="keep-awake-helper" class="mat-body-small" role="note">
+          @if (uiEvent.noSleepSupported()) {
+            Prevents the device screen from blanking on its inactivity timer while Skip is the foreground app.
+          } @else {
+            This device or browser does not support the screen wake lock (a secure HTTPS connection is required).
+          }
+        </p>
+      </mat-expansion-panel>
     </mat-accordion>
     <br />
     <mat-accordion>

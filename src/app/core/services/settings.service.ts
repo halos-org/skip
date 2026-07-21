@@ -38,8 +38,10 @@ export class SettingsService {
   private readonly _isRemoteControl = signal<boolean>(false);
   private readonly _instanceName = signal<string>('');
   private readonly _browserTabTitle = signal<string>('Skip');
+  private readonly _keepScreenAwake = signal<boolean>(true);
 
   public readonly themeName = this._themeName.asReadonly();
+  public readonly keepScreenAwake = this._keepScreenAwake.asReadonly();
   public readonly notificationConfig = this._notificationConfig.asReadonly();
   public readonly autoNightMode = this._autoNightMode.asReadonly();
   public readonly redNightMode = this._redNightMode.asReadonly();
@@ -238,6 +240,7 @@ export class SettingsService {
     this._autoNightMode.set(app.autoNightMode === undefined ? false : app.autoNightMode);
     this._redNightMode.set(app.redNightMode === undefined ? false : app.redNightMode);
     this._nightModeBrightness.set(app.nightModeBrightness === undefined ? 0.2 : app.nightModeBrightness);
+    this._keepScreenAwake.set(app.keepScreenAwake === undefined ? true : app.keepScreenAwake);
 
     // Embed is strictly read-only: the in-memory defaults above are applied, but the persist-on-missing
     // self-heal write is suppressed so a framed read-only boot never PATCHes the profile's app config.
@@ -348,6 +351,15 @@ export class SettingsService {
 
   public getAutoNightMode(): boolean {
     return this.autoNightMode();
+  }
+
+  public setKeepScreenAwake(enabled: boolean) {
+    this._keepScreenAwake.set(enabled);
+    this.saveAppConfig();
+  }
+
+  public getKeepScreenAwake(): boolean {
+    return this.keepScreenAwake();
   }
 
   // Red night mode
@@ -498,7 +510,8 @@ export class SettingsService {
       redNightMode: this.redNightMode(),
       nightModeBrightness: this.nightModeBrightness(),
       notificationConfig: this.notificationConfig(),
-      browserTabTitle: this.browserTabTitle()
+      browserTabTitle: this.browserTabTitle(),
+      keepScreenAwake: this.keepScreenAwake()
     }
     return storageObject;
   }
