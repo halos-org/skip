@@ -25,7 +25,7 @@ describe('app.routes default-page normalization', () => {
       if (route.path === 'page/:id') {
         return { ...route, component: TestRouteTargetComponent };
       }
-      if (route.path === 'actions' || route.path === 'settings') {
+      if (route.path === 'actions' || route.path === 'settings' || route.path === 'connection') {
         return { path: route.path, component: TestRouteTargetComponent };
       }
       return route;
@@ -79,5 +79,10 @@ describe('app.routes default-page normalization', () => {
   it('resolves /settings (the renamed config page) instead of falling through to the wildcard', async () => {
     await router.navigateByUrl('/settings');
     expect(router.url).toBe('/settings');
+  });
+
+  it('resolves /connection (the relocated connection status page) instead of falling through to the wildcard', async () => {
+    await router.navigateByUrl('/connection');
+    expect(router.url).toBe('/connection');
   });
 });

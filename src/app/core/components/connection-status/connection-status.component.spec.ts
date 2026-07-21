@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConnectionStatusComponent } from './connection-status.component';
 import { EndpointStatus, SignalKConnectionService } from '../../services/signalk-connection.service';
 import { SignalKDeltaService, StreamStatus } from '../../services/signalk-delta.service';
+import { SsoRedirectService } from '../../services/sso-redirect.service';
 
 describe('ConnectionStatusComponent', () => {
   let component: ConnectionStatusComponent;
@@ -26,6 +27,14 @@ describe('ConnectionStatusComponent', () => {
 
   it('should be created', () => {
     expect(component).toBeTruthy();
+  });
+
+  // This component is the sole sign-in entry point after the Connectivity tab was retired.
+  it('routes Sign in through the SSO redirect service', () => {
+    const sso = TestBed.inject(SsoRedirectService);
+    const spy = vi.spyOn(sso, 'manualSignIn').mockImplementation(() => undefined);
+    (component as unknown as { signIn: () => void }).signIn();
+    expect(spy).toHaveBeenCalled();
   });
 
   // The connection and delta services both re-emit the SAME mutated status object on each update.
