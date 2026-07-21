@@ -246,13 +246,12 @@ export class WidgetChargerComponent implements AfterViewInit {
 
   private applyConfig(cfg: IWidgetSvcConfig): void {
     const trackedDevices = normalizeTrackedDevices(cfg.charger?.trackedDevices);
+    const previousTrackedKeys = new Set(this.trackedDevices().map(device => device.key));
     this.trackedDevices.set(trackedDevices);
-    this.reprojectSnapshotsToDeviceKeys(trackedDevices);
+    this.reprojectSnapshotsToDeviceKeys(trackedDevices, previousTrackedKeys);
   }
 
-  private reprojectSnapshotsToDeviceKeys(devices: ElectricalTrackedDevice[]): void {
-    if (!devices.length) return;
-
+  private reprojectSnapshotsToDeviceKeys(devices: ElectricalTrackedDevice[], previousTrackedKeys: Set<string>): void {
     const idToKeys = new Map<string, string[]>();
     const devicesByKey = new Map<string, ElectricalTrackedDevice>();
     devices.forEach(d => {
@@ -261,10 +260,15 @@ export class WidgetChargerComponent implements AfterViewInit {
       idToKeys.set(d.id, existing);
       devicesByKey.set(d.key, d);
     });
+    const trackedKeys = new Set(devices.map(d => d.key));
+    const untrackedKeys = [...previousTrackedKeys].filter(key => !trackedKeys.has(key));
 
     this.chargersByKey.update(current => {
       let next = current;
       let changed = false;
+      const forkStore = (): void => {
+        if (!changed) { next = { ...current }; changed = true; }
+      };
 
       idToKeys.forEach((keys, id) => {
         const sourceSnapshot = current[id];
@@ -273,18 +277,30 @@ export class WidgetChargerComponent implements AfterViewInit {
         for (const deviceKey of keys) {
           if (current[deviceKey]) continue;
           const trackedDevice = devicesByKey.get(deviceKey);
-          if (!changed) { next = { ...current }; changed = true; }
+          forkStore();
           next[deviceKey] = { ...sourceSnapshot, source: trackedDevice?.source ?? null, deviceKey };
         }
 
         if (next[id] && (next[id].deviceKey === undefined || next[id].deviceKey === id)) {
-          if (!changed) {
-            next = { ...current };
-            changed = true;
-          }
+          forkStore();
           delete next[id];
         }
       });
+
+      // Reconcile removals. A device that was just untracked leaves a source-qualified snapshot
+      // that visibleChargerKeys would keep suppressing a fresh plain-id delta (frozen card) or
+      // rendering alongside a new-source delta (ghost duplicate). Re-key only those just-untracked
+      // keys back to a discovered plain-id so the card persists and any later source-qualified
+      // delta supersedes it. Never-tracked discovered source-qualified snapshots are untouched.
+      for (const key of untrackedKeys) {
+        const snapshot = next[key];
+        if (!snapshot) continue;
+        forkStore();
+        delete next[key];
+        if (!idToKeys.has(snapshot.id) && !next[snapshot.id]) {
+          next[snapshot.id] = { ...snapshot, source: null, deviceKey: undefined };
+        }
+      }
 
       return changed ? next : current;
     });

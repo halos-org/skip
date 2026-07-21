@@ -193,6 +193,145 @@ describe('WidgetChargerComponent', () => {
     expect(visible.map(v => v.id).sort()).toEqual(['c1', 'c2']);
   });
 
+  it('does not freeze a card behind a stale tracked device-key after untracking (#376)', async () => {
+    await setup(
+      [makeUpdate('self.electrical.chargers.c1.voltage', 12, States.Normal, 'sourceA')],
+      { charger: { trackedDevices: [{ id: 'c1', source: 'sourceA', key: 'c1||sourceA' }] } }
+    );
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      processBatch: (entries: { id: string; key: string; source: string | null; value: unknown; state: States }[]) => void;
+      visibleChargers: () => { id: string; voltage?: number | null; deviceKey?: string }[];
+    };
+    expect(probe.visibleChargers().filter(c => c.id === 'c1')).toHaveLength(1);
+
+    runtimeMock.options.mockReturnValue({ charger: { trackedDevices: [] } });
+    probe.applyConfig({ charger: { trackedDevices: [] } });
+
+    // the same device re-reports without a source after being untracked
+    probe.processBatch([{ id: 'c1', key: 'voltage', source: null, value: 13, state: States.Normal }]);
+
+    const c1 = probe.visibleChargers().filter(c => c.id === 'c1');
+    expect(c1).toHaveLength(1);
+    expect(c1[0]?.voltage).toBe(13); // live, not frozen at the stale tracked value
+    expect(c1[0]?.deviceKey).toBeUndefined();
+  });
+
+  it('does not leave a ghost duplicate after untracking then re-seeing under a new source (#376)', async () => {
+    await setup(
+      [makeUpdate('self.electrical.chargers.c1.voltage', 12, States.Normal, 'sourceA')],
+      { charger: { trackedDevices: [{ id: 'c1', source: 'sourceA', key: 'c1||sourceA' }] } }
+    );
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      processBatch: (entries: { id: string; key: string; source: string | null; value: unknown; state: States }[]) => void;
+      visibleChargers: () => { id: string; voltage?: number | null; deviceKey?: string }[];
+    };
+
+    runtimeMock.options.mockReturnValue({ charger: { trackedDevices: [] } });
+    probe.applyConfig({ charger: { trackedDevices: [] } });
+
+    probe.processBatch([{ id: 'c1', key: 'voltage', source: 'sourceB', value: 13, state: States.Normal }]);
+
+    const c1 = probe.visibleChargers().filter(c => c.id === 'c1');
+    expect(c1).toHaveLength(1);
+    expect(c1[0]?.voltage).toBe(13);
+    expect(c1[0]?.deviceKey).toBe('c1||sourceB');
+  });
+
+  it('keeps a never-tracked source-qualified discovered card across a config re-apply (#376)', async () => {
+    await setup(
+      [makeUpdate('self.electrical.chargers.c1.voltage', 12, States.Normal, 'sourceA')],
+      { charger: { trackedDevices: [] } }
+    );
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      visibleChargers: () => { id: string; deviceKey?: string }[];
+    };
+    let c1 = probe.visibleChargers().filter(c => c.id === 'c1');
+    expect(c1).toHaveLength(1);
+    expect(c1[0]?.deviceKey).toBe('c1||sourceA'); // discovered as source-qualified
+
+    // a benign config re-emit with still-no tracked devices must not collapse the discovered card
+    probe.applyConfig({ charger: { trackedDevices: [] } });
+
+    c1 = probe.visibleChargers().filter(c => c.id === 'c1');
+    expect(c1).toHaveLength(1);
+    expect(c1[0]?.deviceKey).toBe('c1||sourceA');
+  });
+
+  it('drops one source of a still-tracked charger without leaving a phantom plain-id (#376)', async () => {
+    await setup(
+      [
+        makeUpdate('self.electrical.chargers.c1.voltage', 28, States.Normal, 'sourceA'),
+        makeUpdate('self.electrical.chargers.c1.voltage', 31, States.Normal, 'sourceB')
+      ],
+      {
+        charger: {
+          trackedDevices: [
+            { id: 'c1', source: 'sourceA', key: 'c1||sourceA' },
+            { id: 'c1', source: 'sourceB', key: 'c1||sourceB' }
+          ]
+        }
+      }
+    );
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      chargersByKey: () => Record<string, { voltage?: number | null; deviceKey?: string }>;
+      visibleChargers: () => { id: string; deviceKey?: string }[];
+    };
+    const cfg = { charger: { trackedDevices: [{ id: 'c1', source: 'sourceB', key: 'c1||sourceB' }] } };
+    runtimeMock.options.mockReturnValue(cfg);
+    probe.applyConfig(cfg);
+
+    const map = probe.chargersByKey();
+    expect(map['c1||sourceA']).toBeUndefined();
+    expect(map['c1']).toBeUndefined(); // id still tracked via sourceB → no phantom plain-id
+    expect(map['c1||sourceB']?.voltage).toBe(31);
+
+    const visible = probe.visibleChargers();
+    expect(visible).toHaveLength(1);
+    expect(visible[0]?.deviceKey).toBe('c1||sourceB');
+  });
+
+  it('does not commit the store when re-applying an identical charger config (#376)', async () => {
+    await setup(
+      [makeUpdate('self.electrical.chargers.c1.voltage', 12, States.Normal, 'sourceA')],
+      { charger: { trackedDevices: [{ id: 'c1', source: 'sourceA', key: 'c1||sourceA' }] } }
+    );
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      chargersByKey: () => Record<string, unknown>;
+    };
+    const before = probe.chargersByKey();
+    const cfg = { charger: { trackedDevices: [{ id: 'c1', source: 'sourceA', key: 'c1||sourceA' }] } };
+    runtimeMock.options.mockReturnValue(cfg);
+    probe.applyConfig(cfg);
+
+    expect(probe.chargersByKey()).toBe(before);
+  });
+
+  it('self-heals in place when the same source re-reports after untracking (#376)', async () => {
+    await setup(
+      [makeUpdate('self.electrical.chargers.c1.voltage', 12, States.Normal, 'sourceA')],
+      { charger: { trackedDevices: [{ id: 'c1', source: 'sourceA', key: 'c1||sourceA' }] } }
+    );
+    const probe = component as unknown as {
+      applyConfig: (cfg: unknown) => void;
+      processBatch: (entries: { id: string; key: string; source: string | null; value: unknown; state: States }[]) => void;
+      visibleChargers: () => { id: string; voltage?: number | null; deviceKey?: string }[];
+    };
+    runtimeMock.options.mockReturnValue({ charger: { trackedDevices: [] } });
+    probe.applyConfig({ charger: { trackedDevices: [] } });
+
+    probe.processBatch([{ id: 'c1', key: 'voltage', source: 'sourceA', value: 13, state: States.Normal }]);
+
+    const c1 = probe.visibleChargers().filter(c => c.id === 'c1');
+    expect(c1).toHaveLength(1);
+    expect(c1[0]?.voltage).toBe(13);
+    expect(c1[0]?.deviceKey).toBe('c1||sourceA');
+  });
+
   it('materializes separate cards for same id across different sources', async () => {
     await setup(
       [
