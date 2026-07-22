@@ -2,9 +2,7 @@
   <img src="./src/assets/skip-logo.svg" alt="Skip logo" width="120">
 </p>
 
-# Skip – Signal K Multi-Function Display (MFD) and Marine Instrument Panel
-
-> **Skip** is a [HaLOS](https://halos.fi) fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin. It adds standard Signal K session/SSO authentication and account-independent named profiles, and diverges from upstream as it evolves. The webapp is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)).
+# Skip – Signal K Marine Instrument Panel
 
 ---
 
@@ -12,9 +10,9 @@
 [![Community Videos](https://img.shields.io/badge/Community-Videos-purple)](src/assets/help-docs/community.md)
 [![Contact](https://img.shields.io/badge/Contact-Get_in_touch-success)](src/assets/help-docs/contact-us.md)
 
-**Skip is a Signal K MFD and marine instrument panel: touch-optimized and ready-to-use across all your devices.**
+**Skip is a Signal K marine instrument panel and dashboard: touch-optimized and ready-to-use across all your devices.**
 
-Skip offers full MFD functionality as a Signal K webapp. Install it from the Signal K app store, then open Skip in a browser and it’s ready to go. A single instance works everywhere — no per‑device deployment is needed.
+Skip turns your Signal K data into clear, purpose-built instrument dashboards. Install it from the Signal K app store, then open Skip in a browser and it’s ready to go. A single instance works everywhere — no per‑device deployment is needed.
 
 Skip is designed for sailors and boaters who want:
 
@@ -25,38 +23,35 @@ Skip is designed for sailors and boaters who want:
 - **Instant access to all Signal K data**: displays gauges, plots, switches, and other widgets right out of the box.
 - **Flexible dashboards**: customize layouts, drag-and-drop widgets, night/day mode, kiosk/fullscreen and remote control support.
 
-With Skip, you get the **familiar feel of professional Multi-Function Displays** combined with the flexibility of Signal K. It’s simple, reliable, and highly usable — a modern, touch-first Multi-Function Display for [Signal K](https://signalk.org) vessels.
+With Skip, you get the **clarity of a purpose-built marine instrument panel** combined with the flexibility of Signal K. It’s simple, reliable, and highly usable — a modern, touch-first instrument panel for [Signal K](https://signalk.org) vessels.
 
 ![Skip](./images/SkipDemo.png)
 
 ## Table of Content
-- [Installations Showcase](#installations-showcase)
-- [Design Goal](#design-goal)
+- [Where Skip Runs](#where-skip-runs)
+- [Design Goals](#design-goals)
 - [User Experience](#user-experience)
-- [Dashboards and Configuration](#dashboards-and-configuration), [Widget Library](#widget-library) & [Historical Data](#historycal-data)
+- [Dashboards and Configuration](#dashboards-and-configuration), [Widget Library](#widget-library) & [Historical Data](#historical-data)
 - [Night Modes](#night-modes)
 - [Remote Control](#remote-control-other-skip-displays)
 - [Kiosk Mode](#dedicated-fullscreen-instrument-display-kiosk-mode)
-- [Progressive Web App (PWA)](#progressive-web-app-pwa)
-- [Multiple User Configurations](#multiple-user-configurations)
-- [How To Contribute](#how-to-contribute) & [Creating Your Own Widgets](#skip-widgets)
+- [Multiple Profiles](#multiple-profiles)
+- [How To Contribute](#how-to-contribute) & [Extending Skip](#extending-skip)
 - [Connect, Share, and Support](#connect-share-and-support) & [Features, Ideas, Bugs](#features-ideas-bugs)
 
-## Installations Showcase
+## Where Skip Runs
 ![Form factor support](./images/exterior_user_installs.png)
-In addition to the obvious navstation, wall mounted instrument panel and autopilot remote control usecases using PCs, tablets and phones, users have taken Skip into the elements using Raspberry Pi, Pi Zero, rugged tablets and all kinds of low cost AliExpress screens and industry leading, high quality, sunlight readable marine touch screens. Skip's native remote control feature opens up all kinds of possibilities.
+Skip runs anywhere a modern browser does. Beyond the obvious navstation, wall-mounted instrument panel, and autopilot-remote uses on PCs, tablets, and phones, it suits the elements just as well — Raspberry Pi and Pi Zero displays, rugged tablets, low-cost screens, and industry-leading sunlight-readable marine touchscreens alike. Its built-in remote control opens up multi-display setups across the boat.
 
-## Read the Help Introduction How-To
-You just installed Skip and you're stuck; read the [Introduction](src/assets/help-docs/welcome.md) help file.
+# Design Goals
 
-# Design Goal
-The goal is to replicate and enhance the functionality of modern marine instrumentation displays while providing unmatched customization and flexibility. The design principles include:
+Skip has two guiding goals: **flawless usability** and **seamless integration with Signal K**.
 
-- **Full-Screen Utilization**: Ensure the display uses the entire screen without requiring scrolling, maximizing visibility, usability reducing onscreen control clutter.
-- **Optimized for Readability**: Present data in a large, clear, and easily interpretable format to ensure quick comprehension. Utilize high-contrast color schemes to enhance visibility, especially in bright daylight conditions.
-- **Touchscreen Excellence**: Deliver an intuitive and seamless experience for touchscreen users, with support for gestures like swiping and tapping.
-- **Cross-Device Compatibility**: Guarantee a consistent and responsive experience across phones, tablets, computers, and other devices.
-- **Modern Browser Support**: Include support for the latest versions of Chromium and other modern web browsers to ensure optimal performance and compatibility.
+**Flawless usability.** The display is legible at a glance — large, clear values and high-contrast themes readable in bright daylight — and uses the whole screen without scrolling. Chrome auto-hides so the instruments own the display, and it's genuinely usable on *every* input — touch, mouse, and keyboard alike — not "optimized" for one and awkward on the rest. Features are discoverable: you can start using Skip straight away, without first working through manuals or tutorials.
+
+**Seamless Signal K integration.** Skip is Signal K–native. It signs in through the server's own session (SSO, no separate credentials), takes its display units and metadata/zones straight from the server, and stores none of its own data — history comes from a standard Signal K History API provider. It surfaces whatever your Signal K stack offers and plays cleanly alongside the rest of it (Freeboard-SK, plugins, InfluxDB/Grafana, Node-RED).
+
+The same instance runs across phones, tablets, laptops, Raspberry Pi, and fixed displays, on any modern browser.
 
 ![Form factor support](./images/formfactor.png)
 
@@ -72,7 +67,7 @@ The goal is to replicate and enhance the functionality of modern marine instrume
 - Add, resize, and align widgets to design tailored displays for your specific needs.
 - Duplicate widgets or entire dashboards, including their configurations, with a single click.
 - Reorder pages by dragging, and give each a unique icon and name — open the toolbar's **Manage pages** panel, tap a page, and choose Edit.
-- Easily switch between multiple user and device configurations profiles for different roles, formfactors or use cases.
+- Easily switch between multiple configuration profiles for different roles, form factors, or use cases.
 
 An auto-hiding toolbar keeps the screen clutter-free and puts navigation one tap away: page icons to jump between pages, a **Manage pages** button, and a menu for Settings, Connection, Remote Control, and Help.
 
@@ -92,8 +87,7 @@ Intuitive widget configuration.
 See what Signal K has to offer that you can leverage with widgets. Select it and tweak the display options to suit your purpose.
 ![Paths Configuration Image](./images/SkipWidgetConfig-paths-1024x488.png)
 
-Many units are supported. Choose your preferred app defaults, then tweak them widget-by-widget as necessary. Skip will automatically convert the units for you.
-![Units Configuration Image](./images/SkipConfig-Units-1024.png)
+Skip displays every value in the units set by your Signal K server's unit preferences, converting automatically — there are no separate unit settings to manage in Skip.
 
 Organize your pages from the toolbar's **Manage pages** panel — add, reorder, rename, duplicate, and delete.
 
@@ -157,11 +151,8 @@ Use cases
 ## Dedicated Fullscreen instrument display (Kiosk Mode)
 Runs Skip on Raspberry Pi as a single full-screen application, suppresses the desktop UI and stays on screen like a dedicated chartplotter or marine instrument panel at a fraction of the cost. Read the [Kiosk Mode](src/assets/help-docs/kiosk.md) help file.
 
-## Progressive Web App PWA
-Run Skip without browser controls, just like a native computer, tablet or phone app. This feature is supported on most mobile operating systems and desktop browser. It freezes up screen real estate and offers a native Android and iOS app experience with single icon launch. Follow your browser's instructions to install Progressiver Web Apps. It's usually just a few clicks, such as "Add to Home Screen".
-
-## Multiple User Configurations
-If you have different roles on board: captain, skipper, tactician, navigator, engineer—or simply different people with different needs, each can tailor Skip as they wish. The use of profiles also allows you to tie specific configuration arrangements to use cases or device form factors.
+## Multiple Profiles
+Skip supports multiple named configuration profiles under a single Signal K account — each an independent set of pages, layouts, and theme. Use them to tailor the display per role (captain, navigator, engineer), per use case, or per device form factor. Each device remembers which profile it's showing, so different displays signed in as the same user can each show a different setup.
 
 ## Complementary Components
 Typical complementary components you may install (most are often bundled with Signal K distributions):
@@ -185,41 +176,13 @@ Skip is under the MIT license and is built with Node and Angular using various o
 
 Please ensure you submit an issue (bug/feature) before submitting a pull request.
 
-## Project Scope
-What Skip IS about:
-- Real‑time presentation of vessel & environment data (navigation, performance, systems) pulled from Signal K.
-- Fast, legible, touchscreen‑friendly dashboards for underway decision making.
-- Configurable widgets (gauges, plots, timers, controls) tuned for sailing operations.
+## Extending Skip
 
-What Skip deliberately IS NOT trying to become:
-- A full data lake / long‑term time‑series historian.
-- A general purpose automation / rules / orchestration engine.
-- A universal external web‑app embedding or mash‑up framework.
-- A low‑code integration hub for arbitrarily wiring protocols and services.
+Skip is one part of a Signal K stack, and it's easy to extend in two directions:
 
-Those domains already have excellent, specialized open‑source tools. Instead of re‑implementing them, Skip plays nicely alongside them within a Signal K based onboard stack.
+**Signal K Plugins** — domain-specific enrichment (polars, performance calculations, derived environmental data, routing aids) published into the Signal K data model, which Skip can then display.
 
-### Processing, Extensions and Widgets
-
-#### Signal K Plugins
-Domain‑specific enrichment (polars, performance calculations, derived environmental data, routing aids) published directly into the Signal K data model that Skip can then display.
-
-#### Skip Widgets
-Visual data representation component that use Signal K path data and API V2 features. Scaffolding a new widgets only takes a few moments and is backed by Skip AI agent instructions providing willed creative minds a personal assistant programmer.
-
-Run one simple command (example):
-```
-npm run generate:widget
-```
-or ask your AI to create a widget using the Skip project AI instructions.
-
-For deeper details you can still look at `COPILOT.md`, but you don’t need to in order to get started.
-
-### Why this separation matters
-
-Keeping Skip focused preserves responsiveness (lower CPU / memory), reduces UI clutter, and accelerates core sailing user experience development. Heavy analytics, complex workflow logic, and broad third‑party embedding stay where they are strongest—outside—but still feed Skip through the common Signal K data fabric.
-
-In short: use Skip to see & act on live sailing information; use the complementary tools to store it long‑term, analyze it deeply, automate decisions, or build advanced integrations.
+**Skip Widgets** — visual components that read Signal K path data and API v2 features. Scaffolding a new one takes only a few moments: run `npm run generate:widget`, or ask your AI to build one from the Skip project instructions. See `CLAUDE.md` and `docs/widget-schematic.md` for details.
 
 ## Getting Started
 
@@ -246,11 +209,6 @@ In short: use Skip to see & act on live sailing information; use the complementa
 *As you work on source code and save files, the app will automatically reload in the browser with your latest changes.*  
 *You will also need a running Signal K server for Skip to connect to and receive data. You could also use https://demo.signalk.org but without authentication enabled, your actions, features and test coverage will be limited.*
 
-**Apple PWA Icon Generation**
-
-Use the following tool and command line:  
-`npx pwa-asset-generator ./src/assets/favicon.svg ./src/assets/ -i ./src/index.html -m ./src manifest.json -b "linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.15) 100%), radial-gradient(at top center, rgba(255,255,255,0.40) 0%, rgba(0,0,0,0.40) 120%) #989898" -p 5%`
-
 **Share**
 
 Once done with your work, from your fork's working branch, make a GitHub pull request to have your code reviewed, merged, and included in the next release. It's always optimal to sync with us prior to engaging in extensive new development work.
@@ -268,7 +226,7 @@ For comprehensive development guidance, please refer to these instruction files:
 ### Development Workflow
 1. **Start Here**: Read `CLAUDE.md` for architecture, commands, and the testing model; then `.github/instructions/project.instructions.md` for Skip policy contracts.
 2. **Angular Standards**: Follow `.github/instructions/angular.instructions.md` for modern Angular development.
-3. **Architecture Context**: Use `COPILOT.md` for rationale and dated architecture notes.
+3. **Architecture Context**: See the Architecture section of `CLAUDE.md`; the inherited `COPILOT.md` is loose, partly-stale background only.
 4. **Setup & Build**: Use this README for project setup and build commands.
 
 ### Widget Creation Workflow
@@ -287,7 +245,10 @@ For comprehensive development guidance, please refer to these instruction files:
 Skip is open-source under the MIT license, built by the community and 100% free. Contribute to the project on [GitHub](https://github.com/halos-org/skip)!
 
 # Connect, Share, and Support
-Report issues and request features on [Skip's GitHub project](https://github.com/halos-org/skip/issues). Skip is a fork of [Kip](https://github.com/mxtommy/Kip); the upstream Kip community chats on [Discord](https://discord.gg/AMDYT2DQga).
+Report issues and request features on [Skip's GitHub project](https://github.com/halos-org/skip/issues). The upstream Kip community chats on [Discord](https://discord.gg/AMDYT2DQga).
+
+## About Skip
+Skip is a [HaLOS](https://halos.fi) fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin. It adds standard Signal K session/SSO authentication and account-independent named profiles, and diverges from upstream as it evolves. The webapp is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)).
 
 # Features, Ideas, Bugs
 See [Skip's GitHub project](https://github.com/halos-org/skip/issues) for the latest feature requests and bug reports.
