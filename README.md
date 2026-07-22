@@ -63,26 +63,25 @@ The goal is to replicate and enhance the functionality of modern marine instrume
 ## User Experience
 
 ### Interactions
-- Swipe up and down to navigate through your dashboards effortlessly.
-- Swipe left and right to access notifications and other system features quickly.
-- Use keyboard shortcuts for essential features, ensuring fast and efficient navigation across devices types.
+- **Touch:** swipe left/right to move between pages, swipe down from the top to reveal the auto-hiding toolbar, and tap a page's icon to jump straight to it.
+- **Mouse:** scroll to change pages, click the top peek strip (or scroll up) to reveal the toolbar, and click any control.
+- **Keyboard:** single-key shortcuts for the essentials — <kbd>←</kbd>/<kbd>→</kbd> change pages, <kbd>E</kbd> edit, <kbd>F</kbd> fullscreen, <kbd>N</kbd> night mode, <kbd>Esc</kbd> cancel an edit.
 
 ### Customize
 - Effortlessly create and customize dashboards using an intuitive grid layout system.
 - Add, resize, and align widgets to design tailored displays for your specific needs.
 - Duplicate widgets or entire dashboards, including their configurations, with a single click.
-- Simply drag dashboards to reorganize them. Double-click any dashboard to open the icon gallery and give each page a unique visual identity.
+- Reorder pages by dragging, and give each a unique icon and name — open the toolbar's **Manage pages** panel, tap a page, and choose Edit.
 - Easily switch between multiple user and device configurations profiles for different roles, formfactors or use cases.
 
-Sidenav for quick access to all important features.
-![Sidenav Dashboard Access](./images/ActionSidenav.png)
+An auto-hiding toolbar keeps the screen clutter-free and puts navigation one tap away: page icons to jump between pages, a **Manage pages** button, and a menu for Settings, Connection, Remote Control, and Help.
 
 ## Dashboards and Configuration
 
 ### Customizable and Easy
 Meant to build purposeful dashboards with however many widgets you want, wherever you want them.
 
-Add, resize, and position the widgets of your choosing. Need more? Add as many additional dashboards as you wish to keep your display purposeful. Simply swipe up and down to quickly cycle through dashboards or effortlessly jump between dashboards with a single tap in the action sidenav, always knowing exactly where you are thanks to clear highlighting of your current dashboard.
+Add, resize, and position the widgets of your choosing. Need more? Add as many pages as you wish to keep your display purposeful. Swipe left and right to cycle through pages, or tap a page's icon in the toolbar to jump straight to it — the current page is always clearly highlighted.
 
 Widget lists are sorted by category.
 ![Layouts Configuration Image](./images/SkipWidgetConfig-layout-1024.png)
@@ -96,8 +95,7 @@ See what Signal K has to offer that you can leverage with widgets. Select it and
 Many units are supported. Choose your preferred app defaults, then tweak them widget-by-widget as necessary. Skip will automatically convert the units for you.
 ![Units Configuration Image](./images/SkipConfig-Units-1024.png)
 
-Organize your dashboards and access tools.
-![Options and Dashboards](./images/Options.png)
+Organize your pages from the toolbar's **Manage pages** panel — add, reorder, rename, duplicate, and delete.
 
 ## Widget Library
 All Skip widgets are visual presentation controls that are very versatile, with multiple advanced configuration options available to suit your needs:
@@ -262,13 +260,13 @@ Once done with your work, from your fork's working branch, make a GitHub pull re
 For comprehensive development guidance, please refer to these instruction files:
 
 ### Primary Instructions
-- **[Project Instructions](./.github/instructions/project.instructions.md)**: Skip policy owner for architecture/domain rules, including widget creation and Host2 contracts.
-- **[COPILOT.md](./COPILOT.md)**: Architecture context, rationale, and evolution notes (non-policy).
+- **[CLAUDE.md](./CLAUDE.md)**: The authoritative repo guide — architecture, commands, the testing model, and fork-specific gotchas. **Start here.**
+- **[Project Instructions](./.github/instructions/project.instructions.md)**: Skip policy for architecture/domain rules, including widget creation and Host2 contracts.
 - **[Angular Instructions](./.github/instructions/angular.instructions.md)**: Modern Angular v21+ coding standards, component patterns, and framework best practices.
-- **[Copilot Agent Instructions](./.github/copilot-instructions.md)**: Architecture details and coding-agent guardrails for this repository.
+- `COPILOT.md` and `.github/copilot-instructions.md` are inherited from upstream Kip — useful as loose architecture context, but partly stale; verify any command or claim against CLAUDE.md and the code.
 
 ### Development Workflow
-1. **Start Here**: Read `.github/instructions/project.instructions.md` for Skip policy contracts.
+1. **Start Here**: Read `CLAUDE.md` for architecture, commands, and the testing model; then `.github/instructions/project.instructions.md` for Skip policy contracts.
 2. **Angular Standards**: Follow `.github/instructions/angular.instructions.md` for modern Angular development.
 3. **Architecture Context**: Use `COPILOT.md` for rationale and dated architecture notes.
 4. **Setup & Build**: Use this README for project setup and build commands.

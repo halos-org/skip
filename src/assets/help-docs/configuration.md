@@ -34,7 +34,7 @@ Then sign in to that account from Skip via **Menu > Connection > Sign in**.
 
 A **profile** is a named set of pages, layouts, and theme, stored under your Signal K user account. Profiles let a single account keep several independent setups — for example one per station, role, or device form factor. Each device remembers which profile it is showing, so different displays signed in as the same user can each show a different profile.
 
-Manage profiles in **Settings > Configurations**:
+Manage profiles in **Menu > Settings > Configurations**:
 
 - **New** — create a new profile.
 - **Switch** — show a different profile on this device.
@@ -51,7 +51,7 @@ To keep devices independent, either sign in with **different** Signal K users, o
 
 ## Backup, Import, and Reset
 
-The **Advanced** section of **Settings > Configurations** provides:
+The **Advanced** section of **Menu > Settings > Configurations** provides:
 
 - **Download** — save the active profile's configuration to a file, for backup or to move it to another Signal K server.
 - **Import** — load a configuration file as a **new profile**. This never overwrites an existing profile.

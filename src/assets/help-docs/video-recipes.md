@@ -1,8 +1,9 @@
 ## Video Recipes
 
 Short, step-by-step guides for the most common things people do with the Video widget. Each one
-starts from a page in **edit mode** (tap the pencil/unlock to add or change widgets). For the
-full reference, see **The Video Widget** help page.
+starts from a page in **edit mode**: tap the edit button (pen) to unlock the page, then tap an
+empty grid space and choose **Add Widget** → **Video**. For the full reference, see **The Video
+Widget** help page.
 
 > Recipes that use a **camera** or **uploaded video** need the free **SK Video** add-on installed on
 > your boat's Signal K server. Recipes that use a **web address (URL)** work with no add-on.

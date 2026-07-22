@@ -7,36 +7,34 @@ Reveal the toolbar and tap the **Manage pages** button (the wrench next to the p
 
 Here you can:
 - Add a new page (+ button)
-- Reorder pages (drag with touch or mouse)
-- Rename and pick an icon (double tap or double click)
-- Duplicate a page (long press or long click → Duplicate)
-- Delete a page (long press or long click → Delete)
+- Reorder pages (drag a page card, with touch or mouse)
+- Rename, change the icon, duplicate, or delete a page — **tap or click the page card** to open its menu, then choose **Edit** (rename + icon), **Duplicate**, or **Delete**
 
 Choose icons that reflect each page’s purpose (e.g. compass for navigation, droplet for tanks, bolt for power). Icons appear wherever pages are listed.
 
 ### Gesture / Action Summary
-| Action        | Touch / Mobile         | Mouse / Desktop         |
-|---------------|------------------------|-------------------------|
-| Add page      | Tap (+)                | Click (+)               |
-| Reorder       | Drag tile              | Drag tile               |
-| Rename/Icon   | Double tap             | Double click            |
-| Duplicate     | Long press → Duplicate | Long click → Duplicate  |
-| Delete        | Long press → Delete    | Long click → Delete     |
+| Action                        | Touch / Mobile        | Mouse / Desktop        | Keyboard                          |
+|-------------------------------|-----------------------|------------------------|-----------------------------------|
+| Add a page                    | Tap (+)               | Click (+)              | Focus (+), press Enter/Space      |
+| Reorder pages                 | Drag a page card      | Drag a page card       | —                                 |
+| Rename / duplicate / delete   | Tap a page → menu     | Click a page → menu    | Focus a page, Enter/Space → menu  |
+
+The page's menu offers **Edit** (rename + change icon), **Duplicate**, and **Delete** (Delete asks you to confirm).
 
 
 ## Editing Page Layouts
 1. Go to the page you want to change (swipe sideways, scroll horizontally, or tap its icon in the toolbar’s page navigator).
 2. Reveal the toolbar (swipe down from the top, scroll up, or tap the top peek strip).
-3. Tap the edit button to unlock the page.
+3. Tap the edit button (the pen) to unlock the page — or press **E** on a keyboard.
 
-In edit mode, widgets show dashed outlines.
+In edit mode, widgets show dashed outlines, and the toolbar swaps to an "Editing layout" label with **Cancel** and **Done** buttons (Done sits in the pen's former slot). The page navigator is hidden while editing, so finish (Done/Cancel) before switching pages.
 
 ### What You Can Do in Edit Mode
 - Add a widget (tap empty space → Add Widget)
 - Move a widget (drag)
 - Resize a widget (drag edges/corners)
 - Configure, duplicate, or delete a widget (tap it → action menu; Delete asks to confirm)
-- Save changes (Check button) or discard (X button) in the lower right
+- **Save** changes (Done) or **discard** them (Cancel, or press **Esc**) — both are in the toolbar while editing
 
 >**Tip:** If you can’t add a widget, free up space by resizing or moving existing ones first.
 
@@ -110,7 +108,7 @@ Skip widgets turn Signal K data into readable visuals and controls. Available wi
 | Issue                  | Possible Cause                        | Fix                                                                 |
 |------------------------|---------------------------------------|---------------------------------------------------------------------|
 | Data shows “—” or blank| Path missing/not configured/null value | Open widget config, verify Signal K path exists and updates. Use the Signal K Data Browser to view raw data from the server. |
-| Wrong units            | Default convert unit used              | Edit widget config paths and set the desired target unit.            |
+| Wrong units            | Server display-unit preference, or a per-widget override | Skip shows units from the Signal K server's unit preferences by default; to override for one widget, edit its config paths and set the desired target unit. |
 | Slow page switching    | Excessive data sampling/too many widgets| Increase sample times; remove unused widgets. Split widgets into separate pages. Optimize system resource usage. |
 | Embedded page blank    | Cross‑origin blocked                   | See "Embed Page Viewer" help section.                               |
 | History dialog not opening on a locked page | The page is still in edit mode, or the widget has no numeric data | Lock the page first, then press and hold the widget. Only numeric‑data widgets have a history. |

@@ -7,6 +7,7 @@ Skip supports touch, mouse, and keyboard input across devices.
 | Move between pages   | Swipe left or right          | Scroll horizontally                   | <kbd>←</kbd>/<kbd>→</kbd> (Left/Right Arrow)       |
 | Jump to a page       | Tap its icon in the toolbar  | Click its icon in the toolbar         | —                                                 |
 | Enter page edit mode | Tap the edit button          | Click the edit button                 | <kbd>E</kbd>                                       |
+| Save page edit       | Tap the Done button          | Click the Done button                 | —                                                 |
 | Cancel page edit     | Tap the Cancel button        | Click the Cancel button               | <kbd>Esc</kbd>                                     |
 | Toggle Fullscreen    | —                            | Click the fullscreen button           | <kbd>F</kbd>                                       |
 | Toggle Night mode    | Tap the night-mode button    | Click the night-mode button           | <kbd>N</kbd>                                       |
@@ -22,7 +23,7 @@ Skip has no permanent navigation bar. A toolbar sits hidden at the top of the pa
 <img src="assets/help-docs/img/toolbar.png" alt="The Skip toolbar with numbered callouts, left to right" title="The Skip toolbar" width="100%">
 
 The toolbar holds, from left to right:
-1. Menu — opens Settings, Connection, Remote Control, and Help
+1. Menu — opens Settings, Connection, Remote Control, and Help (with a footer showing the Skip version and host)
 2. *Fullscreen toggle
 3. **Night-mode toggle
 4. Page navigator — one icon per page; tap a page’s icon to jump to it
@@ -37,25 +38,28 @@ When an alarm is active, a notification badge also appears in the lower-left cor
 **Only visible if automatic day and night is not enabled. See <Menu / Settings / Display>.
 
 ## Loading Skip on Phones, Tablets, Raspberry Pi, and Computers
-Simply navigate to `http://<Signal K Server URL>:<port>/@halos-org/skip/` to load Skip and enjoy its features remotely on any device.
+Navigate to `<Signal K Server URL>:<port>/@halos-org/skip/` to load Skip on any device. On a secured server Skip is reached over **HTTPS** through the Signal K reverse proxy; use that HTTPS address, since a secure connection is required for features like keeping the screen awake.
 
 ## Mobile App
-Run Skip in full screen, without browser controls, just like a regular mobile app. This feature is supported on most mobile operating systems. Each browser has its own way of handling Progressive Web App (PWA) installations.
+Add Skip to your home screen to launch it full-screen, without browser controls, like a native app — a single-tap icon on most mobile and desktop browsers. This uses your browser's standard "Add to Home Screen" and creates a shortcut (Skip has no offline/service-worker install).
 
 **iOS**
 1. Press the "Share" button.
 2. Select "Add to Home Screen" from the action popup list.
 3. Tap "Add" in the top right corner to finish installation.
-Skip is now installed and available on your home screen.
+Skip now launches full-screen from your home screen.
 
 **Android**
 1. Press the "three dot" icon in the upper right to open the menu.
 2. Select "Add to Home screen."
 3. Press the "Add" button in the popup.
-Skip is now installed and available on your home screen.
+Skip now launches full-screen from your home screen.
 
 ## Fullscreen
-You can toggle fullscreen mode on and off, and disable the screen saver and computer sleep mode (if supported by the device/browser), by tapping the Expand/Reduce button on the toolbar or using the keyboard hotkey. This button is not available on mobile devices.
+Toggle fullscreen mode with the Expand/Reduce button on the toolbar or the <kbd>F</kbd> hotkey (not available on mobile devices).
+
+## Keeping the Screen Awake
+Suppressing the screen saver and device sleep is a separate setting: **Settings > Display > Keep screen awake** (on by default). It needs a secure connection (HTTPS), so use your server's HTTPS address.
 
 ## Night Mode
 Save your night vision by automatically switching Skip to day or night mode based on sunrise and sunset hours (the Signal K Derived Data plugin is required for automatic switching). This feature can be enabled in the **Settings > Display** page. You can also manually set the mode by tapping the Moon/Sun button on the toolbar. Note that if automatic switching is enabled, brightness will reset to the Signal K mode value.
@@ -104,7 +108,7 @@ If multiple devices log in with the same Signal K user to share configuration, t
 
 > **Tips**
 >- Keep Instance Names short but meaningful (e.g. Mast, Helm, NavTV).
->- For unattended displays, enable the browser’s keep‑awake / no‑sleep features if supported.
+>- For unattended displays, keep the screen awake via **Settings > Display > Keep screen awake** (needs an HTTPS connection).
 >- Combine with Night Mode + per‑profile layouts for role‑specific remote switching.
 >- Use different Signal K users if you want fully isolated configurations.
 

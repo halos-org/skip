@@ -15,7 +15,7 @@ This page explains:
 
 ## Data Requirements
 
-> AIS data must be available in the Signal K server for the widget to function correctly. This usually means using compatible AIS hardware receiver or connecting to a Virtual AIS service over the internet with a Server Connection of type WebSocket.
+> AIS data must be available in the Signal K server for the widget to function correctly. This usually means a compatible AIS hardware receiver, or a Virtual AIS service configured **on the Signal K server** (for example a WebSocket data connection in the server's settings). Skip subscribes to whatever AIS data the server provides — it has no connection settings of its own.
 
 Skip subscribes to remote AIS and DSC targets automatically, so no connection setting is required to receive them.
 
@@ -119,7 +119,7 @@ Own ship shows an orange dashed vector when own COG and SOG are available and ow
 
 After you understand the visual cues above, use these options to tune what you see.
 
-The widget is configured in the Options dialog under the Display and Filter tabs.
+To configure the widget, enter edit mode (tap the pen), tap the widget to open its action menu, and choose **Configure** — the options dialog has **Display** and **Filter** tabs.
 
 ### Display and range options
 
