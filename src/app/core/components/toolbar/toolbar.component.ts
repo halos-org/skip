@@ -52,8 +52,9 @@ export class ToolbarComponent implements OnDestroy {
   protected readonly fullscreenSupported = this.uiEvent.fullscreenSupported;
   protected readonly fullscreenStatus = this.uiEvent.fullscreenStatus;
   protected readonly appVersion = this.app.appVersion;
-  /** Serving host shown in the app-menu footer; the app is served same-origin by the SK server. */
-  protected readonly host = window.location.host;
+  /** Serving host shown in the app-menu footer; the app is served same-origin by the SK server.
+   *  hostname (not host) so the constant Traefik port is left off. */
+  protected readonly host = window.location.hostname;
 
   /** While a layout edit is active the toolbar swaps its normal nav controls for edit contents. */
   protected readonly isEditing = computed(() => !this.dashboard.isDashboardStatic());
