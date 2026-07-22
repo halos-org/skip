@@ -50,13 +50,15 @@
 
     <div class="toolbar-group toolbar-center">
       <page-nav-control />
+      @if (!isEditing()) {
+        <button mat-icon-button class="manage-pages" aria-label="Manage pages" (click)="openPageManager()">
+          <mat-icon>build</mat-icon>
+        </button>
+      }
     </div>
 
     <div class="toolbar-group toolbar-end">
       @if (isEditing()) {
-        <button mat-icon-button aria-label="Manage pages" (click)="openPageManager()">
-          <mat-icon>dashboard_customize</mat-icon>
-        </button>
         <button mat-icon-button aria-label="Cancel editing" (click)="cancelEdit()">
           <mat-icon>close</mat-icon>
         </button>

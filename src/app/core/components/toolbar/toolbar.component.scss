@@ -104,3 +104,10 @@
   min-width: 0;
   overflow: hidden;
 }
+
+// Manage-pages sits next to the page navigator; a small spacer sets it apart from the
+// page icons so it doesn't read as another page.
+.manage-pages {
+  margin-left: 8px;
+  flex: 0 0 auto;
+}

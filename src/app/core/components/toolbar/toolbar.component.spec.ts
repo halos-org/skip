@@ -122,9 +122,10 @@ describe('ToolbarComponent', () => {
       expect(byLabel('Edit page')).toBeNull();
       // …replaced by the edit contents.
       expect(el.querySelector('.editing-label')).not.toBeNull();
-      expect(byLabel('Manage pages')).not.toBeNull();
       expect(byLabel('Cancel editing')).not.toBeNull();
       expect(byLabel('Done editing')).not.toBeNull();
+      // Page management is a normal-mode action, not part of the widget-layout edit.
+      expect(byLabel('Manage pages')).toBeNull();
       // The page dots stay put for switching pages mid-edit.
       expect(el.querySelector('page-nav-control')).not.toBeNull();
     });
@@ -144,11 +145,28 @@ describe('ToolbarComponent', () => {
       expect(dashboard.requestLayoutEditCancel).toHaveBeenCalledTimes(1);
     });
 
-    it('Manage pages opens the page-manager bottom sheet', () => {
-      dashboard.isDashboardStatic.set(false);
+  });
+
+  describe('manage-pages (normal-mode)', () => {
+    it('shows the Manage pages control next to the page dots in normal mode', () => {
+      dashboard.isDashboardStatic.set(true);
+      init();
+      const control = byLabel('Manage pages');
+      expect(control).not.toBeNull();
+      expect(control!.classList.contains('manage-pages')).toBe(true);
+    });
+
+    it('opens the page-manager bottom sheet from normal mode', () => {
+      dashboard.isDashboardStatic.set(true);
       init();
       byLabel('Manage pages')!.click();
       expect(bottomSheet.open).toHaveBeenCalledWith(PageManagerBottomSheetComponent);
+    });
+
+    it('hides Manage pages while editing (kept out of the widget-layout transaction)', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      expect(byLabel('Manage pages')).toBeNull();
     });
   });
 
