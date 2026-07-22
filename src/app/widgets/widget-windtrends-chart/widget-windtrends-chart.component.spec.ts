@@ -33,6 +33,7 @@ import { WidgetWindTrendsChartComponent } from './widget-windtrends-chart.compon
 import { HistoryChartStreamService, HISTORY_UNAVAILABLE } from '../../core/services/history-chart-stream.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { UnitsService } from '../../core/services/units.service';
+import { DataService } from '../../core/services/data.service';
 import { CanvasService } from '../../core/services/canvas.service';
 import type { ITheme } from '../../core/services/app-service';
 import type { IDatasetServiceDatapoint } from '../../core/interfaces/dataset.interfaces';
@@ -51,7 +52,13 @@ describe('WidgetWindTrendsChartComponent', () => {
 
   const runtimeMock = { options: vi.fn() };
   const historyMock = { getBackfillThenLive: vi.fn() };
-  const unitsMock = { convertToUnit: (_unit: string, value: number) => value };
+  const unitsMock = {
+    convertToUnit: (_unit: string, value: number) => value,
+    resolvePathMeasure: () => 'knots',
+    getUnitDisplaySymbol: (measure: string) => measure
+  };
+  // Speed measure resolution folds the path's meta subject; a single emission is enough to resolve it.
+  const dataMock = { getPathMetaObservable: () => of(null) };
   const canvasMock = { registerCanvas: vi.fn(), releaseCanvas: vi.fn(), unregisterCanvas: vi.fn() };
   const breakpointMock = { observe: vi.fn().mockReturnValue(of({ matches: false, breakpoints: {} })) };
 
@@ -64,6 +71,7 @@ describe('WidgetWindTrendsChartComponent', () => {
         { provide: WidgetRuntimeDirective, useValue: runtimeMock },
         { provide: HistoryChartStreamService, useValue: historyMock },
         { provide: UnitsService, useValue: unitsMock },
+        { provide: DataService, useValue: dataMock },
         { provide: CanvasService, useValue: canvasMock },
         { provide: BreakpointObserver, useValue: breakpointMock }
       ]
@@ -84,6 +92,11 @@ describe('WidgetWindTrendsChartComponent', () => {
     const probe = fixture.componentInstance as unknown as { chart: unknown; isChartReady(chart: unknown): boolean };
     return probe.isChartReady(probe.chart);
   };
+
+  // The big-number unit label is drawn inside the chart plugin (which the MockChart never invokes), so
+  // its source — speedUnitSymbol() — is probed directly, the same private-seam pattern as readiness().
+  const speedLabel = (): string =>
+    (fixture.componentInstance as unknown as { speedUnitSymbol(): string }).speedUnitSymbol();
 
   beforeEach(() => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as unknown as CanvasRenderingContext2D);
@@ -138,6 +151,96 @@ describe('WidgetWindTrendsChartComponent', () => {
       { timestamp: 2000, data: { value: 350, sma: 340, lastAverage: 345, lastMinimum: 10, lastMaximum: 350 } }
     ];
     expect(() => { dir.next(batch); spd.next(batch); }).not.toThrow();
+  });
+
+  it('converts the speed series with the server-resolved measure, not hardcoded knots', async () => {
+    const dir = new Subject();
+    const spd = new Subject();
+    historyMock.getBackfillThenLive
+      .mockReturnValueOnce(dir)
+      .mockReturnValueOnce(spd);
+    // Server prefers m/s for this speed path (as on the live boat); the widget must follow it.
+    const resolveSpy = vi.spyOn(unitsMock, 'resolvePathMeasure').mockReturnValue('m/s');
+    const convertSpy = vi.spyOn(unitsMock, 'convertToUnit');
+    await setup('Last 30 Minutes');
+
+    spd.next([
+      { timestamp: 1000, data: { value: 5, sma: 5, lastAverage: 5, lastMinimum: 5, lastMaximum: 5 } }
+    ]);
+
+    expect(resolveSpy).toHaveBeenCalledWith('self.environment.wind.speedTrue');
+    // Speed datasets are converted to the server-resolved measure ('m/s'), never the old hardcoded 'knots'.
+    const speedConversionUnits = convertSpy.mock.calls.map(c => c[0]).filter(u => u !== 'deg');
+    expect(speedConversionUnits).toContain('m/s');
+    expect(speedConversionUnits).not.toContain('knots');
+  });
+
+  it('labels the speed readout with the server-resolved symbol, not a hardcoded kts', async () => {
+    vi.spyOn(unitsMock, 'resolvePathMeasure').mockReturnValue('m/s');
+    const symbolSpy = vi.spyOn(unitsMock, 'getUnitDisplaySymbol');
+    await setup('Last 30 Minutes');
+
+    expect(speedLabel()).toBe('m/s');
+    expect(symbolSpy).toHaveBeenCalledWith('m/s');
+  });
+
+  it('shows base-SI values with no unit label when the server has no speed preference', async () => {
+    const spd = new Subject();
+    historyMock.getBackfillThenLive.mockReturnValueOnce(new Subject()).mockReturnValueOnce(spd);
+    vi.spyOn(unitsMock, 'resolvePathMeasure').mockReturnValue('unitless');
+    const convertSpy = vi.spyOn(unitsMock, 'convertToUnit');
+    await setup('Last 30 Minutes');
+
+    spd.next([{ timestamp: 1000, data: { value: 5, sma: 5, lastAverage: 5, lastMinimum: 5, lastMaximum: 5 } }]);
+
+    // No client-side fallback: values pass through in base SI (convertToUnit('unitless') is identity),
+    // never re-substituted to knots.
+    const speedUnits = convertSpy.mock.calls.map(c => c[0]).filter(u => u !== 'deg');
+    expect(speedUnits).toContain('unitless');
+    expect(speedUnits).not.toContain('knots');
+    // The readout is unlabeled rather than showing the raw 'unitless' key.
+    expect(speedLabel()).toBe('');
+  });
+
+  it('re-resolves and rebuilds the speed series when the server displayUnits change', async () => {
+    const metaSubject = new Subject<null>();
+    vi.spyOn(dataMock, 'getPathMetaObservable').mockReturnValue(metaSubject);
+    const resolveSpy = vi.spyOn(unitsMock, 'resolvePathMeasure').mockReturnValue('knots');
+    const convertSpy = vi.spyOn(unitsMock, 'convertToUnit');
+    const spd2 = new Subject();
+    historyMock.getBackfillThenLive
+      .mockReturnValueOnce(new Subject())   // initial direction stream
+      .mockReturnValueOnce(new Subject())   // initial speed stream
+      .mockReturnValueOnce(new Subject())   // rebuilt direction stream
+      .mockReturnValueOnce(spd2);           // rebuilt speed stream
+
+    await setup('Last 30 Minutes');
+    const callsBefore = historyMock.getBackfillThenLive.mock.calls.length;
+
+    // A late/changed displayUnits fires the path's meta subject; the resolved measure flips to m/s.
+    resolveSpy.mockReturnValue('m/s');
+    metaSubject.next(null);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // The measure change fed the rebuild signature and re-opened the streams…
+    expect(historyMock.getBackfillThenLive.mock.calls.length).toBeGreaterThan(callsBefore);
+    // …so new data now converts in the new unit rather than the stale knots.
+    convertSpy.mockClear();
+    spd2.next([{ timestamp: 3000, data: { value: 5, sma: 5, lastAverage: 5, lastMinimum: 5, lastMaximum: 5 } }]);
+    const speedUnits = convertSpy.mock.calls.map(c => c[0]).filter(u => u !== 'deg');
+    expect(speedUnits).toContain('m/s');
+    expect(speedUnits).not.toContain('knots');
+  });
+
+  it('keeps TWD structural but TWS a display path, so the history dialog follows the server unit', () => {
+    // The history dialog classifies a slot as structural (stored unit) vs display (server measure) by
+    // showConvertUnitTo===false. TWS must stay a display path or the dialog pins to knots while the tile
+    // shows the server unit — the lock-step break this fix closes.
+    const paths = WidgetWindTrendsChartComponent.DEFAULT_CONFIG.paths as IPathArray;
+    expect(paths.trueWindDirection.showConvertUnitTo).toBe(false);
+    expect(paths.trueWindSpeed.showConvertUnitTo).toBeUndefined();
   });
 
   it('opens the History streams on the user-configured direction and speed paths', async () => {
