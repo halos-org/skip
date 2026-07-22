@@ -26,11 +26,12 @@ const dashboard = {
   activeDashboard: signal(0),
   isDashboardStatic: signal(true),
   navigateTo: vi.fn(),
+  navigateToActive: vi.fn(),
   setStaticDashboard: vi.fn(),
   requestLayoutEditSave: vi.fn(),
   requestLayoutEditCancel: vi.fn(),
 };
-const bottomSheet = { open: vi.fn() };
+const bottomSheet = { open: vi.fn(() => ({ afterDismissed: () => of(undefined) })) };
 const uiEvent = {
   toggleFullScreen: vi.fn(),
   fullscreenSupported: signal(true),
@@ -53,7 +54,7 @@ describe('ToolbarComponent', () => {
   beforeEach(() => {
     for (const spy of [
       chrome.reveal, chrome.suppressHide, chrome.allowHide,
-      dashboard.navigateTo, dashboard.setStaticDashboard,
+      dashboard.navigateTo, dashboard.navigateToActive, dashboard.setStaticDashboard,
       dashboard.requestLayoutEditSave, dashboard.requestLayoutEditCancel, bottomSheet.open,
       uiEvent.toggleFullScreen, app.toggleDayNightMode, app.toggleNightMode, dialog.openNotifications, router.navigate,
     ]) spy.mockClear();
@@ -161,6 +162,15 @@ describe('ToolbarComponent', () => {
       init();
       byLabel('Manage pages')!.click();
       expect(bottomSheet.open).toHaveBeenCalledWith(PageManagerBottomSheetComponent);
+    });
+
+    it('re-syncs the route to the active page when the sheet is dismissed', () => {
+      // A sheet delete can shift the active index without navigating; the URL must be re-synced
+      // on dismiss or a page dot at the stale index becomes a dead tap.
+      dashboard.isDashboardStatic.set(true);
+      init();
+      byLabel('Manage pages')!.click();
+      expect(dashboard.navigateToActive).toHaveBeenCalledTimes(1);
     });
 
     it('hides Manage pages while editing (kept out of the widget-layout transaction)', () => {

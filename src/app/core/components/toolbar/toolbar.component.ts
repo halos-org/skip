@@ -122,7 +122,13 @@ export class ToolbarComponent implements OnDestroy {
 
   /** Open the page-manager sheet (add / reorder / rename / duplicate / delete pages). */
   protected openPageManager(): void {
-    this.bottomSheet.open(PageManagerBottomSheetComponent);
+    // A sheet page op (e.g. deleting a lower page) can reassign the active page without
+    // navigating, leaving the URL on a now-stale index; re-sync the route on dismiss so the
+    // page dots stay tappable.
+    this.bottomSheet
+      .open(PageManagerBottomSheetComponent)
+      .afterDismissed()
+      .subscribe(() => this.dashboard.navigateToActive());
   }
 
   protected openNotifications(): void {
