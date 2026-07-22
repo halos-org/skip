@@ -138,6 +138,9 @@ export class RemoteDashboardsService {
 
       untracked(() => {
         if (!this.isRemoteControl()) return;
+        // Local edits pre-empt remote nav: a controller changing the page while someone edits
+        // here must not navigate and reload the grid, which would discard the unsaved layout.
+        if (!this.dashboard.isDashboardStatic()) return;
         if (changeTo === undefined || changeTo.data.value == null) return;
         const idx = Number(changeTo.data.value);
         if (!isNaN(idx) && idx >= 0 && idx < this.dashboard.dashboards().length) {
