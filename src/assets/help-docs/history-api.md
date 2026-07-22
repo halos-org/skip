@@ -1,7 +1,7 @@
 ## Using a History API Provider
 
 Skip reads historical data from an external Signal K History API provider plugin. With a compatible provider installed, Skip can:
-1. Pre-seed Data Plot and Wind Trends so they show recent trends immediately.
+1. Pre-seed Realtime Data Plot and Wind Trends so they show recent trends immediately.
 2. Populate historical views for widgets on your pages that use numeric value paths.
 
 You must configure the provider plugin to capture the paths you want to plot, and it must have enough recorded data to cover your plot time span. This is not automatic.
@@ -116,7 +116,7 @@ To seed plots with historical data, you must configure your provider to collect 
 1. Verify that a History API plugin is installed on your Signal K server.
 2. Configure the plugin to capture the paths you want to plot.
 3. Wait for the plugin to collect enough data to fill your plot time span.
-4. Open a Data Plot or Wind Trends widget with a time scale of minutes or longer.
+4. Open a Realtime Data Plot or Wind Trends widget with a time scale of minutes or longer.
 5. Let the plot load; history appears when available.
 6. For more details, consult plugin documentation and Signal K community resources.
 

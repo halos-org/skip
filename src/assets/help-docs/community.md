@@ -19,7 +19,7 @@ Improve or add entries: PR or Discord #showcase.
 
 
 ## Authors & Channels
-Creator channels producing helpful Kip or Signal K related content.
+Creator channels producing helpful Skip, Kip, or Signal K related content.
 
 ### Boating with the Baileys
 - Channel: https://www.youtube.com/@BoatingwiththeBaileys

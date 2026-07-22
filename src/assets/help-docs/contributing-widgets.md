@@ -29,8 +29,8 @@ Developer references:
 2. Generate and implement the widget.
 3. Generate and implement the widget test when necessary.
 4. Add an svg icon
-5. Update README.md and Skip documentation with your plugin information.
-6. Validate with lint/tests (ng lint/ng test).
+5. Update README.md and Skip documentation with your widget information.
+6. Validate with lint/tests (`npm run lint` / `npm test`, or `npm run ci` for the full gate).
 7. Submit a pull request with screenshots and a short behavior summary.
 
 ## Notes
