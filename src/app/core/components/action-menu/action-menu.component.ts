@@ -50,6 +50,16 @@ export class ActionMenuComponent {
     const el = this._anchor().nativeElement;
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
+    // A transformed ancestor becomes the containing block for this fixed anchor, so left/top
+    // resolve against that box instead of the viewport and the pop-over lands off the tap point.
+    // (The bottom-sheet container keeps a residual transform matrix from its forwards-filled
+    // enter animation, so its box — centred and offset on wide screens — is the reference.)
+    // Measure the offset the containing block introduces and cancel it; a no-op when there is none.
+    const rect = el.getBoundingClientRect();
+    const offsetX = rect.left - x;
+    const offsetY = rect.top - y;
+    el.style.left = `${x - offsetX}px`;
+    el.style.top = `${y - offsetY}px`;
     this._trigger().openMenu();
   }
 
