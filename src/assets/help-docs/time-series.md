@@ -7,7 +7,7 @@ History is served by an external **Signal K History API provider** — a server 
 See [History-API Provider](#/help/history-api.md) in the Integrations help menu for how to install and configure a provider.
 
 ## What Skip Does With History
-- Pre-seeds Data Plot and Wind Trends so they show recent trends immediately on open.
+- Pre-seeds Realtime Data Plot and Wind Trends so they show recent trends immediately on open.
 - Provides a pop-up historical view for numeric-value widgets on your pages.
 
 The detail and time span available depend entirely on what your provider has recorded and how it is configured.
@@ -20,7 +20,7 @@ The pop-up plot displays recorded data only (no live-stream overlay), across a f
 ## Supported Widgets
 Most widgets that use numeric paths support history, including Horizon, Battery Monitor, Solar, and similar numeric-based widgets. Plot widgets seed from history according to their configuration:
 
-#### Data Plot Widget
+#### Realtime Data Plot Widget
 - **Supported:** Yes, seeded with history data.
 - **Requirements:** Time scale must be minutes or longer.
 

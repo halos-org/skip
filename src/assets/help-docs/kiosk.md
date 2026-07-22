@@ -3,6 +3,8 @@
 This guide launches Chromium in kiosk mode to display Skip at:
 http://<sk_server_IP>:3000/@halos-org/skip/#/page/0
 
+Use your server's real address and port. `:3000` is the default for a bare Signal K server; on a secured/proxied setup use the **HTTPS** address served through the reverse proxy instead (also required if you want Skip's own *Keep screen awake* Display setting to work — see Screen Blanking below). Substitute your URL in every command that follows.
+
 It supports Raspberry Pi OS Bullseye (X11/LXDE) and Bookworm (Wayland).
 
 ## What is “kiosk mode”?

@@ -25,7 +25,7 @@ Before creating a new issue:
 Provide clear, specific details so we can reproduce and fix the problem faster:
 - What you expected vs. what happened
 - Steps to reproduce (numbered list if possible)
-- Skip version (see About / build info) and deployment method (e.g. Signal K app store, manual build)
+- Skip version (shown in the toolbar menu footer, or on the **Connection** status page alongside your browser and OS) and deployment method (e.g. Signal K app store, manual build)
 - Signal K server version
 - Browser + version (e.g. Firefox 128, Chrome 129, Safari 18)
 - Relevant widget(s) or data paths (e.g. `navigation.speedOverGround`)
@@ -51,7 +51,7 @@ If something critical slips through, feel free to politely bump the issue after 
 
 
 ## Contributing Beyond Issues
-- Share dashboards, layouts, or usage patterns. Use the Discord #showcase chanel with a few pictures (great inspiration for others!).
+- Share dashboards, layouts, or usage patterns. Use the Discord #showcase channel with a few pictures (great inspiration for others!).
 - Help answer other users’ questions on Discord.
 - Test new widgets or configuration flows and give feedback.
 

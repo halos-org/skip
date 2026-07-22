@@ -49,7 +49,7 @@ You can **Silence** or **Resolve** notifications.
 - **Notifications Menu:**  
   The Notifications Menu lists all active notifications, including details such as path, severity, and message. You can silence or resolve notifications directly from this menu. At the bottom of the Notifications menu, you will find a Mute button. This button mutes the notification volume. It does not Silence the notifications. It is meant as a quick noise cancelling button to spare your ears until you resolve the issue(s) but has no effect on the notifications.
   
-  By default, the Notifications menu is hidden; when an alarm is active, a notification badge appears in the lower-left corner and stays there until the alarm clears. Tap or click it to open the menu.
+  Open the Notifications menu from the bell button in the toolbar. When an alarm is active, a notification badge also appears in the lower-left corner and stays there until the alarm clears; tap or click either to open the menu.
 
 - **Zones State Panel:**
 
