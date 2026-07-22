@@ -6,7 +6,7 @@ import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
 import { DashboardComponent } from './dashboard.component';
-import { DashboardService } from '../../services/dashboard.service';
+import { Dashboard, DashboardService } from '../../services/dashboard.service';
 import { ToastService } from '../../services/toast.service';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
 import { DialogService } from '../../services/dialog.service';
@@ -243,6 +243,39 @@ describe('DashboardComponent', () => {
             fresh.detectChanges();
             expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
             expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('active-page identity reload', () => {
+        function stubLoad(): ReturnType<typeof vi.spyOn> {
+            return vi.spyOn(component as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);
+        }
+
+        it('reloads the grid when a page op swaps the page at the active index', () => {
+            const loadSpy = stubLoad();
+            const pages: Dashboard[] = [
+                { id: 'a', configuration: [] }, { id: 'b', configuration: [] }, { id: 'c', configuration: [] }
+            ];
+            mockDashboardService.dashboards.set(pages);
+            mockDashboardService.activeDashboard.set(1);
+            fixture.detectChanges();
+            loadSpy.mockClear();
+            // Delete the active page (index 1): the index stays 1 but now points at a different page.
+            mockDashboardService.dashboards.set([{ id: 'a', configuration: [] }, { id: 'c', configuration: [] }]);
+            fixture.detectChanges();
+            expect(loadSpy).toHaveBeenCalledWith(1);
+        });
+
+        it('does not reload on a config-only change to the active page (widget save)', () => {
+            const loadSpy = stubLoad();
+            mockDashboardService.dashboards.set([{ id: 'a', configuration: [] }, { id: 'b', configuration: [] }]);
+            mockDashboardService.activeDashboard.set(1);
+            fixture.detectChanges();
+            loadSpy.mockClear();
+            // Same id at the active index, different configuration → grid is the source of truth, no reload.
+            mockDashboardService.dashboards.set([{ id: 'a', configuration: [] }, { id: 'b', name: 'edited', configuration: [] }]);
+            fixture.detectChanges();
+            expect(loadSpy).not.toHaveBeenCalled();
         });
     });
 
