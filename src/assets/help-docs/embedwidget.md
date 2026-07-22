@@ -1,66 +1,66 @@
 ## Using the Embed Page Viewer Widget
 
-The Embed Page Viewer widget allows you to display external web pages or web applications directly within your dashboard. By default, the Embed Page Viewer widget does not allow input (touch, mouse and keyboard interactions) with the content in the Embed. To enable interactions, check the setting the widget's options. 
+The Embed Page Viewer widget allows you to display external web pages or web applications directly within your dashboard. By default, the Embed Page Viewer widget does not allow input (touch, mouse and keyboard interactions) with the content in the Embed. To enable interactions, check the setting in the widget's options.
 
-While this embedding feature is powerful, it comes with certain limitations due to browser security policies, specifically related to Cross-Origin Resource Sharing (CORS). This guide explains these limitations in simple terms and how they might affect your use of the widget.
+While this embedding feature is powerful, it comes with certain limitations due to browser security policies — specifically, whether the embedded site permits being shown in an iframe, and whether it shares the same origin as Skip. This guide explains these limitations in simple terms and how they might affect your use of the widget.
 
-## What Are CORS Limitations?
+## Why Some Pages Won't Embed
 
-CORS (Cross-Origin Resource Sharing) is a security feature built into web browsers. It prevents one website from accessing resources (like web pages or data) from another website unless the other website explicitly allows it. This is done to protect users from malicious websites trying to steal data or perform unauthorized actions.
+Whether a page can be shown inside an iframe is decided by **the page you are embedding**, not by Skip or Signal K. A site controls this with the `X-Frame-Options` HTTP header or a `Content-Security-Policy: frame-ancestors` directive. If the site forbids framing (many banking, social-media, and login sites do), the browser blocks it and you see a blank area or an error. Nothing the widget does can bypass it — the site owner has to allow it (see "Authorizing Skip to Load Embedded Content" below).
 
-When you use the Embed Page Viewer widget, it tries to load the content of the URL you provide into an iframe. However, if the website you are trying to embed does not allow its content to be displayed in an iframe on another website (like embeding their app in your Skip dashboard), the browser will block it. This is not something the widget or Signal K can control—it is a restriction set by the website you are trying to embed.
+> This is a different mechanism from CORS. CORS governs cross-origin *data* requests (fetch/XHR); it does not decide whether a page can be framed.
 
-## Understanding CORS and Hostname/Port Behavior
+## Same-Origin Content and Gestures
 
-It is important to clarify that CORS (Cross-Origin Resource Sharing) restrictions are not enforced when the hostname and port of the embedded content match the hostname and port of the Skip dashboard. This is because CORS only applies to requests made across different origins. An origin is defined as a combination of the protocol (e.g., `http` or `https`), hostname (e.g., `localhost` or `example.com`), and optional port (e.g., `80`, `443`, or a custom port). If all those are the same as the ones used by Skip, irrespective of the paths that can be present after the port, it is a same-origin path and CORS restrictions do not apply.
+A second browser rule matters here: the **same-origin policy**. When you turn on **Enable Input**, Skip injects small gestures into the embedded page so you can still swipe to change pages or reveal the auto-hiding toolbar over a full-screen embed. The browser only lets Skip script the iframe when the embedded content is **same-origin** — the same protocol, hostname, and port as the Skip dashboard. An origin is that combination of protocol (e.g. `http` or `https`), hostname (e.g. `localhost` or `example.com`), and optional port (e.g. `80`, `443`, or a custom port); the path after the port doesn't matter.
 
-### When CORS Does Not Apply
+### When Content Is Same-Origin
 
-If the URL you are embedding in the Embed Page Viewer widget uses the same hostname and port as your Skip dashboard (e.g., all Signal K app store applications), the browser considers it to be the same origin. In this case, CORS restrictions do not apply, and the content can be embedded without issues.
+If the URL you embed uses the same protocol, hostname, and port as your Skip dashboard (e.g. any Signal K app-store application served by your own server), the browser treats it as same-origin: Skip's gestures work over it, and framing is not an issue.
 
 #### Examples:
 
-1. **Same Origin (No CORS Restrictions)**:
+1. **Same Origin**:
    - Skip Dashboard URL: `http://localhost:3000/@halos-org/skip/`
    - Embedded Content URL: `http://localhost:3000/some-page/`
-   - Since both Skip and the embedded URL share the same protocol (`http`), hostname (`localhost`), and port (`3000`), CORS does not apply.
+   - Both share the same protocol (`http`), hostname (`localhost`), and port (`3000`), so this is same-origin — Skip's gestures work over it.
 
-2. **Different Origin (CORS Restrictions Apply)**:
+2. **Different Origin (cross-origin)**:
    - Skip Dashboard URL: `http://localhost:3000/@halos-org/skip/`
    - Embedded Content URL: `http://localhost:4000/some-page/`
-   - In this case, the ports are different (`3000` vs. `4000`), so the browser considers them to be different origins, and CORS restrictions will apply.
+   - The ports differ (`3000` vs. `4000`), so the browser treats them as different origins: Skip can't inject gestures, and whether the page frames at all is up to its own policy.
 
-3. **Different Hostname (CORS Restrictions Apply)**:
+3. **Different Hostname (cross-origin)**:
    - Skip Dashboard URL: `http://dashboard.local/@halos-org/skip/`
    - Embedded Content URL: `http://example.com/some-page`
-   - Even if the ports are the same, the hostnames are different (`dashboard.local` vs. `example.com`), so CORS restrictions will apply.
+   - Even with the same port, the hostnames differ (`dashboard.local` vs. `example.com`), so this is cross-origin.
 
-4. **Different Protocol (CORS Restrictions Apply)**:
+4. **Different Protocol (cross-origin)**:
    - Skip Dashboard URL: `http://localhost:3000/@halos-org/skip/`
    - Embedded Content URL: `https://localhost:3000/some-page/`
-   - Even though the hostname and port are the same, the protocols are different (`http` vs. `https`), so CORS restrictions will apply.
+   - Even with the same hostname and port, the protocols differ (`http` vs. `https`), so this is cross-origin.
 
 ### IMPORTANT:  Practical Implications for Skip Users
 
-- Embedding webapp and websites is far from perfect. Their are tradeoffs and limitations. If you find yourself unhappy with the result, keep your smile and give back to the community by build a dedicated Skip widget. We will help and many have done so.
+- Embedding webapps and websites is far from perfect. There are tradeoffs and limitations. If you find yourself unhappy with the result, keep your smile and give back to the community by building a dedicated Skip widget. We will help and many have done so.
 - By default you cannot interact with the Embed content. Activate the **Enable Input** widget option if you need to interact with the content.
 - If you are hosting custom web pages or applications on the same server as your Skip dashboard, ideally you've created a Signal K webapp and shared it with the community, ensure they use the same hostname and port. Use a relative URL path in the Embed configuration. For example, if your Skip dashboard is running on `http://localhost:3000/@halos-org/skip/` and your custom content is under the same origin, such as `http://localhost:3000/signalk-anchoralarm-plugin/` simply enter a relative URL in the widget options, like `/signalk-anchoralarm-plugin/`. Skip will automatically add the proper protocol, hostname, port and load the content. This will prevent issues loading the embedded content when launching Skip from different devices such as: the server, on your phone, tablet, laptop, etc.
 
 ### Summary
 
-CORS restrictions only apply when the protocol, hostname, or port of the embedded content differs from the Skip dashboard. By ensuring that your embedded content shares the same origin as the dashboard, you can avoid CORS-related issues and seamlessly use the Embed Page Viewer widget.
+Two independent rules apply: the embedded site's framing policy (`X-Frame-Options` / `frame-ancestors`) decides whether it can be shown at all, and the same-origin policy decides whether Skip can inject gestures over it. Hosting your embedded content at the same origin as the dashboard avoids the second problem entirely and lets you use the Embed Page Viewer widget seamlessly.
 
 ## How Does This Affect the Embed Widget?
 
 1. **Blocked Content**:
-   - If the website you are trying to embed has CORS restrictions or does not allow embedding via iframes, the widget will not display the content. Instead, you might see a blank area or an error message.
+   - If the website you are trying to embed forbids framing (via `X-Frame-Options` or a `frame-ancestors` policy), the widget will not display the content. Instead, you might see a blank area or an error message.
 
 2. **Common Examples of Blocked Content**:
    - Many popular websites (e.g., banking sites, social media platforms, or secure portals) block iframe embedding for security reasons.
    - Some websites may allow embedding only for specific trusted domains, which most probably, do not include your Signal K installation.
 
-3. **Consequences of Blocked Content in Skip**:
-   - When you enable the "Allow Input" Embed widget option, Skip needs to inject gestures within the embedded application to trigger page navigation or reveal the auto-hiding toolbar. To achieve this, Skip dynamically injects scripts into the iframe application. If CORS restrictions apply, this will be prohibited by the browser. This means that gestures will not work over the Embed widget. If you have a full-screen Embed widget, you could get stuck with no way to change pages or reveal the toolbar.
+3. **Consequences of Cross-Origin Content in Skip**:
+   - When you enable the "Enable Input" Embed widget option, Skip needs to inject gestures within the embedded application to trigger page navigation or reveal the auto-hiding toolbar. To do this, Skip scripts the iframe. The same-origin policy only permits this for same-origin content, so over a **cross-origin** embed the gestures will not work. If you have a full-screen cross-origin Embed widget, you could get stuck with no way to change pages or reveal the toolbar.
 
 4. **No Workaround for Restricted Websites**:
    - If the application does not allow iframe embedding, there is no way to bypass this restriction without the application owner's adding some kind of authorization for you. This is a browser-enforced security feature.
@@ -92,4 +92,4 @@ When using the Embed Page Viewer widget, it is important to understand that the 
        ```
 
 2. **Test the Configuration**:
-   - After updating the HTTP headers, test the website in the Embed Page Viewer widget. To ensure it loads correctly, look in the Browser's consol log for error messages.
+   - After updating the HTTP headers, test the website in the Embed Page Viewer widget. To ensure it loads correctly, look in the browser's console log for error messages.
