@@ -277,6 +277,19 @@ describe('DashboardComponent', () => {
             fixture.detectChanges();
             expect(loadSpy).not.toHaveBeenCalled();
         });
+
+        it('does not reload over an unsaved edit: a config change while editing (same id) never reloads', () => {
+            const loadSpy = stubLoad();
+            mockDashboardService.dashboards.set([{ id: 'a', configuration: [] }, { id: 'b', configuration: [] }]);
+            mockDashboardService.activeDashboard.set(1);
+            mockDashboardService.isDashboardStatic.set(false); // active widget edit in progress
+            fixture.detectChanges();
+            loadSpy.mockClear();
+            // A Done commit writes the active page's configuration back (same id) — must not reload the live grid.
+            mockDashboardService.dashboards.set([{ id: 'a', configuration: [] }, { id: 'b', name: 'edited', configuration: [] }]);
+            fixture.detectChanges();
+            expect(loadSpy).not.toHaveBeenCalled();
+        });
     });
 
     it('should save dashboard configuration', () => {
