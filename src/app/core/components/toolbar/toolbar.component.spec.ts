@@ -38,7 +38,7 @@ const uiEvent = {
   fullscreenSupported: signal(true),
   fullscreenStatus: signal(false),
 };
-const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn(), appVersion: signal('4.8.0') };
+const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn(), appVersion: signal('1.0.0') };
 const settings = { autoNightMode: signal(false) };
 const dialog = { openNotifications: vi.fn() };
 const router = { navigate: vi.fn() };
@@ -134,7 +134,7 @@ describe('ToolbarComponent', () => {
       ensureTestIconsReady();
       init();
       await openMenu();
-      expect(document.querySelector('.mat-mdc-menu-panel')?.textContent).toContain('Skip v4.8.0');
+      expect(document.querySelector('.mat-mdc-menu-panel')?.textContent).toContain('Skip v1.0.0');
       fixture.destroy();
     });
   });
