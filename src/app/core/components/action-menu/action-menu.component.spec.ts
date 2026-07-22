@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { of } from 'rxjs';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { ActionMenuComponent } from './action-menu.component';
 
 describe('ActionMenuComponent', () => {
@@ -52,5 +53,19 @@ describe('ActionMenuComponent', () => {
     component.open(10, 20);
 
     expect(selected).toHaveBeenCalledWith('add');
+  });
+
+  // Guards that the non-phone branch runs and opens the pop-over. Geometry (the offset-cancel
+  // math) is deliberately not asserted: jsdom has no layout engine, so getBoundingClientRect
+  // returns a zero rect and any position assertion would be green against a real regression.
+  it('opens the pop-over menu on non-phone screens', () => {
+    breakpoint.isMatched.mockReturnValue(false);
+    const openMenu = vi.spyOn(MatMenuTrigger.prototype, 'openMenu').mockImplementation(() => undefined);
+
+    component.open(10, 20);
+
+    expect(openMenu).toHaveBeenCalledTimes(1);
+    expect(bottomSheet.open).not.toHaveBeenCalled();
+    openMenu.mockRestore();
   });
 });
