@@ -49,8 +49,8 @@
     </div>
 
     <div class="toolbar-group toolbar-center">
-      <page-nav-control />
       @if (!isEditing()) {
+        <page-nav-control />
         <button mat-icon-button class="manage-pages" aria-label="Manage pages" (click)="openPageManager()">
           <mat-icon>build</mat-icon>
         </button>

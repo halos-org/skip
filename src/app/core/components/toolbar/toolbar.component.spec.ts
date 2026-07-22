@@ -125,10 +125,10 @@ describe('ToolbarComponent', () => {
       expect(el.querySelector('.editing-label')).not.toBeNull();
       expect(byLabel('Cancel editing')).not.toBeNull();
       expect(byLabel('Done editing')).not.toBeNull();
-      // Page management is a normal-mode action, not part of the widget-layout edit.
+      // Page navigation and management are normal-mode only: no page dots and no Manage pages
+      // while editing, so a mid-edit page switch can't discard the unsaved layout.
       expect(byLabel('Manage pages')).toBeNull();
-      // The page dots stay put for switching pages mid-edit.
-      expect(el.querySelector('page-nav-control')).not.toBeNull();
+      expect(el.querySelector('page-nav-control')).toBeNull();
     });
 
     it('marks the host as editing so the peek strip renders accent', () => {
@@ -149,9 +149,10 @@ describe('ToolbarComponent', () => {
   });
 
   describe('manage-pages (normal-mode)', () => {
-    it('shows the Manage pages control next to the page dots in normal mode', () => {
+    it('shows the page dots and the Manage pages control in normal mode', () => {
       dashboard.isDashboardStatic.set(true);
       init();
+      expect(el.querySelector('page-nav-control')).not.toBeNull();
       const control = byLabel('Manage pages');
       expect(control).not.toBeNull();
       expect(control!.classList.contains('manage-pages')).toBe(true);
