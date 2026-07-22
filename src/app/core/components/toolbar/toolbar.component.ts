@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatBadgeModule } from '@angular/material/badge';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ChromeVisibilityService, CHROME_HOVER_DWELL_MS } from '../../services/chrome-visibility.service';
@@ -31,7 +32,7 @@ const PEEK_HOTZONE_PX = 8;
 @Component({
   selector: 'app-toolbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatIconModule, MatBadgeModule, PageNavControlComponent],
+  imports: [MatButtonModule, MatIconModule, MatBadgeModule, MatMenuModule, PageNavControlComponent],
   templateUrl: './toolbar.component.html',
   styleUrl: './toolbar.component.scss',
 })
@@ -50,6 +51,10 @@ export class ToolbarComponent implements OnDestroy {
   protected readonly autoNightMode = this.settings.autoNightMode;
   protected readonly fullscreenSupported = this.uiEvent.fullscreenSupported;
   protected readonly fullscreenStatus = this.uiEvent.fullscreenStatus;
+  protected readonly appVersion = this.app.appVersion;
+  /** Serving host shown in the app-menu footer; the app is served same-origin by the SK server.
+   *  hostname (not host) so the constant Traefik port is left off. */
+  protected readonly host = window.location.hostname;
 
   /** While a layout edit is active the toolbar swaps its normal nav controls for edit contents. */
   protected readonly isEditing = computed(() => !this.dashboard.isDashboardStatic());
@@ -102,8 +107,20 @@ export class ToolbarComponent implements OnDestroy {
     this.app.toggleNightMode();
   }
 
-  protected openActions(): void {
-    this.router.navigate(['/actions']);
+  protected openSettings(): void {
+    this.router.navigate(['/settings']);
+  }
+
+  protected openConnection(): void {
+    this.router.navigate(['/connection']);
+  }
+
+  protected openRemote(): void {
+    this.router.navigate(['/remote']);
+  }
+
+  protected openHelp(): void {
+    this.router.navigate(['/help']);
   }
 
   protected enterEdit(): void {

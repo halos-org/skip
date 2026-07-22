@@ -25,7 +25,7 @@ describe('app.routes default-page normalization', () => {
       if (route.path === 'page/:id') {
         return { ...route, component: TestRouteTargetComponent };
       }
-      if (route.path === 'actions' || route.path === 'settings' || route.path === 'connection') {
+      if (route.path === 'settings' || route.path === 'connection') {
         return { path: route.path, component: TestRouteTargetComponent };
       }
       return route;
@@ -71,9 +71,9 @@ describe('app.routes default-page normalization', () => {
     expect(router.url).toBe('/page/0');
   });
 
-  it('resolves /actions (the renamed hub) instead of falling through to the wildcard', async () => {
+  it('redirects the retired /actions hub to /page/0 (stale bookmarks)', async () => {
     await router.navigateByUrl('/actions');
-    expect(router.url).toBe('/actions');
+    expect(router.url).toBe('/page/0');
   });
 
   it('resolves /settings (the renamed config page) instead of falling through to the wildcard', async () => {

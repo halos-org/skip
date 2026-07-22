@@ -27,11 +27,12 @@ export const routes: Routes = [
     path: 'dashboard/:id',
     redirectTo: route => `/page/${route.params['id']}`
   },
+  // The Actions page is retired (#390): app navigation moved to the toolbar menu and page
+  // management to Edit mode. Redirect stale bookmarks/deep links to the dashboard.
   {
     path: 'actions',
-    canActivate: [embedBlockedGuard],
-    loadComponent: () => import('./core/components/actions/actions.component').then(m => m.ActionsComponent),
-    title: 'Skip - Actions'
+    redirectTo: 'page/0',
+    pathMatch: 'full'
   },
   {
     path: 'settings',

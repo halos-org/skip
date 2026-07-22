@@ -13,6 +13,7 @@ import { SettingsService } from '../../services/settings.service';
 import { uiEventService } from '../../services/uiEvent.service';
 import { PageManagerBottomSheetComponent } from '../page-manager-bottom-sheet/page-manager-bottom-sheet.component';
 import { ToolbarComponent } from './toolbar.component';
+import { ensureTestIconsReady } from '../../../../test-helpers/icon-test-utils';
 
 const chrome = {
   revealed: signal(false),
@@ -37,7 +38,7 @@ const uiEvent = {
   fullscreenSupported: signal(true),
   fullscreenStatus: signal(false),
 };
-const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn() };
+const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn(), appVersion: signal('4.8.0') };
 const settings = { autoNightMode: signal(false) };
 const dialog = { openNotifications: vi.fn() };
 const router = { navigate: vi.fn() };
@@ -91,10 +92,51 @@ describe('ToolbarComponent', () => {
 
   const byLabel = (label: string) => el.querySelector<HTMLElement>(`[aria-label="${label}"]`);
 
-  it('opens the actions view via the router', () => {
+  it('exposes the app menu trigger (no direct /actions navigation)', () => {
     init();
-    byLabel('Actions')!.click();
-    expect(router.navigate).toHaveBeenCalledWith(['/actions']);
+    expect(byLabel('Open menu')).not.toBeNull();
+    expect(byLabel('Actions')).toBeNull();
+  });
+
+  describe('app menu (rendered via the overlay)', () => {
+    const menuItems = () => Array.from(document.querySelectorAll<HTMLElement>('.mat-mdc-menu-item'));
+    const openMenu = async () => {
+      byLabel('Open menu')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    it('lists the destinations in order and routes each item through its (click) binding', async () => {
+      ensureTestIconsReady();
+      init();
+      const expected: [string, string][] = [
+        ['Settings', '/settings'],
+        ['Connection', '/connection'],
+        ['Remote Control', '/remote'],
+        ['Help', '/help'],
+      ];
+      await openMenu();
+      expect(menuItems().map(i => i.textContent!.trim())).toEqual(expected.map(e => e[0]));
+
+      // A menu-item click closes the menu, so reopen between clicks. This exercises the
+      // matMenuTriggerFor wiring and each item→method mapping through the template.
+      for (let i = 0; i < expected.length; i++) {
+        if (!menuItems().length) await openMenu();
+        menuItems()[i].click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(router.navigate).toHaveBeenCalledWith([expected[i][1]]);
+      }
+      fixture.destroy();
+    });
+
+    it('shows the version and host in the menu footer', async () => {
+      ensureTestIconsReady();
+      init();
+      await openMenu();
+      expect(document.querySelector('.mat-mdc-menu-panel')?.textContent).toContain('Skip v4.8.0');
+      fixture.destroy();
+    });
   });
 
   it('toggles fullscreen and night mode', () => {

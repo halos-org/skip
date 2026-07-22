@@ -15,10 +15,6 @@ export class PageHeaderComponent {
   protected readonly svgIconId = input.required<string>();
   private _router = inject(Router);
 
-  protected backPage() {
-    this._router.navigate(['/actions']);
-  }
-
   protected closePage() {
     this._router.navigate(['/page']);
   }
