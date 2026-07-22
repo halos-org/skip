@@ -172,9 +172,8 @@ Stay informed with notifications about the state of the data you are interested 
 For example, Signal K will notify Skip when a water depth or temperature sensor reaches certain levels. In addition to Skip's centralized notification menu, individual widgets offer tailored visual representations appropriate to their design objectives, providing an optimal user experience.
 
 # How To Contribute
-Skip is under the MIT license and is built with Node and Angular using various open-source assets. All free! The project want's to insure your time is well invested by favouring discussion before submitting bug fixes and new features.
 
-Please ensure you submit an issue (bug/feature) before submitting a pull request.
+We are happy to receive GitHub issues and pull requests!
 
 ## Extending Skip
 
@@ -252,6 +251,3 @@ Skip is a [HaLOS](https://halos.fi) fork of [Kip](https://github.com/mxtommy/Kip
 
 # Features, Ideas, Bugs
 See [Skip's GitHub project](https://github.com/halos-org/skip/issues) for the latest feature requests and bug reports.
-
-This repository may not be used to train machine learning or AI models
-without explicit permission from the author.
