@@ -41,9 +41,9 @@
   margin: 0;
   padding: 0;
   border: 0;
-  // A bright accent so the cue is easy to notice against dashboard content.
-  background: var(--mat-sys-primary, #6ea8fe);
-  box-shadow: 0 1px 8px 0 var(--mat-sys-primary, #6ea8fe);
+  // A neutral cue by default; it turns accent while editing (see .editing below) as a
+  // persistent "you're editing → reveal for Done/Cancel" reminder.
+  background: var(--mat-sys-outline-variant, #4a4d52);
   opacity: 0;
   transform: translateY(-100%);
   transition: transform 300ms ease, opacity 300ms ease;
@@ -55,6 +55,34 @@
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+// While a layout edit is active the peek strip is persistently visible and accent-coloured,
+// so the "reveal for Done/Cancel" affordance never fully disappears behind the auto-hide.
+// The accent applies only while the toolbar is hidden (:not(.revealed)); once revealed, its
+// own Done/Cancel contents are the affordance.
+.toolbar-host.editing:not(.revealed) .peek-strip {
+  background: var(--mat-sys-primary, #6ea8fe);
+  box-shadow: 0 1px 8px 0 var(--mat-sys-primary, #6ea8fe);
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.editing-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--mat-sys-primary, #6ea8fe);
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
 }
 
 .peek-strip:focus-visible {
@@ -75,4 +103,11 @@
   justify-content: center;
   min-width: 0;
   overflow: hidden;
+}
+
+// Manage-pages sits next to the page navigator; a small spacer sets it apart from the
+// page icons so it doesn't read as another page.
+.manage-pages {
+  margin-left: 8px;
+  flex: 0 0 auto;
 }

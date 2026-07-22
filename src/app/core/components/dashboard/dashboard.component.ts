@@ -84,6 +84,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   private _previousIsStaticState = true;
   /** Suppress starting a drag sequence right after a long-press add (until pointer released) */
   private _suppressDrag = false;
+  /** Index/identity of the page last loaded into the grid, so a page op that swaps the page
+   *  at the active index (e.g. deleting the active page) triggers a reload, config saves don't. */
+  private _loadedActiveIndex: number | null = null;
+  private _loadedActiveId: string | null = null;
 
 
   private subGridOptions: GridStackOptions = {
@@ -130,12 +134,42 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       });
     });
 
+    // Reload the grid when the active page's index OR identity changes. Tracking identity —
+    // not just the index — catches a structural page op that swaps the page occupying the
+    // current index (deleting the active page leaves the index unchanged but pointing at a
+    // different page). A config-only change (a widget save) keeps the same id, so it never
+    // reloads over the live grid.
     effect(() => {
-      this.dashboard.activeDashboard();
+      const active = this.dashboard.activeDashboard();
+      const activeId = active === null ? null : this.dashboard.dashboards()[active]?.id ?? null;
 
       untracked(() => {
+        if (active === this._loadedActiveIndex && activeId === this._loadedActiveId) return;
+        this._loadedActiveIndex = active;
+        this._loadedActiveId = activeId;
         void this.runPageChange();
       });
+    });
+
+    // Done/Cancel live on the toolbar, outside this component; they reach the grid through
+    // these request counters. The commit/discard logic stays here, the only holder of the
+    // gridstack instance. The counters are root-scoped and monotonic, so a stale value from
+    // an earlier edit would otherwise auto-fire when this component is re-created on
+    // navigation — snapshot the value seen at construction and act only on a later increment.
+    let lastSaveRequest = this.dashboard.layoutEditSaveRequested();
+    effect(() => {
+      const tick = this.dashboard.layoutEditSaveRequested();
+      if (tick === lastSaveRequest) return;
+      lastSaveRequest = tick;
+      untracked(() => this.saveLayoutChanges());
+    });
+
+    let lastCancelRequest = this.dashboard.layoutEditCancelRequested();
+    effect(() => {
+      const tick = this.dashboard.layoutEditCancelRequested();
+      if (tick === lastCancelRequest) return;
+      lastCancelRequest = tick;
+      untracked(() => this.cancelLayoutChanges());
     });
   }
 
@@ -361,13 +395,13 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.dashboard.updateConfiguration(activeDashboard, immutableConfiguration);
   }
 
-  protected saveLayoutChanges(): void {
+  private saveLayoutChanges(): void {
     this.dashboard.setStaticDashboard(true);
     this.saveDashboard();
     this.dashboard.notifyLayoutEditSaved();
   }
 
-  protected cancelLayoutChanges(): void {
+  private cancelLayoutChanges(): void {
     this.loadDashboard(this.dashboard.activeDashboard());
     this.dashboard.setStaticDashboard(true);
     this.dashboard.notifyLayoutEditCanceled();

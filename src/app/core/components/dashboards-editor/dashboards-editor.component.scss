@@ -94,6 +94,60 @@
   font-size: 1.1em;
 }
 
+/* Compact single-row strip for the page-manager bottom sheet. */
+:host.compact {
+  height: auto;
+  overflow-y: hidden;
+}
+
+.dashboard-manage.compact {
+  height: auto;
+  padding: 4px 12px 12px;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  .dashboard-card {
+    flex: 0 0 auto;
+    height: 112px;
+    width: 128px;
+    margin: 6px;
+    border-radius: 10px;
+    padding: 6px;
+  }
+
+  .item-index {
+    top: 8px;
+    left: 8px;
+    height: 26px;
+    width: 26px;
+    font-size: 0.9em;
+  }
+
+  .dashboard-name {
+    margin-top: 4px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dashboard-add-btn button {
+    transform: scale(0.75);
+  }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .dashboard-manage.compact {
+    padding: 4px 12px 12px;
+
+    .dashboard-card {
+      height: 112px;
+    }
+  }
+}
+
 .cdk-drag-preview {
   box-sizing: border-box;
   border-radius: 4px;

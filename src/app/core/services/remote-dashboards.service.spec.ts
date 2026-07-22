@@ -32,6 +32,7 @@ class SettingsServiceStub {
 class DashboardServiceStub {
   public dashboards = signal<Dashboard[]>(DASHBOARDS);
   public activeDashboard = signal<number | null>(null);
+  public isDashboardStatic = signal<boolean>(true);
   public navigateTo: Mock = vi.fn();
 }
 
@@ -335,6 +336,17 @@ describe('RemoteDashboardsService', () => {
       enableRemoteControl();
 
       data.push(OWN_ACTIVE_SCREEN_PATH, 1);
+      TestBed.tick();
+
+      expect(dashboard.navigateTo).not.toHaveBeenCalled();
+    });
+
+    it('ignores a remote change while a local layout edit is in progress (local pre-empts)', () => {
+      dashboard.isDashboardStatic.set(false); // editing locally
+      createService();
+      enableRemoteControl();
+
+      data.push(OWN_ACTIVE_SCREEN_PATH, 2);
       TestBed.tick();
 
       expect(dashboard.navigateTo).not.toHaveBeenCalled();

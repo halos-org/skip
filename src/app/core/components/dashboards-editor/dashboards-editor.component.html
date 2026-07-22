@@ -1,4 +1,4 @@
-<div class="dashboard-manage" cdkDropList cdkDropListOrientation="mixed" (cdkDropListDropped)="drop($event)">
+<div class="dashboard-manage" [class.compact]="compact()" cdkDropList cdkDropListOrientation="mixed" (cdkDropListDropped)="drop($event)">
   @for (dashboard of _dashboard.dashboards(); track dashboard.id; let index = $index) {
     <div class="dashboard-card dashboard-item"
       skipGestures
@@ -19,8 +19,8 @@
       <div >
         <mat-icon class="dashboard-icon"
           [svgIcon]="dashboard.icon || 'dashboard'"
-          [style.width.px]="72"
-          [style.height.px]="72"
+          [style.width.px]="iconSizePx()"
+          [style.height.px]="iconSizePx()"
           aria-hidden="false"
         ></mat-icon>
       </div>

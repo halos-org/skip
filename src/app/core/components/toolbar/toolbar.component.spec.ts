@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppService } from '../../services/app-service';
@@ -10,6 +11,7 @@ import { DialogService } from '../../services/dialog.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { SettingsService } from '../../services/settings.service';
 import { uiEventService } from '../../services/uiEvent.service';
+import { PageManagerBottomSheetComponent } from '../page-manager-bottom-sheet/page-manager-bottom-sheet.component';
 import { ToolbarComponent } from './toolbar.component';
 
 const chrome = {
@@ -22,9 +24,14 @@ const chrome = {
 const dashboard = {
   dashboards: signal([{ id: 'a', name: 'Nav', icon: 'ic' }]),
   activeDashboard: signal(0),
+  isDashboardStatic: signal(true),
   navigateTo: vi.fn(),
+  navigateToActive: vi.fn(),
   setStaticDashboard: vi.fn(),
+  requestLayoutEditSave: vi.fn(),
+  requestLayoutEditCancel: vi.fn(),
 };
+const bottomSheet = { open: vi.fn(() => ({ afterDismissed: () => of(undefined) })) };
 const uiEvent = {
   toggleFullScreen: vi.fn(),
   fullscreenSupported: signal(true),
@@ -47,11 +54,13 @@ describe('ToolbarComponent', () => {
   beforeEach(() => {
     for (const spy of [
       chrome.reveal, chrome.suppressHide, chrome.allowHide,
-      dashboard.navigateTo, dashboard.setStaticDashboard,
+      dashboard.navigateTo, dashboard.navigateToActive, dashboard.setStaticDashboard,
+      dashboard.requestLayoutEditSave, dashboard.requestLayoutEditCancel, bottomSheet.open,
       uiEvent.toggleFullScreen, app.toggleDayNightMode, app.toggleNightMode, dialog.openNotifications, router.navigate,
     ]) spy.mockClear();
     chrome.revealed.set(false);
     chrome.peeking.set(false);
+    dashboard.isDashboardStatic.set(true);
     uiEvent.fullscreenSupported.set(true);
     uiEvent.fullscreenStatus.set(false);
     app.isNightMode.set(false);
@@ -69,6 +78,7 @@ describe('ToolbarComponent', () => {
         { provide: DialogService, useValue: dialog },
         { provide: NotificationsService, useValue: notifications },
         { provide: Router, useValue: router },
+        { provide: MatBottomSheet, useValue: bottomSheet },
       ],
     });
   });
@@ -101,6 +111,74 @@ describe('ToolbarComponent', () => {
     expect(dashboard.setStaticDashboard).toHaveBeenCalledWith(false);
     byLabel('Notifications')!.click();
     expect(dialog.openNotifications).toHaveBeenCalled();
+  });
+
+  describe('edit-mode toolbar swap', () => {
+    it('swaps normal nav controls for edit contents while the dashboard is non-static', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      // Normal controls are gone…
+      expect(byLabel('Actions')).toBeNull();
+      expect(byLabel('Notifications')).toBeNull();
+      expect(byLabel('Edit page')).toBeNull();
+      // …replaced by the edit contents.
+      expect(el.querySelector('.editing-label')).not.toBeNull();
+      expect(byLabel('Cancel editing')).not.toBeNull();
+      expect(byLabel('Done editing')).not.toBeNull();
+      // Page navigation and management are normal-mode only: no page dots and no Manage pages
+      // while editing, so a mid-edit page switch can't discard the unsaved layout.
+      expect(byLabel('Manage pages')).toBeNull();
+      expect(el.querySelector('page-nav-control')).toBeNull();
+    });
+
+    it('marks the host as editing so the peek strip renders accent', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      expect(el.querySelector('.toolbar-host')!.classList.contains('editing')).toBe(true);
+    });
+
+    it('Done requests a save and Cancel requests a cancel', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      byLabel('Done editing')!.click();
+      expect(dashboard.requestLayoutEditSave).toHaveBeenCalledTimes(1);
+      byLabel('Cancel editing')!.click();
+      expect(dashboard.requestLayoutEditCancel).toHaveBeenCalledTimes(1);
+    });
+
+  });
+
+  describe('manage-pages (normal-mode)', () => {
+    it('shows the page dots and the Manage pages control in normal mode', () => {
+      dashboard.isDashboardStatic.set(true);
+      init();
+      expect(el.querySelector('page-nav-control')).not.toBeNull();
+      const control = byLabel('Manage pages');
+      expect(control).not.toBeNull();
+      expect(control!.classList.contains('manage-pages')).toBe(true);
+    });
+
+    it('opens the page-manager bottom sheet from normal mode', () => {
+      dashboard.isDashboardStatic.set(true);
+      init();
+      byLabel('Manage pages')!.click();
+      expect(bottomSheet.open).toHaveBeenCalledWith(PageManagerBottomSheetComponent);
+    });
+
+    it('re-syncs the route to the active page when the sheet is dismissed', () => {
+      // A sheet delete can shift the active index without navigating; the URL must be re-synced
+      // on dismiss or a page dot at the stale index becomes a dead tap.
+      dashboard.isDashboardStatic.set(true);
+      init();
+      byLabel('Manage pages')!.click();
+      expect(dashboard.navigateToActive).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides Manage pages while editing (kept out of the widget-layout transaction)', () => {
+      dashboard.isDashboardStatic.set(false);
+      init();
+      expect(byLabel('Manage pages')).toBeNull();
+    });
   });
 
   it('reveals on peek-strip click and suppresses/resumes hide on hover', () => {

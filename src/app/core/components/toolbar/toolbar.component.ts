@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatBadgeModule } from '@angular/material/badge';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ChromeVisibilityService, CHROME_HOVER_DWELL_MS } from '../../services/chrome-visibility.service';
 import { DashboardService } from '../../services/dashboard.service';
@@ -12,6 +13,7 @@ import { SettingsService } from '../../services/settings.service';
 import { DialogService } from '../../services/dialog.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { PageNavControlComponent } from '../page-nav-control/page-nav-control.component';
+import { PageManagerBottomSheetComponent } from '../page-manager-bottom-sheet/page-manager-bottom-sheet.component';
 
 /** Top-edge band (px) whose cursor dwell exposes the toolbar; matches `--peek-height` in the SCSS. */
 const PEEK_HOTZONE_PX = 8;
@@ -42,11 +44,15 @@ export class ToolbarComponent implements OnDestroy {
   private readonly dialog = inject(DialogService);
   private readonly router = inject(Router);
   private readonly notifications = inject(NotificationsService);
+  private readonly bottomSheet = inject(MatBottomSheet);
 
   protected readonly isNightMode = this.app.isNightMode;
   protected readonly autoNightMode = this.settings.autoNightMode;
   protected readonly fullscreenSupported = this.uiEvent.fullscreenSupported;
   protected readonly fullscreenStatus = this.uiEvent.fullscreenStatus;
+
+  /** While a layout edit is active the toolbar swaps its normal nav controls for edit contents. */
+  protected readonly isEditing = computed(() => !this.dashboard.isDashboardStatic());
 
   private readonly notificationsInfo = toSignal(this.notifications.observerNotificationsInfo());
   protected readonly alarmCount = computed(() => this.notificationsInfo()?.alarmCount ?? 0);
@@ -102,6 +108,27 @@ export class ToolbarComponent implements OnDestroy {
 
   protected enterEdit(): void {
     this.dashboard.setStaticDashboard(false);
+  }
+
+  /** Commit the current page's layout edit; the mounted dashboard serialises and saves the grid. */
+  protected doneEdit(): void {
+    this.dashboard.requestLayoutEditSave();
+  }
+
+  /** Discard the current page's layout edit; the mounted dashboard reloads the persisted config. */
+  protected cancelEdit(): void {
+    this.dashboard.requestLayoutEditCancel();
+  }
+
+  /** Open the page-manager sheet (add / reorder / rename / duplicate / delete pages). */
+  protected openPageManager(): void {
+    // A sheet page op (e.g. deleting a lower page) can reassign the active page without
+    // navigating, leaving the URL on a now-stale index; re-sync the route on dismiss so the
+    // page dots stay tappable.
+    this.bottomSheet
+      .open(PageManagerBottomSheetComponent)
+      .afterDismissed()
+      .subscribe(() => this.dashboard.navigateToActive());
   }
 
   protected openNotifications(): void {

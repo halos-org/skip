@@ -1,0 +1,25 @@
+:host {
+  display: block;
+}
+
+.page-manager-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 4px 16px;
+}
+
+.page-manager-title {
+  font-weight: 600;
+  font-size: 1.1em;
+}
+
+.page-manager-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

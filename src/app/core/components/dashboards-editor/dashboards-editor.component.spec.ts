@@ -145,4 +145,18 @@ describe('DashboardsEditorComponent', () => {
     expect(dialog.openConfirmationDialog).not.toHaveBeenCalled();
     expect(dashboard.delete).not.toHaveBeenCalled();
   });
+
+  it('renders the full tiled layout by default', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.dashboard-manage.compact')).toBeNull();
+    expect((component as unknown as { iconSizePx: () => number }).iconSizePx()).toBe(72);
+  });
+
+  it('renders the compact single-row strip when compact is set', () => {
+    fixture.componentRef.setInput('compact', true);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.dashboard-manage.compact')).not.toBeNull();
+    expect((component as unknown as { iconSizePx: () => number }).iconSizePx()).toBe(40);
+  });
 });
