@@ -1,12 +1,13 @@
-import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, Signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnDestroy, ElementRef, viewChild, inject, effect, NgZone, input, untracked, computed, Signal, ChangeDetectionStrategy } from '@angular/core';
 import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { IWidgetSvcConfig, IWidgetPath } from '../../core/interfaces/widgets-interface';
 import { HistoryChartStreamService, IHistoryChartStreamParams, isHistoryUnavailable } from '../../core/services/history-chart-stream.service';
 import { IDatasetServiceDatapoint } from '../../core/interfaces/dataset.interfaces';
 import { resolveWindowMs, deriveDataSourceInfo, IChartDataSourceInfo } from '../../core/utils/chart-window.util';
-import { Subscription } from 'rxjs';
+import { Subscription, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 import { CanvasService } from '../../core/services/canvas.service';
+import { DataService } from '../../core/services/data.service';
 import { UnitsService } from '../../core/services/units.service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { ITheme } from '../../core/services/app-service';
@@ -54,9 +55,13 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     filterSelfPaths: true,
     color: 'contrast',
     timeScale: 'Last 30 Minutes',
-    // The axes are fixed to degrees (TWD) / knots (TWS) and the widget hardcodes those conversions,
-    // so the slots hide the unit-filter and Format dropdowns (showPathSkUnitsFilter/showConvertUnitTo
-    // false) — a picker there would be inert and misleading; only path and source are configurable.
+    // TWD is STRUCTURAL: fixed to degrees (showConvertUnitTo:false) because the widget's angle-wrap and
+    // tick math are degree-native — the history dialog keeps it in degrees too. TWS is a DISPLAY path:
+    // it follows the server's displayUnits preference, resolved at render like widget-data-chart (and by
+    // the history dialog via resolvePathMeasure), so it must NOT carry showConvertUnitTo:false — that
+    // flag would pin the dialog to the stored knots while the tile shows the server unit. Skip owns no
+    // per-widget speed unit; convertUnitTo:'knots' is an inert stored default kept to match the other
+    // wind widgets. showPathSkUnitsFilter:false hides the unit-filter on both slots.
     paths: {
       trueWindDirection: {
         description: 'True Wind Direction',
@@ -81,7 +86,6 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         convertUnitTo: 'knots',
-        showConvertUnitTo: false,
         sampleTime: 1000
       }
     }
@@ -90,8 +94,27 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   private readonly historyStream = inject(HistoryChartStreamService);
   private readonly canvasService = inject(CanvasService);
   private readonly unitsService = inject(UnitsService);
+  private readonly dataService = inject(DataService);
   private readonly responsive = inject(BreakpointObserver);
   protected isPhonePortrait: Signal<BreakpointState>;
+  /** Configured wind-speed path (record-form slot), or null when the slot is cleared. */
+  private readonly speedPath = computed<string | null>(() =>
+    this.windPathSlot(this.runtime?.options(), 'trueWindSpeed')?.path ?? null);
+  /**
+   * Server-resolved display measure for the wind-speed series. resolvePathMeasure() reads a non-signal
+   * meta cache, so it is folded through the path's meta subject to re-emit when the server's
+   * displayUnits land late or change; that change flows into computeRebuildSignature and rebuilds the
+   * chart in the new unit. Mirrors widget-data-chart's reactive pathMeasure. The actual conversion and
+   * label read the resolved measure directly at build time (see speedMeasureKey).
+   */
+  private readonly speedMeasure = toSignal(
+    toObservable(this.speedPath).pipe(
+      switchMap(path => path
+        ? this.dataService.getPathMetaObservable(path).pipe(map(() => this.unitsService.resolvePathMeasure(path)))
+        : of<string | undefined>(undefined)),
+      distinctUntilChanged()
+    )
+  );
   readonly widgetDataChart = viewChild('widgetDataChart', { read: ElementRef });
   public lineChartData: ChartData<'line', { x: number, y: number }[]> = {
     datasets: []
@@ -124,6 +147,9 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
    * startStreaming and read by the overlay-readiness gate so a cleared slot is not awaited forever. */
   private dirSeriesActive = false;
   private spdSeriesActive = false;
+  /** Server-resolved display measure applied to the speed datasets + big-number label; null when no
+   *  speed path. Re-resolved on each (re)build, so a late/changed displayUnits reconverts the series. */
+  private speedMeasureKey: string | null = null;
   private dataSourceInfo: IChartDataSourceInfo | null = null;
   private xCenter: number | null = null;
   private xStep: number | null = null;
@@ -292,7 +318,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         const unitY = area.top - (this.isPhonePortrait().matches ? this.TOP_UNIT_PHONE_PORTRAIT_Y_OFFSET : this.TOP_UNIT_Y_OFFSET);
         ctx.font = this.isPhonePortrait().matches ? `bold ${this.UNIT_PHONE_PORTRAIT_FONT_SIZE}px ${def.family}` : `bold ${this.UNIT_FONT_SIZE}px ${def.family}`;
         ctx.textAlign = 'left';
-        ctx.fillText('kts', unitX, unitY);
+        ctx.fillText(this.speedUnitSymbol(), unitX, unitY);
         ctx.restore();
       }
 
@@ -413,7 +439,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     const xDefaultMin = 0;
     const xDefaultMax = 360;
     const xDefaultStep = (xDefaultMax - xDefaultMin) / 4; // 5 ticks
-    // Provide initial xSpeed (knots) range as well
+    // Provide an initial xSpeed range (display-unit agnostic; the dynamic scaler resizes from data)
     const xsDefaultMin = 0;
     const xsDefaultMax = 20;
     const xsDefaultStep = (xsDefaultMax - xsDefaultMin) / 4; // 5 ticks
@@ -763,7 +789,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   private computeRebuildSignature(cfg: IWidgetSvcConfig): string {
     const dir = this.windPathSlot(cfg, 'trueWindDirection');
     const spd = this.windPathSlot(cfg, 'trueWindSpeed');
-    return [cfg.timeScale, dir?.path, dir?.source, spd?.path, spd?.source].join('|');
+    return [cfg.timeScale, dir?.path, dir?.source, spd?.path, spd?.source, this.speedMeasure()].join('|');
   }
 
   /**
@@ -805,6 +831,9 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     const spdPath = spd?.path;
     this.dirSeriesActive = !!dirPath;
     this.spdSeriesActive = !!spdPath;
+    // Resolve the server's display measure for the speed path once per build; a late/changed
+    // displayUnits re-emits through speedMeasure and triggers another build (see computeRebuildSignature).
+    this.speedMeasureKey = spdPath ? this.unitsService.resolvePathMeasure(spdPath) : null;
 
     if (dirPath) {
       // TWD is a direction path; the History engine auto-resolves its circular domain from the unit.
@@ -872,7 +901,14 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   }
 
   private pushRowsToSpeedDatasets(rows: IDatasetServiceDatapoint[]): void {
-    this.pushRowsGeneric(rows, 5, 'knots', false);
+    this.pushRowsGeneric(rows, 5, this.speedMeasureKey ?? 'unitless', false);
+  }
+
+  /** Display symbol for the resolved wind-speed measure; empty (no label) before the server's
+   *  displayUnits resolve or when the path carries no unit preference — never a wrong or raw-key label. */
+  private speedUnitSymbol(): string {
+    const measure = this.speedMeasureKey;
+    return measure && measure !== 'unitless' ? this.unitsService.getUnitDisplaySymbol(measure) : '';
   }
 
   private getRowValue(row: IDatasetServiceDatapoint, datasetType: 'value' | 'sma' | 'ema' | 'dema' | 'avg' | 'min' | 'max'): number | null {
@@ -888,8 +924,8 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     }
   }
 
-  // Generic transform for degree/knots series
-  private transformRows(rows: IDatasetServiceDatapoint[], datasetType: 'value' | 'sma' | 'ema' | 'dema' | 'avg' | 'min' | 'max', toUnit: 'deg' | 'knots', unwrap: boolean): IDataSetRow[] {
+  // Generic transform for the degree (structural) and speed (server-resolved measure) series
+  private transformRows(rows: IDatasetServiceDatapoint[], datasetType: 'value' | 'sma' | 'ema' | 'dema' | 'avg' | 'min' | 'max', toUnit: string, unwrap: boolean): IDataSetRow[] {
     const vals = rows.map(row => {
       const raw = this.getRowValue(row, datasetType);
       return raw == null ? null : this.unitsService.convertToUnit(toUnit, raw);
@@ -905,7 +941,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
   }
 
   // Push a batch of rows into 5 consecutive datasets starting at baseIndex
-  private pushRowsGeneric(rows: IDatasetServiceDatapoint[], baseIndex: 0 | 5, toUnit: 'deg' | 'knots', unwrap: boolean): void {
+  private pushRowsGeneric(rows: IDatasetServiceDatapoint[], baseIndex: 0 | 5, toUnit: string, unwrap: boolean): void {
     const types: ('value' | 'sma' | 'avg' | 'min' | 'max')[] = ['value', 'sma', 'avg', 'min', 'max'];
     types.forEach((type, i) => {
       (this.chart.data.datasets[baseIndex + i].data as IDataSetRow[])
@@ -1012,8 +1048,8 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
       const sDiffMin = Math.abs(sAvg - sMin);
       const sDiffMax = Math.abs(sMax - sAvg);
       let halfRangeS = Math.max(sDiffMin, sDiffMax);
-      // Guard minimum half-range to avoid collapse
-      const minHalfRangeS = 0.5; // knots
+      // Guard minimum half-range to avoid collapse (in the resolved display unit)
+      const minHalfRangeS = 0.5;
       halfRangeS = Math.max(halfRangeS, minHalfRangeS);
       // Target 5 ticks (4 intervals) with a nice step (ceiling)
       const requestedStep = (2 * halfRangeS) / 4; // = halfRangeS / 2

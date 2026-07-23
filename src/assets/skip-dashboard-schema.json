@@ -3056,7 +3056,6 @@
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
             "sampleTime": 1000,
-            "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
