@@ -132,11 +132,13 @@ export class AppNetworkInitService implements OnDestroy {
         // saved dashboard needs them. remoteContextDemand is the per-device value computed on the last
         // dashboard change; absent (never computed) fails open to `all` so AIS targets are never
         // silently hidden. Demand isn't known until dashboards load post-auth, so a change takes effect
-        // on the next reload.
+        // on the next reload. An embed or an ephemeral ?profile session renders a slot the per-device
+        // flag cannot describe, so fail open to `all` there rather than trust it.
+        const embedOrEphemeral = this.embedMode.embed() || this.embedMode.profile() !== null;
         await this.connection.initializeConnection(
           {url: this.config.signalKUrl, new: false},
           true,
-          this.config.remoteContextDemand ?? true
+          embedOrEphemeral ? true : (this.config.remoteContextDemand ?? true)
         );
       }
 
