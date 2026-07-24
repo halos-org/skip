@@ -8,6 +8,7 @@ import { DefaultDashboard } from '../../../default-config/config.blank.dashboard
 import { SettingsService } from './settings.service';
 import { Dashboard, DashboardService, widgetOperation } from './dashboard.service';
 import { EmbedModeService } from './embed-mode.service';
+import { StorageService } from './storage.service';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -52,7 +53,8 @@ function makeRouterStub(idParam: string | null) {
 function makeSettingsMock(dashboards: Dashboard[]) {
   return {
     getDashboardConfig: vi.fn<() => Dashboard[]>(() => dashboards),
-    saveDashboards: vi.fn<(dashboards: Dashboard[]) => void>()
+    saveDashboards: vi.fn<(dashboards: Dashboard[]) => void>(),
+    setRemoteContextDemand: vi.fn<(needsRemoteContexts: boolean) => void>()
   };
 }
 
@@ -62,6 +64,11 @@ describe('DashboardService', () => {
   let router: ReturnType<typeof makeRouterStub>;
   let consoleWarn: MockInstance;
   let consoleError: MockInstance;
+  // Demand persistence (#386) is gated on an authoritative, non-ephemeral, non-embed load; these
+  // drive the StorageService/EmbedModeService mocks. Defaults model a normal device boot.
+  let storageBootstrapped: boolean;
+  let ephemeralProfile: string | null;
+  let embedActive: boolean;
 
   function setup(dashboards: Dashboard[] = seed(), routeId: string | null = null): void {
     settings = makeSettingsMock(dashboards);
@@ -70,13 +77,18 @@ describe('DashboardService', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: SettingsService, useValue: settings },
-        { provide: Router, useValue: router }
+        { provide: Router, useValue: router },
+        { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => storageBootstrapped } },
+        { provide: EmbedModeService, useValue: { embed: () => embedActive, profile: () => ephemeralProfile } }
       ]
     });
     service = TestBed.inject(DashboardService);
   }
 
   beforeEach(() => {
+    storageBootstrapped = true;
+    ephemeralProfile = null;
+    embedActive = false;
     consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
@@ -581,6 +593,7 @@ describe('DashboardService', () => {
         providers: [
           { provide: SettingsService, useValue: makeSettingsMock(seed()) },
           { provide: Router, useValue: makeRouterStub(null) },
+          { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => true } },
           { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } }
         ]
       });
@@ -630,6 +643,44 @@ describe('DashboardService', () => {
       service.updateConfiguration(0, []);
       TestBed.tick();
       expect(settings.saveDashboards).toHaveBeenCalledTimes(1);
+    });
+
+    it('recomputes the remote-context demand from the dashboard set on every change (#386)', () => {
+      setup(); // self-only seed (widget-numeric, no paths) -> no remote demand
+      TestBed.tick();
+      expect(settings.setRemoteContextDemand).toHaveBeenLastCalledWith(false);
+
+      const radarHost = {
+        id: 'r-0', x: 0, y: 0, w: 2, h: 2,
+        selector: 'widget-host2',
+        input: { widgetProperties: { type: 'widget-ais-radar', uuid: 'r-0', config: {} } }
+      } as unknown as NgGridStackWidget;
+      service.add('Radar', [radarHost]);
+      TestBed.tick();
+      expect(settings.setRemoteContextDemand).toHaveBeenLastCalledWith(true);
+    });
+
+    it('does NOT persist demand from an ephemeral ?profile viewer, but still saves dashboards (#386)', () => {
+      ephemeralProfile = 'guest';
+      setup();
+      TestBed.tick();
+      expect(settings.saveDashboards).toHaveBeenCalled();
+      expect(settings.setRemoteContextDemand).not.toHaveBeenCalled();
+    });
+
+    it('does NOT persist demand before the authoritative profile has bootstrapped (degraded/seed) (#386)', () => {
+      storageBootstrapped = false;
+      setup();
+      TestBed.tick();
+      expect(settings.setRemoteContextDemand).not.toHaveBeenCalled();
+    });
+
+    it('does NOT persist demand (or save) in embed mode (#386)', () => {
+      embedActive = true;
+      setup();
+      TestBed.tick();
+      expect(settings.setRemoteContextDemand).not.toHaveBeenCalled();
+      expect(settings.saveDashboards).not.toHaveBeenCalled();
     });
   });
 });

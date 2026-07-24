@@ -20,6 +20,7 @@ interface SeedOpts {
   sharedConfigName?: string;
   isRemoteControl?: boolean;
   instanceName?: string;
+  remoteContextDemand?: boolean;
 }
 
 function seedConfig(opts: SeedOpts = {}): void {
@@ -30,6 +31,7 @@ function seedConfig(opts: SeedOpts = {}): void {
     signalKUrl: 'https://boat.example:3443',
     proxyEnabled: false,
     signalKSubscribeAll: false,
+    remoteContextDemand: opts.remoteContextDemand,
     sharedConfigName: opts.sharedConfigName ?? 'profileA',
     isRemoteControl: opts.isRemoteControl ?? false,
     instanceName: opts.instanceName ?? ''
@@ -315,6 +317,25 @@ describe('SettingsService', () => {
       const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.isRemoteControl).toBe(true);
       expect(cc.instanceName).toBe('Helm');
+    });
+
+    it('reads a computed remoteContextDemand from connectionConfig at boot (#386)', () => {
+      expect(createService({ remoteContextDemand: false }).remoteContextDemand).toBe(false);
+    });
+
+    it('leaves remoteContextDemand undefined when never computed (fail-open, #386)', () => {
+      expect(createService({}).remoteContextDemand).toBeUndefined();
+    });
+
+    it('setRemoteContextDemand persists the flag to connectionConfig, no-ops when unchanged (#386)', () => {
+      const service = createService({});
+      service.setRemoteContextDemand(true);
+      expect(JSON.parse(localStorage.getItem('skip.connectionConfig') as string).remoteContextDemand).toBe(true);
+
+      const spy = vi.spyOn(Storage.prototype, 'setItem');
+      service.setRemoteContextDemand(true); // unchanged -> must not rewrite
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
     });
 
     it('getAppConfig no longer carries remote-control fields', () => {

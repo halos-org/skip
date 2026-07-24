@@ -127,12 +127,18 @@ export class AppNetworkInitService implements OnDestroy {
     try {
       if (this.config?.signalKUrl !== undefined && this.config.signalKUrl !== null) {
         // Routing always serves the server's discovered API path from the app's own origin, so the
-        // same-origin session cookie always applies; the stream subscribes to all contexts
-        // unconditionally. Neither is user-configurable.
+        // same-origin session cookie always applies (proxyEnabled is not user-configurable). Subscribe
+        // scope is widget-demand-driven (#386): connect to all remote (AIS/DSC) contexts only when a
+        // saved dashboard needs them. remoteContextDemand is the per-device value computed on the last
+        // dashboard change; absent (never computed) fails open to `all` so AIS targets are never
+        // silently hidden. Demand isn't known until dashboards load post-auth, so a change takes effect
+        // on the next reload. An embed or an ephemeral ?profile session renders a slot the per-device
+        // flag cannot describe, so fail open to `all` there rather than trust it.
+        const embedOrEphemeral = this.embedMode.embed() || this.embedMode.profile() !== null;
         await this.connection.initializeConnection(
           {url: this.config.signalKUrl, new: false},
           true,
-          true
+          embedOrEphemeral ? true : (this.config.remoteContextDemand ?? true)
         );
       }
 

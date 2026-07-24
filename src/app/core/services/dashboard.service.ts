@@ -9,6 +9,8 @@ import isEqual from 'lodash-es/isEqual';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 import { EmbedModeService } from './embed-mode.service';
+import { StorageService } from './storage.service';
+import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
 
 export interface Dashboard {
   id: string
@@ -36,6 +38,7 @@ export class DashboardService {
   private readonly _settings = inject(SettingsService);
   private readonly _router = inject(Router);
   private readonly _embedMode = inject(EmbedModeService);
+  private readonly _storage = inject(StorageService);
   private readonly _destroyRef = inject(DestroyRef);
   public dashboards = signal<Dashboard[]>([], { equal: isEqual });
   public readonly activeDashboard = signal<number | null>(null);
@@ -107,6 +110,15 @@ export class DashboardService {
 
       untracked(() => {
         this._settings.saveDashboards(dashboards);
+        // Recompute the remote (AIS/DSC) context subscribe demand and persist it per-device (#386),
+        // so the next boot's pre-auth subscribe-scope decision reflects the widgets configured.
+        // Derive it ONLY from the device's own authoritative profile: skip an ephemeral ?profile
+        // viewer (embed already returned above) and any pre-load/degraded seed (DefaultDashboard
+        // before the real profile bootstrapped). Otherwise a transient viewer or a failed boot would
+        // clobber the device flag and silently under-subscribe the real profile — hiding AIS.
+        if (!this._embedMode.profile() && this._storage.isRemoteContextBootstrapped()) {
+          this._settings.setRemoteContextDemand(dashboardsRequireRemoteContexts(dashboards));
+        }
       });
     });
   }

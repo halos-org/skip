@@ -6,6 +6,10 @@ export interface IConnectionConfig {
   signalKUrl: string | null;
   proxyEnabled: boolean;
   signalKSubscribeAll: boolean;
+  // Last computed widget-demand for remote (AIS/DSC) contexts (#386), consumed pre-auth at boot to
+  // choose the WS subscribe scope. Absent means "never computed" and is treated as fail-open (all):
+  // under-subscribing would hide collision-relevant AIS targets.
+  remoteContextDemand?: boolean;
   sharedConfigName: string;
   // Remote-control identity is per-device: a profile switch must not change whether this display
   // participates in remote control or the name it advertises.
