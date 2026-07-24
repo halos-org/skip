@@ -225,6 +225,20 @@ describe('DashboardComponent', () => {
             expect(mockDashboardService.setStaticDashboard).toHaveBeenCalledWith(true);
             expect(mockDashboardService.notifyLayoutEditCanceled).toHaveBeenCalledTimes(1);
         });
+
+        it('ignores a Done or Cancel FAB tap while a widget drag is in progress', () => {
+            // The FABs overlay the grid's drag surface; a mid-drag tap must not serialise a
+            // half-dragged geometry or lock the grid out from under an in-flight interaction.
+            mockDashboardService.isDashboardStatic.set(false);
+            fixture.detectChanges();
+            (TestBed.inject(uiEventService) as unknown as { isDragging: { set: (v: boolean) => void } }).isDragging.set(true);
+            fab('Done editing')!.click();
+            fab('Cancel editing')!.click();
+            expect(privateApi._gridstack().grid.save).not.toHaveBeenCalled();
+            expect(mockDashboardService.setStaticDashboard).not.toHaveBeenCalled();
+            expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
+            expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
+        });
     });
 
     describe('active-page identity reload', () => {

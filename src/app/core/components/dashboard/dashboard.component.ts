@@ -375,12 +375,16 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   protected saveLayoutChanges(): void {
+    // The FABs sit over the grid's drag surface; ignore a commit mid-drag so a
+    // half-dragged geometry is never serialised (and setStatic can't pre-empt dragstop).
+    if (this._uiEvent.isDragging()) return;
     this.dashboard.setStaticDashboard(true);
     this.saveDashboard();
     this.dashboard.notifyLayoutEditSaved();
   }
 
   protected cancelLayoutChanges(): void {
+    if (this._uiEvent.isDragging()) return;
     this.loadDashboard(this.dashboard.activeDashboard());
     this.dashboard.setStaticDashboard(true);
     this.dashboard.notifyLayoutEditCanceled();
