@@ -29,8 +29,6 @@ const dashboard = {
   navigateTo: vi.fn(),
   navigateToActive: vi.fn(),
   setStaticDashboard: vi.fn(),
-  requestLayoutEditSave: vi.fn(),
-  requestLayoutEditCancel: vi.fn(),
 };
 const bottomSheet = { open: vi.fn(() => ({ afterDismissed: () => of(undefined) })) };
 const uiEvent = {
@@ -56,7 +54,7 @@ describe('ToolbarComponent', () => {
     for (const spy of [
       chrome.reveal, chrome.suppressHide, chrome.allowHide,
       dashboard.navigateTo, dashboard.navigateToActive, dashboard.setStaticDashboard,
-      dashboard.requestLayoutEditSave, dashboard.requestLayoutEditCancel, bottomSheet.open,
+      bottomSheet.open,
       uiEvent.toggleFullScreen, app.toggleDayNightMode, app.toggleNightMode, dialog.openNotifications, router.navigate,
     ]) spy.mockClear();
     chrome.revealed.set(false);
@@ -156,17 +154,18 @@ describe('ToolbarComponent', () => {
   });
 
   describe('edit-mode toolbar swap', () => {
-    it('swaps normal nav controls for edit contents while the dashboard is non-static', () => {
+    it('swaps the menu and edit-pencil for the editing label while the dashboard is non-static', () => {
       dashboard.isDashboardStatic.set(false);
       init();
-      // Normal controls are gone…
-      expect(byLabel('Actions')).toBeNull();
-      expect(byLabel('Notifications')).toBeNull();
+      // The menu and edit-pencil give way to the editing label. The edit-exit (Done/Cancel)
+      // lives on the dashboard's always-visible FABs now, not the auto-hiding toolbar.
+      expect(byLabel('Open menu')).toBeNull();
       expect(byLabel('Edit page')).toBeNull();
-      // …replaced by the edit contents.
+      expect(byLabel('Cancel editing')).toBeNull();
+      expect(byLabel('Done editing')).toBeNull();
       expect(el.querySelector('.editing-label')).not.toBeNull();
-      expect(byLabel('Cancel editing')).not.toBeNull();
-      expect(byLabel('Done editing')).not.toBeNull();
+      // Notifications stay reachable while editing (alarm access on a marine display).
+      expect(byLabel('Notifications')).not.toBeNull();
       // Page navigation and management are normal-mode only: no page dots and no Manage pages
       // while editing, so a mid-edit page switch can't discard the unsaved layout.
       expect(byLabel('Manage pages')).toBeNull();
@@ -178,16 +177,6 @@ describe('ToolbarComponent', () => {
       init();
       expect(el.querySelector('.toolbar-host')!.classList.contains('editing')).toBe(true);
     });
-
-    it('Done requests a save and Cancel requests a cancel', () => {
-      dashboard.isDashboardStatic.set(false);
-      init();
-      byLabel('Done editing')!.click();
-      expect(dashboard.requestLayoutEditSave).toHaveBeenCalledTimes(1);
-      byLabel('Cancel editing')!.click();
-      expect(dashboard.requestLayoutEditCancel).toHaveBeenCalledTimes(1);
-    });
-
   });
 
   describe('manage-pages (normal-mode)', () => {

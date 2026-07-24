@@ -58,22 +58,15 @@
     </div>
 
     <div class="toolbar-group toolbar-end">
-      @if (isEditing()) {
-        <button mat-icon-button aria-label="Cancel editing" (click)="cancelEdit()">
-          <mat-icon>close</mat-icon>
-        </button>
-        <button mat-icon-button aria-label="Done editing" (click)="doneEdit()">
-          <mat-icon>done</mat-icon>
-        </button>
-      } @else {
-        <button mat-icon-button aria-label="Notifications" (click)="openNotifications()">
-          <mat-icon
-            [matBadge]="alarmCount()"
-            [matBadgeHidden]="!alarmCount()"
-            matBadgeSize="small"
-            matBadgeColor="warn"
-          >notifications</mat-icon>
-        </button>
+      <button mat-icon-button aria-label="Notifications" (click)="openNotifications()">
+        <mat-icon
+          [matBadge]="alarmCount()"
+          [matBadgeHidden]="!alarmCount()"
+          matBadgeSize="small"
+          matBadgeColor="warn"
+        >notifications</mat-icon>
+      </button>
+      @if (!isEditing()) {
         <button mat-icon-button aria-label="Edit page" (click)="enterEdit()">
           <mat-icon>lock_open</mat-icon>
         </button>

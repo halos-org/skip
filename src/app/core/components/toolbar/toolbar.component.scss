@@ -42,7 +42,7 @@
   padding: 0;
   border: 0;
   // A neutral cue by default; it turns accent while editing (see .editing below) as a
-  // persistent "you're editing → reveal for Done/Cancel" reminder.
+  // persistent "you are editing" reminder.
   background: var(--mat-sys-outline-variant, #4a4d52);
   opacity: 0;
   transform: translateY(-100%);
@@ -57,10 +57,10 @@
   pointer-events: auto;
 }
 
-// While a layout edit is active the peek strip is persistently visible and accent-coloured,
-// so the "reveal for Done/Cancel" affordance never fully disappears behind the auto-hide.
-// The accent applies only while the toolbar is hidden (:not(.revealed)); once revealed, its
-// own Done/Cancel contents are the affordance.
+// While a layout edit is active the peek strip stays visible and accent-coloured as a
+// persistent "you are editing" cue; the edit-exit lives on the dashboard's Done/Cancel FABs.
+// The accent applies only while the toolbar is hidden (:not(.revealed)); revealing the toolbar
+// shows the "Editing layout" label and Notifications.
 .toolbar-host.editing:not(.revealed) .peek-strip {
   background: var(--mat-sys-primary, #6ea8fe);
   box-shadow: 0 1px 8px 0 var(--mat-sys-primary, #6ea8fe);
