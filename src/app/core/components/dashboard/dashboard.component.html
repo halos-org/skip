@@ -45,3 +45,24 @@
 }
 </div>
 <action-menu #actionMenu [items]="emptyAreaActions()" (selected)="onEmptyAreaAction($event)" />
+@if (!dashboardStatic) {
+  <div class="edit-layout-close-icon">
+    <button
+      mat-fab
+      class="cancel"
+      style="margin-right: 10px"
+      aria-label="Cancel editing"
+      (click)="cancelLayoutChanges()"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+    <button
+      mat-fab
+      class="save"
+      aria-label="Done editing"
+      (click)="saveLayoutChanges()"
+    >
+      <mat-icon>done</mat-icon>
+    </button>
+  </div>
+}

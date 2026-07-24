@@ -571,16 +571,6 @@ describe('DashboardService', () => {
       expect(service.layoutEditSaved()).toBe(2);
       expect(service.layoutEditCanceled()).toBe(1);
     });
-
-    it('counts inbound save and cancel edit requests', () => {
-      expect(service.layoutEditSaveRequested()).toBe(0);
-      expect(service.layoutEditCancelRequested()).toBe(0);
-      service.requestLayoutEditSave();
-      service.requestLayoutEditCancel();
-      service.requestLayoutEditCancel();
-      expect(service.layoutEditSaveRequested()).toBe(1);
-      expect(service.layoutEditCancelRequested()).toBe(2);
-    });
   });
 
   // Embed mode pins isDashboardStatic true at this single read-only choke point (#216 E6).

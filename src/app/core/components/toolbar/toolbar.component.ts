@@ -127,16 +127,6 @@ export class ToolbarComponent implements OnDestroy {
     this.dashboard.setStaticDashboard(false);
   }
 
-  /** Commit the current page's layout edit; the mounted dashboard serialises and saves the grid. */
-  protected doneEdit(): void {
-    this.dashboard.requestLayoutEditSave();
-  }
-
-  /** Discard the current page's layout edit; the mounted dashboard reloads the persisted config. */
-  protected cancelEdit(): void {
-    this.dashboard.requestLayoutEditCancel();
-  }
-
   /** Open the page-manager sheet (add / reorder / rename / duplicate / delete pages). */
   protected openPageManager(): void {
     // A sheet page op (e.g. deleting a lower page) can reassign the active page without

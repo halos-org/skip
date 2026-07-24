@@ -60,8 +60,6 @@ describe('DashboardComponent', () => {
             setStaticDashboard: vi.fn().mockName("DashboardService.setStaticDashboard"),
             notifyLayoutEditSaved: vi.fn().mockName("DashboardService.notifyLayoutEditSaved"),
             notifyLayoutEditCanceled: vi.fn().mockName("DashboardService.notifyLayoutEditCanceled"),
-            layoutEditSaveRequested: signal(0),
-            layoutEditCancelRequested: signal(0),
             navigateToNextDashboard: vi.fn().mockName("DashboardService.navigateToNextDashboard"),
             navigateToPreviousDashboard: vi.fn().mockName("DashboardService.navigateToPreviousDashboard"),
             consumePendingPageDirection: vi.fn().mockName("DashboardService.consumePendingPageDirection").mockReturnValue(null),
@@ -187,62 +185,45 @@ describe('DashboardComponent', () => {
         });
     });
 
-    describe('toolbar-driven layout edit requests', () => {
+    describe('layout-edit FABs', () => {
         function stubLoad(): ReturnType<typeof vi.spyOn> {
             return vi.spyOn(component as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);
         }
+        const fab = (label: string) =>
+            (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(`[aria-label="${label}"]`);
 
-        it('ignores the initial (zero) request tick', () => {
+        it('renders no edit FABs while the dashboard is static (not editing)', () => {
+            mockDashboardService.isDashboardStatic.set(true);
             fixture.detectChanges();
-            expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
-            expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
+            expect(fab('Done editing')).toBeNull();
+            expect(fab('Cancel editing')).toBeNull();
         });
 
-        it('commits the edit when the toolbar requests a save', () => {
+        it('renders the Done and Cancel FABs while editing', () => {
             mockDashboardService.isDashboardStatic.set(false);
             fixture.detectChanges();
-            mockDashboardService.layoutEditSaveRequested.set(1);
+            expect(fab('Done editing')).not.toBeNull();
+            expect(fab('Cancel editing')).not.toBeNull();
+        });
+
+        it('commits the edit when the Done FAB is clicked', () => {
+            mockDashboardService.isDashboardStatic.set(false);
             fixture.detectChanges();
+            fab('Done editing')!.click();
             expect(privateApi._gridstack().grid.save).toHaveBeenCalledWith(false, false);
             expect(mockDashboardService.setStaticDashboard).toHaveBeenCalledWith(true);
             expect(mockDashboardService.notifyLayoutEditSaved).toHaveBeenCalledTimes(1);
         });
 
-        it('re-commits on a second save request in the same session (counter 1 -> 2)', () => {
-            mockDashboardService.isDashboardStatic.set(false);
-            fixture.detectChanges();
-            mockDashboardService.layoutEditSaveRequested.set(1);
-            fixture.detectChanges();
-            mockDashboardService.layoutEditSaveRequested.set(2);
-            fixture.detectChanges();
-            expect(mockDashboardService.notifyLayoutEditSaved).toHaveBeenCalledTimes(2);
-        });
-
-        it('discards the edit when the toolbar requests a cancel (reloads the persisted page)', () => {
+        it('discards the edit when the Cancel FAB is clicked (reloads the persisted page)', () => {
             const loadSpy = stubLoad();
             mockDashboardService.isDashboardStatic.set(false);
             fixture.detectChanges();
             loadSpy.mockClear();
-            mockDashboardService.layoutEditCancelRequested.set(1);
-            fixture.detectChanges();
+            fab('Cancel editing')!.click();
             expect(loadSpy).toHaveBeenCalledWith(0);
             expect(mockDashboardService.setStaticDashboard).toHaveBeenCalledWith(true);
             expect(mockDashboardService.notifyLayoutEditCanceled).toHaveBeenCalledTimes(1);
-        });
-
-        it('does not replay a stale request counter on a fresh mount (navigation remount)', () => {
-            // A prior Done/Cancel this session left the root-scoped counters non-zero; the
-            // component is recreated on navigation and must not auto-fire on construction.
-            fixture.destroy();
-            mockDashboardService.layoutEditSaveRequested.set(2);
-            mockDashboardService.layoutEditCancelRequested.set(2);
-            const fresh = TestBed.createComponent(DashboardComponent);
-            vi.spyOn(fresh.componentInstance, 'ngOnDestroy').mockImplementation(() => undefined);
-            vi.spyOn(fresh.componentInstance as unknown as DashboardComponentPrivateApi, '_gridstack').mockReturnValue(gridMock);
-            vi.spyOn(fresh.componentInstance as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);
-            fresh.detectChanges();
-            expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
-            expect(mockDashboardService.notifyLayoutEditCanceled).not.toHaveBeenCalled();
         });
     });
 
@@ -649,8 +630,6 @@ describe('DashboardComponent — embed mode empty state', () => {
             setStaticDashboard: vi.fn(),
             notifyLayoutEditSaved: vi.fn(),
             notifyLayoutEditCanceled: vi.fn(),
-            layoutEditSaveRequested: signal(0),
-            layoutEditCancelRequested: signal(0),
             navigateToNextDashboard: vi.fn(),
             navigateToPreviousDashboard: vi.fn(),
             consumePendingPageDirection: vi.fn().mockReturnValue(null),
