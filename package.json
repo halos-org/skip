@@ -128,7 +128,6 @@
     "rxjs": "^7.8.2",
     "sass": "^1.49.9",
     "screenfull": "^6.0.2",
-    "sk-ais-status-plugin": "^1.0.0",
     "steelseries": "^2.0.9",
     "ts-node": "^10.9.2",
     "tslib": "^2.6.2",
@@ -138,6 +137,7 @@
   "dependencies": {
     "@signalk/server-api": "^2.22.0",
     "hls.js": "^1.6.16",
-    "piexifjs": "^1.0.6"
+    "piexifjs": "^1.0.6",
+    "sk-ais-status-plugin": "^1.0.0"
   }
 }
