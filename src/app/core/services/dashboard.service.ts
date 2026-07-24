@@ -9,6 +9,7 @@ import isEqual from 'lodash-es/isEqual';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 import { EmbedModeService } from './embed-mode.service';
+import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
 
 export interface Dashboard {
   id: string
@@ -107,6 +108,11 @@ export class DashboardService {
 
       untracked(() => {
         this._settings.saveDashboards(dashboards);
+        // Recompute the remote (AIS/DSC) context subscribe demand from the current dashboard set and
+        // persist it per-device (#386). Runs on the initial seed and every edit, so the next boot's
+        // pre-auth subscribe-scope decision reflects the widgets actually configured. Skipped in
+        // embed (early return above), whose ephemeral profile must not drive the device flag.
+        this._settings.setRemoteContextDemand(dashboardsRequireRemoteContexts(dashboards));
       });
     });
   }

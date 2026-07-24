@@ -142,18 +142,38 @@ describe('AppNetworkInitService', () => {
         return raw ? JSON.parse(raw) : null;
     }
 
-    describe('connection initialization (fixed routing and subscription)', () => {
-        it('always routes to the app origin and subscribes to all contexts, ignoring stored flags', async () => {
-            // Stored flags are the OPPOSITE of the fixed behavior, proving they are no longer read.
+    describe('connection initialization (fixed routing, demand-driven subscription #386)', () => {
+        const storeConn = (extra: Record<string, unknown>): void => {
             localStorage.setItem('skip.connectionConfig', JSON.stringify({
                 configVersion: 13, skipUUID: 'test-uuid', signalKUrl: 'http://localhost',
                 proxyEnabled: false, signalKSubscribeAll: false, sharedConfigName: 'default',
-                isRemoteControl: false, instanceName: ''
+                isRemoteControl: false, instanceName: '', ...extra
             }));
             mockConnection.initializeConnection.mockClear();
+        };
 
+        it('fails open to subscribe=all when demand was never computed (absent flag)', async () => {
+            // proxyEnabled is always true (routing forced to the app origin); the legacy
+            // signalKSubscribeAll=false is inert. With no remoteContextDemand, scope must be `all` so
+            // AIS targets are never silently hidden.
+            storeConn({});
             await service.initNetworkServices();
+            expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
+                { url: 'http://localhost', new: false }, true, true
+            );
+        });
 
+        it('narrows to subscribe=self when the computed demand is false', async () => {
+            storeConn({ remoteContextDemand: false });
+            await service.initNetworkServices();
+            expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
+                { url: 'http://localhost', new: false }, true, false
+            );
+        });
+
+        it('subscribes to all remote contexts when the computed demand is true', async () => {
+            storeConn({ remoteContextDemand: true });
+            await service.initNetworkServices();
             expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
                 { url: 'http://localhost', new: false }, true, true
             );

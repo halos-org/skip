@@ -52,7 +52,8 @@ function makeRouterStub(idParam: string | null) {
 function makeSettingsMock(dashboards: Dashboard[]) {
   return {
     getDashboardConfig: vi.fn<() => Dashboard[]>(() => dashboards),
-    saveDashboards: vi.fn<(dashboards: Dashboard[]) => void>()
+    saveDashboards: vi.fn<(dashboards: Dashboard[]) => void>(),
+    setRemoteContextDemand: vi.fn<(needsRemoteContexts: boolean) => void>()
   };
 }
 
@@ -630,6 +631,21 @@ describe('DashboardService', () => {
       service.updateConfiguration(0, []);
       TestBed.tick();
       expect(settings.saveDashboards).toHaveBeenCalledTimes(1);
+    });
+
+    it('recomputes the remote-context demand from the dashboard set on every change (#386)', () => {
+      setup(); // self-only seed (widget-numeric, no paths) -> no remote demand
+      TestBed.tick();
+      expect(settings.setRemoteContextDemand).toHaveBeenLastCalledWith(false);
+
+      const radarHost = {
+        id: 'r-0', x: 0, y: 0, w: 2, h: 2,
+        selector: 'widget-host2',
+        input: { widgetProperties: { type: 'widget-ais-radar', uuid: 'r-0', config: {} } }
+      } as unknown as NgGridStackWidget;
+      service.add('Radar', [radarHost]);
+      TestBed.tick();
+      expect(settings.setRemoteContextDemand).toHaveBeenLastCalledWith(true);
     });
   });
 });

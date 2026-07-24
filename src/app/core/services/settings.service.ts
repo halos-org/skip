@@ -51,10 +51,13 @@ export class SettingsService {
   public readonly browserTabTitle = this._browserTabTitle.asReadonly();
 
   // Persisted for config-version compatibility but no longer read by connection setup: routing always
-  // serves the server's discovered API path from the app's own origin and the stream subscribes to
-  // all contexts. #386 will repurpose signalKSubscribeAll to gate subscription on widget demand.
+  // serves the server's discovered API path from the app's own origin. proxyEnabled and the legacy
+  // signalKSubscribeAll flag are inert; subscribe scope is now driven by remoteContextDemand (#386).
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
+  // Computed widget-demand for remote (AIS/DSC) contexts (#386); undefined until first computed.
+  // Persisted to the per-device connectionConfig and read pre-auth at boot to gate WS subscribe scope.
+  public remoteContextDemand: boolean | undefined = undefined;
   private sharedConfigName = 'default';
   // True once the user explicitly changes the remote-control identity this session; until then a
   // connection write preserves the stored (possibly migration-written) identity rather than the
@@ -133,6 +136,7 @@ export class SettingsService {
     this.signalkUrl = {url: config.signalKUrl ?? '', new: false};
     this.proxyEnabled = config.proxyEnabled;
     this.signalKSubscribeAll = config.signalKSubscribeAll;
+    this.remoteContextDemand = config.remoteContextDemand;
     this.sharedConfigName = config.sharedConfigName;
     this.skipUUID = config.skipUUID;
 
@@ -390,6 +394,15 @@ export class SettingsService {
     this.saveConnectionConfigToLocalStorage();
   }
 
+  // Remote (AIS/DSC) context subscribe demand (#386). Persisted per-device; consumed pre-auth at the
+  // next boot. Written whenever the dashboard set changes; the no-op guard avoids churning
+  // localStorage on every unrelated dashboard save.
+  public setRemoteContextDemand(needsRemoteContexts: boolean) {
+    if (this.remoteContextDemand === needsRemoteContexts) return;
+    this.remoteContextDemand = needsRemoteContexts;
+    this.saveConnectionConfigToLocalStorage();
+  }
+
   // Browser tab title (document.title)
   public getBrowserTabTitle(): string {
     return this.browserTabTitle();
@@ -521,6 +534,7 @@ export class SettingsService {
       signalKUrl: this.signalkUrl?.url ?? '',
       proxyEnabled: this.proxyEnabled,
       signalKSubscribeAll: this.signalKSubscribeAll,
+      remoteContextDemand: this.remoteContextDemand,
       sharedConfigName: this.sharedConfigName,
       // Preserve the stored (possibly migration-written) identity unless the user changed it this
       // session, so a connection write around the migration cannot revert the lifted value.
