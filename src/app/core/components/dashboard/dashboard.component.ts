@@ -70,7 +70,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   private readonly _pluginConfig = inject(PluginConfigClientService);
   protected readonly _router = inject(Router);
   private readonly _hostEl = inject(ElementRef<HTMLElement>);
-  protected isDashboardStatic = computed(() => this.dashboard.isDashboardStatic());
   protected readonly dashboardStaticView = computed(() => this.dashboard.isDashboardStatic());
   protected readonly gridIsEmpty = signal<boolean>(true);
   private readonly _gridstack = viewChild.required<GridstackComponent>('grid');
