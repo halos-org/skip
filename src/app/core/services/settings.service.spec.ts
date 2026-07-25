@@ -20,6 +20,7 @@ interface SeedOpts {
   sharedConfigName?: string;
   isRemoteControl?: boolean;
   instanceName?: string;
+  remoteContextDemand?: Record<string, boolean>;
 }
 
 function seedConfig(opts: SeedOpts = {}): void {
@@ -30,6 +31,7 @@ function seedConfig(opts: SeedOpts = {}): void {
     signalKUrl: 'https://boat.example:3443',
     proxyEnabled: false,
     signalKSubscribeAll: false,
+    remoteContextDemand: opts.remoteContextDemand,
     sharedConfigName: opts.sharedConfigName ?? 'profileA',
     isRemoteControl: opts.isRemoteControl ?? false,
     instanceName: opts.instanceName ?? ''
@@ -315,6 +317,34 @@ describe('SettingsService', () => {
       const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.isRemoteControl).toBe(true);
       expect(cc.instanceName).toBe('Helm');
+    });
+
+    it('reads the per-profile remoteContextDemand map from connectionConfig at boot (#386)', () => {
+      expect(createService({ remoteContextDemand: { profileA: false } }).remoteContextDemand).toEqual({ profileA: false });
+    });
+
+    it('starts with an empty demand map when never computed (fail-open, #386)', () => {
+      expect(createService({}).remoteContextDemand).toEqual({});
+    });
+
+    it('setRemoteContextDemand records demand under the active profile, no-ops when unchanged (#386)', () => {
+      const service = createService({}); // active profile = 'profileA'
+      service.setRemoteContextDemand(true);
+      expect(JSON.parse(localStorage.getItem('skip.connectionConfig') as string).remoteContextDemand)
+        .toEqual({ profileA: true });
+
+      const spy = vi.spyOn(Storage.prototype, 'setItem');
+      service.setRemoteContextDemand(true); // unchanged -> must not rewrite
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('keys demand by the CURRENT profile so a switch cannot overwrite a sibling profile (#386)', () => {
+      const service = createService({ remoteContextDemand: { profileA: false } });
+      service.setActiveProfile('night');       // switch device to a different profile (reload mocked)
+      service.setRemoteContextDemand(true);    // night needs AIS
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
+      expect(cc.remoteContextDemand).toEqual({ profileA: false, night: true }); // profileA preserved
     });
 
     it('getAppConfig no longer carries remote-control fields', () => {
