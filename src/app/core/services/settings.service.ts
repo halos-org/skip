@@ -55,9 +55,10 @@ export class SettingsService {
   // signalKSubscribeAll flag are inert; subscribe scope is now driven by remoteContextDemand (#386).
   public proxyEnabled = false;
   public signalKSubscribeAll = false;
-  // Computed widget-demand for remote (AIS/DSC) contexts (#386); undefined until first computed.
-  // Persisted to the per-device connectionConfig and read pre-auth at boot to gate WS subscribe scope.
-  public remoteContextDemand: boolean | undefined = undefined;
+  // Computed widget-demand for remote (AIS/DSC) contexts (#386), keyed by profile (sharedConfigName)
+  // because demand is per-profile. Persisted to the per-device connectionConfig and read pre-auth at
+  // boot for the active profile to gate WS subscribe scope. A missing key fails open (subscribe=all).
+  public remoteContextDemand: Record<string, boolean> = {};
   private sharedConfigName = 'default';
   // True once the user explicitly changes the remote-control identity this session; until then a
   // connection write preserves the stored (possibly migration-written) identity rather than the
@@ -136,7 +137,12 @@ export class SettingsService {
     this.signalkUrl = {url: config.signalKUrl ?? '', new: false};
     this.proxyEnabled = config.proxyEnabled;
     this.signalKSubscribeAll = config.signalKSubscribeAll;
-    this.remoteContextDemand = config.remoteContextDemand;
+    // Tolerate a legacy/garbage shape (e.g. an older boolean) by falling back to an empty map, which
+    // fails open to subscribe=all until recomputed.
+    this.remoteContextDemand =
+      config.remoteContextDemand && typeof config.remoteContextDemand === 'object'
+        ? config.remoteContextDemand
+        : {};
     this.sharedConfigName = config.sharedConfigName;
     this.skipUUID = config.skipUUID;
 
@@ -394,12 +400,15 @@ export class SettingsService {
     this.saveConnectionConfigToLocalStorage();
   }
 
-  // Remote (AIS/DSC) context subscribe demand (#386). Persisted per-device; consumed pre-auth at the
-  // next boot. Written whenever the dashboard set changes; the no-op guard avoids churning
+  // Remote (AIS/DSC) context subscribe demand (#386), recorded under the ACTIVE profile — callers
+  // (the dashboard save effect) only reach here for the device's own authoritative, non-ephemeral
+  // profile, so this.sharedConfigName is the profile the demand was computed for and matches the key
+  // the next boot reads. Consumed pre-auth at the next boot; the no-op guard avoids churning
   // localStorage on every unrelated dashboard save.
   public setRemoteContextDemand(needsRemoteContexts: boolean) {
-    if (this.remoteContextDemand === needsRemoteContexts) return;
-    this.remoteContextDemand = needsRemoteContexts;
+    const profile = this.sharedConfigName;
+    if (this.remoteContextDemand[profile] === needsRemoteContexts) return;
+    this.remoteContextDemand[profile] = needsRemoteContexts;
     this.saveConnectionConfigToLocalStorage();
   }
 

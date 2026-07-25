@@ -97,6 +97,25 @@ describe('dashboardsRequireRemoteContexts', () => {
     expect(dashboardsRequireRemoteContexts([dashboard([nestedSelfOnly])])).toBe(false);
   });
 
+  it('descends through multiple nesting levels (group-in-group)', () => {
+    // Locks the recursion, not just one hop: a non-recursive immediate-children check would pass the
+    // one-level test above yet miss a remote consumer nested two groups deep.
+    const group = (child: unknown): unknown => ({
+      id: 'g', selector: 'widget-host2',
+      input: { widgetProperties: { type: 'group-widget', uuid: 'g', config: { displayName: 'Group' } } },
+      subGridOpts: { children: [child] }
+    });
+    const deepRadar = group(group(widget('widget-ais-radar', {})));
+    const deepRemotePath = group(group(widget('widget-numeric', {
+      paths: { p: { path: 'atons.urn:mrn:imo:mmsi:333.navigation.position' } }
+    })));
+    const deepSelfOnly = group(group(widget('widget-numeric', { paths: { p: { path: 'self.x' } } })));
+
+    expect(dashboardsRequireRemoteContexts([dashboard([deepRadar])])).toBe(true);
+    expect(dashboardsRequireRemoteContexts([dashboard([deepRemotePath])])).toBe(true);
+    expect(dashboardsRequireRemoteContexts([dashboard([deepSelfOnly])])).toBe(false);
+  });
+
   it('tolerates malformed / missing widget config without throwing', () => {
     const d = dashboard([{}, { input: {} }, { input: { widgetProperties: {} } }, null]);
     expect(dashboardsRequireRemoteContexts([d])).toBe(false);

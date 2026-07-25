@@ -163,16 +163,27 @@ describe('AppNetworkInitService', () => {
             );
         });
 
-        it('narrows to subscribe=self when the computed demand is false', async () => {
-            storeConn({ remoteContextDemand: false });
+        it('narrows to subscribe=self when the ACTIVE profile computed demand is false', async () => {
+            storeConn({ remoteContextDemand: { default: false } });
             await service.initNetworkServices();
             expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
                 { url: 'http://localhost', new: false }, true, false
             );
         });
 
-        it('subscribes to all remote contexts when the computed demand is true', async () => {
-            storeConn({ remoteContextDemand: true });
+        it('subscribes to all when the active profile computed demand is true', async () => {
+            storeConn({ remoteContextDemand: { default: true } });
+            await service.initNetworkServices();
+            expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
+                { url: 'http://localhost', new: false }, true, true
+            );
+        });
+
+        it('fails open when only a SIBLING profile has demand (profile switch regression, #386)', async () => {
+            // Active profile is 'default'; the map holds demand for a different profile only. The
+            // active profile's demand is unknown -> must fail open to `all`, never inherit the sibling's
+            // false and silently hide AIS after a profile switch.
+            storeConn({ remoteContextDemand: { night: false } });
             await service.initNetworkServices();
             expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
                 { url: 'http://localhost', new: false }, true, true
@@ -180,9 +191,9 @@ describe('AppNetworkInitService', () => {
         });
 
         it('forces subscribe=all in embed mode, ignoring a stored demand=false (#386)', async () => {
-            // The device flag describes the device profile, not the ephemerally-rendered embed slot,
+            // The device map describes device profiles, not the ephemerally-rendered embed slot,
             // so embed must fail open to all or an embedded AIS radar would go blank.
-            storeConn({ remoteContextDemand: false });
+            storeConn({ remoteContextDemand: { default: false } });
             mockEmbed.embed.mockReturnValue(true);
             await service.initNetworkServices();
             expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
@@ -191,7 +202,7 @@ describe('AppNetworkInitService', () => {
         });
 
         it('forces subscribe=all under an ephemeral ?profile, ignoring a stored demand=false (#386)', async () => {
-            storeConn({ remoteContextDemand: false });
+            storeConn({ remoteContextDemand: { default: false } });
             mockEmbed.profile.mockReturnValue('guest');
             await service.initNetworkServices();
             expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
