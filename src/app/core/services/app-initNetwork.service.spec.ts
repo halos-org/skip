@@ -178,6 +178,26 @@ describe('AppNetworkInitService', () => {
                 { url: 'http://localhost', new: false }, true, true
             );
         });
+
+        it('forces subscribe=all in embed mode, ignoring a stored demand=false (#386)', async () => {
+            // The device flag describes the device profile, not the ephemerally-rendered embed slot,
+            // so embed must fail open to all or an embedded AIS radar would go blank.
+            storeConn({ remoteContextDemand: false });
+            mockEmbed.embed.mockReturnValue(true);
+            await service.initNetworkServices();
+            expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
+                { url: 'http://localhost', new: false }, true, true
+            );
+        });
+
+        it('forces subscribe=all under an ephemeral ?profile, ignoring a stored demand=false (#386)', async () => {
+            storeConn({ remoteContextDemand: false });
+            mockEmbed.profile.mockReturnValue('guest');
+            await service.initNetworkServices();
+            expect(mockConnection.initializeConnection).toHaveBeenCalledWith(
+                { url: 'http://localhost', new: false }, true, true
+            );
+        });
     });
 
     describe('migrateRemoteControlToDevice (connectionConfig v12 -> v13)', () => {

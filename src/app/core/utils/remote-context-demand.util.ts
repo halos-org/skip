@@ -31,11 +31,23 @@ export function dashboardsRequireRemoteContexts(dashboards: Dashboard[] | null |
 }
 
 function widgetHostNeedsRemoteContext(entry: unknown): boolean {
-  const props = (entry as { input?: { widgetProperties?: { type?: string; config?: unknown } } })
-    ?.input?.widgetProperties;
-  if (!props) return false;
-  if (props.type && REMOTE_CONTEXT_WIDGET_TYPES.has(props.type)) return true;
-  return valueReferencesRemoteContext(props.config);
+  const node = entry as {
+    input?: { widgetProperties?: { type?: string; config?: unknown } };
+    subGridOpts?: { children?: unknown[] };
+  };
+  const props = node?.input?.widgetProperties;
+  if (props) {
+    if (props.type && REMOTE_CONTEXT_WIDGET_TYPES.has(props.type)) return true;
+    if (valueReferencesRemoteContext(props.config)) return true;
+  }
+  // A group-widget hosts a nested gridstack; its child widgets serialize into subGridOpts.children
+  // as the same node shape (not into the flat top-level configuration), so descend or a remote
+  // widget nested inside a group would be missed and silently narrow the subscription.
+  const children = node?.subGridOpts?.children;
+  if (Array.isArray(children)) {
+    return children.some(widgetHostNeedsRemoteContext);
+  }
+  return false;
 }
 
 function valueReferencesRemoteContext(value: unknown): boolean {

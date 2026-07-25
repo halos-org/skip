@@ -68,11 +68,33 @@ describe('dashboardsRequireRemoteContexts', () => {
     expect(dashboardsRequireRemoteContexts([selfOnly, withRadar])).toBe(true);
   });
 
-  it('is not fooled by the decoy top-level host selector', () => {
-    // selector is always 'widget-host2'; matching on it would false-positive. The real type is nested.
-    const d = dashboard([widget('widget-numeric', { paths: { p: { path: 'self.a' } } })]);
-    expect((d.configuration?.[0] as { selector?: string }).selector).toBe('widget-host2');
+  it('matches remote contexts by prefix, not substring (self-only stays false)', () => {
+    // 'widget-host2' is the decoy host selector, and free-text config must not false-match on a
+    // 'vessels'/'atons' substring that is not a context prefix.
+    const d = dashboard([
+      widget('widget-numeric', { displayName: 'My vessels overview', paths: { p: { path: 'self.a' } } }),
+      widget('widget-text', { paths: { s: { path: 'navigation.atonsNearby' } } })
+    ]);
     expect(dashboardsRequireRemoteContexts([d])).toBe(false);
+  });
+
+  it('descends into group-widget nested children (subGridOpts.children)', () => {
+    // A group widget hosts a nested gridstack; children live under subGridOpts.children, not the
+    // flat configuration. A remote consumer nested inside must still be detected.
+    const groupWith = (child: unknown): unknown => ({
+      id: 'g', selector: 'widget-host2',
+      input: { widgetProperties: { type: 'group-widget', uuid: 'g', config: { displayName: 'Group' } } },
+      subGridOpts: { children: [child] }
+    });
+    const nestedRadar = groupWith(widget('widget-ais-radar', {}));
+    const nestedRemotePath = groupWith(widget('widget-numeric', {
+      paths: { p: { path: 'vessels.urn:mrn:imo:mmsi:222.navigation.speedOverGround' } }
+    }));
+    const nestedSelfOnly = groupWith(widget('widget-numeric', { paths: { p: { path: 'self.a.b' } } }));
+
+    expect(dashboardsRequireRemoteContexts([dashboard([nestedRadar])])).toBe(true);
+    expect(dashboardsRequireRemoteContexts([dashboard([nestedRemotePath])])).toBe(true);
+    expect(dashboardsRequireRemoteContexts([dashboard([nestedSelfOnly])])).toBe(false);
   });
 
   it('tolerates malformed / missing widget config without throwing', () => {
