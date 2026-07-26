@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('chart.js', () => {
   class MockChart {
     public static register(): void { /* noop */ }
+    // registerChartComponents() sets a line-element default join style on this.
+    public static defaults = { elements: { line: {} } };
     public data: unknown;
     public options: unknown;
     constructor(_ctx: unknown, config: { data: unknown; options: unknown }) {
