@@ -182,4 +182,42 @@ describe('WidgetDataChartComponent', () => {
     expect(title).toContain('knots');
     expect(title).not.toContain('celsius');
   });
+
+  // A 91-sample batch spanning 90s of the default 600s window. Reused by the thinning tests below.
+  const denseBatch = (): IDatasetServiceDatapoint[] => {
+    const batch: IDatasetServiceDatapoint[] = [];
+    for (let t = 0; t <= 90_000; t += 1_000) batch.push({ timestamp: t, data: { value: t / 1_000 } });
+    return batch;
+  };
+  const drawnCount = (): number => fixture.componentInstance.lineChartData.datasets[0].data.length;
+
+  it('thins a dense batch to about one point per pixel on a narrow plot', async () => {
+    const emissions$ = new Subject<IDatasetServiceDatapoint[]>();
+    historyMock.getBackfillThenLive.mockReturnValue(emissions$);
+    await setup(makeConfig({ showAverageData: false }));
+
+    // A measured 20px plot over the 600s window buckets to 30s, so the 91-sample / 90s batch
+    // collapses to one evenly spaced point per bucket instead of shimmering at ~2.6 samples/px.
+    (fixture.componentInstance as unknown as { chart: { chartArea: unknown } }).chart.chartArea =
+      { width: 20, height: 20, left: 0, right: 20, top: 0, bottom: 20 };
+
+    const batch = denseBatch();
+    emissions$.next(batch);
+
+    expect(drawnCount()).toBeLessThan(batch.length);
+    expect(drawnCount()).toBeGreaterThanOrEqual(3);
+    expect(drawnCount()).toBeLessThanOrEqual(5);
+  });
+
+  it('draws every sample when the plot has not been measured (thinning is inert)', async () => {
+    const emissions$ = new Subject<IDatasetServiceDatapoint[]>();
+    historyMock.getBackfillThenLive.mockReturnValue(emissions$);
+    await setup(makeConfig({ showAverageData: false }));
+
+    // No chartArea on the mock chart -> displayBucketMs stays 0 -> every sample is drawn.
+    const batch = denseBatch();
+    emissions$.next(batch);
+
+    expect(drawnCount()).toBe(batch.length);
+  });
 });

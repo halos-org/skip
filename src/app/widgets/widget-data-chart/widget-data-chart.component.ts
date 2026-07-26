@@ -101,6 +101,11 @@ export class WidgetDataChartComponent implements OnDestroy {
   private streamSub: Subscription | null = null;
   private datasetConfig: IDatasetServiceDatasetConfig | null = null;
   private dataSourceInfo: IDatasetServiceDataSourceInfo | null = null;
+  // Display-thinning state (see updateDisplayBucket): the window's time span and the current
+  // one-point-per-pixel bucket width. displayBucketMs 0 means draw every point.
+  private windowMs = 0;
+  private displayBucketMs = 0;
+  private lastKeptTimestampBucket: number | null = null;
   private lastVerticalChart: boolean | null | undefined = null;
   // Latest finite annotation values; NaN until real data arrives, which keeps the
   // min/max/average lines and their labels hidden instead of drawing at a placeholder 0.
@@ -198,12 +203,14 @@ export class WidgetDataChartComponent implements OnDestroy {
     this.lastAverageValue = NaN;
     this.lastMinimumValue = NaN;
     this.lastMaximumValue = NaN;
+    this.lastKeptTimestampBucket = null;
     this.historyUnavailable.set(false);
 
     // Synthesize the config + cadence the axis/streaming options expect, derived from the widget's
     // display window.
     const period = cfg.period ?? 10;
     const windowMs = resolveWindowMs(cfg.timeScale as TimeScaleFormat, period);
+    this.windowMs = windowMs;
     this.dataSourceInfo = deriveDataSourceInfo(windowMs);
     this.datasetConfig = {
       uuid: this.id(),
@@ -224,8 +231,10 @@ export class WidgetDataChartComponent implements OnDestroy {
       data: this.lineChartData,
       options: this.lineChartOptions
     });
-    this.startStreaming();
+    // Lay the chart out first so updateDisplayBucket() can measure the plot before backfill arrives.
     this.ngZone.runOutsideAngular(() => this.chart?.update());
+    this.updateDisplayBucket();
+    this.startStreaming();
   }
 
   private setChartOptions(cfg: IWidgetSvcConfig): void {
@@ -806,28 +815,50 @@ export class WidgetDataChartComponent implements OnDestroy {
 
   private handleDatasetEmission(dsPointOrBatch: IDatasetServiceDatapoint[] | IDatasetServiceDatapoint, cfg: IWidgetSvcConfig): void {
     if (!this.chart) return;
-    if (Array.isArray(dsPointOrBatch)) {
-      const valueRows = this.transformDatasetRows(dsPointOrBatch, 0);
-      this.chart.data.datasets[0].data.push(...valueRows);
-      if (cfg.showAverageData && this.lineChartData.datasets[1]) {
-        const avgRows = this.transformDatasetRows(dsPointOrBatch, cfg.datasetAverageArray);
-        this.chart.data.datasets[1].data.push(...avgRows);
-      }
+    const rows = Array.isArray(dsPointOrBatch) ? dsPointOrBatch : [dsPointOrBatch];
+    if (rows.length === 0) return;
 
-      const lastBatchPoint = dsPointOrBatch[dsPointOrBatch.length - 1];
-      if (lastBatchPoint) {
-        this.applyTitleAndAnnotationValues(lastBatchPoint, cfg);
-      }
-    } else {
-      const valueRow = this.transformDatasetRows([dsPointOrBatch], 0)[0];
-      this.chart.data.datasets[0].data.push(valueRow);
+    // Recompute the per-pixel bucket from the current plot size so thinning tracks the live width
+    // (and adapts across a resize) before deciding which of this emission's samples to draw.
+    this.updateDisplayBucket();
+    const kept = rows.filter(row => this.keepForDisplay(row.timestamp));
+    if (kept.length > 0) {
+      this.chart.data.datasets[0].data.push(...this.transformDatasetRows(kept, 0));
       if (cfg.showAverageData && this.lineChartData.datasets[1]) {
-        const avgRow = this.transformDatasetRows([dsPointOrBatch], cfg.datasetAverageArray)[0];
-        this.chart.data.datasets[1].data.push(avgRow);
+        this.chart.data.datasets[1].data.push(...this.transformDatasetRows(kept, cfg.datasetAverageArray));
       }
-      this.applyTitleAndAnnotationValues(dsPointOrBatch, cfg);
     }
+
+    // Title, average, min and max always reflect the newest sample, whether or not it was drawn.
+    this.applyTitleAndAnnotationValues(rows[rows.length - 1], cfg);
     this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
+  }
+
+  // A window always carries ~TARGET_POINTS_PER_WINDOW samples regardless of how wide it renders. On a
+  // narrow (phone) chart that is several samples per horizontal pixel; the sub-pixel structure can't
+  // be drawn distinctly and shimmers frame to frame as the chart scrolls. Thin the drawn points to
+  // about one per pixel along the time axis. Bucketing by timestamp keeps the kept set evenly spaced
+  // and stable under scroll (unlike min/max or chart.js decimation, which re-select shifting points
+  // and keep boiling). Wide charts, where samples already fit, keep every point (bucket 0).
+  private updateDisplayBucket(): void {
+    const chart = this.chart;
+    const info = this.dataSourceInfo;
+    if (!chart || !info || this.windowMs <= 0) {
+      this.displayBucketMs = 0;
+      return;
+    }
+    const area = chart.chartArea;
+    const axisPx = this.runtime.options()?.verticalChart ? (area?.height ?? 0) : (area?.width ?? 0);
+    const targetPoints = Math.min(info.maxDataPoints, Math.max(1, Math.round(axisPx)));
+    this.displayBucketMs = axisPx > 0 && targetPoints < info.maxDataPoints ? this.windowMs / targetPoints : 0;
+  }
+
+  private keepForDisplay(timestamp: number): boolean {
+    if (this.displayBucketMs <= 0) return true;
+    const bucket = Math.round(timestamp / this.displayBucketMs);
+    if (bucket === this.lastKeptTimestampBucket) return false;
+    this.lastKeptTimestampBucket = bucket;
+    return true;
   }
 
   private applyTitleAndAnnotationValues(point: IDatasetServiceDatapoint, cfg: IWidgetSvcConfig): void {
