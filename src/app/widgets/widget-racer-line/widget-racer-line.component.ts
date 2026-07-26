@@ -470,9 +470,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     );
 
     // Label composites last so its background-color halo can knock the values out behind it.
-    if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
-      this.ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
+    this.canvas.drawTextBitmap(this.ctx, this.titleBitmap, this.cssWidth, this.cssHeight);
 
     this.setLenBias();
   }

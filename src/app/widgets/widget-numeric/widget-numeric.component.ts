@@ -322,9 +322,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
       this.drawMinMax(ctx);
     }
     // Label + unit composite last so the background-color halo can knock the value out behind them.
-    if (this.foregroundBitmap && this.foregroundBitmap.width > 0 && this.foregroundBitmap.height > 0) {
-      ctx.drawImage(this.foregroundBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
+    this.canvas.drawTextBitmap(ctx, this.foregroundBitmap, this.cssWidth, this.cssHeight);
   }
 
   private drawValue(ctx: CanvasRenderingContext2D): void {

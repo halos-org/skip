@@ -428,6 +428,23 @@ export class CanvasService {
     ctx.clearRect(0, 0, width, height);
   }
 
+  /**
+   * Composites a cached text-layer bitmap (a widget's label/unit) over the canvas. Defers through the
+   * same font-readiness gate as {@link drawText}: on a cold boot the value paint is deferred until
+   * fonts settle, so blitting synchronously would land the label *under* the late value. Deferring
+   * here registers the blit after the value's paint (same draw call), preserving the label-over-value
+   * order the background-color halo knockout depends on. No-op for a null or zero-size bitmap.
+   */
+  public drawTextBitmap(ctx: CanvasRenderingContext2D, bitmap: HTMLCanvasElement | null, width: number, height: number): void {
+    if (!ctx || !bitmap || bitmap.width <= 0 || bitmap.height <= 0) return;
+    const blit = () => ctx.drawImage(bitmap, 0, 0, width, height);
+    if (this.areFontsLoaded()) {
+      blit();
+    } else {
+      this.fontsReadyPromise.then(blit).catch(() => blit());
+    }
+  }
+
 
   /**
    * Draws text on the canvas as large as possible with optimal font size.

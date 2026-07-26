@@ -185,8 +185,6 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
     );
 
     // Label composites last so its background-color halo can knock the value out behind it.
-    if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
-      this.canvasCtx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
+    this.canvas.drawTextBitmap(this.canvasCtx, this.titleBitmap, this.cssWidth, this.cssHeight);
   }
 }

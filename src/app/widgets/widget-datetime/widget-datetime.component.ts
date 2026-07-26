@@ -211,8 +211,6 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
     );
 
     // Label composites last so its background-color halo can knock the value out behind it.
-    if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
-      ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
+    this.canvas.drawTextBitmap(ctx, this.titleBitmap, this.cssWidth, this.cssHeight);
   }
 }
