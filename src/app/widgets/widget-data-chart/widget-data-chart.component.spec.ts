@@ -184,4 +184,16 @@ describe('WidgetDataChartComponent', () => {
     expect(title).toContain('knots');
     expect(title).not.toContain('celsius');
   });
+
+  it('draws the value line with a hair of tension so it avoids the fast pixel-bucketing path', async () => {
+    await setup(makeConfig());
+
+    // tension 0 routes the line onto Chart.js fastPathSegment, whose per-pixel-column collapse
+    // shimmers under the streaming plugin's per-frame re-path. A tiny non-zero tension keeps it on
+    // the exact-position path; it must stay non-zero (and visually straight) to avoid a regression.
+    const valueDataset = fixture.componentInstance.lineChartData.datasets[0];
+    expect(valueDataset.label).toBe('Value');
+    expect(valueDataset.tension ?? 0).toBeGreaterThan(0);
+    expect(valueDataset.tension ?? 1).toBeLessThan(0.01);
+  });
 });
