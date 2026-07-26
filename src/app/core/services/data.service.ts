@@ -924,7 +924,7 @@ export class DataService implements OnDestroy {
    * @memberof SignalKDataService
    */
   public timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
-    if (!['string', 'Date', 'number', 'multiple'].includes(pathType)) return;
+    if (!['string', 'Date', 'number', 'multiple', 'object'].includes(pathType)) return;
     const registrations = this._pathRegisterByPath.get(path);
     if (!registrations) return;
 

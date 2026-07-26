@@ -22,6 +22,7 @@ const V13_MIGRATION_OUTPUT_VERSION = 13;
 
 // The v13 -> v14 transform output. Pinned to a fixed 14 for the same reason as the constants above.
 const V14_MIGRATION_OUTPUT_VERSION = 14;
+const V15_MIGRATION_OUTPUT_VERSION = 15;
 
 // SK-02 / #21: the delta parser stopped fabricating dotted child paths for compound leaves, so a
 // stored widget path pointing at a sub-field of one of these leaves must be rewritten to the whole
@@ -236,6 +237,30 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
+    } else if (version === 14) {
+      // Remote (Signal K) configs. v14 slots live in the same active file version as v11/v12/v13.
+      try {
+        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+
+        for (const item of configsList) {
+          try {
+            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V15_MIGRATION_OUTPUT_VERSION}.`);
+            const migratedConfig = this.migrateOneAppVersion(config, 14);
+            if (!migratedConfig) continue; // skip if not a v14 slot
+
+            await this._storage.setConfig(item.scope, item.name, migratedConfig);
+          } catch (error) {
+            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
+          }
+        }
+        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
+        setTimeout(() => this._settings.reloadApp(), 1500);
+      } catch (error) {
+        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        this.upgrading.set(false);
+      }
+
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = {
@@ -365,6 +390,7 @@ export class ConfigurationUpgradeService {
       case 11: return this.upgradeConfig(config);
       case 12: return this.upgradeConfigV12toV13(config);
       case 13: return this.upgradeConfigV13toV14(config);
+      case 14: return this.upgradeConfigV14toV15(config);
       default: return null;
     }
   }
@@ -599,6 +625,69 @@ export class ConfigurationUpgradeService {
       return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading v13->v14: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * v14 -> v15 (#414): the position widget rendered latitude and longitude from two independently
+   * configurable path entries. After the compound leaves stopped being flattened (#21) a numeric
+   * path can no longer point at `navigation.position.latitude`/`.longitude`, and configuring the two
+   * coordinates separately never made sense. Collapse a position widget's paths to a single
+   * object-typed `positionPath` pointing at the whole `navigation.position` leaf; the widget reads
+   * both coordinates off it. The whole `paths` object is replaced (not field-patched) so no stale
+   * `longPath`/`latPath` siblings survive the runtime default-merge. Scoped to `widget-position`
+   * only — a generic widget handed the whole object would render garbage.
+   */
+  private upgradeConfigV14toV15(config: IConfig): IConfig | null {
+    try {
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 14) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v14 config. Skipping...`);
+        return null;
+      }
+
+      let rewritten = 0;
+      if (Array.isArray(config.dashboards)) {
+        for (const dash of config.dashboards) {
+          if (!dash || !Array.isArray(dash.configuration)) continue;
+          for (const widget of dash.configuration) {
+            const wp = (widget as { input?: { widgetProperties?: {
+              type?: unknown;
+              config?: { paths?: unknown };
+            } } })?.input?.widgetProperties;
+            if (!wp || wp.type !== 'widget-position') continue;
+            const cfg = wp.config;
+            if (!cfg || typeof cfg !== 'object') continue;
+            // Preserve a user-pinned source / sampleTime from whichever legacy coordinate entry exists.
+            const oldPaths = cfg.paths as Record<string, { source?: unknown; sampleTime?: unknown }> | undefined;
+            const donor = oldPaths && typeof oldPaths === 'object'
+              ? Object.values(oldPaths).find(p => p && typeof p === 'object')
+              : undefined;
+            cfg.paths = {
+              positionPath: {
+                description: 'Position',
+                path: 'self.navigation.position',
+                source: typeof donor?.source === 'string' ? donor.source : 'default',
+                pathType: 'object',
+                isPathConfigurable: true,
+                showPathSkUnitsFilter: false,
+                pathSkUnitsFilter: null,
+                sampleTime: typeof donor?.sampleTime === 'number' ? donor.sampleTime : 500
+              }
+            };
+            rewritten++;
+          }
+        }
+      }
+      if (rewritten) {
+        this.pushMsg(`[Upgrade] Collapsed ${rewritten} position widget(s) to a single location path.`);
+      }
+
+      appConfig.configVersion = V15_MIGRATION_OUTPUT_VERSION;
+      return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
+    } catch (error) {
+      this.pushError(`[Upgrade Service] Error upgrading v14->v15: ${(error as Error).message}`);
       return null;
     }
   }

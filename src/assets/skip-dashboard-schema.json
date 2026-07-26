@@ -541,7 +541,7 @@
   },
   "meta": {
     "configFileVersion": 11,
-    "configVersion": 14,
+    "configVersion": 15,
     "schemaVersion": 1,
     "skipVersion": "1.0.4"
   },
@@ -1761,28 +1761,14 @@
         "enableTimeout": false,
         "filterSelfPaths": true,
         "paths": {
-          "latPath": {
-            "convertUnitTo": "latitudeMin",
-            "description": "Latitude",
-            "isPathConfigurable": false,
+          "positionPath": {
+            "description": "Position",
+            "isPathConfigurable": true,
             "path": "self.navigation.position",
             "pathSkUnitsFilter": null,
-            "pathType": "number",
+            "pathType": "object",
             "sampleTime": 500,
-            "showConvertUnitTo": false,
-            "showPathSkUnitsFilter": true,
-            "source": "default"
-          },
-          "longPath": {
-            "convertUnitTo": "longitudeMin",
-            "description": "Longitude",
-            "isPathConfigurable": false,
-            "path": "self.navigation.position",
-            "pathSkUnitsFilter": null,
-            "pathType": "number",
-            "sampleTime": 500,
-            "showConvertUnitTo": false,
-            "showPathSkUnitsFilter": true,
+            "showPathSkUnitsFilter": false,
             "source": "default"
           }
         },
@@ -1797,27 +1783,15 @@
       "name": "Position",
       "pathSlots": [
         {
-          "defaultConvertUnitTo": "longitudeMin",
+          "defaultConvertUnitTo": null,
           "defaultPath": "self.navigation.position",
-          "description": "Longitude",
+          "description": "Position",
           "expectedSkUnit": null,
-          "isPathConfigurable": false,
+          "isPathConfigurable": true,
           "pathRequired": false,
-          "pathType": "number",
+          "pathType": "object",
           "sampleTime": 500,
-          "slot": "longPath",
-          "source": "default"
-        },
-        {
-          "defaultConvertUnitTo": "latitudeMin",
-          "defaultPath": "self.navigation.position",
-          "description": "Latitude",
-          "expectedSkUnit": null,
-          "isPathConfigurable": false,
-          "pathRequired": false,
-          "pathType": "number",
-          "sampleTime": 500,
-          "slot": "latPath",
+          "slot": "positionPath",
           "source": "default"
         }
       ],

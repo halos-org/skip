@@ -768,10 +768,31 @@ describe('DataService', () => {
       .subscribe(update => updates.push(update));
 
     const countBefore = updates.length;
-    service.timeoutPathObservable('self.navigation.position', 'default', 'object', 5000);
+    service.timeoutPathObservable('self.navigation.position', 'default', 'boolean', 5000);
 
     expect(updates.length).toBe(countBefore);
     expect(updates.every(update => update !== undefined)).toBe(true);
+  });
+
+  it('resets an object-typed path (navigation.position) to null on timeout', () => {
+    let latest: IPathUpdate | undefined;
+    service
+      .subscribePath('self.navigation.position', 'default')
+      .subscribe(update => (latest = update));
+
+    dataPathUpdates$.next({
+      context: 'self',
+      path: 'navigation.position',
+      source: 'test-source',
+      timestamp: '2026-01-01T00:00:01.000Z',
+      value: { latitude: 59.5, longitude: 22.5 },
+    });
+    expect(latest!.data.value).toEqual({ latitude: 59.5, longitude: 22.5 });
+
+    // The position widget's path is object-typed; a user-enabled data timeout must still blank it.
+    service.timeoutPathObservable('self.navigation.position', 'default', 'object', 5000);
+
+    expect(latest!.data.value).toBeNull();
   });
 
   describe('timeout liveness-gated cross-clear (#254)', () => {

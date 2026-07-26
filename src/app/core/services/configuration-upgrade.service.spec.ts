@@ -248,7 +248,7 @@ describe('ConfigurationUpgradeService', () => {
         await service.runUpgrade(13);
 
         const written = mockStorage.setConfig.mock.calls.at(-1)![2];
-        expect(written.app.configVersion).toBe(14); // still stamped current
+        expect(written.app.configVersion).toBe(14); // still advanced one step to the v13->v14 output
         const numeric = written.dashboards[0].configuration[0].input.widgetProperties.config.paths.numericPath;
         expect(numeric.path).toBe('self.navigation.attitude.pitch'); // path left on the inert child (clean no-data), not collapsed
         expect(numeric.isPathConfigurable).toBe(true);
@@ -307,6 +307,132 @@ describe('ConfigurationUpgradeService', () => {
         const written = mockStorage.setConfig.mock.calls.at(-1)![2];
         expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths.angle.path)
             .toBe('self.navigation.attitude');
+    });
+
+    it('v14 upgrade collapses a position widget to a single object-typed positionPath and stamps v15', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 14 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: {
+                        longPath: { path: 'self.navigation.position.longitude', pathType: 'number', isPathConfigurable: true, source: 'gps.0', sampleTime: 1000 },
+                        latPath: { path: 'self.navigation.position.latitude', pathType: 'number', isPathConfigurable: true, source: 'gps.0', sampleTime: 1000 }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(14);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(15);
+        const paths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        // The two dead coordinate entries are gone, replaced by a single object-typed location path.
+        expect(Object.keys(paths)).toEqual(['positionPath']);
+        expect(paths.positionPath.path).toBe('self.navigation.position');
+        expect(paths.positionPath.pathType).toBe('object');
+        expect(paths.positionPath.isPathConfigurable).toBe(true);
+        // A user-pinned source / sampleTime carries across the collapse.
+        expect(paths.positionPath.source).toBe('gps.0');
+        expect(paths.positionPath.sampleTime).toBe(1000);
+    });
+
+    it('v14 upgrade leaves a non-position widget untouched (scoped rewrite), still stamps v15', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 14 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-numeric', config: { paths: {
+                        numericPath: { path: 'self.navigation.speedOverGround', pathType: 'number', isPathConfigurable: true }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(14);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(15);
+        const paths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        expect(Object.keys(paths)).toEqual(['numericPath']);
+        expect(paths.numericPath.path).toBe('self.navigation.speedOverGround');
+    });
+
+    it('v14 upgrade skips a slot that is not at version 14 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 15 },
+            theme: { themeName: '' },
+            dashboards: []
+        });
+
+        await service.runUpgrade(14);
+
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('v14 upgrade fills default source/sampleTime and handles empty, array, and missing paths without throwing', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 14 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    // legacy record entry with no source/sampleTime -> both fall back to defaults
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: {
+                        longPath: { path: 'self.navigation.position.longitude', pathType: 'number' }
+                    } } } } },
+                    // array form of paths still collapses to the single object entry
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: [
+                        { path: 'self.navigation.position.latitude', pathType: 'number' }
+                    ] } } } },
+                    // empty paths object
+                    { input: { widgetProperties: { type: 'widget-position', config: { paths: {} } } } },
+                    // a widget with no widgetProperties is skipped, not crashed on
+                    { input: {} }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(14);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(15);
+        const cfgs = written.dashboards[0].configuration;
+        for (const i of [0, 1, 2]) {
+            const paths = cfgs[i].input.widgetProperties.config.paths;
+            expect(Object.keys(paths)).toEqual(['positionPath']);
+            expect(paths.positionPath.path).toBe('self.navigation.position');
+            expect(paths.positionPath.pathType).toBe('object');
+            expect(paths.positionPath.source).toBe('default');
+            expect(paths.positionPath.sampleTime).toBe(500);
+        }
+    });
+
+    it('v14 upgrade collapses every position widget across multiple dashboards', async () => {
+        const positionWidget = () => ({ input: { widgetProperties: { type: 'widget-position', config: { paths: {
+            longPath: { path: 'self.navigation.position.longitude', pathType: 'number' },
+            latPath: { path: 'self.navigation.position.latitude', pathType: 'number' }
+        } } } } });
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 14 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [positionWidget()] },
+                { id: 'd1', configuration: [positionWidget()] }
+            ]
+        });
+
+        await service.runUpgrade(14);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(Object.keys(written.dashboards[0].configuration[0].input.widgetProperties.config.paths)).toEqual(['positionPath']);
+        expect(Object.keys(written.dashboards[1].configuration[0].input.widgetProperties.config.paths)).toEqual(['positionPath']);
     });
 
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
