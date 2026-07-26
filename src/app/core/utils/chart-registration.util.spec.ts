@@ -6,7 +6,8 @@ import { describe, it, expect, vi } from 'vitest';
 // registry inside the test and re-import fresh so the guard starts clean regardless of run order.
 // Each mocked component is a distinct sentinel string so the assertion can name the exact set.
 vi.mock('chart.js', () => ({
-  Chart: { register: vi.fn() },
+  // defaults.elements.line: registerChartComponents() writes the round join default onto it.
+  Chart: { register: vi.fn(), defaults: { elements: { line: {} } } },
   LineController: 'LineController',
   LineElement: 'LineElement',
   PointElement: 'PointElement',
@@ -46,5 +47,15 @@ describe('registerChartComponents', () => {
       'annotationPlugin',
       'ChartStreaming'
     );
+  });
+
+  it('sets the line-element default join to round to prevent miter-spike flicker', async () => {
+    vi.resetModules();
+    const { Chart } = await import('chart.js');
+    const { registerChartComponents } = await import('./chart-registration.util');
+
+    registerChartComponents();
+
+    expect(Chart.defaults.elements.line.borderJoinStyle).toBe('round');
   });
 });
