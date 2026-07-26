@@ -6,6 +6,14 @@ import { Injectable } from '@angular/core';
 export class CanvasService {
   public readonly DEFAULT_FONT = 'Roboto';
   public readonly EDGE_BUFFER = 10;
+  /**
+   * Minimum on-screen size (CSS px) for auxiliary text — widget labels and unit symbols — so it
+   * stays legible on small tiles and in daylight. Below this the text overflows its box instead of
+   * shrinking; callers pair the floor with a background-color halo so the overflow reads over the
+   * value (see {@link drawText}/{@link drawTitle} `haloColor`). Tunable.
+   */
+  public readonly MIN_LABEL_PX = 16;
+  public readonly MIN_UNIT_PX = 12;
   /** Enable verbose canvas diagnostics (dev only) */
   public debug = false;
   public scaleFactor = window.devicePixelRatio || 1;
@@ -333,7 +341,9 @@ export class CanvasService {
     fontWeight = 'normal',
     canvasWidth: number,
     canvasHeight: number,
-    titleFraction = 0.1 // default for widgets
+    titleFraction = 0.1, // default for widgets
+    haloColor?: string,
+    floorPx = 0
   ): void {
     if (!ctx) return;
     const runDraw = () => {
@@ -355,12 +365,12 @@ export class CanvasService {
           try { ctx.save(); ctx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0); restored = true; } catch { /* ignore */ }
         }
 
-        this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction);
+        this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction, haloColor, floorPx);
 
         if (restored) ctx.restore();
       } catch (err) {
         console.warn('[CanvasService] drawTitle failed', err);
-        try { this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction); } catch { /* ignore */ }
+        try { this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction, haloColor, floorPx); } catch { /* ignore */ }
       }
     };
 
@@ -384,20 +394,27 @@ export class CanvasService {
     fontWeight = 'normal',
     canvasWidth: number,
     canvasHeight: number,
-    titleFraction: number
+    titleFraction: number,
+    haloColor?: string,
+    floorPx = 0
   ): void {
     if (!ctx) return;
 
     const maxWidth = canvasWidth - 2 * this.EDGE_BUFFER;
     const maxHeight = Math.round(canvasHeight * titleFraction);
-    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight);
+    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight, floorPx);
+    // Floored text may exceed its width box: let it overflow rather than squish (drop the maxWidth cap).
+    const widthArg = floorPx > 0 ? undefined : maxWidth;
 
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx.font = `${fontWeight} ${fontSize}px ${this.DEFAULT_FONT}`;
-    ctx.fillStyle = color;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(text, this.EDGE_BUFFER, this.EDGE_BUFFER, maxWidth);
+    if (haloColor) {
+      this.strokeTextHalo(ctx, text, this.EDGE_BUFFER, this.EDGE_BUFFER, fontSize, haloColor, widthArg);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(text, this.EDGE_BUFFER, this.EDGE_BUFFER, widthArg);
   }
 
   /**
@@ -436,7 +453,9 @@ export class CanvasService {
     fontWeight = 'normal',
     color = '#000',
     textAlign: CanvasTextAlign = 'center',
-    textBaseline: CanvasTextBaseline = 'middle'
+    textBaseline: CanvasTextBaseline = 'middle',
+    haloColor?: string,
+    floorPx = 0
   ): void {
     if (!ctx) return;
     const runDraw = () => {
@@ -444,7 +463,7 @@ export class CanvasService {
       try {
         ctx.save();
         ctx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0);
-        this.drawTextInternal(ctx, text, x, y, maxWidth, maxHeight, fontWeight, color, textAlign, textBaseline);
+        this.drawTextInternal(ctx, text, x, y, maxWidth, maxHeight, fontWeight, color, textAlign, textBaseline, haloColor, floorPx);
       } finally {
         try { ctx.restore(); } catch { /* ignore */ }
       }
@@ -465,13 +484,18 @@ export class CanvasService {
   /**
    * Draws text on the canvas with optimal font size.
    */
-  private drawTextInternal(ctx: CanvasRenderingContext2D, text: string, x: number = this.EDGE_BUFFER, y: number = this.EDGE_BUFFER, maxWidth: number, maxHeight: number, fontWeight = 'normal', color = '#000', textAlign: CanvasTextAlign = 'center', textBaseline: CanvasTextBaseline = 'middle'): void {
-    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight);
+  private drawTextInternal(ctx: CanvasRenderingContext2D, text: string, x: number = this.EDGE_BUFFER, y: number = this.EDGE_BUFFER, maxWidth: number, maxHeight: number, fontWeight = 'normal', color = '#000', textAlign: CanvasTextAlign = 'center', textBaseline: CanvasTextBaseline = 'middle', haloColor?: string, floorPx = 0): void {
+    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight, floorPx);
+    // Floored text may exceed its width box: let it overflow rather than squish (drop the maxWidth cap).
+    const widthArg = floorPx > 0 ? undefined : maxWidth;
     ctx.font = `${fontWeight} ${fontSize}px ${this.DEFAULT_FONT}`;
-    ctx.fillStyle = color;
     ctx.textAlign = textAlign;
     ctx.textBaseline = textBaseline;
-    ctx.fillText(text, x, y, maxWidth);
+    if (haloColor) {
+      this.strokeTextHalo(ctx, text, x, y, fontSize, haloColor, widthArg);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y, widthArg);
   }
 
   /**
@@ -489,11 +513,11 @@ export class CanvasService {
   * context has been transformed to device pixels (service methods generally
   * ensure the context transform so callers may pass CSS units).
    */
-  public calculateOptimalFontSize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxHeight: number, fontWeight = 'normal'): number {
+  public calculateOptimalFontSize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxHeight: number, fontWeight = 'normal', floorPx = 0): number {
     const cacheKey = `${fontWeight}|${Math.round(maxWidth)}|${Math.round(maxHeight)}|${text}`;
     const cached = this._fontSizeCache.get(cacheKey);
     if (cached !== undefined) {
-      return cached;
+      return floorPx > 0 ? Math.max(cached, Math.round(floorPx)) : cached;
     }
 
     let minFontSize = 1;
@@ -517,7 +541,24 @@ export class CanvasService {
       this._fontSizeCache.clear();
     }
     this._fontSizeCache.set(cacheKey, maxFontSize);
-    return maxFontSize;
+    // Cache the raw fitted size; apply the floor on read so floored and unfloored callers share it.
+    return floorPx > 0 ? Math.max(maxFontSize, Math.round(floorPx)) : maxFontSize;
+  }
+
+  /**
+   * Strokes a background-color "halo" behind text to keep it legible where it overlaps other content.
+   * Because the stroke is the widget background color it is invisible over the empty card and only
+   * carves a clean channel around the glyphs where they sit over the value. Stroke is drawn before the
+   * fill by the caller. `maxWidth` is omitted when the text is floored so it overflows rather than squishes.
+   */
+  private strokeTextHalo(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fontSizePx: number, haloColor: string, maxWidth?: number): void {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = Math.max(2, fontSizePx / 5);
+    ctx.strokeStyle = haloColor;
+    ctx.strokeText(text, x, y, maxWidth);
+    ctx.restore();
   }
 
   /**

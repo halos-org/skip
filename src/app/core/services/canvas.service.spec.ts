@@ -122,3 +122,55 @@ describe('CanvasService text measurement (#321 font-race)', () => {
     await expect(service.whenFontsReady()).resolves.toBeUndefined();
   });
 });
+
+/**
+ * Auxiliary text (widget labels and unit symbols) is sized as a fraction of the
+ * tile height and shrinks below legibility on small tiles. A pixel floor keeps it
+ * readable; the fit is capped only from below, and the floor is applied on read so
+ * floored and unfloored callers share one memo entry.
+ */
+describe('CanvasService font-size floor (label/unit legibility)', () => {
+  let service: CanvasService;
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(CanvasService);
+  });
+
+  // measured width scales with font px and text length, so the binary search is deterministic.
+  function fakeCtx(onMeasure?: () => void) {
+    return {
+      font: '',
+      measureText(text: string): TextMetrics {
+        onMeasure?.();
+        const px = parseInt(this.font, 10) || 10;
+        return { width: text.length * px * 0.5 } as TextMetrics;
+      }
+    } as unknown as CanvasRenderingContext2D;
+  }
+
+  it('floors the result at floorPx when the box would force a smaller size', () => {
+    const ctx = fakeCtx();
+    const unfloored = service.calculateOptimalFontSize(ctx, 'Label', 200, 6, 'normal');
+    expect(unfloored).toBeLessThanOrEqual(6);            // height-bound to the tiny box
+    const floored = service.calculateOptimalFontSize(ctx, 'Label', 200, 6, 'normal', 12);
+    expect(floored).toBe(12);                            // never below the floor
+  });
+
+  it('leaves the size unchanged when the fitted size already clears the floor', () => {
+    const ctx = fakeCtx();
+    const fitted = service.calculateOptimalFontSize(ctx, 'X', 200, 40, 'normal');
+    expect(fitted).toBeGreaterThan(12);
+    expect(service.calculateOptimalFontSize(ctx, 'X', 200, 40, 'normal', 12)).toBe(fitted);
+  });
+
+  it('applies the floor on read without re-running the search (shared memo entry)', () => {
+    let measureCalls = 0;
+    const ctx = fakeCtx(() => { measureCalls++; });
+    const unfloored = service.calculateOptimalFontSize(ctx, 'Label', 200, 6, 'normal');
+    const afterSearch = measureCalls;
+    const floored = service.calculateOptimalFontSize(ctx, 'Label', 200, 6, 'normal', 12);
+    expect(measureCalls).toBe(afterSearch);              // cache hit: no new search
+    expect(unfloored).toBeLessThan(12);
+    expect(floored).toBe(12);                            // floor applied on the cached value
+  });
+});
