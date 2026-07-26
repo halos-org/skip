@@ -157,6 +157,7 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
     if (!ctx) return;
     const cfg = this.runtime.options();
     if (!cfg) return;
+    const haloColor = this.theme()?.cardColor || undefined;
     // Only recreate the title bitmap if the title text, title color, or full canvas size changes.
     // Note: the offscreen bitmap returned by createTitleBitmap is backed by
     // device pixels (width/height === css * devicePixelRatio), so compare
@@ -173,20 +174,16 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
         titleColor,
         'normal',
         this.cssWidth,
-        this.cssHeight
+        this.cssHeight,
+        0.1,
+        haloColor,
+        this.canvas.MIN_LABEL_PX
       );
       this.titleBitmapText = `${cfg.displayName}-${cfg.color}`;
       this.titleBitmapColor = titleColor;
     }
 
     this.canvas.clearCanvas(ctx, this.cssWidth, this.cssHeight);
-
-    // Draw the title bitmap at the top. Request an explicit target size in
-    // CSS pixels to avoid any ambiguity with device-pixel intrinsic sizes.
-    // Ensure canvas is not size 0
-    if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
-      ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
 
     let valueText: string;
 
@@ -212,5 +209,8 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
       'bold',
       this.valueColor
     );
+
+    // Label composites last so its background-color halo can knock the value out behind it.
+    this.canvas.drawTextBitmap(ctx, this.titleBitmap, this.cssWidth, this.cssHeight);
   }
 }

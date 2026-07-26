@@ -141,6 +141,7 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
     const titleHeight = Math.floor(this.cssHeight * 0.1);
     const cfg = this.runtime.options();
     if (!cfg) return;
+    const haloColor = this.theme()?.cardColor || undefined;
     const bgText = cfg.displayName + '|' + this.labelColor();
 
     if (!this.titleBitmap ||
@@ -152,15 +153,15 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
         this.labelColor(),
         'normal',
         this.cssWidth,
-        this.cssHeight
+        this.cssHeight,
+        0.1,
+        haloColor,
+        this.canvas.MIN_LABEL_PX
       );
       this.titleBitmapText = cfg.displayName + '|' + this.labelColor();
     }
 
     this.canvas.clearCanvas(this.canvasCtx, this.cssWidth, this.cssHeight);
-    if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
-      this.canvasCtx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
 
     const valueText = this.dataValue === null ? '--' : this.dataValue;
     const edge = this.canvas.EDGE_BUFFER || 10;
@@ -182,5 +183,8 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
       'center',
       'middle'
     );
+
+    // Label composites last so its background-color halo can knock the value out behind it.
+    this.canvas.drawTextBitmap(this.canvasCtx, this.titleBitmap, this.cssWidth, this.cssHeight);
   }
 }

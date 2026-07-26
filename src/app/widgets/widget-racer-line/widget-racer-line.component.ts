@@ -380,14 +380,14 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     if (!this.ctx || !this.canvasElement) return;
     const cfg = this.runtime.options();
     const name = cfg?.displayName || 'DTS';
+    const haloColor = this.theme()?.cardColor || undefined;
     const titleColor = this.labelColor();
     if (!this.titleBitmap || !cfg || this.titleBitmap.width !== this.canvasElement.width || this.titleBitmap.height !== this.canvasElement.height || this.titleBitmapText !== name || this.titleBitmapColor !== titleColor) {
-      this.titleBitmap = this.canvas.createTitleBitmap(name, titleColor, 'normal', this.cssWidth, this.cssHeight);
+      this.titleBitmap = this.canvas.createTitleBitmap(name, titleColor, 'normal', this.cssWidth, this.cssHeight, 0.1, haloColor, this.canvas.MIN_LABEL_PX);
       this.titleBitmapText = name;
       this.titleBitmapColor = titleColor;
     }
     this.canvas.clearCanvas(this.ctx, this.cssWidth, this.cssHeight);
-    if (this.titleBitmap) this.ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
 
     this.canvas.drawText(
       this.ctx,
@@ -412,7 +412,9 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       'normal',
       this.dtsColor,
       'right',
-      'bottom'
+      'bottom',
+      haloColor,
+      this.canvas.MIN_UNIT_PX
     );
 
     this.canvas.drawText(
@@ -466,6 +468,9 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       'left',
       'bottom'
     );
+
+    // Label composites last so its background-color halo can knock the values out behind it.
+    this.canvas.drawTextBitmap(this.ctx, this.titleBitmap, this.cssWidth, this.cssHeight);
 
     this.setLenBias();
   }

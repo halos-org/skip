@@ -273,14 +273,14 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
     if (!this.ctx || !this.canvasElement) return;
     const cfg = this.runtime.options();
     const name = cfg?.displayName || 'TTS';
+    const haloColor = this.theme()?.cardColor || undefined;
     const titleColor = this.labelColor();
     if (!this.titleBitmap || this.titleBitmap.width !== this.canvasElement.width || this.titleBitmap.height !== this.canvasElement.height || this.titleBitmapText !== name || this.titleBitmapColor !== titleColor) {
-      this.titleBitmap = this.canvas.createTitleBitmap(name, titleColor, 'normal', this.cssWidth, this.cssHeight);
+      this.titleBitmap = this.canvas.createTitleBitmap(name, titleColor, 'normal', this.cssWidth, this.cssHeight, 0.1, haloColor, this.canvas.MIN_LABEL_PX);
       this.titleBitmapText = name;
       this.titleBitmapColor = titleColor;
     }
     this.canvas.clearCanvas(this.ctx, this.cssWidth, this.cssHeight);
-    if (this.titleBitmap) this.ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
     this.canvas.drawText(
       this.ctx,
       this.getValueText(),
@@ -293,6 +293,9 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
       'center',
       'middle'
     );
+
+    // Label composites last so its background-color halo can knock the value out behind it.
+    this.canvas.drawTextBitmap(this.ctx, this.titleBitmap, this.cssWidth, this.cssHeight);
   }
 
   private beep(frequency = 440, duration = 100) {

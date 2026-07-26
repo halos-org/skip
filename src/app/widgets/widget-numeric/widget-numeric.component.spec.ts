@@ -27,8 +27,12 @@ interface NumericInternals {
  *
  * The component is driven headless: onNumericValue (the stream callback that sets dataValue +
  * effectiveUnit) is invoked directly, and getValueText (the smallest seam producing the drawn text)
- * is read back. Effects are never flushed (no TestBed.tick()) so the required `theme` input is never
- * read, and ignoreZones:true keeps onNumericValue out of the zone branch that also reads theme().
+ * is read back. onNumericValue calls drawWidget(), which now reads the required `theme()` input (for
+ * the halo card color) — but drawWidget bails at its `if (!canvasCtx) return` guard here, because the
+ * component is constructed via `new` without ngOnInit so the canvas context is never set and theme()
+ * is never reached. ignoreZones:true likewise keeps onNumericValue out of the zone branch that reads
+ * theme(). Adding ngOnInit/detectChanges to this spec would make drawWidget reach this.theme() and
+ * throw NG0950 (required input not set).
  */
 describe('WidgetNumericComponent value text (crash-fix ddfb377c)', () => {
   let component: WidgetNumericComponent;

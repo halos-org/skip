@@ -6,6 +6,14 @@ import { Injectable } from '@angular/core';
 export class CanvasService {
   public readonly DEFAULT_FONT = 'Roboto';
   public readonly EDGE_BUFFER = 10;
+  /**
+   * Minimum on-screen size (CSS px) for auxiliary text — widget labels and unit symbols — so it
+   * stays legible on small tiles and in daylight. Below this the text overflows its box instead of
+   * shrinking; callers pair the floor with a background-color halo so the overflow reads over the
+   * value (see {@link drawText}/{@link drawTitle} `haloColor`). Tunable.
+   */
+  public readonly MIN_LABEL_PX = 16;
+  public readonly MIN_UNIT_PX = 12;
   /** Enable verbose canvas diagnostics (dev only) */
   public debug = false;
   public scaleFactor = window.devicePixelRatio || 1;
@@ -333,7 +341,9 @@ export class CanvasService {
     fontWeight = 'normal',
     canvasWidth: number,
     canvasHeight: number,
-    titleFraction = 0.1 // default for widgets
+    titleFraction = 0.1, // default for widgets
+    haloColor?: string,
+    floorPx = 0
   ): void {
     if (!ctx) return;
     const runDraw = () => {
@@ -355,12 +365,12 @@ export class CanvasService {
           try { ctx.save(); ctx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0); restored = true; } catch { /* ignore */ }
         }
 
-        this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction);
+        this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction, haloColor, floorPx);
 
         if (restored) ctx.restore();
       } catch (err) {
         console.warn('[CanvasService] drawTitle failed', err);
-        try { this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction); } catch { /* ignore */ }
+        try { this.drawTitleInternal(ctx, text, color, fontWeight, canvasWidth, canvasHeight, titleFraction, haloColor, floorPx); } catch { /* ignore */ }
       }
     };
 
@@ -384,20 +394,27 @@ export class CanvasService {
     fontWeight = 'normal',
     canvasWidth: number,
     canvasHeight: number,
-    titleFraction: number
+    titleFraction: number,
+    haloColor?: string,
+    floorPx = 0
   ): void {
     if (!ctx) return;
 
     const maxWidth = canvasWidth - 2 * this.EDGE_BUFFER;
     const maxHeight = Math.round(canvasHeight * titleFraction);
-    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight);
+    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight, floorPx);
+    // Floored text may exceed its width box: let it overflow rather than squish (drop the maxWidth cap).
+    const widthArg = floorPx > 0 ? undefined : maxWidth;
 
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx.font = `${fontWeight} ${fontSize}px ${this.DEFAULT_FONT}`;
-    ctx.fillStyle = color;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(text, this.EDGE_BUFFER, this.EDGE_BUFFER, maxWidth);
+    if (haloColor) {
+      this.strokeTextHalo(ctx, text, this.EDGE_BUFFER, this.EDGE_BUFFER, fontSize, haloColor, widthArg);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(text, this.EDGE_BUFFER, this.EDGE_BUFFER, widthArg);
   }
 
   /**
@@ -409,6 +426,23 @@ export class CanvasService {
    */
   public clearCanvas(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     ctx.clearRect(0, 0, width, height);
+  }
+
+  /**
+   * Composites a cached text-layer bitmap (a widget's label/unit) over the canvas. Defers through the
+   * same font-readiness gate as {@link drawText}: on a cold boot the value paint is deferred until
+   * fonts settle, so blitting synchronously would land the label *under* the late value. Deferring
+   * here registers the blit after the value's paint (same draw call), preserving the label-over-value
+   * order the background-color halo knockout depends on. No-op for a null or zero-size bitmap.
+   */
+  public drawTextBitmap(ctx: CanvasRenderingContext2D, bitmap: HTMLCanvasElement | null, width: number, height: number): void {
+    if (!ctx || !bitmap || bitmap.width <= 0 || bitmap.height <= 0) return;
+    const blit = () => ctx.drawImage(bitmap, 0, 0, width, height);
+    if (this.areFontsLoaded()) {
+      blit();
+    } else {
+      this.fontsReadyPromise.then(blit).catch(() => blit());
+    }
   }
 
 
@@ -436,7 +470,9 @@ export class CanvasService {
     fontWeight = 'normal',
     color = '#000',
     textAlign: CanvasTextAlign = 'center',
-    textBaseline: CanvasTextBaseline = 'middle'
+    textBaseline: CanvasTextBaseline = 'middle',
+    haloColor?: string,
+    floorPx = 0
   ): void {
     if (!ctx) return;
     const runDraw = () => {
@@ -444,7 +480,7 @@ export class CanvasService {
       try {
         ctx.save();
         ctx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0);
-        this.drawTextInternal(ctx, text, x, y, maxWidth, maxHeight, fontWeight, color, textAlign, textBaseline);
+        this.drawTextInternal(ctx, text, x, y, maxWidth, maxHeight, fontWeight, color, textAlign, textBaseline, haloColor, floorPx);
       } finally {
         try { ctx.restore(); } catch { /* ignore */ }
       }
@@ -465,13 +501,18 @@ export class CanvasService {
   /**
    * Draws text on the canvas with optimal font size.
    */
-  private drawTextInternal(ctx: CanvasRenderingContext2D, text: string, x: number = this.EDGE_BUFFER, y: number = this.EDGE_BUFFER, maxWidth: number, maxHeight: number, fontWeight = 'normal', color = '#000', textAlign: CanvasTextAlign = 'center', textBaseline: CanvasTextBaseline = 'middle'): void {
-    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight);
+  private drawTextInternal(ctx: CanvasRenderingContext2D, text: string, x: number = this.EDGE_BUFFER, y: number = this.EDGE_BUFFER, maxWidth: number, maxHeight: number, fontWeight = 'normal', color = '#000', textAlign: CanvasTextAlign = 'center', textBaseline: CanvasTextBaseline = 'middle', haloColor?: string, floorPx = 0): void {
+    const fontSize = this.calculateOptimalFontSize(ctx, text, maxWidth, maxHeight, fontWeight, floorPx);
+    // Floored text may exceed its width box: let it overflow rather than squish (drop the maxWidth cap).
+    const widthArg = floorPx > 0 ? undefined : maxWidth;
     ctx.font = `${fontWeight} ${fontSize}px ${this.DEFAULT_FONT}`;
-    ctx.fillStyle = color;
     ctx.textAlign = textAlign;
     ctx.textBaseline = textBaseline;
-    ctx.fillText(text, x, y, maxWidth);
+    if (haloColor) {
+      this.strokeTextHalo(ctx, text, x, y, fontSize, haloColor, widthArg);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y, widthArg);
   }
 
   /**
@@ -489,11 +530,11 @@ export class CanvasService {
   * context has been transformed to device pixels (service methods generally
   * ensure the context transform so callers may pass CSS units).
    */
-  public calculateOptimalFontSize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxHeight: number, fontWeight = 'normal'): number {
+  public calculateOptimalFontSize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxHeight: number, fontWeight = 'normal', floorPx = 0): number {
     const cacheKey = `${fontWeight}|${Math.round(maxWidth)}|${Math.round(maxHeight)}|${text}`;
     const cached = this._fontSizeCache.get(cacheKey);
     if (cached !== undefined) {
-      return cached;
+      return floorPx > 0 ? Math.max(cached, Math.round(floorPx)) : cached;
     }
 
     let minFontSize = 1;
@@ -517,7 +558,24 @@ export class CanvasService {
       this._fontSizeCache.clear();
     }
     this._fontSizeCache.set(cacheKey, maxFontSize);
-    return maxFontSize;
+    // Cache the raw fitted size; apply the floor on read so floored and unfloored callers share it.
+    return floorPx > 0 ? Math.max(maxFontSize, Math.round(floorPx)) : maxFontSize;
+  }
+
+  /**
+   * Strokes a background-color "halo" behind text to keep it legible where it overlaps other content.
+   * Because the stroke is the widget background color it is invisible over the empty card and only
+   * carves a clean channel around the glyphs where they sit over the value. Stroke is drawn before the
+   * fill by the caller. `maxWidth` is omitted when the text is floored so it overflows rather than squishes.
+   */
+  private strokeTextHalo(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fontSizePx: number, haloColor: string, maxWidth?: number): void {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = Math.max(2, fontSizePx / 5);
+    ctx.strokeStyle = haloColor;
+    ctx.strokeText(text, x, y, maxWidth);
+    ctx.restore();
   }
 
   /**
@@ -543,7 +601,9 @@ export class CanvasService {
     fontWeight: string,
     cssWidth: number,
     cssHeight: number,
-    titleFraction = 0.1
+    titleFraction = 0.1,
+    haloColor?: string,
+    floorPx = 0
   ): HTMLCanvasElement {
     const offscreen = document.createElement('canvas');
     offscreen.width = Math.round(cssWidth * this.scaleFactor);
@@ -556,7 +616,7 @@ export class CanvasService {
       offCtx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0);
       // Use provided titleFraction (defaults to 0.1) for consistent appearance.
       // receive a visible bitmap even if web fonts are still loading.
-      this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction);
+      this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction, haloColor, floorPx);
       // If fonts are not yet ready, schedule a re-render when they load so
       // the offscreen bitmap updates with correct metrics. Widgets that cache
       // the returned canvas should redraw when they detect the bitmap changed.
@@ -565,7 +625,7 @@ export class CanvasService {
           try {
             // re-scale in case DPR changed
             offCtx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0);
-            this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction);
+            this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction, haloColor, floorPx);
           } catch { /* ignore */ }
         }).catch(() => { /* ignore */ });
       }
