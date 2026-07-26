@@ -39,6 +39,15 @@ interface IChartColors {
 }
 interface IDataSetRow { x: number | null, y: number | null }
 
+// A hair of curvature — visually a straight line — that routes the value line off Chart.js's fast
+// integer-pixel-bucketing draw path onto the exact-position path. The streaming plugin re-paths the
+// line every animation frame from sub-pixel-shifted points; on the fast path that re-buckets dense
+// points into per-pixel-column min/max strokes whose x jumps as points cross pixel boundaries, so
+// features shimmer independently as the chart scrolls. The exact-position path draws every point
+// where it is and translates the whole line as one. Bezier control points at this tension sit far
+// below a pixel from the vertices, so the rendered line is indistinguishable from straight segments.
+const NON_FAST_PATH_TENSION = 1e-6;
+
 @Component({
   selector: 'widget-data-chart',
   templateUrl: './widget-data-chart.component.html',
@@ -489,7 +498,7 @@ export class WidgetDataChartComponent implements OnDestroy {
         data: [],
         order: cfg.trackAgainstAverage ? 1 : 0,
         parsing: false,
-        tension: 0,
+        tension: NON_FAST_PATH_TENSION,
         pointRadius: cfg.showDataPoints ? (cfg.trackAgainstAverage ? 0 : 1.5) : 0,
         pointHoverRadius: 0,
         pointHitRadius: 0,
