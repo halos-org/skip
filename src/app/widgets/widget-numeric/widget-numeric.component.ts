@@ -68,8 +68,8 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private canvasCtx: CanvasRenderingContext2D | null;
   private cssWidth = 0;
   private cssHeight = 0;
-  private backgroundBitmap: HTMLCanvasElement | null = null;
-  private backgroundBitmapText: string | null = null;
+  private foregroundBitmap: HTMLCanvasElement | null = null;
+  private foregroundBitmapText: string | null = null;
 
   private dataValue: number | null = null;
   private effectiveUnit = signal<string>('');
@@ -257,8 +257,8 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!cfg || !theme) return;
     this.labelColor.set(getColors(cfg.color ?? 'contrast', theme).dim);
     this.valueStateColor = this.valueColor = getColors(cfg.color ?? 'contrast', theme).color;
-    this.backgroundBitmap = null;
-    this.backgroundBitmapText = null;
+    this.foregroundBitmap = null;
+    this.foregroundBitmapText = null;
   }
 
   private drawWidget(): void {
@@ -270,13 +270,16 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     const marginX = 10 * this.canvas.scaleFactor;
     const marginY = 5 * this.canvas.scaleFactor;
     const displayName = cfg.displayName ?? 'Gauge Label';
-    const bgText = displayName + '|' + unit;
+    // Background-color halo: invisible over the empty card, carves the value out only where the
+    // floored label/unit overlap it. Requires the label/unit to be composited above the value below.
+    const haloColor = this.theme()?.cardColor || undefined;
+    const fgText = displayName + '|' + unit;
 
-    if (!this.backgroundBitmap ||
-        this.backgroundBitmap.width !== this.canvasElement.width ||
-        this.backgroundBitmap.height !== this.canvasElement.height ||
-        this.backgroundBitmapText !== bgText) {
-      this.backgroundBitmap = this.canvas.renderStaticToBitmap(
+    if (!this.foregroundBitmap ||
+        this.foregroundBitmap.width !== this.canvasElement.width ||
+        this.foregroundBitmap.height !== this.canvasElement.height ||
+        this.foregroundBitmapText !== fgText) {
+      this.foregroundBitmap = this.canvas.renderStaticToBitmap(
         ctx,
         this.cssWidth,
         this.cssHeight,
@@ -288,7 +291,9 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
             'normal',
             this.cssWidth,
             this.cssHeight,
-            0.1
+            0.1,
+            haloColor,
+            this.canvas.MIN_LABEL_PX
           );
           if (unit && !['unitless', 'percent', 'percentraw', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
             this.canvas.drawText(
@@ -301,22 +306,24 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
               'bold',
               this.valueColor,
               'end',
-              'bottom'
+              'bottom',
+              haloColor,
+              this.canvas.MIN_UNIT_PX
             );
           }
         }
       );
-      this.backgroundBitmapText = bgText;
+      this.foregroundBitmapText = fgText;
     }
 
     this.canvas.clearCanvas(ctx, this.cssWidth, this.cssHeight);
-    if (this.backgroundBitmap && this.backgroundBitmap.width > 0 && this.backgroundBitmap.height > 0) {
-      ctx.drawImage(this.backgroundBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
-
     this.drawValue(ctx);
     if (cfg.showMax || cfg.showMin) {
       this.drawMinMax(ctx);
+    }
+    // Label + unit composite last so the background-color halo can knock the value out behind them.
+    if (this.foregroundBitmap && this.foregroundBitmap.width > 0 && this.foregroundBitmap.height > 0) {
+      ctx.drawImage(this.foregroundBitmap, 0, 0, this.cssWidth, this.cssHeight);
     }
   }
 
