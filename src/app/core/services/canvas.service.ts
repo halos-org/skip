@@ -584,7 +584,9 @@ export class CanvasService {
     fontWeight: string,
     cssWidth: number,
     cssHeight: number,
-    titleFraction = 0.1
+    titleFraction = 0.1,
+    haloColor?: string,
+    floorPx = 0
   ): HTMLCanvasElement {
     const offscreen = document.createElement('canvas');
     offscreen.width = Math.round(cssWidth * this.scaleFactor);
@@ -597,7 +599,7 @@ export class CanvasService {
       offCtx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0);
       // Use provided titleFraction (defaults to 0.1) for consistent appearance.
       // receive a visible bitmap even if web fonts are still loading.
-      this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction);
+      this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction, haloColor, floorPx);
       // If fonts are not yet ready, schedule a re-render when they load so
       // the offscreen bitmap updates with correct metrics. Widgets that cache
       // the returned canvas should redraw when they detect the bitmap changed.
@@ -606,7 +608,7 @@ export class CanvasService {
           try {
             // re-scale in case DPR changed
             offCtx.setTransform(this.scaleFactor, 0, 0, this.scaleFactor, 0, 0);
-            this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction);
+            this.drawTitleInternal(offCtx, text, color, fontWeight, cssWidth, cssHeight, titleFraction, haloColor, floorPx);
           } catch { /* ignore */ }
         }).catch(() => { /* ignore */ });
       }

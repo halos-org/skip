@@ -166,6 +166,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
     if (!this.ctx || !this.canvasElement) return;
     const cfg = this.runtime.options();
     if (!cfg) return;
+    const haloColor = this.theme()?.cardColor || undefined;
     const name = cfg.displayName || 'Position';
     const titleColor = this.labelColor();
     if (
@@ -175,17 +176,11 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
       this.titleBitmapText !== name ||
       this.titleBitmapColor !== titleColor
     ) {
-      this.titleBitmap = this.canvas.createTitleBitmap(name, titleColor, 'normal', this.cssWidth, this.cssHeight);
+      this.titleBitmap = this.canvas.createTitleBitmap(name, titleColor, 'normal', this.cssWidth, this.cssHeight, 0.1, haloColor, this.canvas.MIN_LABEL_PX);
       this.titleBitmapText = name;
       this.titleBitmapColor = titleColor;
     }
     this.canvas.clearCanvas(this.ctx, this.cssWidth, this.cssHeight);
-    // Draw the title bitmap at the top. Request an explicit target size in
-    // CSS pixels to avoid any ambiguity with device-pixel intrinsic sizes.
-    // Ensure canvas is not size 0
-    if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
-      this.ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
-    }
     // Latitude
     this.canvas.drawText(
       this.ctx,
@@ -212,6 +207,11 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
       'center',
       'top'
     );
+
+    // Label composites last so its background-color halo can knock the values out behind it.
+    if (this.titleBitmap && this.titleBitmap.width > 0 && this.titleBitmap.height > 0) {
+      this.ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
+    }
   }
 
   ngOnDestroy(): void {
