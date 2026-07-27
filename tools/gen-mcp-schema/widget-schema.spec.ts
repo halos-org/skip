@@ -34,7 +34,7 @@ describe('extractWidgetSchemas', () => {
       defaultPath: 'self.environment.wind.speedTrue',
       expectedSkUnit: 'm/s',
       defaultConvertUnitTo: 'knots',
-      isPathConfigurable: true,
+      isPathConfigurable: false, // now a fixed slot (Effort B); direction is the choice slot
       pathRequired: false,
     });
   });

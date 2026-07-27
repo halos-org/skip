@@ -65,7 +65,11 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     // wind widgets. showPathSkUnitsFilter:false hides the unit-filter on both slots.
     paths: {
       trueWindDirection: {
-        description: 'True Wind Direction',
+        description: 'Wind Direction',
+        pathOptions: [
+          { label: 'True', path: 'self.environment.wind.directionTrue' },
+          { label: 'Magnetic', path: 'self.environment.wind.directionMagnetic' }
+        ],
         path: 'self.environment.wind.directionTrue',
         source: 'default',
         pathType: 'number',
@@ -81,7 +85,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         path: 'self.environment.wind.speedTrue',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',

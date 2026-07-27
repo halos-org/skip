@@ -541,7 +541,7 @@
   },
   "meta": {
     "configFileVersion": 11,
-    "configVersion": 17,
+    "configVersion": 18,
     "schemaVersion": 1,
     "skipVersion": "1.0.5"
   },
@@ -2075,7 +2075,7 @@
           "appWindAngle": {
             "convertUnitTo": "deg",
             "description": "Apparent Wind Angle",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.angleApparent",
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -2085,7 +2085,7 @@
           "appWindSpeed": {
             "convertUnitTo": "knots",
             "description": "Apparent Wind Speed",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.speedApparent",
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
@@ -2093,9 +2093,19 @@
           },
           "courseOverGround": {
             "convertUnitTo": "deg",
-            "description": "True Course Over Ground",
+            "description": "Course Over Ground",
             "isPathConfigurable": true,
             "path": "self.navigation.courseOverGroundTrue",
+            "pathOptions": [
+              {
+                "label": "True",
+                "path": "self.navigation.courseOverGroundTrue"
+              },
+              {
+                "label": "Magnetic",
+                "path": "self.navigation.courseOverGroundMagnetic"
+              }
+            ],
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -2105,7 +2115,7 @@
           "drift": {
             "convertUnitTo": "knots",
             "description": "Drift Speed Impact",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.current.drift",
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
@@ -2114,9 +2124,19 @@
           },
           "headingPath": {
             "convertUnitTo": "deg",
-            "description": "True Heading",
+            "description": "Heading",
             "isPathConfigurable": true,
             "path": "self.navigation.headingTrue",
+            "pathOptions": [
+              {
+                "label": "True",
+                "path": "self.navigation.headingTrue"
+              },
+              {
+                "label": "Magnetic",
+                "path": "self.navigation.headingMagnetic"
+              }
+            ],
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
             "showConvertUnitTo": false,
@@ -2125,7 +2145,7 @@
           "nextWaypointBearing": {
             "convertUnitTo": "deg",
             "description": "Next Waypoint True Bearing",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.navigation.course.calcValues.bearingTrue",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
@@ -2156,7 +2176,7 @@
           "set": {
             "convertUnitTo": "deg",
             "description": "True Drift Set",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.current.setTrue",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
@@ -2196,9 +2216,19 @@
           },
           "trueWindAngle": {
             "convertUnitTo": "deg",
-            "description": "True Wind Angle",
+            "description": "Wind Angle",
             "isPathConfigurable": true,
             "path": "self.environment.wind.angleTrueWater",
+            "pathOptions": [
+              {
+                "label": "Water",
+                "path": "self.environment.wind.angleTrueWater"
+              },
+              {
+                "label": "Ground",
+                "path": "self.environment.wind.angleTrueGround"
+              }
+            ],
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -2208,7 +2238,7 @@
           "trueWindSpeed": {
             "convertUnitTo": "knots",
             "description": "True Wind Speed",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.speedTrue",
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
@@ -2244,7 +2274,7 @@
         {
           "defaultConvertUnitTo": "deg",
           "defaultPath": "self.navigation.headingTrue",
-          "description": "True Heading",
+          "description": "Heading",
           "expectedSkUnit": "rad",
           "isPathConfigurable": true,
           "pathRequired": false,
@@ -2323,7 +2353,7 @@
           "defaultPath": "self.environment.wind.angleApparent",
           "description": "Apparent Wind Angle",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "appWindAngle",
@@ -2334,7 +2364,7 @@
           "defaultPath": "self.environment.wind.speedApparent",
           "description": "Apparent Wind Speed",
           "expectedSkUnit": "m/s",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "appWindSpeed",
@@ -2343,7 +2373,7 @@
         {
           "defaultConvertUnitTo": "deg",
           "defaultPath": "self.environment.wind.angleTrueWater",
-          "description": "True Wind Angle",
+          "description": "Wind Angle",
           "expectedSkUnit": "rad",
           "isPathConfigurable": true,
           "pathRequired": false,
@@ -2356,7 +2386,7 @@
           "defaultPath": "self.environment.wind.speedTrue",
           "description": "True Wind Speed",
           "expectedSkUnit": "m/s",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "trueWindSpeed",
@@ -2365,7 +2395,7 @@
         {
           "defaultConvertUnitTo": "deg",
           "defaultPath": "self.navigation.courseOverGroundTrue",
-          "description": "True Course Over Ground",
+          "description": "Course Over Ground",
           "expectedSkUnit": "rad",
           "isPathConfigurable": true,
           "pathRequired": false,
@@ -2378,7 +2408,7 @@
           "defaultPath": "self.navigation.course.calcValues.bearingTrue",
           "description": "Next Waypoint True Bearing",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "nextWaypointBearing",
@@ -2400,7 +2430,7 @@
           "defaultPath": "self.environment.current.setTrue",
           "description": "True Drift Set",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "set",
@@ -2411,7 +2441,7 @@
           "defaultPath": "self.environment.current.drift",
           "description": "Drift Speed Impact",
           "expectedSkUnit": "m/s",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "drift",
@@ -2674,7 +2704,7 @@
           "appWindAngle": {
             "convertUnitTo": "deg",
             "description": "Apparent Wind Angle",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.angleApparent",
             "pathRequired": true,
             "pathSkUnitsFilter": "rad",
@@ -2686,7 +2716,7 @@
           "appWindSpeed": {
             "convertUnitTo": "knots",
             "description": "Apparent Wind Speed",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.speedApparent",
             "pathRequired": true,
             "pathSkUnitsFilter": "m/s",
@@ -2696,9 +2726,19 @@
           },
           "courseOverGround": {
             "convertUnitTo": "deg",
-            "description": "True Course Over Ground",
+            "description": "Course Over Ground",
             "isPathConfigurable": true,
             "path": "self.navigation.courseOverGroundTrue",
+            "pathOptions": [
+              {
+                "label": "True",
+                "path": "self.navigation.courseOverGroundTrue"
+              },
+              {
+                "label": "Magnetic",
+                "path": "self.navigation.courseOverGroundMagnetic"
+              }
+            ],
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -2709,7 +2749,7 @@
           "drift": {
             "convertUnitTo": "knots",
             "description": "Drift Speed Impact",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.current.drift",
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
@@ -2719,9 +2759,19 @@
           },
           "headingPath": {
             "convertUnitTo": "deg",
-            "description": "True Heading",
+            "description": "Heading",
             "isPathConfigurable": true,
             "path": "self.navigation.headingTrue",
+            "pathOptions": [
+              {
+                "label": "True",
+                "path": "self.navigation.headingTrue"
+              },
+              {
+                "label": "Magnetic",
+                "path": "self.navigation.headingMagnetic"
+              }
+            ],
             "pathRequired": true,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -2744,7 +2794,7 @@
           "set": {
             "convertUnitTo": "deg",
             "description": "True Drift Set",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.current.setTrue",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
@@ -2755,9 +2805,19 @@
           },
           "trueWindAngle": {
             "convertUnitTo": "deg",
-            "description": "True Wind Angle",
+            "description": "Wind Angle",
             "isPathConfigurable": true,
             "path": "self.environment.wind.angleTrueWater",
+            "pathOptions": [
+              {
+                "label": "Water",
+                "path": "self.environment.wind.angleTrueWater"
+              },
+              {
+                "label": "Ground",
+                "path": "self.environment.wind.angleTrueGround"
+              }
+            ],
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -2768,7 +2828,7 @@
           "trueWindSpeed": {
             "convertUnitTo": "knots",
             "description": "True Wind Speed",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.speedTrue",
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
@@ -2797,7 +2857,7 @@
         {
           "defaultConvertUnitTo": "deg",
           "defaultPath": "self.navigation.headingTrue",
-          "description": "True Heading",
+          "description": "Heading",
           "expectedSkUnit": "rad",
           "isPathConfigurable": true,
           "pathRequired": true,
@@ -2810,7 +2870,7 @@
           "defaultPath": "self.environment.wind.angleApparent",
           "description": "Apparent Wind Angle",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": true,
           "pathType": "number",
           "slot": "appWindAngle",
@@ -2821,7 +2881,7 @@
           "defaultPath": "self.environment.wind.speedApparent",
           "description": "Apparent Wind Speed",
           "expectedSkUnit": "m/s",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": true,
           "pathType": "number",
           "slot": "appWindSpeed",
@@ -2830,7 +2890,7 @@
         {
           "defaultConvertUnitTo": "deg",
           "defaultPath": "self.environment.wind.angleTrueWater",
-          "description": "True Wind Angle",
+          "description": "Wind Angle",
           "expectedSkUnit": "rad",
           "isPathConfigurable": true,
           "pathRequired": false,
@@ -2843,7 +2903,7 @@
           "defaultPath": "self.environment.wind.speedTrue",
           "description": "True Wind Speed",
           "expectedSkUnit": "m/s",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "trueWindSpeed",
@@ -2852,7 +2912,7 @@
         {
           "defaultConvertUnitTo": "deg",
           "defaultPath": "self.navigation.courseOverGroundTrue",
-          "description": "True Course Over Ground",
+          "description": "Course Over Ground",
           "expectedSkUnit": "rad",
           "isPathConfigurable": true,
           "pathRequired": false,
@@ -2876,7 +2936,7 @@
           "defaultPath": "self.environment.current.setTrue",
           "description": "True Drift Set",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "set",
@@ -2887,7 +2947,7 @@
           "defaultPath": "self.environment.current.drift",
           "description": "Drift Speed Impact",
           "expectedSkUnit": "m/s",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "drift",
@@ -2907,9 +2967,19 @@
         "paths": {
           "trueWindDirection": {
             "convertUnitTo": "deg",
-            "description": "True Wind Direction",
+            "description": "Wind Direction",
             "isPathConfigurable": true,
             "path": "self.environment.wind.directionTrue",
+            "pathOptions": [
+              {
+                "label": "True",
+                "path": "self.environment.wind.directionTrue"
+              },
+              {
+                "label": "Magnetic",
+                "path": "self.environment.wind.directionMagnetic"
+              }
+            ],
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -2920,7 +2990,7 @@
           "trueWindSpeed": {
             "convertUnitTo": "knots",
             "description": "True Wind Speed",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.speedTrue",
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
@@ -2943,7 +3013,7 @@
         {
           "defaultConvertUnitTo": "deg",
           "defaultPath": "self.environment.wind.directionTrue",
-          "description": "True Wind Direction",
+          "description": "Wind Direction",
           "expectedSkUnit": "rad",
           "isPathConfigurable": true,
           "pathRequired": false,
@@ -2956,7 +3026,7 @@
           "defaultPath": "self.environment.wind.speedTrue",
           "description": "True Wind Speed",
           "expectedSkUnit": "m/s",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
           "slot": "trueWindSpeed",
