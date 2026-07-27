@@ -105,4 +105,41 @@ describe('PathControlConfigComponent', () => {
     enableFormFields(true);
     expect(pathForm.controls['source'].value).toBe('default');
   });
+
+  // B1: fixed/choice paths keep an editable, valid, saveable Data Source, driven off the resolved
+  // stored path (not path.valid). This is the decoupling the Effort-A review traced.
+  const setupSourceFor = (path: string | null) =>
+    (component as unknown as { setupSourceFor: (p: string | null) => void }).setupSourceFor(path);
+
+  it('populates and enables Data Source from the resolved path for a fixed/choice path', () => {
+    pathObject.sources = src('gps.0', 'gps.1');
+    pathForm.controls['source'].setValue('');
+    setupSourceFor('self.navigation.headingTrue');
+    expect(component.availableSources).toEqual(['default', 'gps.0', 'gps.1']);
+    expect(pathForm.controls['source'].value).toBe('default');
+    expect(pathForm.controls['source'].enabled).toBe(true);
+  });
+
+  it('keeps Data Source valid and saveable when the fixed path has no live data (offline)', () => {
+    pathObject = null as unknown as Partial<ISkPathData>; // getPathObject resolves to null
+    pathForm.controls['source'].setValue('');
+    setupSourceFor('self.some.offline.path');
+    expect(component.availableSources).toEqual(['default']); // only "Any"
+    expect(pathForm.controls['source'].value).toBe('default'); // valid, not empty+required+invalid
+    expect(pathForm.controls['source'].enabled).toBe(true);
+  });
+
+  it('resets a pinned Data Source to "Any" when the newly chosen path no longer offers it', () => {
+    pathForm.controls['source'].setValue('gps.9');
+    pathObject.sources = src('gps.0');
+    setupSourceFor('self.navigation.headingMagnetic');
+    expect(pathForm.controls['source'].value).toBe('default');
+  });
+
+  it('preserves a still-valid pinned Data Source across a choice change', () => {
+    pathForm.controls['source'].setValue('gps.0');
+    pathObject.sources = src('gps.0', 'gps.1');
+    setupSourceFor('self.navigation.headingTrue');
+    expect(pathForm.controls['source'].value).toBe('gps.0');
+  });
 });

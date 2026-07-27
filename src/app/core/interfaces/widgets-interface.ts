@@ -661,6 +661,14 @@ export interface IWidgetPath {
    */
   isPathConfigurable: boolean;
   /**
+   * Optional: a small closed set of alternative Signal K paths this slot may point at (e.g. true vs
+   * magnetic heading, water- vs ground-referenced true wind). When present, the Widget settings show
+   * a labelled choice control instead of the free path autocomplete, and selecting an option writes
+   * its `path` into `path`. The chosen path is not validated against the live server list (the
+   * alternatives are known-good), and the slot's Data Source stays user-selectable.
+   */
+  pathOptions?: { label: string; path: string }[];
+  /**
    * Numeric path type filter to limit path search results based on SK Meta Units.
    * Allowed values are defined in {@link TValidSkUnits}.
    * Use 'unitless' for numeric paths with no meta units, or null to list all types of paths (no filter).

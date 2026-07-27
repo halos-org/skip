@@ -75,10 +75,15 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
   public readonly unitlessUnit: ISkBaseUnit = {unit: 'unitless', properties: {display: '(null)', quantity: 'Unitless', quantityDisplay: '(null)', description: '', }};
 
   ngOnInit() {
-    // Do not process if path is disabled. Disabled path control (isPathConfigurable: false
-    // widget property) means the path is hardcoded and cannot be changed by the user.
     const pathFormGroup = this.pathFormGroup();
-    if (pathFormGroup.controls['path'].disabled) return;
+    const hasChoices = (pathFormGroup.value.pathOptions?.length ?? 0) > 0;
+    // A fixed (disabled-path) or choice path keeps an editable Data Source but skips the free-path
+    // autocomplete machinery (unit filter, live-list validation, autocomplete filtering). Its Source
+    // is driven off the resolved stored path, so it stays valid and saveable without live data.
+    if (hasChoices || pathFormGroup.controls['path'].disabled) {
+      this.setupSourceFor(pathFormGroup.controls['path'].value);
+      return;
+    }
     // Path Unit filter setup
     this.pathSkUnitsFiltersList = this._units.skBaseUnits.sort((a, b) => {
       return a.properties.quantity > b.properties.quantity ? 1 : -1;
@@ -195,6 +200,30 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
     // Then filter based on the path
     filteredPaths = filteredPaths.filter(item => item.path.toLowerCase().includes(filterString));
     this.filteredPaths.next(filteredPaths);
+  }
+
+  /**
+   * Populate and enable the Data Source control for a fixed or choice path, off the RESOLVED stored
+   * path rather than `path.valid` (a fixed path's control is disabled and reports invalid, which would
+   * otherwise disable the Source). 'Any' (default) always leads and is a valid value, so the form is
+   * saveable even before the path has reported live data; a pinned source the current path no longer
+   * offers falls back to 'Any'.
+   */
+  private setupSourceFor(path: string | null): void {
+    const pathObject = path ? this._data.getPathObject(path) : null;
+    this.availableSources = pathObject != null
+      ? ['default', ...Object.keys(pathObject.sources).sort()]
+      : ['default'];
+    const sourceControl = this.pathFormGroup().controls['source'];
+    if (!sourceControl.value || !this.availableSources.includes(sourceControl.value)) {
+      sourceControl.setValue('default', { onlySelf: true });
+    }
+    sourceControl.enable({ onlySelf: false });
+  }
+
+  /** A choice select changed the bound `path`: recompute the sources the newly selected path offers. */
+  protected onPathChoiceChange(): void {
+    this.setupSourceFor(this.pathFormGroup().controls['path'].value);
   }
 
   private enableFormFields(setValues?: boolean): void {

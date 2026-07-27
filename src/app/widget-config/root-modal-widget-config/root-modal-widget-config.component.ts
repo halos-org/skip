@@ -169,8 +169,11 @@ export class RootModalWidgetConfigComponent implements OnInit {
               const pathObj = pathsValue[pathKey] as IWidgetPath;
               if (pathObj) {
                 const pathGroup = this.generateFormGroups(pathObj, pathKey);
-                if (pathObj.isPathConfigurable === false) {
-                  pathGroup.disable(); // disables validation,
+                const hasChoices = (pathObj.pathOptions?.length ?? 0) > 0;
+                if (pathObj.isPathConfigurable === false && !hasChoices) {
+                  // Fix the path but keep the Data Source (and other per-path controls) editable —
+                  // disabling only the path control, not the whole group.
+                  pathGroup.get('path')?.disable();
                 }
                 pathsGroup.addControl(pathKey, pathGroup);
               }
@@ -304,13 +307,15 @@ export class RootModalWidgetConfigComponent implements OnInit {
 
   /** True when the Paths tab has something to configure. Array-form widgets (multiChildCtrls) build
    * their paths through that tab, so it must stay even while their path collection is empty. A
-   * non-array widget whose every path is fixed (isPathConfigurable:false) has nothing to edit there,
-   * so the tab is suppressed (its per-path picker was already hidden by path-control-config). */
+   * non-array widget surfaces the tab when at least one path is editable in some way — a free-path
+   * picker (isPathConfigurable !== false) or a choice control (pathOptions). A widget whose every
+   * path is fixed with no choice alternatives has no path-related control to show, so the tab is
+   * suppressed (its per-path Data Source is then not user-editable, matching the pre-#417 behaviour). */
   get hasConfigurablePaths(): boolean {
     if (this.widgetConfig?.multiChildCtrls !== undefined) return true;
-    const entries = Object.values((this.widgetConfig?.paths ?? {}) as Record<string, { isPathConfigurable?: boolean }>);
+    const entries = Object.values((this.widgetConfig?.paths ?? {}) as Record<string, { isPathConfigurable?: boolean; pathOptions?: unknown[] }>);
     if (entries.length === 0) return false;
-    return entries.some(p => p?.isPathConfigurable !== false);
+    return entries.some(p => p?.isPathConfigurable !== false || (p?.pathOptions?.length ?? 0) > 0);
   }
 
   get dataTimeoutToControl(): UntypedFormControl {

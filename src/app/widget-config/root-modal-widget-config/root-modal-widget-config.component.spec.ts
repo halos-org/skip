@@ -332,4 +332,41 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
     const component = buildForm(WidgetBooleanSwitchComponent.DEFAULT_CONFIG);
     expect(component.updateIntervalToControl).not.toBeNull();
   });
+
+  // B1: decouple path-editability from Source. A fixed path disables only its `path` control, so its
+  // Data Source stays editable; a choice (pathOptions) path keeps `path` enabled for the select.
+  it('disables only the path control (not Data Source) for a fixed record-form path', () => {
+    const cfg = { paths: { p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false } } } as unknown as IWidgetSvcConfig;
+    const pathGroup = (buildForm(cfg).formMaster.get('paths') as UntypedFormGroup).get('p') as UntypedFormGroup;
+    expect(pathGroup.get('path')!.disabled).toBe(true);
+    expect(pathGroup.get('source')!.disabled).toBe(false);
+  });
+
+  it('keeps the path control enabled for a choice (pathOptions) path so the select can write it', () => {
+    const cfg = { paths: { p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false, pathOptions: [{ label: 'A', path: 'self.x' }, { label: 'B', path: 'self.y' }] } } } as unknown as IWidgetSvcConfig;
+    const pathGroup = (buildForm(cfg).formMaster.get('paths') as UntypedFormGroup).get('p') as UntypedFormGroup;
+    expect(pathGroup.get('path')!.disabled).toBe(false);
+  });
+
+  it('leaves the path control editable for a generic configurable path (autocomplete non-regression)', () => {
+    const cfg = { paths: { numericPath: { description: 'N', path: null, source: 'default', pathType: 'number', isPathConfigurable: true } } } as unknown as IWidgetSvcConfig;
+    const pathGroup = (buildForm(cfg).formMaster.get('paths') as UntypedFormGroup).get('numericPath') as UntypedFormGroup;
+    expect(pathGroup.get('path')!.disabled).toBe(false);
+  });
+
+  it('hasConfigurablePaths is true when a path has choices even if the rest are fixed', () => {
+    const cfg = { paths: {
+      a: { description: 'A', path: 'self.a', source: 'default', pathType: 'number', isPathConfigurable: false },
+      b: { description: 'B', path: 'self.b', source: 'default', pathType: 'number', isPathConfigurable: false, pathOptions: [{ label: 'X', path: 'self.b' }, { label: 'Y', path: 'self.c' }] }
+    } } as unknown as IWidgetSvcConfig;
+    expect(buildForm(cfg).hasConfigurablePaths).toBe(true);
+  });
+
+  it('hasConfigurablePaths is false when every path is fixed with no choices (tab stays suppressed)', () => {
+    const cfg = { paths: {
+      a: { description: 'A', path: 'self.a', source: 'default', pathType: 'number', isPathConfigurable: false },
+      b: { description: 'B', path: 'self.b', source: 'default', pathType: 'number', isPathConfigurable: false }
+    } } as unknown as IWidgetSvcConfig;
+    expect(buildForm(cfg).hasConfigurablePaths).toBe(false);
+  });
 });
