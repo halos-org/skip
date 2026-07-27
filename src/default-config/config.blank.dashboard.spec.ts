@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DefaultDashboard } from './config.blank.dashboard';
 import { WidgetPositionComponent } from '../app/widgets/widget-position/widget-position.component';
+import { WidgetWindComponent } from '../app/widgets/widget-windsteer/widget-windsteer.component';
+import { WidgetRacesteerComponent } from '../app/widgets/widget-racesteer/widget-racesteer.component';
+import { WidgetWindTrendsChartComponent } from '../app/widgets/widget-windtrends-chart/widget-windtrends-chart.component';
 
 // The shipped seed is stamped at LATEST_APP_CONFIG_VERSION, so config migrations never run on a
 // fresh install/profile. A widget whose path shape drifts from its DEFAULT_CONFIG therefore ships
@@ -47,6 +50,63 @@ describe('DefaultDashboard seed', () => {
         expect(cfg?.dataTimeout).toBe(5);
         expect(typeof cfg?.updateInterval).toBe('number');
         expect(cfg?.updateInterval).toBeGreaterThan(0);
+      }
+    });
+  }
+
+  // The seed is stamped at LATEST, so migrations never touch it; the wind-steer seed must agree with
+  // its DEFAULT_CONFIG or a fresh install ships a value migrated users don't get. The seed had already
+  // drifted (angleTrueGround / speedOverGround) undetected before Effort B corrected it — guard every
+  // seeded slot against the default so it can't drift again. pathOptions is base-sourced (supplied by
+  // the runtime merge), so it is deliberately excluded here.
+  it('seeds widget-wind-steer with path + editability matching its DEFAULT_CONFIG', () => {
+    const seedWidgets = seededWidgetsOfType('widget-wind-steer');
+    expect(seedWidgets.length).toBeGreaterThan(0);
+    const defaults = WidgetWindComponent.DEFAULT_CONFIG.paths as Record<string, { path?: string; isPathConfigurable?: boolean }>;
+    for (const widget of seedWidgets) {
+      const paths = (widget.input?.widgetProperties?.config?.paths ?? {}) as Record<string, { path?: string; isPathConfigurable?: boolean }>;
+      for (const [slot, seedPath] of Object.entries(paths)) {
+        expect(seedPath.path, `seed wind-steer ${slot}.path`).toBe(defaults[slot]?.path);
+        expect(seedPath.isPathConfigurable, `seed wind-steer ${slot}.isPathConfigurable`).toBe(defaults[slot]?.isPathConfigurable);
+      }
+    }
+  });
+});
+
+// The choice/fixed slot shape is hand-declared per widget DEFAULT_CONFIG and mirrored by the
+// v17->v18 migration map. Guard it directly so a dropped pathOptions array (choice degrades to a free
+// picker) or a flipped isPathConfigurable (a fixed internal path becomes user-editable) fails the
+// build — widget-racesteer has no spec of its own, so this is its only DEFAULT_CONFIG guard.
+describe('wind-family path config shape', () => {
+  const WIND_SHAPE = [
+    { type: 'widget-wind-steer', config: WidgetWindComponent.DEFAULT_CONFIG,
+      choice: ['headingPath', 'trueWindAngle', 'courseOverGround'],
+      fixed: ['appWindAngle', 'appWindSpeed', 'trueWindSpeed', 'set', 'drift'] },
+    { type: 'widget-racesteer', config: WidgetRacesteerComponent.DEFAULT_CONFIG,
+      choice: ['headingPath', 'trueWindAngle', 'courseOverGround'],
+      fixed: ['appWindAngle', 'appWindSpeed', 'trueWindSpeed', 'nextWaypointBearing', 'set', 'drift'] },
+    { type: 'widget-windtrends-chart', config: WidgetWindTrendsChartComponent.DEFAULT_CONFIG,
+      choice: ['trueWindDirection'],
+      fixed: ['trueWindSpeed'] },
+  ];
+
+  for (const { type, config, choice, fixed } of WIND_SHAPE) {
+    it(`${type}: choice slots carry pathOptions and stay configurable`, () => {
+      const paths = config.paths as Record<string, { pathOptions?: unknown[]; isPathConfigurable?: boolean }>;
+      for (const slot of choice) {
+        expect(paths[slot], `${type}.${slot}`).toBeDefined();
+        expect(Array.isArray(paths[slot].pathOptions), `${type}.${slot}.pathOptions`).toBe(true);
+        expect(paths[slot].pathOptions!.length).toBeGreaterThanOrEqual(2);
+        expect(paths[slot].isPathConfigurable).toBe(true);
+      }
+    });
+
+    it(`${type}: fixed slots are non-editable with no choice`, () => {
+      const paths = config.paths as Record<string, { pathOptions?: unknown[]; isPathConfigurable?: boolean }>;
+      for (const slot of fixed) {
+        expect(paths[slot], `${type}.${slot}`).toBeDefined();
+        expect(paths[slot].isPathConfigurable).toBe(false);
+        expect(paths[slot].pathOptions).toBeUndefined();
       }
     });
   }

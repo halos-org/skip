@@ -342,6 +342,14 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
     expect(pathGroup.get('source')!.disabled).toBe(false);
   });
 
+  // The whole fixed-path design rests on submitConfig reading getRawValue() (not .value): a disabled
+  // path control is dropped by .value, so a fixed path would vanish from the saved config. Guard it.
+  it('retains a disabled fixed path value through submitConfig (getRawValue, not .value)', () => {
+    const cfg = { paths: { p: { description: 'X', path: 'self.fixed.path', source: 'default', pathType: 'number', isPathConfigurable: false } } } as unknown as IWidgetSvcConfig;
+    const raw = buildForm(cfg).formMaster.getRawValue() as { paths: { p: { path: string } } };
+    expect(raw.paths.p.path).toBe('self.fixed.path');
+  });
+
   it('keeps the path control enabled for a choice (pathOptions) path so the select can write it', () => {
     const cfg = { paths: { p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false, pathOptions: [{ label: 'A', path: 'self.x' }, { label: 'B', path: 'self.y' }] } } } as unknown as IWidgetSvcConfig;
     const pathGroup = (buildForm(cfg).formMaster.get('paths') as UntypedFormGroup).get('p') as UntypedFormGroup;
