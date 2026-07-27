@@ -557,6 +557,11 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     expect(runUpgradeSpy).toHaveBeenCalledWith(16);
   });
 
+  it('runs the config migration in the full app for an upgradeable v17 config (the wind-family path gate)', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 17 });
+    expect(runUpgradeSpy).toHaveBeenCalledWith(17);
+  });
+
   it('does NOT show the missing-shared-config create prompt under embed', async () => {
     const { toast, bootstrapIssue$ } = await render({ embed: true });
     toast.show.mockClear();
