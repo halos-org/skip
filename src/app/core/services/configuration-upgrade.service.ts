@@ -922,9 +922,9 @@ export class ConfigurationUpgradeService {
 
   /**
    * v17 -> v18: slim the wind-family widgets' path config. Reset each swept path (keyed by widget
-   * type via V18_WIND_PATH_DEFAULTS) to its canonical path + fixed/choice editability, discarding
-   * stored overrides (escape-hatch loss accepted). Keys are unchanged, so a field-patch is safe;
-   * pathOptions is base-sourced from DEFAULT_CONFIG and is not written here.
+   * type via V18_WIND_PATH_DEFAULTS) to its canonical path + fixed/choice editability + a default
+   * source, discarding stored overrides (escape-hatch loss accepted). Keys are unchanged, so a
+   * field-patch is safe; pathOptions is base-sourced from DEFAULT_CONFIG and is not written here.
    */
   private upgradeConfigV17toV18(config: IConfig): IConfig | null {
     try {
@@ -954,6 +954,9 @@ export class ConfigurationUpgradeService {
               pathCfg['path'] = target.path;
               pathCfg['isPathConfigurable'] = target.isPathConfigurable;
               if (target.description !== undefined) pathCfg['description'] = target.description;
+              // Reset the source pin too: a pin left over from the pre-reset path can point at a
+              // source bucket the new canonical path never fills, silently starving the widget.
+              pathCfg['source'] = 'default';
               rewritten++;
             }
           }
