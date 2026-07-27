@@ -62,6 +62,16 @@ describe('extractWidgetSchemas', () => {
     });
   });
 
+  it('conveys a choice slot\'s closed pathOptions set, and null for a fixed slot', () => {
+    const heading = bySelector('widget-wind-steer')?.pathSlots.find((s) => s.slot === 'headingPath');
+    expect(heading?.pathOptions).toEqual([
+      { label: 'True', path: 'self.navigation.headingTrue' },
+      { label: 'Magnetic', path: 'self.navigation.headingMagnetic' },
+    ]);
+    const appWind = bySelector('widget-wind-steer')?.pathSlots.find((s) => s.slot === 'appWindAngle');
+    expect(appWind?.pathOptions).toBeNull();
+  });
+
   it('gives non-record widgets no path slots', () => {
     expect(bySelector('widget-data-chart')?.pathSlots).toEqual([]);
     expect(bySelector('widget-boolean-switch')?.pathSlots).toEqual([]);

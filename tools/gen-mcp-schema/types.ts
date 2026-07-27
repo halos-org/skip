@@ -71,6 +71,8 @@ export interface PathSlot {
   pathType: string | null;
   /** Whether the user (or MCP) may set this slot's path. */
   isPathConfigurable: boolean;
+  /** Closed set of selectable {label, path} choices for a choice slot; null for a free or fixed path. */
+  pathOptions: { label: string; path: string }[] | null;
   /** Whether the widget needs this slot bound to work. */
   pathRequired: boolean;
   /** Default unit conversion (convertUnitTo), or null. */

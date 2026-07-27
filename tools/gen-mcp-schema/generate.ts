@@ -134,6 +134,7 @@ function extractPathSlots(config: Record<string, unknown>): PathSlot[] {
     source: asStringOrNull(raw.source),
     pathType: asStringOrNull(raw.pathType),
     isPathConfigurable: raw.isPathConfigurable === true,
+    pathOptions: asPathOptionsOrNull(raw.pathOptions),
     pathRequired: raw.pathRequired === true,
     defaultConvertUnitTo: asStringOrNull(raw.convertUnitTo),
     expectedSkUnit: asStringOrNull(raw.pathSkUnitsFilter),
@@ -142,6 +143,17 @@ function extractPathSlots(config: Record<string, unknown>): PathSlot[] {
 
 function asStringOrNull(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function asPathOptionsOrNull(value: unknown): { label: string; path: string }[] | null {
+  if (!Array.isArray(value)) return null;
+  const options = value
+    .filter((o): o is { label: string; path: string } =>
+      o != null && typeof o === 'object' &&
+      typeof (o as { label?: unknown }).label === 'string' &&
+      typeof (o as { path?: unknown }).path === 'string')
+    .map((o) => ({ label: o.label, path: o.path }));
+  return options.length > 0 ? options : null;
 }
 
 /**
