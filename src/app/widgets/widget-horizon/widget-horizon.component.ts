@@ -64,6 +64,10 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
     displayName: 'Horizon',
     filterSelfPaths: true,
     paths: {
+      // pathType stays 'number' though the path is the whole navigation.attitude object: the
+      // streams pipeline extracts the pitch/roll sub-field (observe below) BEFORE the number-type
+      // conversion runs, so it converts the scalar rad->deg. Switching to 'object' would skip that
+      // conversion and render radians. Both paths are fixed (isPathConfigurable:false) — no Paths tab.
       gaugePitchPath: {
         description: 'Attitude Pitch Data',
         path: 'self.navigation.attitude',
@@ -98,7 +102,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
       invertPitch: false,
       invertRoll: false
     },
-    enableTimeout: false,
+    enableTimeout: true,
     dataTimeout: 5
   };
 

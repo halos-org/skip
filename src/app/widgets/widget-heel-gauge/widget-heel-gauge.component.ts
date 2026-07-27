@@ -75,6 +75,10 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
     displayName: 'Heel',
     filterSelfPaths: true,
     paths: {
+      // pathType stays 'number' though the path is the whole navigation.attitude object: the
+      // streams pipeline extracts the 'roll' sub-field (observe below) BEFORE the number-type
+      // conversion runs, so it converts the scalar rad->deg. Switching to 'object' would skip that
+      // conversion and render radians. The path is fixed (isPathConfigurable:false) — no Paths tab.
       angle: {
         description: 'Heel / Roll Angle',
         path: 'self.navigation.attitude',
@@ -95,7 +99,7 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
     numInt: 2,
     numDecimal: 0,
     color: 'contrast',
-    enableTimeout: false,
+    enableTimeout: true,
     dataTimeout: 5
   };
 

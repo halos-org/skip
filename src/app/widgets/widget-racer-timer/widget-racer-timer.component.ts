@@ -54,7 +54,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
       dtsPath: { description: 'Distance to Start Line path, used to determine OCS', path: 'self.navigation.racing.distanceStartline', source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, convertUnitTo: 'm', showConvertUnitTo: false, showPathSkUnitsFilter: false, pathSkUnitsFilter: 'm', sampleTime: 500 }
     },
     color: 'contrast',
-    enableTimeout: false,
+    enableTimeout: true,
     dataTimeout: 5,
     ignoreZones: true
   };

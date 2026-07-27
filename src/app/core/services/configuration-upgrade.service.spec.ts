@@ -435,6 +435,144 @@ describe('ConfigurationUpgradeService', () => {
         expect(Object.keys(written.dashboards[1].configuration[0].input.widgetProperties.config.paths)).toEqual(['positionPath']);
     });
 
+    it('v15 upgrade resets heel-gauge/horizon paths to the fixed default, enables the timeout, and stamps v16', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 15 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    // the stranded boat shape: whole leaf, still configurable, with a stale unit override
+                    { input: { widgetProperties: { type: 'widget-heel-gauge', config: {
+                        paths: { angle: { path: 'self.navigation.attitude', pathType: 'number', isPathConfigurable: true, convertUnitTo: 'rad' } },
+                        enableTimeout: false, dataTimeout: 5
+                    } } } },
+                    // stale sub-field paths must be reset back to the whole leaf
+                    { input: { widgetProperties: { type: 'widget-horizon', config: {
+                        paths: {
+                            gaugePitchPath: { path: 'self.navigation.attitude.pitch', pathType: 'number', isPathConfigurable: true },
+                            gaugeRollPath: { path: 'self.navigation.attitude.roll', pathType: 'number', isPathConfigurable: true }
+                        },
+                        enableTimeout: false, dataTimeout: 5
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(15);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(16);
+        const heelWp = written.dashboards[0].configuration[0].input.widgetProperties;
+        expect(heelWp.config.paths.angle.path).toBe('self.navigation.attitude');
+        expect(heelWp.config.paths.angle.isPathConfigurable).toBe(false);
+        expect(heelWp.config.paths.angle.pathType).toBe('number'); // pipeline extracts sub-field then converts rad->deg
+        expect(heelWp.config.paths.angle.convertUnitTo).toBe('deg'); // stale 'rad' override discarded
+        // The Paths tab (and its timeout control) is gone, so the timeout defaults on.
+        expect(heelWp.config.enableTimeout).toBe(true);
+        expect(heelWp.config.dataTimeout).toBe(5);
+        const horizon = written.dashboards[0].configuration[1].input.widgetProperties.config.paths;
+        expect(horizon.gaugePitchPath.path).toBe('self.navigation.attitude');
+        expect(horizon.gaugeRollPath.path).toBe('self.navigation.attitude');
+        expect(horizon.gaugePitchPath.isPathConfigurable).toBe(false);
+        expect(horizon.gaugeRollPath.isPathConfigurable).toBe(false);
+        expect(written.dashboards[0].configuration[1].input.widgetProperties.config.enableTimeout).toBe(true);
+    });
+
+    it('v15 upgrade handles empty, array, and missing paths without throwing (still enables timeout, stamps v16)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 15 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-heel-gauge', config: { paths: {
+                        angle: { path: 'self.navigation.attitude.roll', pathType: 'number', isPathConfigurable: true }
+                    } } } } },
+                    // array-form paths
+                    { input: { widgetProperties: { type: 'widget-horizon', config: { paths: [
+                        { path: 'self.navigation.attitude', pathType: 'number', isPathConfigurable: true }
+                    ] } } } },
+                    // empty paths object — still enables the timeout, does not throw
+                    { input: { widgetProperties: { type: 'widget-heel-gauge', config: { paths: {} } } } },
+                    // a widget with no widgetProperties is skipped, not crashed on
+                    { input: {} }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(15);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(16);
+        const cfgs = written.dashboards[0].configuration;
+        expect(cfgs[0].input.widgetProperties.config.paths.angle.path).toBe('self.navigation.attitude');
+        expect(cfgs[1].input.widgetProperties.config.paths[0].isPathConfigurable).toBe(false);
+        // empty-paths widget still gets the timeout default and no throw
+        expect(cfgs[2].input.widgetProperties.config.enableTimeout).toBe(true);
+    });
+
+    it('v15 upgrade enables the timeout on racer widgets without resetting their (scalar) paths', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 15 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-racer-timer', config: {
+                        paths: { ttsPath: { path: 'self.navigation.racing.timeToStart', pathType: 'number', isPathConfigurable: false } },
+                        enableTimeout: false, dataTimeout: 5
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(15);
+
+        const wp = mockStorage.setConfig.mock.calls.at(-1)![2].dashboards[0].configuration[0].input.widgetProperties;
+        // Paths tab (and its timeout toggle) is suppressed for this all-fixed-path widget → timeout defaults on.
+        expect(wp.config.enableTimeout).toBe(true);
+        expect(wp.config.dataTimeout).toBe(5);
+        // Its scalar path is already fixed — left untouched (only attitude widgets get the path reset).
+        expect(wp.config.paths.ttsPath.path).toBe('self.navigation.racing.timeToStart');
+    });
+
+    it('v15 upgrade leaves a non-attitude widget untouched (scoped), still stamps v16', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 15 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-numeric', config: { paths: {
+                        numericPath: { path: 'self.navigation.speedOverGround', pathType: 'number', isPathConfigurable: true }
+                    } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(15);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(16);
+        const numeric = written.dashboards[0].configuration[0].input.widgetProperties.config.paths.numericPath;
+        expect(numeric.path).toBe('self.navigation.speedOverGround');
+        expect(numeric.isPathConfigurable).toBe(true);
+    });
+
+    it('v15 upgrade skips a slot that is not at version 15 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 16 },
+            theme: { themeName: '' },
+            dashboards: []
+        });
+
+        await service.runUpgrade(15);
+
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([

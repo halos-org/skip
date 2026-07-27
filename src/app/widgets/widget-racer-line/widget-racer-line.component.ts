@@ -57,7 +57,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     numDecimal: 0,
     ignoreZones: true,
     color: 'contrast',
-    enableTimeout: false,
+    enableTimeout: true,
     dataTimeout: 5,
     paths: {
       dtsPath: {

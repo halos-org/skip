@@ -162,6 +162,57 @@ describe('ModalWidgetComponent title composition (#180)', () => {
   });
 });
 
+// The Paths tab is suppressed when a widget has no user-configurable path (#416): all-fixed-path
+// widgets (heel-gauge/horizon) would otherwise show an empty/irrelevant tab.
+describe('ModalWidgetComponent Paths tab visibility (#416)', () => {
+  const unitsServiceStub: Pick<UnitsService, 'getConversionsForPath'> = {
+    getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }),
+  };
+  const appServiceStub: Pick<AppService, 'configurableThemeColors'> = { configurableThemeColors: [] };
+
+  beforeEach(() => TestBed.resetTestingModule());
+
+  function createComponentWithData(data: object): RootModalWidgetConfigComponent {
+    TestBed.configureTestingModule({
+      imports: [RootModalWidgetConfigComponent],
+      providers: [
+        { provide: UnitsService, useValue: unitsServiceStub },
+        { provide: AppService, useValue: appServiceStub },
+        { provide: MAT_DIALOG_DATA, useValue: data },
+        { provide: MatDialogRef, useValue: { close: vi.fn() } },
+      ],
+    });
+    ensureTestIconsReady();
+    return TestBed.createComponent(RootModalWidgetConfigComponent).componentInstance;
+  }
+
+  it('suppresses the Paths tab when every path is fixed (isPathConfigurable:false)', () => {
+    const component = createComponentWithData({ paths: {
+      angle: { path: 'self.navigation.attitude', pathType: 'number', isPathConfigurable: false }
+    } });
+    expect(component.hasConfigurablePaths).toBe(false);
+  });
+
+  it('shows the Paths tab when at least one path is user-configurable', () => {
+    const component = createComponentWithData({ paths: {
+      a: { path: 'self.foo', pathType: 'number', isPathConfigurable: false },
+      b: { path: 'self.bar', pathType: 'number', isPathConfigurable: true }
+    } });
+    expect(component.hasConfigurablePaths).toBe(true);
+  });
+
+  it('treats a path with no explicit isPathConfigurable flag as configurable', () => {
+    const component = createComponentWithData({ paths: { p: { path: 'self.foo', pathType: 'number' } } });
+    expect(component.hasConfigurablePaths).toBe(true);
+  });
+
+  it('keeps the tab for an array-form (multiChildCtrls) widget even with empty paths', () => {
+    // widget-boolean-switch / widget-zones-state-panel ship paths:[] and add paths via this tab.
+    const component = createComponentWithData({ paths: [], multiChildCtrls: [] });
+    expect(component.hasConfigurablePaths).toBe(true);
+  });
+});
+
 // Characterization of the two closed leaf shapes built reflectively by the widget-config
 // form generator: the multiChildCtrls control group and the array-mode path group. Locks the
 // exact control tree + required validators so the typed-factory refactor cannot drift them.

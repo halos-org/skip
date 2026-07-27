@@ -8,7 +8,7 @@
  *
  * Three distinct version spaces (all from src/app/core/constants/config-versions.const.ts):
  *  - applicationData URL path segment 11 (REMOTE_CONFIG_FILE_VERSION)
- *  - app.configVersion 15 (LATEST_APP_CONFIG_VERSION)
+ *  - app.configVersion 16 (LATEST_APP_CONFIG_VERSION)
  *  - connectionConfig.configVersion 13 (CONNECTION_CONFIG_VERSION)
  */
 export const SELF_URN = 'vessels.urn:mrn:signalk:uuid:11111111-1111-4111-8111-111111111111';
@@ -22,12 +22,12 @@ const DEFAULT_NOTIF = {
 };
 
 export function appConfig(extra = {}) {
-  // configVersion at LATEST (15): a genuine current config, so the boot skips
+  // configVersion at LATEST (16): a genuine current config, so the boot skips
   // ConfigurationUpgradeService's migration toast/reload entirely inside the
   // measurement window. Bump this in lockstep with LATEST_APP_CONFIG_VERSION, or
   // the boot triggers an upgrade+reload and the boot-assert fails.
   return {
-    configVersion: 15, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
+    configVersion: 16, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
     widgetHistoryDisabled: false,
     notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'Skip', ...extra,
   };
