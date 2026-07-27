@@ -23,6 +23,7 @@ const V13_MIGRATION_OUTPUT_VERSION = 13;
 // The v13 -> v14 transform output. Pinned to a fixed 14 for the same reason as the constants above.
 const V14_MIGRATION_OUTPUT_VERSION = 14;
 const V15_MIGRATION_OUTPUT_VERSION = 15;
+const V16_MIGRATION_OUTPUT_VERSION = 16;
 
 // SK-02 / #21: the delta parser stopped fabricating dotted child paths for compound leaves, so a
 // stored widget path pointing at a sub-field of one of these leaves must be rewritten to the whole
@@ -261,6 +262,30 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
+    } else if (version === 15) {
+      // Remote (Signal K) configs. v15 slots live in the same active file version as v11..v14.
+      try {
+        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+
+        for (const item of configsList) {
+          try {
+            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V16_MIGRATION_OUTPUT_VERSION}.`);
+            const migratedConfig = this.migrateOneAppVersion(config, 15);
+            if (!migratedConfig) continue; // skip if not a v15 slot
+
+            await this._storage.setConfig(item.scope, item.name, migratedConfig);
+          } catch (error) {
+            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
+          }
+        }
+        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
+        setTimeout(() => this._settings.reloadApp(), 1500);
+      } catch (error) {
+        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        this.upgrading.set(false);
+      }
+
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = {
@@ -391,6 +416,7 @@ export class ConfigurationUpgradeService {
       case 12: return this.upgradeConfigV12toV13(config);
       case 13: return this.upgradeConfigV13toV14(config);
       case 14: return this.upgradeConfigV14toV15(config);
+      case 15: return this.upgradeConfigV15toV16(config);
       default: return null;
     }
   }
@@ -688,6 +714,73 @@ export class ConfigurationUpgradeService {
       return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading v14->v15: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * v15 -> v16 (#416): widgets whose paths are all fixed (heel-gauge, horizon, racer-timer,
+   * racer-line) no longer show the widget-settings Paths tab — with it goes the data-timeout
+   * control, so those widgets default to a 5 s data timeout instead. heel-gauge/horizon additionally
+   * carried a stranded dead path picker (a stored entry left at `pathType: 'number'` +
+   * `isPathConfigurable: true`, which a number picker can't resolve against the object leaf — the
+   * bug #414 fixed for position; the v14->v15 step only rewrote position). This enables the timeout
+   * on all four types and, for the two attitude widgets, resets every path entry to its canonical
+   * fixed shape (`self.navigation.attitude`, `pathType: 'number'` so the pipeline's sub-field extract
+   * + rad->deg conversion still runs, `isPathConfigurable: false`, `convertUnitTo: 'deg'`), discarding
+   * stale stored overrides. Racer paths are already scalar/fixed, so only their timeout changes.
+   */
+  private upgradeConfigV15toV16(config: IConfig): IConfig | null {
+    try {
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 15) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v15 config. Skipping...`);
+        return null;
+      }
+
+      const ATTITUDE_WIDGET_TYPES = new Set(['widget-heel-gauge', 'widget-horizon']);
+      // All-fixed-path widgets whose Paths tab (and its timeout control) is now suppressed.
+      const TIMEOUT_DEFAULT_WIDGET_TYPES = new Set([
+        'widget-heel-gauge', 'widget-horizon', 'widget-racer-timer', 'widget-racer-line'
+      ]);
+      let rewritten = 0;
+      if (Array.isArray(config.dashboards)) {
+        for (const dash of config.dashboards) {
+          if (!dash || !Array.isArray(dash.configuration)) continue;
+          for (const widget of dash.configuration) {
+            const wp = (widget as { input?: { widgetProperties?: {
+              type?: unknown;
+              config?: { paths?: unknown; enableTimeout?: boolean; dataTimeout?: number };
+            } } })?.input?.widgetProperties;
+            if (!wp || typeof wp.type !== 'string' || !TIMEOUT_DEFAULT_WIDGET_TYPES.has(wp.type) || !wp.config) continue;
+            if (ATTITUDE_WIDGET_TYPES.has(wp.type)) {
+              const paths = wp.config.paths;
+              if (paths && typeof paths === 'object') {
+                for (const pathCfg of Object.values(paths as Record<string, Record<string, unknown>>)) {
+                  if (!pathCfg || typeof pathCfg !== 'object') continue;
+                  // Discard stale overrides — the fixed attitude path is not user-configurable.
+                  pathCfg.path = 'self.navigation.attitude';
+                  pathCfg.pathType = 'number';
+                  pathCfg.isPathConfigurable = false;
+                  pathCfg.convertUnitTo = 'deg';
+                  rewritten++;
+                }
+              }
+            }
+            // The Paths tab (and its timeout control) is gone — default the timeout on.
+            wp.config.enableTimeout = true;
+            wp.config.dataTimeout = 5;
+          }
+        }
+      }
+      if (rewritten) {
+        this.pushMsg(`[Upgrade] Reset ${rewritten} attitude path(s) to the fixed hidden default.`);
+      }
+
+      appConfig.configVersion = V16_MIGRATION_OUTPUT_VERSION;
+      return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
+    } catch (error) {
+      this.pushError(`[Upgrade Service] Error upgrading v15->v16: ${(error as Error).message}`);
       return null;
     }
   }

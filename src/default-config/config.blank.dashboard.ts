@@ -1325,7 +1325,7 @@ export const DefaultDashboard: Dashboard[] = [
               "numInt": 2,
               "numDecimal": 0,
               "color": "contrast",
-              "enableTimeout": false,
+              "enableTimeout": true,
               "dataTimeout": 5
             }
           }
@@ -1381,7 +1381,7 @@ export const DefaultDashboard: Dashboard[] = [
                 "invertPitch": false,
                 "invertRoll": false
               },
-              "enableTimeout": false,
+              "enableTimeout": true,
               "dataTimeout": 5
             }
           }

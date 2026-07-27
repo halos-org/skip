@@ -300,6 +300,17 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return this.configControl('filterSelfPaths') as FormControl<boolean>;
   }
 
+  /** True when the Paths tab has something to configure. Array-form widgets (multiChildCtrls) build
+   * their paths through that tab, so it must stay even while their path collection is empty. A
+   * non-array widget whose every path is fixed (isPathConfigurable:false) has nothing to edit there,
+   * so the tab is suppressed (its per-path picker was already hidden by path-control-config). */
+  get hasConfigurablePaths(): boolean {
+    if (this.widgetConfig?.multiChildCtrls !== undefined) return true;
+    const entries = Object.values((this.widgetConfig?.paths ?? {}) as Record<string, { isPathConfigurable?: boolean }>);
+    if (entries.length === 0) return false;
+    return entries.some(p => p?.isPathConfigurable !== false);
+  }
+
   get dataTimeoutToControl(): UntypedFormControl {
     return this.configControl('dataTimeout') as UntypedFormControl;
   }

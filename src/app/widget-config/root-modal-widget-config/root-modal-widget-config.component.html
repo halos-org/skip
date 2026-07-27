@@ -758,7 +758,7 @@
         </mat-tab>
       }
       <!-- Paths stuff -->
-      @if ((widgetConfig?.paths !== undefined)) {
+      @if ((widgetConfig?.paths !== undefined) && hasConfigurablePaths) {
         <mat-tab label="Paths">
           <div class="tab-content">
             <div>
