@@ -10,6 +10,7 @@ import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { MIN_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 import { WidgetBooleanSwitchComponent } from '../../widgets/widget-boolean-switch/widget-boolean-switch.component';
 import { WidgetZonesStatePanelComponent } from '../../widgets/widget-zones-state-panel/widget-zones-state-panel.component';
+import { WidgetAutopilotComponent } from '../../widgets/widget-autopilot/widget-autopilot.component';
 
 describe('ModalWidgetComponent', () => {
   let component: RootModalWidgetConfigComponent;
@@ -376,5 +377,25 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
       b: { description: 'B', path: 'self.b', source: 'default', pathType: 'number', isPathConfigurable: false }
     } } as unknown as IWidgetSvcConfig;
     expect(buildForm(cfg).hasConfigurablePaths).toBe(false);
+  });
+
+  // The decoupling is general, not wind-only (accepted): a non-wind mixed-path widget (autopilot has
+  // configurable heading paths alongside fixed internal state/mode/rudder paths) now exposes an
+  // editable Data Source on its fixed paths too, with only the `path` control disabled. Pin that so
+  // Effort C revisits it deliberately rather than a regression flipping it back.
+  it('autopilot (non-wind mixed-path): every path keeps an editable Source; fixed paths disable only path', () => {
+    const component = buildForm(WidgetAutopilotComponent.DEFAULT_CONFIG);
+    expect(component.hasConfigurablePaths).toBe(true);
+    const pathGroups = Object.values((component.formMaster.get('paths') as UntypedFormGroup).controls) as UntypedFormGroup[];
+    expect(pathGroups.length).toBeGreaterThan(0);
+    let sawFixed = false;
+    for (const g of pathGroups) {
+      expect(g.get('source')!.enabled).toBe(true);
+      if (g.get('isPathConfigurable')!.value === false) {
+        sawFixed = true;
+        expect(g.get('path')!.disabled).toBe(true);
+      }
+    }
+    expect(sawFixed).toBe(true); // autopilot does carry fixed internal paths
   });
 });
