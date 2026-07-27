@@ -14,6 +14,12 @@ import type { FormControl } from '@angular/forms';
  */
 
 
+/** Fallback display-update cadence (ms) applied when a widget declares no valid updateInterval. */
+export const DEFAULT_WIDGET_UPDATE_INTERVAL_MS = 1000;
+
+/** Minimum user-settable display-update cadence (ms); below this, repaint cost outweighs the benefit. */
+export const MIN_UPDATE_INTERVAL_MS = 100;
+
 export enum ControlType {
   toggle = 0,
   push = 1,
@@ -251,6 +257,13 @@ export interface IWidgetSvcConfig {
   enableTimeout?: boolean;
   /** Sets data stream no-data timeout notification in minutes */
   dataTimeout?: number;
+  /**
+   * The widget's display-update cadence, in milliseconds. This throttles how often the widget
+   * re-emits and repaints (an RxJS output sample of the live stream) to bound change-detection
+   * work — it does not affect how often Signal K sends data. One value applies to every path the
+   * widget observes. Absent, non-finite, or non-positive falls back to 1000 ms.
+   */
+  updateInterval?: number;
   /** Used by multiple Widget: number of fixed decimal places to display */
   numDecimal?: number;
   /** Used by multiple Widget: number of fixed Integer places to display */
@@ -272,14 +285,14 @@ export interface IWidgetSvcConfig {
    * ```typescript
    * const cfg: IWidgetSvcConfig = {
    *   supportAutomaticHistoricalSeries: false,
+   *   updateInterval: 1000,
    *   paths: {
    *     numericPath: {
    *       description: 'Speed',
    *       path: 'navigation.speedOverGround',
    *       source: null,
    *       pathType: 'number',
-   *       isPathConfigurable: true,
-   *       sampleTime: 1000
+   *       isPathConfigurable: true
    *     }
    *   }
    * };
@@ -585,22 +598,21 @@ export interface IDataHighlight {
  * ```typescript
  * // As part of a widget config object:
  * const widgetConfig: IWidgetSvcConfig = {
+ *   updateInterval: 1000,
  *   paths: {
  *     main: {
  *       description: 'Apparent Wind Angle',
  *       path: 'self.environment.wind.angleApparent',
  *       source: null,
  *       pathType: 'number',
- *       isPathConfigurable: true,
- *       sampleTime: 1000
+ *       isPathConfigurable: true
  *     },
  *     hidden: {
  *       description: 'Hidden Path',
  *       path: 'self.hidden.path',
  *       source: null,
  *       pathType: 'number',
- *       isPathConfigurable: false, // Not shown in UI or validated
- *       sampleTime: 1000
+ *       isPathConfigurable: false // Not shown in UI or validated
  *     }
  *   }
  * };
@@ -680,12 +692,6 @@ export interface IWidgetPath {
    * format configuration.
    */
   showConvertUnitTo?: boolean;
-  /**
-   * Required: Used to throttle/limit the path's Observer emitted values
-   * frequency and reduce Angular change detection cycles. Configure according
-   * to data type and human perception. Value in milliseconds.
-   */
-  sampleTime: number;
   /**
    * Optional: Suppress leading bootstrap `null` emissions until the first
    * non-null datapoint is observed for this subscription.

@@ -60,10 +60,10 @@ export class WidgetMultiStateSwitchComponent {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null,
         showConvertUnitTo: false,
-        convertUnitTo: null,
-        sampleTime: 500
+        convertUnitTo: null
       }
     },
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
     color: 'contrast',

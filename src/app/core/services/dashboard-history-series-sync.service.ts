@@ -345,7 +345,9 @@ export class DashboardHistorySeriesSyncService {
 
       const pathKey = this.slugify(path);
       const sourceKey = this.slugify(source ?? 'default');
-      const sampleTime = this.normalizeNumber(pathCfg.sampleTime);
+      // The auto history series samples at the widget's display-update cadence (per-path sampleTime
+      // was removed in favour of a single widget-level updateInterval).
+      const sampleTime = this.normalizeNumber(cfg?.updateInterval);
 
       seriesBySignature.set(signature, {
         seriesId: `${widgetUuid}:auto:${pathKey}:${sourceKey}`,

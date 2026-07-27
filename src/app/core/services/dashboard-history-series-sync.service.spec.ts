@@ -20,7 +20,6 @@ const WIND_DIRECTION_SLOT: IWidgetPath = {
     pathType: 'number',
     isPathConfigurable: true,
     pathRequired: false,
-    sampleTime: 1000,
 };
 const WIND_SPEED_SLOT: IWidgetPath = {
     description: 'True Wind Speed',
@@ -29,11 +28,11 @@ const WIND_SPEED_SLOT: IWidgetPath = {
     pathType: 'number',
     isPathConfigurable: true,
     pathRequired: false,
-    sampleTime: 1000,
 };
 const WINDTRENDS_DEFAULT_CONFIG: IWidgetSvcConfig = {
     filterSelfPaths: true,
     color: 'contrast',
+    updateInterval: 1000,
     timeScale: 'Last 30 Minutes',
     paths: {
         trueWindDirection: WIND_DIRECTION_SLOT,
@@ -448,8 +447,7 @@ describe('DashboardHistorySeriesSyncService', () => {
                         path: 'navigation.speedThroughWater',
                         source: null,
                         pathType: 'number',
-                        isPathConfigurable: true,
-                        sampleTime: 1000
+                        isPathConfigurable: true
                     }
                 }
             }
@@ -468,22 +466,21 @@ describe('DashboardHistorySeriesSyncService', () => {
                 supportAutomaticHistoricalSeries: true,
                 timeScale: 'minute',
                 period: 30,
+                updateInterval: 1000,
                 paths: {
                     gaugePitchPath: {
                         description: 'Pitch',
                         path: 'self.navigation.attitude.pitch',
                         source: 'default',
                         pathType: 'number',
-                        isPathConfigurable: true,
-                        sampleTime: 1000
+                        isPathConfigurable: true
                     },
                     gaugeRollPath: {
                         description: 'Roll',
                         path: 'self.navigation.attitude.roll',
                         source: 'default',
                         pathType: 'number',
-                        isPathConfigurable: true,
-                        sampleTime: 1000
+                        isPathConfigurable: true
                     }
                 }
             };

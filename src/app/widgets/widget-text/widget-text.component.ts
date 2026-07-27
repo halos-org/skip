@@ -29,11 +29,11 @@ export class WidgetTextComponent implements AfterViewInit, OnInit, OnDestroy {
         path: null,
         source: null,
         pathType: "string",
-        isPathConfigurable: true,
-        sampleTime: 500
+        isPathConfigurable: true
       }
     },
     color: 'contrast',
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5
   };

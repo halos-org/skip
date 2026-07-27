@@ -38,6 +38,7 @@ export class WidgetBooleanSwitchComponent implements OnDestroy {
     paths: [],
     enableTimeout: false,
     dataTimeout: 5,
+    updateInterval: 1000,
     color: 'contrast',
     zonesOnlyPaths: false,
     putEnable: true,

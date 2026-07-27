@@ -2,7 +2,7 @@ import { Component, OnInit, OnChanges, SimpleChange, input, inject, DestroyRef }
 import { DataService } from '../../core/services/data.service';
 import { IPathMetaData } from "../../core/interfaces/app-interfaces";
 import { IConversionPathList, ISkBaseUnit, UnitsService } from '../../core/services/units.service';
-import { UntypedFormGroup, UntypedFormControl, Validators, ValidatorFn, AbstractControl, ValidationErrors, FormsModule, ReactiveFormsModule, FormControl, FormGroup } from '@angular/forms';
+import { UntypedFormGroup, ValidatorFn, AbstractControl, ValidationErrors, FormsModule, ReactiveFormsModule, FormControl, FormGroup } from '@angular/forms';
 import { debounce, map, startWith } from 'rxjs/operators';
 import { BehaviorSubject, timer } from 'rxjs'
 import { MatSelect } from '@angular/material/select';
@@ -113,12 +113,6 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
       this.disablePathFields();
     }
 
-    // If SampleTime control is not present because the path property is missing, add it.
-    if (!pathFormGroup.controls['sampleTime']) {
-      pathFormGroup.addControl('sampleTime', new UntypedFormControl('500', Validators.required));
-      (pathFormGroup.controls['sampleTime'] as AbstractControl).updateValueAndValidity({ onlySelf: true, emitEvent: false });
-    }
-
     // subscribe to path formControl changes
     pathFormGroup.controls['path'].valueChanges.pipe(
       debounce(value => value === '' ? timer(0) : timer(350)),
@@ -206,7 +200,6 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
   private enableFormFields(setValues?: boolean): void {
     const pathObject = this._data.getPathObject(this.pathFormGroup().controls['path'].value);
     if (pathObject != null) {
-      this.pathFormGroup().controls['sampleTime'].enable({onlySelf: false});
       const pathFormGroup = this.pathFormGroup();
       if (pathFormGroup.controls['pathType'].value == 'number') { // convertUnitTo control not present unless pathType is number
         this.unitList = this._units.getConversionsForPath(pathFormGroup.controls['path'].value); // array of Group or Groups: "angle", "speed", etc...
@@ -235,7 +228,6 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
   private disablePathFields(): void {
     this.pathFormGroup().controls['source'].reset('', {onlySelf: true});
     this.pathFormGroup().controls['source'].disable({onlySelf: false});
-    this.pathFormGroup().controls['sampleTime'].disable({onlySelf: false});
     const pathFormGroup = this.pathFormGroup();
     if (pathFormGroup.controls['pathType'].value == 'number') { // convertUnitTo control not present unless pathType is number
       pathFormGroup.controls['convertUnitTo'].reset('', {onlySelf: true});

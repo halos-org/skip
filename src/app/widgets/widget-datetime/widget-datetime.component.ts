@@ -33,13 +33,13 @@ export class WidgetDatetimeComponent implements AfterViewInit, OnDestroy {
         path: null,
         source: null,
         pathType: 'Date',
-        isPathConfigurable: true,
-        sampleTime: 1000
+        isPathConfigurable: true
       }
     },
     dateFormat: 'dd/MM/yyyy HH:mm:ss',
     dateTimezone: 'Atlantic/Azores',
     color: 'contrast',
+    updateInterval: 1000,
     enableTimeout: false,
     dataTimeout: 5
   };

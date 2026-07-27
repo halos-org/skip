@@ -55,8 +55,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
         isPathConfigurable: true,
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: null,
-        convertUnitTo: 'unitless',
-        sampleTime: 500
+        convertUnitTo: 'unitless'
       }
     },
     displayScale: { lower: 0, upper: 100, type: 'linear' },
@@ -70,6 +69,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     numInt: 1,
     numDecimal: 0,
     color: 'contrast',
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
     ignoreZones: false
@@ -320,7 +320,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     opt.ticksWidth = ticks ? (enableNeedle ? (isVertical ? 15 : 10) : 10) : 0;
     opt.ticksPadding = ticks ? (isVertical ? (enableNeedle ? 0 : 5) : (enableNeedle ? 9 : 8)) : 0;
     opt.tickSide = 'left';
-    Object.assign(opt, gaugeAnimationOptions(this.animationEnabled())); opt.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
+    Object.assign(opt, gaugeAnimationOptions(this.animationEnabled())); opt.animationDuration = gaugeAnimationDurationMs(cfg.updateInterval ?? 500);
     opt.highlights = []; opt.highlightsWidth = cfg.gauge?.highlightsWidth;
     // pre-populate highlights if already available
     const h = this.highlights();

@@ -41,8 +41,7 @@ export class WidgetSteelGaugeComponent {
         isPathConfigurable: true,
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: null,
-        convertUnitTo: 'unitless',
-        sampleTime: 500
+        convertUnitTo: 'unitless'
       }
     },
     displayScale: { type: 'linear', lower: 0, upper: 100 },
@@ -56,6 +55,7 @@ export class WidgetSteelGaugeComponent {
       digitalMeter: false
     },
     numDecimal: 2,
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
     ignoreZones: false

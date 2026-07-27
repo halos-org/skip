@@ -53,7 +53,6 @@ describe('PathControlConfigComponent', () => {
       showPathSkUnitsFilter: new UntypedFormControl(false),
       pathSkUnitsFilter: new UntypedFormControl(null),
       convertUnitTo: new UntypedFormControl('knots'),
-      sampleTime: new UntypedFormControl(500),
       pathRequired: new UntypedFormControl(true)
     });
     fixture.componentRef.setInput('pathFormGroup', pathForm);

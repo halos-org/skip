@@ -1,7 +1,7 @@
 import { Directive, DestroyRef, OnDestroy, inject, signal } from '@angular/core';
 import { DataService, IPathUpdate } from '../services/data.service';
 import { UnitsService } from '../services/units.service';
-import { IWidgetSvcConfig } from '../interfaces/widgets-interface';
+import { IWidgetSvcConfig, DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interface';
 import { Observable, Observer, Subject, delayWhen, filter, map, retryWhen, sampleTime, tap, throwError, timeout, timer, takeUntil, take, merge, combineLatest, distinctUntilChanged, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -23,7 +23,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
  * - Automatic unit conversion for numeric paths via UnitsService
  * - Optional timeout + retry handling (enableTimeout, dataTimeout config)
  * - Path validation: null/undefined/empty paths trigger cleanup
- * - Signature tracking: path + pathType + sampleTime + convertUnitTo + source + bootstrap null policy
+ * - Signature tracking: per-path (path + pathType + convertUnitTo + source + bootstrap null policy); the widget-level update cadence lives in the root signature
  *
  * Usage Pattern:
  * - Call observe(pathKey, callback) once per required path
@@ -59,10 +59,10 @@ export class WidgetStreamsDirective implements OnDestroy {
     };
   }
 
-  private computePathSignature(pathCfg: { path: string; pathType: string; sampleTime?: number; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }): string {
+  private computePathSignature(pathCfg: { path: string; pathType: string; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }): string {
     const normalizedPath = this.normalizePath(pathCfg.path) ?? '';
     const src = (pathCfg.source?.trim() || 'default');
-    return [normalizedPath, pathCfg.pathType, pathCfg.sampleTime, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0'].join('|');
+    return [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0'].join('|');
   }
 
   private computeBaseKey(path: string, source?: string): string {
@@ -79,7 +79,9 @@ export class WidgetStreamsDirective implements OnDestroy {
 
   private computeRootSignature(cfg: IWidgetSvcConfig | undefined): string {
     if (!cfg) return 'none';
-    return `timeout:${cfg.enableTimeout ? '1' : '0'}:${cfg.dataTimeout ?? ''}`;
+    // updateInterval is widget-level, so it lives in the root signature: a cadence change rebuilds
+    // every path's pipeline (the base observable is reused; only the sampling stage is rebuilt).
+    return `timeout:${cfg.enableTimeout ? '1' : '0'}:${cfg.dataTimeout ?? ''}|update:${cfg.updateInterval ?? ''}`;
   }
 
   private ensureStreamsMap(): void {
@@ -113,7 +115,7 @@ export class WidgetStreamsDirective implements OnDestroy {
   }
 
   /** Create (or reuse) base observable, assemble pipeline, and subscribe with diff-aware replacement. */
-  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; sampleTime?: number; convertUnitTo?: string; showConvertUnitTo?: boolean; source?: string; suppressBootstrapNull?: boolean }, subField?: string): void {
+  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; convertUnitTo?: string; showConvertUnitTo?: boolean; source?: string; suppressBootstrapNull?: boolean }, subField?: string): void {
     const normalizedPath = this.normalizePath(pathCfg.path);
     if (!normalizedPath) {
       const existing = this.subscriptions.get(pathName);
@@ -132,7 +134,7 @@ export class WidgetStreamsDirective implements OnDestroy {
     const currentBaseKey = this.baseSignatures.get(pathName);
     if (!this.streams!.has(pathName) || currentBaseKey !== baseKey) {
       // Base identity (path+source) changed: release the old registration before overwriting so the
-      // superseded (path, source) is not leaked. Never reached on a sampleTime/unit/timeout change —
+      // superseded (path, source) is not leaked. Never reached on a cadence/unit/timeout change —
       // those keep baseKey identical and only rebuild the RxJS pipeline downstream.
       this.releaseBase(pathName);
       const handle = this.dataService.acquirePath(normalizedPath, effectiveSource);
@@ -150,8 +152,8 @@ export class WidgetStreamsDirective implements OnDestroy {
 
     const pathType = pathCfg.pathType;
     const suppressBootstrapNull = !!pathCfg.suppressBootstrapNull;
-    let sample = Number(pathCfg.sampleTime);
-    if (!Number.isFinite(sample) || sample <= 0) sample = 1000;
+    let sample = Number(cfg.updateInterval);
+    if (!Number.isFinite(sample) || sample <= 0) sample = DEFAULT_WIDGET_UPDATE_INTERVAL_MS;
     // Structural paths keep their widget-owned fixed unit; display paths follow the server's
     // resolved measure (which can change when displayUnits meta arrives after first subscribe).
     const isStructural = pathCfg.showConvertUnitTo === false;
@@ -296,8 +298,8 @@ export class WidgetStreamsDirective implements OnDestroy {
    * Called automatically by Host2 when widget config updates.
    *
    * Behavior:
-  * - Compares path signatures (path + pathType + sampleTime + convertUnitTo + source + bootstrap null policy)
-   * - Compares root signature (timeout settings: enableTimeout + dataTimeout)
+  * - Compares path signatures (path + pathType + convertUnitTo + source + bootstrap null policy)
+   * - Compares root signature (widget-level settings: enableTimeout + dataTimeout + updateInterval)
    * - Only rebuilds subscriptions for paths with changed signatures
    * - Removes subscriptions for deleted paths
    * - Preserves unchanged subscriptions for performance
@@ -383,7 +385,7 @@ export class WidgetStreamsDirective implements OnDestroy {
    * - Subsequent calls with same callback are no-op (idempotent)
    * - Different callback for same path replaces the previous registration
    * - Invalid paths (null/empty) clear any existing subscription
-  * - Pipeline rebuilds automatically when path config signature changes. Signature is made of: path, pathType, source, sampleTime, convertUnitTo, suppressBootstrapNull
+  * - Pipeline rebuilds automatically when the path signature changes (path, pathType, source, convertUnitTo, suppressBootstrapNull) or the widget-level update cadence changes
    *
    * Lifecycle / Cleanup:
    * - Subscriptions auto-cleanup on directive destroy

@@ -7,6 +7,9 @@ import { IConversionPathList, UnitsService } from '../../core/services/units.ser
 import { AppService } from '../../core/services/app-service';
 import { ensureTestIconsReady } from '../../../test-helpers/icon-test-utils';
 import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+import { MIN_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
+import { WidgetBooleanSwitchComponent } from '../../widgets/widget-boolean-switch/widget-boolean-switch.component';
+import { WidgetZonesStatePanelComponent } from '../../widgets/widget-zones-state-panel/widget-zones-state-panel.component';
 
 describe('ModalWidgetComponent', () => {
   let component: RootModalWidgetConfigComponent;
@@ -243,8 +246,7 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
         isPathConfigurable: true,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null,
-        convertUnitTo: null,
-        sampleTime: 500
+        convertUnitTo: null
       }
     ]
   };
@@ -283,29 +285,51 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
     });
   });
 
-  it('builds each paths-array entry with source/sampleTime required and other keys plain', () => {
+  it('builds each paths-array entry with source required and other keys plain', () => {
     const component = buildForm(multiControlConfig);
     const pathsArray = component.formMaster.get('paths') as UntypedFormArray;
     expect(pathsArray.length).toBe(1);
 
     const pathGroup = pathsArray.at(0) as UntypedFormGroup;
-    ['description', 'path', 'source', 'pathType', 'zonesOnlyPaths', 'supportsPut', 'isPathConfigurable', 'showPathSkUnitsFilter', 'pathSkUnitsFilter', 'convertUnitTo', 'sampleTime'].forEach(key => {
+    ['description', 'path', 'source', 'pathType', 'zonesOnlyPaths', 'supportsPut', 'isPathConfigurable', 'showPathSkUnitsFilter', 'pathSkUnitsFilter', 'convertUnitTo'].forEach(key => {
       expect(pathGroup.get(key)).not.toBeNull();
     });
 
     const source = pathGroup.get('source') as UntypedFormControl;
-    const sampleTime = pathGroup.get('sampleTime') as UntypedFormControl;
     const path = pathGroup.get('path') as UntypedFormControl;
 
     expect(source.hasValidator(Validators.required)).toBe(true);
-    expect(sampleTime.hasValidator(Validators.required)).toBe(true);
     expect(path.hasValidator(Validators.required)).toBe(false);
 
     source.setValue(null);
-    sampleTime.setValue(null);
     path.setValue(null);
     expect(source.hasError('required')).toBe(true);
-    expect(sampleTime.hasError('required')).toBe(true);
     expect(path.hasError('required')).toBe(false);
+  });
+
+  it('builds the widget-level updateInterval control as required and floored at MIN_UPDATE_INTERVAL_MS', () => {
+    const component = buildForm({ ...multiControlConfig, updateInterval: 1000 } as IWidgetSvcConfig);
+    const ctrl = component.updateIntervalToControl;
+    expect(ctrl).toBeTruthy();
+    expect(ctrl.hasValidator(Validators.required)).toBe(true);
+    ctrl.setValue(MIN_UPDATE_INTERVAL_MS - 1);
+    expect(ctrl.hasError('min')).toBe(true);
+    ctrl.setValue(1000);
+    expect(ctrl.valid).toBe(true);
+  });
+
+  // Regression (#430): the Paths tab renders for any multiChildCtrls widget and binds a REQUIRED
+  // updateInterval control; a widget whose DEFAULT_CONFIG omits updateInterval yields a null control
+  // and paths-options binds [formControl]=null, throwing on render. Prove the shipped array-form
+  // widgets carry it, exercised through the real form-builder.
+  it('array-form widget DEFAULT_CONFIGs carry updateInterval so the Paths tab never binds a null control', () => {
+    for (const cfg of [WidgetBooleanSwitchComponent.DEFAULT_CONFIG, WidgetZonesStatePanelComponent.DEFAULT_CONFIG]) {
+      expect(typeof cfg.updateInterval).toBe('number');
+      expect(cfg.updateInterval as number).toBeGreaterThan(0);
+    }
+    // Exercise the real form-builder for one array-form widget: the control must resolve non-null
+    // (buildForm instantiates TestBed, so only one build per test).
+    const component = buildForm(WidgetBooleanSwitchComponent.DEFAULT_CONFIG);
+    expect(component.updateIntervalToControl).not.toBeNull();
   });
 });

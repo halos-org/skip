@@ -59,6 +59,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     color: 'contrast',
     enableTimeout: true,
     dataTimeout: 5,
+    updateInterval: 500,
     paths: {
       dtsPath: {
         description: 'Distance to Start Line',
@@ -69,8 +70,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: 'm',
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: 'm',
-        sampleTime: 500
+        pathSkUnitsFilter: 'm'
       },
       lineLengthPath: {
         description: 'Length of the start line',
@@ -81,8 +81,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: 'm',
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: 'm',
-        sampleTime: 1000
+        pathSkUnitsFilter: 'm'
       },
       lineBiasPath: {
         description: 'Bias of the start line to starboard end',
@@ -93,8 +92,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: 'm',
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: 'm',
-        sampleTime: 1000
+        pathSkUnitsFilter: 'm'
       },
       startLineNamePath: {
         description: 'The current named start line',
@@ -105,8 +103,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: null,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: null,
-        sampleTime: 1000
+        pathSkUnitsFilter: null
       },
       linesPath: {
         description: 'The known named lines',
@@ -117,8 +114,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: null,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: null,
-        sampleTime: 1000
+        pathSkUnitsFilter: null
       },
       ttlPath: {
         description: 'Time to sail to the start line in seconds',
@@ -130,8 +126,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         convertUnitTo: 's',
         showConvertUnitTo: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 's',
-        sampleTime: 500
+        pathSkUnitsFilter: 's'
       },
       ttbPath: {
         description: 'Time to delay before sailing to the start line in seconds',
@@ -143,8 +138,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         convertUnitTo: 's',
         showConvertUnitTo: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 's',
-        sampleTime: 500
+        pathSkUnitsFilter: 's'
       },
     }
   };

@@ -36,8 +36,7 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null,
         showConvertUnitTo: false,
-        supportsPut: true,
-        sampleTime: 500
+        supportsPut: true
       }
     },
     displayScale: {
@@ -45,6 +44,7 @@ export class WidgetSliderComponent implements OnInit, OnDestroy {
       upper: 1,
       type: 'linear'
     },
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
     color: 'contrast'

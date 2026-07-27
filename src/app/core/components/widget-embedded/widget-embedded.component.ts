@@ -63,10 +63,10 @@ interface WidgetViewComponentBase { defaultConfig?: IWidgetSvcConfig }
  *           path: 'navigation.course.crossTrackError',
  *           pathType: 'number',
  *           convertUnitTo: 'nm',
- *           sampleTime: 1000,
  *           isPathConfigurable: false
  *         }
  *       },
+ *       updateInterval: 1000,
  *       numDecimal: 2
  *     }
  *   };

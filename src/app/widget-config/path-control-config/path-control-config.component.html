@@ -88,17 +88,6 @@
           </mat-select>
         </mat-form-field>
       </div>
-      @if (!pathFormGroup().value.zonesOnlyPaths) {
-        <div class="sampleTimeField">
-          <mat-form-field class="fields" appearance="outline" floatLabel="always">
-            <mat-label>Sample Time</mat-label>
-            <input matInput type="number"
-              placeholder="Sample time in milliseconds"
-              formControlName="sampleTime"
-              required>
-          </mat-form-field>
-        </div>
-      }
     </div>
   </div>
 }

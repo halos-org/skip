@@ -51,7 +51,7 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
   // Ready flag after initial frame to enable CSS transitions if needed
   protected readonly ready = signal(false);
   protected readonly pointerTransition = computed(() => {
-    const ms = this.runtime.options()?.paths?.['angle']?.sampleTime ?? 1000;
+    const ms = this.runtime.options()?.updateInterval ?? 1000;
     const duration = Math.max(100, ms * 0.95);
     return `transform ${duration}ms ease-in-out`;
   });
@@ -87,7 +87,6 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
         isPathConfigurable: false,
         convertUnitTo: 'deg',
         showConvertUnitTo: false,
-        sampleTime: 1000,
         pathRequired: true
       }
     },
@@ -99,6 +98,7 @@ export class WidgetHeelGaugeComponent implements AfterViewInit {
     numInt: 2,
     numDecimal: 0,
     color: 'contrast',
+    updateInterval: 1000,
     enableTimeout: true,
     dataTimeout: 5
   };

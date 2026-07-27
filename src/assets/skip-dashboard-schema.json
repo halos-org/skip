@@ -541,7 +541,7 @@
   },
   "meta": {
     "configFileVersion": 11,
-    "configVersion": 16,
+    "configVersion": 17,
     "schemaVersion": 1,
     "skipVersion": "1.0.4"
   },
@@ -684,7 +684,6 @@
             "isPathConfigurable": false,
             "path": "self.steering.autopilot.engaged",
             "pathType": "boolean",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -694,7 +693,6 @@
             "isPathConfigurable": false,
             "path": "self.steering.autopilot.mode",
             "pathType": "string",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -704,7 +702,6 @@
             "isPathConfigurable": false,
             "path": "self.steering.autopilot.state",
             "pathType": "string",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -715,7 +712,6 @@
             "path": "self.steering.autopilot.target.headingMagnetic",
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -727,7 +723,6 @@
             "path": "self.steering.autopilot.target.windAngleApparent",
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -739,7 +734,6 @@
             "path": "self.steering.autopilot.target",
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -752,7 +746,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": true,
             "source": "default"
@@ -765,7 +758,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -778,7 +770,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -790,7 +781,6 @@
             "path": "self.steering.rudderAngle",
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -803,7 +793,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -816,13 +805,13 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
         },
-        "supportAutomaticHistoricalSeries": false
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 500
       },
       "defaultHeight": 10,
       "defaultWidth": 4,
@@ -840,7 +829,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "string",
-          "sampleTime": 500,
           "slot": "autopilotState",
           "source": "default"
         },
@@ -852,7 +840,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "string",
-          "sampleTime": 500,
           "slot": "autopilotMode",
           "source": "default"
         },
@@ -864,7 +851,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "boolean",
-          "sampleTime": 500,
           "slot": "autopilotEngaged",
           "source": "default"
         },
@@ -876,7 +862,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "autopilotV2Target",
           "source": "default"
         },
@@ -888,7 +873,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "autopilotTargetHeading",
           "source": "default"
         },
@@ -900,7 +884,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "autopilotTargetWindHeading",
           "source": "default"
         },
@@ -912,7 +895,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "rudderAngle",
           "source": "default"
         },
@@ -924,7 +906,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "courseXte",
           "source": "default"
         },
@@ -936,7 +917,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "headingMag",
           "source": "default"
         },
@@ -948,7 +928,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "headingTrue",
           "source": "default"
         },
@@ -960,7 +939,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "windAngleApparent",
           "source": "default"
         },
@@ -972,7 +950,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "windAngleTrueWater",
           "source": "default"
         }
@@ -1019,6 +996,7 @@
         "putEnable": true,
         "putMomentary": false,
         "showLabel": true,
+        "updateInterval": 1000,
         "zonesOnlyPaths": false
       },
       "defaultHeight": 6,
@@ -1114,10 +1092,10 @@
             "isPathConfigurable": true,
             "path": null,
             "pathType": "Date",
-            "sampleTime": 1000,
             "source": null
           }
-        }
+        },
+        "updateInterval": 1000
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1135,7 +1113,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "Date",
-          "sampleTime": 1000,
           "slot": "gaugePath",
           "source": null
         }
@@ -1189,14 +1166,14 @@
             "path": null,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": null,
             "suppressBootstrapNull": true
           }
         },
-        "supportAutomaticHistoricalSeries": true
+        "supportAutomaticHistoricalSeries": true,
+        "updateInterval": 500
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1214,7 +1191,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "gaugePath",
           "source": null
         }
@@ -1255,13 +1231,13 @@
             "path": null,
             "pathSkUnitsFilter": null,
             "pathType": "number",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": true,
             "source": null,
             "suppressBootstrapNull": true
           }
         },
-        "supportAutomaticHistoricalSeries": true
+        "supportAutomaticHistoricalSeries": true,
+        "updateInterval": 500
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1279,7 +1255,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "gaugePath",
           "source": null
         }
@@ -1323,13 +1298,13 @@
             "path": null,
             "pathSkUnitsFilter": null,
             "pathType": "number",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": true,
             "source": null,
             "suppressBootstrapNull": true
           }
         },
-        "supportAutomaticHistoricalSeries": true
+        "supportAutomaticHistoricalSeries": true,
+        "updateInterval": 500
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1347,7 +1322,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "gaugePath",
           "source": null
         }
@@ -1388,12 +1362,12 @@
             "path": null,
             "pathSkUnitsFilter": null,
             "pathType": "number",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": true,
             "source": null
           }
         },
-        "supportAutomaticHistoricalSeries": true
+        "supportAutomaticHistoricalSeries": true,
+        "updateInterval": 500
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1411,7 +1385,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "gaugePath",
           "source": null
         }
@@ -1444,12 +1417,12 @@
             "path": "self.navigation.attitude",
             "pathRequired": true,
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "source": "default"
           }
         },
-        "supportAutomaticHistoricalSeries": false
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 1000
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1467,7 +1440,6 @@
           "isPathConfigurable": false,
           "pathRequired": true,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "angle",
           "source": "default"
         }
@@ -1518,7 +1490,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -1531,13 +1502,13 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
         },
-        "supportAutomaticHistoricalSeries": false
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 1000
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1555,7 +1526,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "gaugePitchPath",
           "source": "default"
         },
@@ -1567,7 +1537,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "gaugeRollPath",
           "source": "default"
         }
@@ -1658,14 +1627,14 @@
             "pathRequired": true,
             "pathSkUnitsFilter": null,
             "pathType": "multiple",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": null,
             "supportsPut": true
           }
         },
-        "showLabel": true
+        "showLabel": true,
+        "updateInterval": 500
       },
       "defaultHeight": 4,
       "defaultWidth": 4,
@@ -1683,7 +1652,6 @@
           "isPathConfigurable": true,
           "pathRequired": true,
           "pathType": "multiple",
-          "sampleTime": 500,
           "slot": "controlPath",
           "source": null
         }
@@ -1712,7 +1680,6 @@
             "path": null,
             "pathSkUnitsFilter": null,
             "pathType": "number",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": true,
             "source": null,
             "suppressBootstrapNull": true
@@ -1722,6 +1689,7 @@
         "showMin": false,
         "showMiniChart": false,
         "supportAutomaticHistoricalSeries": true,
+        "updateInterval": 500,
         "verticalChart": false,
         "yScaleMax": 10,
         "yScaleMin": 0
@@ -1742,7 +1710,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "numericPath",
           "source": null
         }
@@ -1767,12 +1734,12 @@
             "path": "self.navigation.position",
             "pathSkUnitsFilter": null,
             "pathType": "object",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
         },
-        "supportAutomaticHistoricalSeries": false
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 500
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -1790,7 +1757,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "object",
-          "sampleTime": 500,
           "slot": "positionPath",
           "source": "default"
         }
@@ -1819,7 +1785,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m",
             "pathType": "number",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": true,
             "source": "default"
           },
@@ -1831,7 +1796,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m",
             "pathType": "number",
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": true,
             "source": "default"
           },
@@ -1843,7 +1807,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m",
             "pathType": "number",
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": true,
             "source": "default"
           },
@@ -1855,7 +1818,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": null,
             "pathType": null,
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -1867,7 +1829,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": null,
             "pathType": "string",
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -1879,7 +1840,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "s",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -1892,14 +1852,14 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "s",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
         },
         "playBeeps": true,
-        "supportAutomaticHistoricalSeries": false
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 500
       },
       "defaultHeight": 4,
       "defaultWidth": 4,
@@ -1917,7 +1877,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "dtsPath",
           "source": "default"
         },
@@ -1929,7 +1888,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "lineLengthPath",
           "source": "default"
         },
@@ -1941,7 +1899,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "lineBiasPath",
           "source": "default"
         },
@@ -1953,7 +1910,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "string",
-          "sampleTime": 1000,
           "slot": "startLineNamePath",
           "source": "default"
         },
@@ -1965,7 +1921,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": null,
-          "sampleTime": 1000,
           "slot": "linesPath",
           "source": "default"
         },
@@ -1977,7 +1932,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "ttlPath",
           "source": "default"
         },
@@ -1989,7 +1943,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "ttbPath",
           "source": "default"
         }
@@ -2020,7 +1973,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -2031,7 +1983,6 @@
             "path": "self.navigation.racing.startTime",
             "pathRequired": false,
             "pathType": "Date",
-            "sampleTime": 500,
             "source": "default"
           },
           "ttsPath": {
@@ -2042,14 +1993,14 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "s",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
         },
         "playBeeps": true,
-        "supportAutomaticHistoricalSeries": false
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 500
       },
       "defaultHeight": 4,
       "defaultWidth": 4,
@@ -2067,7 +2018,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "ttsPath",
           "source": "default"
         },
@@ -2079,7 +2029,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "Date",
-          "sampleTime": 500,
           "slot": "startTimePath",
           "source": "default"
         },
@@ -2091,7 +2040,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "dtsPath",
           "source": "default"
         }
@@ -2122,7 +2070,6 @@
             "path": "self.performance.velocityMadeGood",
             "pathRequired": false,
             "pathType": "number",
-            "sampleTime": 500,
             "source": "default"
           },
           "appWindAngle": {
@@ -2132,7 +2079,6 @@
             "path": "self.environment.wind.angleApparent",
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2143,7 +2089,6 @@
             "path": "self.environment.wind.speedApparent",
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
-            "sampleTime": 500,
             "source": "default"
           },
           "courseOverGround": {
@@ -2154,7 +2099,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2166,7 +2110,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
-            "sampleTime": 500,
             "source": "default"
           },
           "headingPath": {
@@ -2176,7 +2119,6 @@
             "path": "self.navigation.headingTrue",
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2188,7 +2130,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2199,7 +2140,6 @@
             "path": "self.performance.optimumWindAngle",
             "pathRequired": false,
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2210,7 +2150,6 @@
             "path": "self.performance.polarSpeedRatio",
             "pathRequired": false,
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2222,7 +2161,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2234,7 +2172,6 @@
             "pathRequired": true,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2245,7 +2182,6 @@
             "path": "self.performance.targetAngle",
             "pathRequired": false,
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2256,7 +2192,6 @@
             "path": "self.performance.targetVelocityMadeGood",
             "pathRequired": false,
             "pathType": "number",
-            "sampleTime": 500,
             "source": "default"
           },
           "trueWindAngle": {
@@ -2267,7 +2202,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "source": "default"
           },
@@ -2279,7 +2213,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
-            "sampleTime": 500,
             "source": "default"
           },
           "vmgToWaypoint": {
@@ -2289,13 +2222,13 @@
             "path": "self.performance.velocityMadeGoodToWaypoint",
             "pathRequired": false,
             "pathType": "number",
-            "sampleTime": 500,
             "source": "default"
           }
         },
         "sailSetupEnable": false,
         "supportAutomaticHistoricalSeries": false,
         "twsEnable": true,
+        "updateInterval": 500,
         "waypointEnable": true,
         "windSectorEnable": true,
         "windSectorWindowSeconds": 5
@@ -2316,7 +2249,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "headingPath",
           "source": "default"
         },
@@ -2328,7 +2260,6 @@
           "isPathConfigurable": false,
           "pathRequired": true,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "tackTrue",
           "source": "default"
         },
@@ -2340,7 +2271,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "polarSpeedRatio",
           "source": "default"
         },
@@ -2352,7 +2282,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "targetAngle",
           "source": "default"
         },
@@ -2364,7 +2293,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "optimalWindAngle",
           "source": "default"
         },
@@ -2376,7 +2304,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "targetVMG",
           "source": "default"
         },
@@ -2388,7 +2315,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "VMG",
           "source": "default"
         },
@@ -2400,7 +2326,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "appWindAngle",
           "source": "default"
         },
@@ -2412,7 +2337,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "appWindSpeed",
           "source": "default"
         },
@@ -2424,7 +2348,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "trueWindAngle",
           "source": "default"
         },
@@ -2436,7 +2359,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "trueWindSpeed",
           "source": "default"
         },
@@ -2448,7 +2370,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "courseOverGround",
           "source": "default"
         },
@@ -2460,7 +2381,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "nextWaypointBearing",
           "source": "default"
         },
@@ -2472,7 +2392,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "vmgToWaypoint",
           "source": "default"
         },
@@ -2484,7 +2403,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "set",
           "source": "default"
         },
@@ -2496,7 +2414,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "drift",
           "source": "default"
         }
@@ -2556,12 +2473,12 @@
             "path": null,
             "pathSkUnitsFilter": "V",
             "pathType": "number",
-            "sampleTime": 500,
             "showPathSkUnitsFilter": true,
             "source": null
           }
         },
-        "supportAutomaticHistoricalSeries": true
+        "supportAutomaticHistoricalSeries": true,
+        "updateInterval": 500
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -2579,7 +2496,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "gaugePath",
           "source": null
         }
@@ -2609,14 +2525,14 @@
             "path": null,
             "pathSkUnitsFilter": null,
             "pathType": "number",
-            "sampleTime": 500,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": null,
             "supportsPut": true
           }
         },
-        "supportAutomaticHistoricalSeries": false
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 500
       },
       "defaultHeight": 4,
       "defaultWidth": 4,
@@ -2634,7 +2550,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 500,
           "slot": "gaugePath",
           "source": null
         }
@@ -2681,10 +2596,10 @@
             "isPathConfigurable": true,
             "path": null,
             "pathType": "string",
-            "sampleTime": 500,
             "source": null
           }
-        }
+        },
+        "updateInterval": 500
       },
       "defaultHeight": 6,
       "defaultWidth": 4,
@@ -2702,7 +2617,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "string",
-          "sampleTime": 500,
           "slot": "stringPath",
           "source": null
         }
@@ -2765,7 +2679,6 @@
             "pathRequired": true,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -2778,7 +2691,6 @@
             "pathRequired": true,
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -2790,7 +2702,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -2803,7 +2714,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -2815,7 +2725,6 @@
             "pathRequired": true,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -2828,7 +2737,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -2841,7 +2749,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -2854,7 +2761,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -2867,7 +2773,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
@@ -2876,6 +2781,7 @@
         "supportAutomaticHistoricalSeries": false,
         "twaEnable": true,
         "twsEnable": true,
+        "updateInterval": 1000,
         "waypointEnable": true,
         "windSectorEnable": true,
         "windSectorWindowSeconds": 5
@@ -2896,7 +2802,6 @@
           "isPathConfigurable": true,
           "pathRequired": true,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "headingPath",
           "source": "default"
         },
@@ -2908,7 +2813,6 @@
           "isPathConfigurable": true,
           "pathRequired": true,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "appWindAngle",
           "source": "default"
         },
@@ -2920,7 +2824,6 @@
           "isPathConfigurable": true,
           "pathRequired": true,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "appWindSpeed",
           "source": "default"
         },
@@ -2932,7 +2835,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "trueWindAngle",
           "source": "default"
         },
@@ -2944,7 +2846,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "trueWindSpeed",
           "source": "default"
         },
@@ -2956,7 +2857,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "courseOverGround",
           "source": "default"
         },
@@ -2968,7 +2868,6 @@
           "isPathConfigurable": false,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "nextWaypointBearing",
           "source": "default"
         },
@@ -2980,7 +2879,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "set",
           "source": "default"
         },
@@ -2992,7 +2890,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "drift",
           "source": "default"
         }
@@ -3016,7 +2913,6 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
-            "sampleTime": 1000,
             "showConvertUnitTo": false,
             "showPathSkUnitsFilter": false,
             "source": "default"
@@ -3029,12 +2925,12 @@
             "pathRequired": false,
             "pathSkUnitsFilter": "m/s",
             "pathType": "number",
-            "sampleTime": 1000,
             "showPathSkUnitsFilter": false,
             "source": "default"
           }
         },
-        "timeScale": "Last 30 Minutes"
+        "timeScale": "Last 30 Minutes",
+        "updateInterval": 1000
       },
       "defaultHeight": 8,
       "defaultWidth": 10,
@@ -3052,7 +2948,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "trueWindDirection",
           "source": "default"
         },
@@ -3064,7 +2959,6 @@
           "isPathConfigurable": true,
           "pathRequired": false,
           "pathType": "number",
-          "sampleTime": 1000,
           "slot": "trueWindSpeed",
           "source": "default"
         }
@@ -3087,6 +2981,7 @@
         "putEnable": false,
         "putMomentary": false,
         "showLabel": true,
+        "updateInterval": 1000,
         "zonesOnlyPaths": true
       },
       "defaultHeight": 6,

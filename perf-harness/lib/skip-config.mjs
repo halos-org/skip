@@ -8,7 +8,7 @@
  *
  * Three distinct version spaces (all from src/app/core/constants/config-versions.const.ts):
  *  - applicationData URL path segment 11 (REMOTE_CONFIG_FILE_VERSION)
- *  - app.configVersion 16 (LATEST_APP_CONFIG_VERSION)
+ *  - app.configVersion 17 (LATEST_APP_CONFIG_VERSION)
  *  - connectionConfig.configVersion 13 (CONNECTION_CONFIG_VERSION)
  */
 export const SELF_URN = 'vessels.urn:mrn:signalk:uuid:11111111-1111-4111-8111-111111111111';
@@ -22,12 +22,12 @@ const DEFAULT_NOTIF = {
 };
 
 export function appConfig(extra = {}) {
-  // configVersion at LATEST (16): a genuine current config, so the boot skips
+  // configVersion at LATEST (17): a genuine current config, so the boot skips
   // ConfigurationUpgradeService's migration toast/reload entirely inside the
   // measurement window. Bump this in lockstep with LATEST_APP_CONFIG_VERSION, or
   // the boot triggers an upgrade+reload and the boot-assert fails.
   return {
-    configVersion: 16, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
+    configVersion: 17, autoNightMode: false, redNightMode: false, nightModeBrightness: 0.27,
     widgetHistoryDisabled: false,
     notificationConfig: DEFAULT_NOTIF, browserTabTitle: 'Skip', ...extra,
   };
@@ -52,25 +52,25 @@ function node(w, h, x, y, widgetProperties) {
   return { x, y, w, h, id, selector: 'widget-host2', input: { widgetProperties } };
 }
 
-export function numericWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', sampleTime = 500, miniChart = false, displayName = 'N' } = {}) {
+export function numericWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', updateInterval = 500, miniChart = false, displayName = 'N' } = {}) {
   const uuid = uid('num');
   return (x, y) => node(4, 6, x, y, {
     type: 'widget-numeric', uuid,
     config: {
-      displayName, filterSelfPaths: true,
-      paths: { numericPath: { description: 'Numeric Data', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit, sampleTime } },
+      displayName, filterSelfPaths: true, updateInterval,
+      paths: { numericPath: { description: 'Numeric Data', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit } },
       numDecimal: 1, showMiniChart: miniChart, color: 'blue', enableTimeout: false, dataTimeout: 5, ignoreZones: false,
     },
   });
 }
 
-export function radialGaugeWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', sampleTime = 500 } = {}) {
+export function radialGaugeWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', updateInterval = 500 } = {}) {
   const uuid = uid('rad');
   return (x, y) => node(4, 6, x, y, {
     type: 'widget-gauge-ng-radial', uuid,
     config: {
-      displayName: 'G', filterSelfPaths: true,
-      paths: { gaugePath: { description: 'Gauge', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit, sampleTime } },
+      displayName: 'G', filterSelfPaths: true, updateInterval,
+      paths: { gaugePath: { description: 'Gauge', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit } },
       gauge: { type: 'ngRadial', subType: 'measuring' },
       displayScale: { lower: 0, upper: 30, type: 'linear' }, numInt: 2, numDecimal: 1,
       color: 'blue', enableTimeout: false, dataTimeout: 5,
@@ -115,14 +115,14 @@ export function booleanControlWidget({ controls, w = 4, h = 6, displayName = 'Sw
     });
     paths.push({
       description: c.label, path: c.path ?? `self.electrical.switches.bank.0.${i}.state`,
-      source: 'default', pathType: 'boolean', isPathConfigurable: true, sampleTime: 500, pathID,
+      source: 'default', pathType: 'boolean', isPathConfigurable: true, pathID,
       suppressBootstrapNull: true,
     });
   });
   return (x, y) => node(w, h, x, y, {
     type: 'widget-boolean-switch', uuid,
     config: {
-      displayName, showLabel, filterSelfPaths: true, paths,
+      displayName, showLabel, filterSelfPaths: true, updateInterval: 500, paths,
       enableTimeout: false, dataTimeout: 5, color, zonesOnlyPaths: false,
       putEnable: true, putMomentary: false, multiChildCtrls,
     },

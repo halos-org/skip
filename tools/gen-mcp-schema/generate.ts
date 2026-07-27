@@ -137,7 +137,6 @@ function extractPathSlots(config: Record<string, unknown>): PathSlot[] {
     pathRequired: raw.pathRequired === true,
     defaultConvertUnitTo: asStringOrNull(raw.convertUnitTo),
     expectedSkUnit: asStringOrNull(raw.pathSkUnitsFilter),
-    sampleTime: typeof raw.sampleTime === 'number' ? raw.sampleTime : null,
   }));
 }
 

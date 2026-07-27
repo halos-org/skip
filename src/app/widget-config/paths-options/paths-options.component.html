@@ -1,4 +1,14 @@
 <div class="widget-options-grid">
+  <mat-form-field>
+    <mat-label>Display update interval</mat-label>
+    <input type="number" matNativeControl placeholder="Interval in milliseconds..."
+      name="updateInterval"
+      [formControl]="updateInterval()"
+      min="100"
+      required>
+    <span matTextSuffix>ms</span>
+    <mat-hint>How often the widget refreshes its reading on screen. Lower is more responsive but does more work; it does not change how often data is received.</mat-hint>
+  </mat-form-field>
   <mat-checkbox
     name="enableTimeout"
     [formControl]="enableTimeout()">

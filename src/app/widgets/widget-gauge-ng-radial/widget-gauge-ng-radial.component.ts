@@ -55,8 +55,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
         isPathConfigurable: true,
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: null,
-        convertUnitTo: 'unitless',
-        sampleTime: 500
+        convertUnitTo: 'unitless'
       }
     },
     displayScale: { lower: 0, upper: 100, type: 'linear' },
@@ -72,6 +71,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     },
     numInt: 1,
     numDecimal: 0,
+    updateInterval: 500,
     enableTimeout: false,
     color: 'contrast',
     dataTimeout: 5,
@@ -319,7 +319,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     g.valueInt = cfg.numInt ?? 1; g.valueDec = cfg.numDecimal ?? 2; g.majorTicksInt = g.valueInt; g.majorTicksDec = g.valueDec;
     g.highlightsWidth = cfg.gauge?.highlightsWidth;
     Object.assign(g, gaugeAnimationOptions(this.animationEnabled()));
-    g.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
+    g.animationDuration = gaugeAnimationDurationMs(cfg.updateInterval ?? 500);
     g.colorBorderShadow = false; g.colorBorderOuter = theme.cardColor; g.colorBorderOuterEnd = ''; g.colorBorderMiddle = theme.cardColor; g.colorBorderMiddleEnd = '';
     g.colorPlate = g.colorPlateEnd = theme.cardColor; g.colorBar = theme.background;
 

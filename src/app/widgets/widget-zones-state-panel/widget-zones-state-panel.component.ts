@@ -31,6 +31,7 @@ export class WidgetZonesStatePanelComponent {
     paths: [],
     enableTimeout: false,
     dataTimeout: 5,
+    updateInterval: 1000,
     color: 'contrast',
     putEnable: false,
     zonesOnlyPaths: true,

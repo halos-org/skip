@@ -34,7 +34,7 @@ function createHost2Widget(options) {
         zonesSupport: !!options.zonesSupport,
         // Hidden defaults
         convertUnitTo: null,
-        sampleTime: 1000,
+        updateInterval: 1000,
         icon: 'placeholder-icon',
         description: 'TODO: Add description',
       }),
@@ -48,7 +48,7 @@ function createHost2Widget(options) {
       template({
         ...commonTemplateCtx,
         convertUnitTo: null,
-        sampleTime: 1000,
+        updateInterval: 1000,
         icon: 'placeholder-icon',
         description: 'TODO: Add description'
       }), move(widgetFolder)

@@ -75,8 +75,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         showConvertUnitTo: false,
-        convertUnitTo: 'deg',
-        sampleTime: 500
+        convertUnitTo: 'deg'
       }
     },
       supportAutomaticHistoricalSeries: true,
@@ -87,6 +86,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       compassUseNumbers: false,
       showValueBox: false
     },
+    updateInterval: 500,
     enableTimeout: false,
     color: "contrast",
     dataTimeout: 5
@@ -233,7 +233,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
     else {
       g.animationTarget = this.ANIMATION_TARGET_NEEDLE; g.useMinPath = true;
     }
-    Object.assign(g, gaugeAnimationOptions(this.animationEnabled())); g.animationDuration = gaugeAnimationDurationMs(cfg.paths?.['gaugePath']?.sampleTime ?? 500);
+    Object.assign(g, gaugeAnimationOptions(this.animationEnabled())); g.animationDuration = gaugeAnimationDurationMs(cfg.updateInterval ?? 500);
     // Colors (RGBA unsupported -> convert)
     const palette = getColors(cfg.color ?? 'contrast', theme);
     const dim = rgbaToHex(palette.dim);

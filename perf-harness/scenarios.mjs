@@ -14,8 +14,8 @@ const POOL = [
 // data.service still upserts _skData and emits _pathUpdates$ for every path).
 const manyPaths = (n) => [...POOL, ...Array.from({ length: Math.max(0, n - POOL.length) }, (_, i) => `sensors.mock.n${i}.value`)];
 
-const numericGrid = (n) => buildDashboards(Array.from({ length: n }, (_, i) => numericWidget({ path: 'self.' + POOL[i % POOL.length], sampleTime: 500 })));
-const gaugeGrid = (n) => buildDashboards(Array.from({ length: n }, (_, i) => radialGaugeWidget({ path: 'self.' + POOL[i % POOL.length], sampleTime: 500 })));
+const numericGrid = (n) => buildDashboards(Array.from({ length: n }, (_, i) => numericWidget({ path: 'self.' + POOL[i % POOL.length], updateInterval: 500 })));
+const gaugeGrid = (n) => buildDashboards(Array.from({ length: n }, (_, i) => radialGaugeWidget({ path: 'self.' + POOL[i % POOL.length], updateInterval: 500 })));
 
 export const scenarios = [
   {

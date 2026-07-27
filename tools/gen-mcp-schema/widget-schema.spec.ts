@@ -49,7 +49,6 @@ describe('extractWidgetSchemas', () => {
       pathRequired: false,
       defaultConvertUnitTo: 'unitless',
       expectedSkUnit: null,
-      sampleTime: 500,
     });
   });
 

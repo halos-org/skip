@@ -35,8 +35,7 @@ export class WidgetSimpleLinearComponent {
         isPathConfigurable: true,
         showPathSkUnitsFilter: true,
         pathSkUnitsFilter: 'V',
-        convertUnitTo: 'V',
-        sampleTime: 500
+        convertUnitTo: 'V'
       }
     },
     displayScale: { lower: 0, upper: 15, type: 'linear' },
@@ -45,6 +44,7 @@ export class WidgetSimpleLinearComponent {
     numDecimal: 2,
     ignoreZones: false,
     color: 'contrast',
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5
   };

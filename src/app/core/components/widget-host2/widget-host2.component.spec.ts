@@ -109,8 +109,7 @@ describe('WidgetHost2Component', () => {
                         path: 'navigation.speedThroughWater',
                         source: 'default',
                         pathType: 'number',
-                        isPathConfigurable: true,
-                        sampleTime: 1000
+                        isPathConfigurable: true
                     }
                 }
             }
@@ -202,8 +201,7 @@ describe('WidgetHost2Component', () => {
                 path: 'navigation.state',
                 source: null,
                 pathType: 'string',
-                isPathConfigurable: true,
-                sampleTime: 1000
+                isPathConfigurable: true
             }
         };
 
