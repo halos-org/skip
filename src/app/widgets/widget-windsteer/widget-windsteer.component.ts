@@ -28,7 +28,11 @@ export class WidgetWindComponent implements OnDestroy {
     filterSelfPaths: true,
     paths: {
       headingPath: {
-        description: 'True Heading',
+        description: 'Heading',
+        pathOptions: [
+          { label: 'True', path: 'self.navigation.headingTrue' },
+          { label: 'Magnetic', path: 'self.navigation.headingMagnetic' }
+        ],
         path: 'self.navigation.headingTrue',
         source: 'default',
         pathType: 'number',
@@ -44,7 +48,7 @@ export class WidgetWindComponent implements OnDestroy {
         path: 'self.environment.wind.angleApparent',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         pathRequired: true,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
@@ -56,14 +60,18 @@ export class WidgetWindComponent implements OnDestroy {
         path: 'self.environment.wind.speedApparent',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         pathRequired: true,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         convertUnitTo: 'knots'
       },
       trueWindAngle: {
-        description: 'True Wind Angle',
+        description: 'Wind Angle',
+        pathOptions: [
+          { label: 'Water', path: 'self.environment.wind.angleTrueWater' },
+          { label: 'Ground', path: 'self.environment.wind.angleTrueGround' }
+        ],
         path: 'self.environment.wind.angleTrueWater',
         source: 'default',
         pathType: 'number',
@@ -79,14 +87,18 @@ export class WidgetWindComponent implements OnDestroy {
         path: 'self.environment.wind.speedTrue',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         convertUnitTo: 'knots'
       },
       courseOverGround: {
-        description: 'True Course Over Ground',
+        description: 'Course Over Ground',
+        pathOptions: [
+          { label: 'True', path: 'self.navigation.courseOverGroundTrue' },
+          { label: 'Magnetic', path: 'self.navigation.courseOverGroundMagnetic' }
+        ],
         path: 'self.navigation.courseOverGroundTrue',
         source: 'default',
         pathType: 'number',
@@ -114,7 +126,7 @@ export class WidgetWindComponent implements OnDestroy {
         path: 'self.environment.current.setTrue',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
@@ -126,7 +138,7 @@ export class WidgetWindComponent implements OnDestroy {
         path: 'self.environment.current.drift',
         source: 'default',
         pathType: 'number',
-        isPathConfigurable: true,
+        isPathConfigurable: false,
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',

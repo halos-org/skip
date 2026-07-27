@@ -10,6 +10,7 @@ import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { MIN_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 import { WidgetBooleanSwitchComponent } from '../../widgets/widget-boolean-switch/widget-boolean-switch.component';
 import { WidgetZonesStatePanelComponent } from '../../widgets/widget-zones-state-panel/widget-zones-state-panel.component';
+import { WidgetAutopilotComponent } from '../../widgets/widget-autopilot/widget-autopilot.component';
 
 describe('ModalWidgetComponent', () => {
   let component: RootModalWidgetConfigComponent;
@@ -331,5 +332,70 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
     // (buildForm instantiates TestBed, so only one build per test).
     const component = buildForm(WidgetBooleanSwitchComponent.DEFAULT_CONFIG);
     expect(component.updateIntervalToControl).not.toBeNull();
+  });
+
+  // B1: decouple path-editability from Source. A fixed path disables only its `path` control, so its
+  // Data Source stays editable; a choice (pathOptions) path keeps `path` enabled for the select.
+  it('disables only the path control (not Data Source) for a fixed record-form path', () => {
+    const cfg = { paths: { p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false } } } as unknown as IWidgetSvcConfig;
+    const pathGroup = (buildForm(cfg).formMaster.get('paths') as UntypedFormGroup).get('p') as UntypedFormGroup;
+    expect(pathGroup.get('path')!.disabled).toBe(true);
+    expect(pathGroup.get('source')!.disabled).toBe(false);
+  });
+
+  // The whole fixed-path design rests on submitConfig reading getRawValue() (not .value): a disabled
+  // path control is dropped by .value, so a fixed path would vanish from the saved config. Guard it.
+  it('retains a disabled fixed path value through submitConfig (getRawValue, not .value)', () => {
+    const cfg = { paths: { p: { description: 'X', path: 'self.fixed.path', source: 'default', pathType: 'number', isPathConfigurable: false } } } as unknown as IWidgetSvcConfig;
+    const raw = buildForm(cfg).formMaster.getRawValue() as { paths: { p: { path: string } } };
+    expect(raw.paths.p.path).toBe('self.fixed.path');
+  });
+
+  it('keeps the path control enabled for a choice (pathOptions) path so the select can write it', () => {
+    const cfg = { paths: { p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false, pathOptions: [{ label: 'A', path: 'self.x' }, { label: 'B', path: 'self.y' }] } } } as unknown as IWidgetSvcConfig;
+    const pathGroup = (buildForm(cfg).formMaster.get('paths') as UntypedFormGroup).get('p') as UntypedFormGroup;
+    expect(pathGroup.get('path')!.disabled).toBe(false);
+  });
+
+  it('leaves the path control editable for a generic configurable path (autocomplete non-regression)', () => {
+    const cfg = { paths: { numericPath: { description: 'N', path: null, source: 'default', pathType: 'number', isPathConfigurable: true } } } as unknown as IWidgetSvcConfig;
+    const pathGroup = (buildForm(cfg).formMaster.get('paths') as UntypedFormGroup).get('numericPath') as UntypedFormGroup;
+    expect(pathGroup.get('path')!.disabled).toBe(false);
+  });
+
+  it('hasConfigurablePaths is true when a path has choices even if the rest are fixed', () => {
+    const cfg = { paths: {
+      a: { description: 'A', path: 'self.a', source: 'default', pathType: 'number', isPathConfigurable: false },
+      b: { description: 'B', path: 'self.b', source: 'default', pathType: 'number', isPathConfigurable: false, pathOptions: [{ label: 'X', path: 'self.b' }, { label: 'Y', path: 'self.c' }] }
+    } } as unknown as IWidgetSvcConfig;
+    expect(buildForm(cfg).hasConfigurablePaths).toBe(true);
+  });
+
+  it('hasConfigurablePaths is false when every path is fixed with no choices (tab stays suppressed)', () => {
+    const cfg = { paths: {
+      a: { description: 'A', path: 'self.a', source: 'default', pathType: 'number', isPathConfigurable: false },
+      b: { description: 'B', path: 'self.b', source: 'default', pathType: 'number', isPathConfigurable: false }
+    } } as unknown as IWidgetSvcConfig;
+    expect(buildForm(cfg).hasConfigurablePaths).toBe(false);
+  });
+
+  // The decoupling is general, not wind-only (accepted): a non-wind mixed-path widget (autopilot has
+  // configurable heading paths alongside fixed internal state/mode/rudder paths) now exposes an
+  // editable Data Source on its fixed paths too, with only the `path` control disabled. Pin that so
+  // Effort C revisits it deliberately rather than a regression flipping it back.
+  it('autopilot (non-wind mixed-path): every path keeps an editable Source; fixed paths disable only path', () => {
+    const component = buildForm(WidgetAutopilotComponent.DEFAULT_CONFIG);
+    expect(component.hasConfigurablePaths).toBe(true);
+    const pathGroups = Object.values((component.formMaster.get('paths') as UntypedFormGroup).controls) as UntypedFormGroup[];
+    expect(pathGroups.length).toBeGreaterThan(0);
+    let sawFixed = false;
+    for (const g of pathGroups) {
+      expect(g.get('source')!.enabled).toBe(true);
+      if (g.get('isPathConfigurable')!.value === false) {
+        sawFixed = true;
+        expect(g.get('path')!.disabled).toBe(true);
+      }
+    }
+    expect(sawFixed).toBe(true); // autopilot does carry fixed internal paths
   });
 });

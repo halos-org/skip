@@ -34,7 +34,7 @@ describe('extractWidgetSchemas', () => {
       defaultPath: 'self.environment.wind.speedTrue',
       expectedSkUnit: 'm/s',
       defaultConvertUnitTo: 'knots',
-      isPathConfigurable: true,
+      isPathConfigurable: false, // now a fixed slot (Effort B); direction is the choice slot
       pathRequired: false,
     });
   });
@@ -60,6 +60,16 @@ describe('extractWidgetSchemas', () => {
       expectedSkUnit: 'rad',
       defaultConvertUnitTo: 'deg',
     });
+  });
+
+  it('conveys a choice slot\'s closed pathOptions set, and null for a fixed slot', () => {
+    const heading = bySelector('widget-wind-steer')?.pathSlots.find((s) => s.slot === 'headingPath');
+    expect(heading?.pathOptions).toEqual([
+      { label: 'True', path: 'self.navigation.headingTrue' },
+      { label: 'Magnetic', path: 'self.navigation.headingMagnetic' },
+    ]);
+    const appWind = bySelector('widget-wind-steer')?.pathSlots.find((s) => s.slot === 'appWindAngle');
+    expect(appWind?.pathOptions).toBeNull();
   });
 
   it('gives non-record widgets no path slots', () => {

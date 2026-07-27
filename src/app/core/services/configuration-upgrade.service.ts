@@ -26,6 +26,41 @@ const V14_MIGRATION_OUTPUT_VERSION = 14;
 const V15_MIGRATION_OUTPUT_VERSION = 15;
 const V16_MIGRATION_OUTPUT_VERSION = 16;
 const V17_MIGRATION_OUTPUT_VERSION = 17;
+const V18_MIGRATION_OUTPUT_VERSION = 18;
+
+/**
+ * v17 -> v18 target shape for the wind-family widgets' swept paths, keyed by runtime widget `type`
+ * then path key. Each entry pins the path's canonical value and whether it stays user-editable (a
+ * choice slot: true, the select offers the alternatives) or becomes fixed (false, Data Source only).
+ * `pathOptions` is base-sourced from DEFAULT_CONFIG, so the migration never writes it.
+ */
+const V18_WIND_PATH_DEFAULTS: Record<string, Record<string, { path: string; isPathConfigurable: boolean; description?: string }>> = {
+  'widget-wind-steer': {
+    headingPath: { path: 'self.navigation.headingTrue', isPathConfigurable: true, description: 'Heading' },
+    appWindAngle: { path: 'self.environment.wind.angleApparent', isPathConfigurable: false },
+    appWindSpeed: { path: 'self.environment.wind.speedApparent', isPathConfigurable: false },
+    trueWindAngle: { path: 'self.environment.wind.angleTrueWater', isPathConfigurable: true, description: 'Wind Angle' },
+    trueWindSpeed: { path: 'self.environment.wind.speedTrue', isPathConfigurable: false },
+    courseOverGround: { path: 'self.navigation.courseOverGroundTrue', isPathConfigurable: true, description: 'Course Over Ground' },
+    set: { path: 'self.environment.current.setTrue', isPathConfigurable: false },
+    drift: { path: 'self.environment.current.drift', isPathConfigurable: false },
+  },
+  'widget-racesteer': {
+    headingPath: { path: 'self.navigation.headingTrue', isPathConfigurable: true, description: 'Heading' },
+    appWindAngle: { path: 'self.environment.wind.angleApparent', isPathConfigurable: false },
+    appWindSpeed: { path: 'self.environment.wind.speedApparent', isPathConfigurable: false },
+    trueWindAngle: { path: 'self.environment.wind.angleTrueWater', isPathConfigurable: true, description: 'Wind Angle' },
+    trueWindSpeed: { path: 'self.environment.wind.speedTrue', isPathConfigurable: false },
+    courseOverGround: { path: 'self.navigation.courseOverGroundTrue', isPathConfigurable: true, description: 'Course Over Ground' },
+    nextWaypointBearing: { path: 'self.navigation.course.calcValues.bearingTrue', isPathConfigurable: false },
+    set: { path: 'self.environment.current.setTrue', isPathConfigurable: false },
+    drift: { path: 'self.environment.current.drift', isPathConfigurable: false },
+  },
+  'widget-windtrends-chart': {
+    trueWindDirection: { path: 'self.environment.wind.directionTrue', isPathConfigurable: true, description: 'Wind Direction' },
+    trueWindSpeed: { path: 'self.environment.wind.speedTrue', isPathConfigurable: false },
+  },
+};
 
 // SK-02 / #21: the delta parser stopped fabricating dotted child paths for compound leaves, so a
 // stored widget path pointing at a sub-field of one of these leaves must be rewritten to the whole
@@ -312,6 +347,30 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
+    } else if (version === 17) {
+      // Remote (Signal K) configs. v17 slots live in the same active file version as v11..v16.
+      try {
+        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+
+        for (const item of configsList) {
+          try {
+            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V18_MIGRATION_OUTPUT_VERSION}.`);
+            const migratedConfig = this.migrateOneAppVersion(config, 17);
+            if (!migratedConfig) continue; // skip if not a v17 slot
+
+            await this._storage.setConfig(item.scope, item.name, migratedConfig);
+          } catch (error) {
+            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
+          }
+        }
+        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
+        setTimeout(() => this._settings.reloadApp(), 1500);
+      } catch (error) {
+        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        this.upgrading.set(false);
+      }
+
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = {
@@ -444,6 +503,7 @@ export class ConfigurationUpgradeService {
       case 14: return this.upgradeConfigV14toV15(config);
       case 15: return this.upgradeConfigV15toV16(config);
       case 16: return this.upgradeConfigV16toV17(config);
+      case 17: return this.upgradeConfigV17toV18(config);
       default: return null;
     }
   }
@@ -856,6 +916,60 @@ export class ConfigurationUpgradeService {
       return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading v16->v17: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * v17 -> v18: slim the wind-family widgets' path config. Reset each swept path (keyed by widget
+   * type via V18_WIND_PATH_DEFAULTS) to its canonical path + fixed/choice editability + a default
+   * source, discarding stored overrides (escape-hatch loss accepted). Keys are unchanged, so a
+   * field-patch is safe; pathOptions is base-sourced from DEFAULT_CONFIG and is not written here.
+   */
+  private upgradeConfigV17toV18(config: IConfig): IConfig | null {
+    try {
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 17) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v17 config. Skipping...`);
+        return null;
+      }
+
+      let rewritten = 0;
+      if (Array.isArray(config.dashboards)) {
+        for (const dash of config.dashboards) {
+          if (!dash || !Array.isArray(dash.configuration)) continue;
+          for (const widget of dash.configuration) {
+            const wp = (widget as { input?: { widgetProperties?: {
+              type?: unknown;
+              config?: { paths?: unknown };
+            } } })?.input?.widgetProperties;
+            if (!wp || typeof wp.type !== 'string') continue;
+            const targets = V18_WIND_PATH_DEFAULTS[wp.type];
+            const paths = wp.config?.paths;
+            if (!targets || !paths || typeof paths !== 'object') continue;
+            const pathMap = paths as Record<string, Record<string, unknown>>;
+            for (const [key, target] of Object.entries(targets)) {
+              const pathCfg = pathMap[key];
+              if (!pathCfg || typeof pathCfg !== 'object') continue;
+              pathCfg['path'] = target.path;
+              pathCfg['isPathConfigurable'] = target.isPathConfigurable;
+              if (target.description !== undefined) pathCfg['description'] = target.description;
+              // Reset the source pin too: a pin left over from the pre-reset path can point at a
+              // source bucket the new canonical path never fills, silently starving the widget.
+              pathCfg['source'] = 'default';
+              rewritten++;
+            }
+          }
+        }
+      }
+      if (rewritten) {
+        this.pushMsg(`[Upgrade] Reset ${rewritten} wind-family path(s) to the fixed/choice default.`);
+      }
+
+      appConfig.configVersion = V18_MIGRATION_OUTPUT_VERSION;
+      return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
+    } catch (error) {
+      this.pushError(`[Upgrade Service] Error upgrading v17->v18: ${(error as Error).message}`);
       return null;
     }
   }

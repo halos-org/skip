@@ -681,6 +681,133 @@ describe('ConfigurationUpgradeService', () => {
         expect(cfg.paths.c.sampleTime).toBeUndefined();
     });
 
+    it('v17 upgrade resets wind-family paths to their fixed/choice default and stamps v18', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 17 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-wind-steer', config: {
+                        paths: {
+                            headingPath: { description: 'True Heading', path: 'self.navigation.headingMagnetic', isPathConfigurable: true, source: 'a-pinned-device' },
+                            appWindAngle: { description: 'Apparent Wind Angle', path: 'self.environment.wind.angleApparent', isPathConfigurable: true },
+                            trueWindAngle: { description: 'True Wind Angle', path: 'self.environment.wind.angleTrueGround', isPathConfigurable: true, source: 'ground-source' },
+                            trueWindSpeed: { description: 'True Wind Speed', path: 'self.environment.wind.speedOverGround', isPathConfigurable: true }
+                        }
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(17);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(18);
+        const paths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        // choice slot: hard-reset to the canonical default, description neutralized, stays configurable
+        expect(paths.trueWindAngle.path).toBe('self.environment.wind.angleTrueWater');
+        expect(paths.trueWindAngle.description).toBe('Wind Angle');
+        expect(paths.trueWindAngle.isPathConfigurable).toBe(true);
+        expect(paths.headingPath.path).toBe('self.navigation.headingTrue'); // stored magnetic override discarded
+        expect(paths.headingPath.description).toBe('Heading');
+        // fixed slots: no longer user-editable; a stale path is corrected
+        expect(paths.appWindAngle.isPathConfigurable).toBe(false);
+        expect(paths.trueWindSpeed.isPathConfigurable).toBe(false);
+        expect(paths.trueWindSpeed.path).toBe('self.environment.wind.speedTrue');
+        // a pinned source is discarded too: a leftover pin can starve the reset path at runtime
+        expect(paths.headingPath.source).toBe('default');
+        expect(paths.trueWindAngle.source).toBe('default');
+    });
+
+    it('v17 upgrade resets widget-racesteer wind + nav paths to their fixed/choice defaults', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 17 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-racesteer', config: {
+                        paths: {
+                            courseOverGround: { description: 'True Course Over Ground', path: 'self.navigation.courseOverGroundMagnetic', isPathConfigurable: true, source: 'compass' },
+                            nextWaypointBearing: { description: 'Next Waypoint Bearing', path: 'self.navigation.course.calcValues.bearingMagnetic', isPathConfigurable: true },
+                            drift: { description: 'Drift', path: 'self.environment.current.drift', isPathConfigurable: true }
+                        }
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(17);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(18);
+        const paths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        // choice slot
+        expect(paths.courseOverGround.path).toBe('self.navigation.courseOverGroundTrue');
+        expect(paths.courseOverGround.description).toBe('Course Over Ground');
+        expect(paths.courseOverGround.isPathConfigurable).toBe(true);
+        expect(paths.courseOverGround.source).toBe('default');
+        // fixed slots
+        expect(paths.nextWaypointBearing.path).toBe('self.navigation.course.calcValues.bearingTrue');
+        expect(paths.nextWaypointBearing.isPathConfigurable).toBe(false);
+        expect(paths.drift.isPathConfigurable).toBe(false);
+    });
+
+    it('v17 upgrade resets widget-windtrends-chart direction (choice) and speed (fixed)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 17 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-windtrends-chart', config: {
+                        paths: {
+                            trueWindDirection: { description: 'True Wind Direction', path: 'self.environment.wind.directionMagnetic', isPathConfigurable: true },
+                            trueWindSpeed: { description: 'True Wind Speed', path: 'self.environment.wind.speedTrue', isPathConfigurable: true }
+                        }
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(17);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(18);
+        const paths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        expect(paths.trueWindDirection.path).toBe('self.environment.wind.directionTrue');
+        expect(paths.trueWindDirection.description).toBe('Wind Direction');
+        expect(paths.trueWindDirection.isPathConfigurable).toBe(true);
+        expect(paths.trueWindSpeed.isPathConfigurable).toBe(false);
+        expect(paths.trueWindSpeed.path).toBe('self.environment.wind.speedTrue');
+    });
+
+    it('v17 upgrade leaves a non-wind widget untouched, still stamps v18', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 17 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-numeric', config: { paths: { numericPath: { path: 'self.navigation.speedOverGround', isPathConfigurable: true } } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(17);
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(18);
+        expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths.numericPath.isPathConfigurable).toBe(true);
+    });
+
+    it('v17 upgrade skips a slot that is not at version 17 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({ app: { configVersion: 16 }, theme: { themeName: '' }, dashboards: [] });
+        await service.runUpgrade(17);
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([
