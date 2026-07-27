@@ -31,10 +31,11 @@ export interface IDimensions {
  * - 'number'
  * - 'string'
  * - 'boolean'
+ * - 'object' (a whole compound leaf, e.g. navigation.position — the widget reads its sub-fields)
  * - 'Date'
  * - null
  */
-export type TWidgetPathType = 'number' | 'string' | 'boolean' | 'Date' | 'multiple' | null;
+export type TWidgetPathType = 'number' | 'string' | 'boolean' | 'object' | 'Date' | 'multiple' | null;
 
 /**
  * Skip Dynamic Widgets interface.

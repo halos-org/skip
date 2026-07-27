@@ -542,6 +542,11 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     expect(runUpgradeSpy).toHaveBeenCalledWith(13);
   });
 
+  it('runs the config migration in the full app for an upgradeable v14 config (the position-collapse gate)', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 14 });
+    expect(runUpgradeSpy).toHaveBeenCalledWith(14);
+  });
+
   it('does NOT show the missing-shared-config create prompt under embed', async () => {
     const { toast, bootstrapIssue$ } = await render({ embed: true });
     toast.show.mockClear();

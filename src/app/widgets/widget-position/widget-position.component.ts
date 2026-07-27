@@ -4,6 +4,7 @@ import { CanvasService } from '../../core/services/canvas.service';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { UnitsService } from '../../core/services/units.service';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ITheme } from '../../core/services/app-service';
 
@@ -24,6 +25,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
   protected readonly runtime = inject(WidgetRuntimeDirective);
   private readonly streams = inject(WidgetStreamsDirective);
   private readonly canvas = inject(CanvasService);
+  private readonly units = inject(UnitsService);
 
   // Canvas refs
   private canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
@@ -48,33 +50,18 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
   protected labelColor = signal<string>('');
   private valueColor = '';
 
-  // Static default config cloned from legacy implementation
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     supportAutomaticHistoricalSeries: false,
     displayName: 'Position',
     filterSelfPaths: true,
     paths: {
-      longPath: {
-        description: 'Longitude',
+      positionPath: {
+        description: 'Position',
         path: 'self.navigation.position',
         source: 'default',
-        pathType: 'number',
-        isPathConfigurable: false,
-        convertUnitTo: 'longitudeMin',
-        showConvertUnitTo: false,
-        showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: null,
-        sampleTime: 500
-      },
-      latPath: {
-        description: 'Latitude',
-        path: 'self.navigation.position',
-        source: 'default',
-        pathType: 'number',
-        isPathConfigurable: false,
-        convertUnitTo: 'latitudeMin',
-        showConvertUnitTo: false,
-        showPathSkUnitsFilter: true,
+        pathType: 'object',
+        isPathConfigurable: true,
+        showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null,
         sampleTime: 500
       }
@@ -98,36 +85,29 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
       });
     });
 
-    // Observe longitude path
+    // Observe the whole position object and render both coordinates from it. Signal K emits
+    // navigation.position as a single {latitude, longitude} object (in degrees), so one path
+    // drives both values — latitude and longitude are never independent paths.
     effect(() => {
       const cfg = this.runtime.options();
       if (!cfg) return;
-      const pathCfg = cfg.paths?.['longPath'];
+      const pathCfg = cfg.paths?.['positionPath'];
       if (!pathCfg?.path) return;
-      untracked(() => this.streams.observe('longPath', pkt => {
-        const val = pkt?.data?.value as number | null;
-        if (val === null || val === undefined) this.longPos = '';
-        else if (pathCfg.convertUnitTo === 'pdeg') this.longPos = (val as number).toFixed(6) + '°';
-        else this.longPos = String(val);
+      untracked(() => this.streams.observe('positionPath', pkt => {
+        const pos = pkt?.data?.value as { latitude?: number | null; longitude?: number | null } | null;
+        this.latPos = this.formatCoordinate('latitudeMin', pos?.latitude);
+        this.longPos = this.formatCoordinate('longitudeMin', pos?.longitude);
         this.calculateFontSizeAndPositions();
         this.draw();
-      }, 'longitude'));
+      }));
     });
+  }
 
-    // Observe latitude path
-    effect(() => {
-      const cfg = this.runtime.options(); if (!cfg) return;
-      const pathCfg = cfg.paths?.['latPath'];
-      if (!pathCfg?.path) return;
-      untracked(() => this.streams.observe('latPath', pkt => {
-        const val = pkt?.data?.value as number | null;
-        if (val === null || val === undefined) this.latPos = '';
-        else if (pathCfg.convertUnitTo === 'pdeg') this.latPos = (val as number).toFixed(7) + '°';
-        else this.latPos = String(val);
-        this.calculateFontSizeAndPositions();
-        this.draw();
-      }, 'latitude'));
-    });
+  private formatCoordinate(measure: 'latitudeMin' | 'longitudeMin', value: number | null | undefined): string {
+    if (value === null || value === undefined || !Number.isFinite(value)) return '';
+    // The latitudeMin/longitudeMin conversions return a preformatted DMS string despite convertToUnit's
+    // number|null signature, so the String() coercion is load-bearing — do not drop it or reformat here.
+    return String(this.units.convertToUnit(measure, value) ?? '');
   }
 
   // Canvas lifecycle

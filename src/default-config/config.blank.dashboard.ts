@@ -1405,25 +1405,13 @@ export const DefaultDashboard: Dashboard[] = [
               "displayName": "Position",
               "filterSelfPaths": true,
               "paths": {
-                "longPath": {
-                  "description": "Longitude",
+                "positionPath": {
+                  "description": "Position",
                   "path": "self.navigation.position",
                   "source": "default",
-                  "pathType": "number",
-                  "isPathConfigurable": false,
-                  "convertUnitTo": "longitudeMin",
-                  "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
-                },
-                "latPath": {
-                  "description": "Latitude",
-                  "path": "self.navigation.position",
-                  "source": "default",
-                  "pathType": "number",
-                  "isPathConfigurable": false,
-                  "convertUnitTo": "latitudeMin",
-                  "showPathSkUnitsFilter": true,
+                  "pathType": "object",
+                  "isPathConfigurable": true,
+                  "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": null,
                   "sampleTime": 500
                 }
