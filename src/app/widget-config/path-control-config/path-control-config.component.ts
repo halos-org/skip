@@ -211,12 +211,23 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
    */
   private setupSourceFor(path: string | null): void {
     const pathObject = path ? this._data.getPathObject(path) : null;
-    this.availableSources = pathObject != null
-      ? ['default', ...Object.keys(pathObject.sources).sort()]
-      : ['default'];
     const sourceControl = this.pathFormGroup().controls['source'];
-    if (!sourceControl.value || !this.availableSources.includes(sourceControl.value)) {
-      sourceControl.setValue('default', { onlySelf: true });
+    const storedSource = sourceControl.value;
+    if (pathObject != null) {
+      this.availableSources = ['default', ...Object.keys(pathObject.sources).sort()];
+      if (!storedSource || !this.availableSources.includes(storedSource)) {
+        sourceControl.setValue('default', { onlySelf: true });
+      }
+    } else {
+      // Path has no live data yet (instrument off / boat at dock): we can't tell whether a pinned
+      // source is still offered, so keep it rather than clobbering it to 'Any', and surface it so
+      // the select can display it. Only a genuinely empty source falls back to a valid default.
+      this.availableSources = storedSource && storedSource !== 'default'
+        ? ['default', storedSource]
+        : ['default'];
+      if (!storedSource) {
+        sourceControl.setValue('default', { onlySelf: true });
+      }
     }
     sourceControl.enable({ onlySelf: false });
   }

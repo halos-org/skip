@@ -142,4 +142,48 @@ describe('PathControlConfigComponent', () => {
     setupSourceFor('self.navigation.headingTrue');
     expect(pathForm.controls['source'].value).toBe('gps.0');
   });
+
+  it('keeps a pinned Data Source when the path is offline, rather than clobbering it to "Any"', () => {
+    pathObject = null as unknown as Partial<ISkPathData>; // path has no live data yet
+    pathForm.controls['source'].setValue('gps.7');
+    setupSourceFor('self.some.offline.path');
+    // A valid pin must survive a transient-offline dialog open (else Save persists the loss).
+    expect(pathForm.controls['source'].value).toBe('gps.7');
+    expect(component.availableSources).toContain('gps.7'); // surfaced so the select can display it
+    expect(pathForm.controls['source'].enabled).toBe(true);
+  });
+
+  it('routes a choice slot to Data Source setup on init and recomputes sources when the choice flips', () => {
+    pathObject.sources = src('gps.0');
+    const choiceForm = new UntypedFormGroup({
+      description: new UntypedFormControl('Heading'),
+      path: new UntypedFormControl('self.navigation.headingTrue'),
+      pathID: new UntypedFormControl('uuid-2'),
+      source: new UntypedFormControl('default'),
+      pathType: new UntypedFormControl('number'),
+      supportsPut: new UntypedFormControl(false),
+      isPathConfigurable: new UntypedFormControl(true),
+      pathOptions: new UntypedFormControl([
+        { label: 'True', path: 'self.navigation.headingTrue' },
+        { label: 'Magnetic', path: 'self.navigation.headingMagnetic' }
+      ]),
+      showPathSkUnitsFilter: new UntypedFormControl(false),
+      pathSkUnitsFilter: new UntypedFormControl(null),
+      convertUnitTo: new UntypedFormControl('deg'),
+      pathRequired: new UntypedFormControl(true)
+    });
+    const choiceFixture = TestBed.createComponent(PathControlConfigComponent);
+    choiceFixture.componentRef.setInput('pathFormGroup', choiceForm);
+    choiceFixture.componentRef.setInput('multiCTRLArray', [] as IDynamicControl[]);
+    choiceFixture.componentRef.setInput('filterSelfPaths', false);
+    choiceFixture.detectChanges(); // ngOnInit takes the choice branch -> setupSourceFor(headingTrue)
+    const choiceComponent = choiceFixture.componentInstance;
+    expect(choiceComponent.availableSources).toEqual(['default', 'gps.0']);
+
+    // The mat-select writes the newly chosen path, then (selectionChange) fires onPathChoiceChange.
+    choiceForm.controls['path'].setValue('self.navigation.headingMagnetic');
+    pathObject.sources = src('gps.0', 'wmm.0');
+    (choiceComponent as unknown as { onPathChoiceChange: () => void }).onPathChoiceChange();
+    expect(choiceComponent.availableSources).toEqual(['default', 'gps.0', 'wmm.0']);
+  });
 });
