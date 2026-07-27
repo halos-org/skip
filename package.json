@@ -1,6 +1,6 @@
 {
   "name": "@halos-org/skip",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "plugin/index.js",
   "publishConfig": {
     "access": "public"
