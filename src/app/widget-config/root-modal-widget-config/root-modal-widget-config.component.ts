@@ -15,6 +15,7 @@ import { DisplayChartOptionsComponent } from '../display-chart-options/display-c
 import { DatasetChartOptionsComponent } from '../dataset-chart-options/dataset-chart-options.component';
 import { AppService } from '../../core/services/app-service';
 import type { ElectricalTrackedDevice, IDynamicControl, IDynamicControlGroup, IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+import { MIN_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 import { PathsOptionsComponent } from '../paths-options/paths-options.component';
 import { IDeleteEventObj } from '../boolean-control-config/boolean-control-config.component';
 import { DisplayDatetimeComponent } from '../display-datetime/display-datetime.component';
@@ -200,6 +201,9 @@ export class RootModalWidgetConfigComponent implements OnInit {
             case "dataTimeout": groups.addControl(key, new UntypedFormControl(value, Validators.required));
               break;
 
+            case "updateInterval": groups.addControl(key, new UntypedFormControl(value, [Validators.required, Validators.min(MIN_UPDATE_INTERVAL_MS)]));
+              break;
+
             default: groups.addControl(key, new UntypedFormControl(value));
               break;
           }
@@ -223,8 +227,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
       case "path": return new FormControl(value);
 
       case "source": return new FormControl(value, Validators.required);
-
-      case "sampleTime": return new FormControl(value, Validators.required);
 
       default: return new FormControl(value);
     }
@@ -317,6 +319,10 @@ export class RootModalWidgetConfigComponent implements OnInit {
 
   get enableTimeoutToControl(): UntypedFormControl {
     return this.configControl('enableTimeout') as UntypedFormControl;
+  }
+
+  get updateIntervalToControl(): UntypedFormControl {
+    return this.configControl('updateInterval') as UntypedFormControl;
   }
 
   get dateTimezoneToControl(): FormControl<string> {

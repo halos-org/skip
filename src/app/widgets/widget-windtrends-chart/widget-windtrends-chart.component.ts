@@ -55,6 +55,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
     filterSelfPaths: true,
     color: 'contrast',
     timeScale: 'Last 30 Minutes',
+    updateInterval: 1000,
     // TWD is STRUCTURAL: fixed to degrees (showConvertUnitTo:false) because the widget's angle-wrap and
     // tick math are degree-native — the history dialog keeps it in degrees too. TWS is a DISPLAY path:
     // it follows the server's displayUnits preference, resolved at render like widget-data-chart (and by
@@ -73,8 +74,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       },
       trueWindSpeed: {
         description: 'True Wind Speed',
@@ -85,8 +85,7 @@ export class WidgetWindTrendsChartComponent implements OnDestroy {
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
-        convertUnitTo: 'knots',
-        sampleTime: 1000
+        convertUnitTo: 'knots'
       }
     }
   };

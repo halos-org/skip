@@ -77,8 +77,6 @@ export interface PathSlot {
   defaultConvertUnitTo: string | null;
   /** Expected Signal K base unit filter (pathSkUnitsFilter), or null. */
   expectedSkUnit: string | null;
-  /** Default subscription throttle in milliseconds, or null. */
-  sampleTime: number | null;
 }
 
 /**

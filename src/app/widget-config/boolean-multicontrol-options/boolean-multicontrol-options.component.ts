@@ -77,8 +77,7 @@ export class BooleanMultiControlOptionsComponent implements OnInit, OnDestroy {
         isPathConfigurable: true,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null,
-        convertUnitTo: null,
-        sampleTime: 500
+        convertUnitTo: null
       },
       ctrlType: this.zonesOnlyPaths() ? 4 : 3 // 4 = Zones State, 3 = indicator
     };

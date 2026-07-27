@@ -28,6 +28,7 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
   readonly isArray = input.required<boolean>();
   readonly enableTimeout = input.required<UntypedFormControl>();
   readonly dataTimeout = input.required<UntypedFormControl>();
+  readonly updateInterval = input.required<UntypedFormControl>();
   readonly filterSelfPaths = input.required<UntypedFormControl>();
   readonly addPathEvent = input<IAddNewPathObject>();
   readonly delPathEvent = input<string>();
@@ -78,7 +79,6 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
         showPathSkUnitsFilter: [newPath.path.showPathSkUnitsFilter],
         pathSkUnitsFilter: [newPath.path.pathSkUnitsFilter],
         convertUnitTo: [newPath.path.convertUnitTo],
-        sampleTime: [newPath.path.sampleTime],
         supportsPut: [newPath.path.supportsPut],
       })
     );

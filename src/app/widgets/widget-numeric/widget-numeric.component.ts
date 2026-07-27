@@ -37,8 +37,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
         isPathConfigurable: true,
         convertUnitTo: "unitless",
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: null,
-        sampleTime: 500
+        pathSkUnitsFilter: null
       }
     },
     showMax: false,
@@ -50,6 +49,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     inverseYAxis: false,
     verticalChart: false,
     color: 'contrast',
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
     ignoreZones: false
@@ -94,7 +94,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     return [
       pathCfg.path,
       pathCfg.pathType,
-      pathCfg.sampleTime,
+      cfg?.updateInterval,
       pathCfg.convertUnitTo,
       src,
       pathCfg.suppressBootstrapNull ? '1' : '0'

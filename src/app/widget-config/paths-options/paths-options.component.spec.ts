@@ -35,6 +35,7 @@ describe('PathsOptionsComponent', () => {
     set('isArray', true);
     set('enableTimeout', new UntypedFormControl(false));
     set('dataTimeout', new UntypedFormControl(0));
+    set('updateInterval', new UntypedFormControl(500));
     set('filterSelfPaths', new UntypedFormControl(false));
     fixture.detectChanges();
   });

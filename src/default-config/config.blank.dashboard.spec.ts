@@ -7,7 +7,7 @@ import { WidgetPositionComponent } from '../app/widgets/widget-position/widget-p
 // its old shape forever. Guard the position widget specifically — its two-path shape was the #414
 // bug — so a future re-export of the seed can't silently reintroduce longPath/latPath.
 describe('DefaultDashboard seed', () => {
-  interface SeedWidget { input?: { widgetProperties?: { type?: string; config?: { paths?: Record<string, unknown>; enableTimeout?: boolean; dataTimeout?: number } } } }
+  interface SeedWidget { input?: { widgetProperties?: { type?: string; config?: { paths?: Record<string, unknown>; enableTimeout?: boolean; dataTimeout?: number; updateInterval?: number } } } }
 
   const seededWidgetsOfType = (type: string): SeedWidget[] =>
     DefaultDashboard.flatMap(dash => (dash.configuration ?? []) as SeedWidget[])
@@ -45,6 +45,8 @@ describe('DefaultDashboard seed', () => {
         }
         expect(cfg?.enableTimeout).toBe(true);
         expect(cfg?.dataTimeout).toBe(5);
+        expect(typeof cfg?.updateInterval).toBe('number');
+        expect(cfg?.updateInterval).toBeGreaterThan(0);
       }
     });
   }

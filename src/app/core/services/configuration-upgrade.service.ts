@@ -4,6 +4,7 @@ import { StorageService, Config } from './storage.service';
 import { SettingsService } from './settings.service';
 import { IAppConfig, IConfig, IThemeConfig } from '../interfaces/app-settings.interfaces';
 import { v10IConfig, v10IThemeConfig } from '../interfaces/v10-config-interface';
+import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interface';
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
@@ -24,6 +25,7 @@ const V13_MIGRATION_OUTPUT_VERSION = 13;
 const V14_MIGRATION_OUTPUT_VERSION = 14;
 const V15_MIGRATION_OUTPUT_VERSION = 15;
 const V16_MIGRATION_OUTPUT_VERSION = 16;
+const V17_MIGRATION_OUTPUT_VERSION = 17;
 
 // SK-02 / #21: the delta parser stopped fabricating dotted child paths for compound leaves, so a
 // stored widget path pointing at a sub-field of one of these leaves must be rewritten to the whole
@@ -286,6 +288,30 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
+    } else if (version === 16) {
+      // Remote (Signal K) configs. v16 slots live in the same active file version as v11..v15.
+      try {
+        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+
+        for (const item of configsList) {
+          try {
+            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V17_MIGRATION_OUTPUT_VERSION}.`);
+            const migratedConfig = this.migrateOneAppVersion(config, 16);
+            if (!migratedConfig) continue; // skip if not a v16 slot
+
+            await this._storage.setConfig(item.scope, item.name, migratedConfig);
+          } catch (error) {
+            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
+          }
+        }
+        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
+        setTimeout(() => this._settings.reloadApp(), 1500);
+      } catch (error) {
+        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        this.upgrading.set(false);
+      }
+
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = {
@@ -417,6 +443,7 @@ export class ConfigurationUpgradeService {
       case 13: return this.upgradeConfigV13toV14(config);
       case 14: return this.upgradeConfigV14toV15(config);
       case 15: return this.upgradeConfigV15toV16(config);
+      case 16: return this.upgradeConfigV16toV17(config);
       default: return null;
     }
   }
@@ -781,6 +808,54 @@ export class ConfigurationUpgradeService {
       return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading v15->v16: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * v16 -> v17: the per-path `sampleTime` display-cadence field is replaced by a single widget-level
+   * `updateInterval` (ms). For every path-bearing widget, collapse its paths' sampleTimes to one
+   * value (the minimum — the most responsive) and delete the per-path field. Widgets without paths
+   * are left untouched (they have no cadence to carry).
+   */
+  private upgradeConfigV16toV17(config: IConfig): IConfig | null {
+    try {
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 16) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v16 config. Skipping...`);
+        return null;
+      }
+
+      let rewritten = 0;
+      if (Array.isArray(config.dashboards)) {
+        for (const dash of config.dashboards) {
+          if (!dash || !Array.isArray(dash.configuration)) continue;
+          for (const widget of dash.configuration) {
+            const wp = (widget as { input?: { widgetProperties?: {
+              config?: { paths?: unknown; updateInterval?: number };
+            } } })?.input?.widgetProperties;
+            const cfg = wp?.config;
+            if (!cfg || !cfg.paths || typeof cfg.paths !== 'object') continue;
+            const sampleTimes: number[] = [];
+            for (const pathCfg of Object.values(cfg.paths as Record<string, Record<string, unknown>>)) {
+              if (!pathCfg || typeof pathCfg !== 'object') continue;
+              const st = pathCfg['sampleTime'];
+              if (typeof st === 'number' && Number.isFinite(st) && st > 0) sampleTimes.push(st);
+              delete pathCfg['sampleTime'];
+            }
+            cfg.updateInterval = sampleTimes.length ? Math.min(...sampleTimes) : DEFAULT_WIDGET_UPDATE_INTERVAL_MS;
+            rewritten++;
+          }
+        }
+      }
+      if (rewritten) {
+        this.pushMsg(`[Upgrade] Collapsed per-path sampleTime to a widget-level updateInterval on ${rewritten} widget(s).`);
+      }
+
+      appConfig.configVersion = V17_MIGRATION_OUTPUT_VERSION;
+      return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
+    } catch (error) {
+      this.pushError(`[Upgrade Service] Error upgrading v16->v17: ${(error as Error).message}`);
       return null;
     }
   }

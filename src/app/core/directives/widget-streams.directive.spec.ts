@@ -78,7 +78,7 @@ function makeCfg(opts: {
     key?: string;
     path?: string | null;
     pathType?: 'number' | 'string' | 'Date' | 'boolean';
-    sampleTime?: number;
+    updateInterval?: number;
     convertUnitTo?: string | null;
     showConvertUnitTo?: boolean;
     source?: string | null;
@@ -101,7 +101,6 @@ function makeCfg(opts: {
             pathSkUnitsFilter: null,
             convertUnitTo: (opts.convertUnitTo ?? undefined) as unknown as string,
             showConvertUnitTo: opts.showConvertUnitTo,
-            sampleTime: opts.sampleTime ?? 1000,
             supportsPut: false
         }
     };
@@ -109,6 +108,7 @@ function makeCfg(opts: {
         displayName: opts.displayName ?? 'Test Widget',
         filterSelfPaths: true,
         paths,
+        updateInterval: opts.updateInterval ?? 1000,
         enableTimeout: opts.enableTimeout ?? false,
         dataTimeout: opts.dataTimeout ?? 5,
         color: 'contrast',
@@ -133,7 +133,6 @@ function makeMultiCfg(entries: { key: string; path: string }[]): IWidgetSvcConfi
             showPathSkUnitsFilter: false,
             pathSkUnitsFilter: null,
             convertUnitTo: undefined as unknown as string,
-            sampleTime: 1000,
             supportsPut: false
         };
     }
@@ -169,7 +168,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('subscribes and receives updates for a valid path', async () => {
-        const cfg = makeCfg({ path: 'env.test', source: null, pathType: 'string', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'env.test', source: null, pathType: 'string', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: unknown[] = [];
@@ -187,7 +186,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('extracts the configured sub-field from a whole compound-object value', () => {
-        const cfg = makeCfg({ path: 'navigation.position', source: null, pathType: 'number', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'navigation.position', source: null, pathType: 'number', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: unknown[] = [];
@@ -200,7 +199,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('applies unit conversion to the extracted sub-field (extraction precedes conversion)', () => {
-        const cfg = makeCfg({ path: 'navigation.attitude', source: null, pathType: 'number', convertUnitTo: 'x10', showConvertUnitTo: false, sampleTime: 50 });
+        const cfg = makeCfg({ path: 'navigation.attitude', source: null, pathType: 'number', convertUnitTo: 'x10', showConvertUnitTo: false, updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: unknown[] = [];
@@ -213,7 +212,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('passes a scalar value straight through when a sub-field is configured (customised scalar path stays working)', () => {
-        const cfg = makeCfg({ path: 'steering.rudderAngle', source: null, pathType: 'number', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'steering.rudderAngle', source: null, pathType: 'number', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: unknown[] = [];
@@ -226,7 +225,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('emits null for a missing sub-field of a compound value', () => {
-        const cfg = makeCfg({ path: 'navigation.position', source: null, pathType: 'number', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'navigation.position', source: null, pathType: 'number', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: unknown[] = [];
@@ -239,7 +238,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('resubscribes to DataService when source changes', async () => {
-        const cfg1 = makeCfg({ path: 'env.switch', source: null, pathType: 'string', sampleTime: 50 });
+        const cfg1 = makeCfg({ path: 'env.switch', source: null, pathType: 'string', updateInterval: 50 });
         directive.setStreamsConfig(cfg1);
 
         const hits: string[] = [];
@@ -257,7 +256,7 @@ describe('WidgetStreamsDirective', () => {
         const subjDefault = dataSvc.subjects.get('env.switch|default')!;
         subjDefault.next({ data: { value: 'A1', timestamp: new Date() }, state: 'normal' } as IPathUpdate);
 
-        const cfg2 = makeCfg({ path: 'env.switch', source: 'n2k', pathType: 'string', sampleTime: 50 });
+        const cfg2 = makeCfg({ path: 'env.switch', source: 'n2k', pathType: 'string', updateInterval: 50 });
         directive.applyStreamsConfigDiff(cfg2);
 
         // Old source should no longer be listened to
@@ -329,7 +328,7 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('does nothing when observing the same signature twice', async () => {
-        const cfg = makeCfg({ path: 'env.same', source: null, pathType: 'string', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'env.same', source: null, pathType: 'string', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const hits: string[] = [];
@@ -369,7 +368,7 @@ describe('WidgetStreamsDirective', () => {
 
     it('rewires pipeline on signature change (convertUnitTo) while reusing base stream', () => {
         // Initial config: structural number path, no conversion (convertUnitTo drives the value).
-        const cfg1 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', showConvertUnitTo: false, sampleTime: 50 });
+        const cfg1 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', showConvertUnitTo: false, updateInterval: 50 });
         directive.setStreamsConfig(cfg1);
 
         const hits: number[] = [];
@@ -384,7 +383,7 @@ describe('WidgetStreamsDirective', () => {
         expect(hits).toEqual([2]);
 
         // Change only convertUnitTo (part of signature), keep base identity (path+source) the same
-        const cfg2 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', convertUnitTo: 'x10', showConvertUnitTo: false, sampleTime: 50 });
+        const cfg2 = makeCfg({ path: 'env.rewire', source: null, pathType: 'number', convertUnitTo: 'x10', showConvertUnitTo: false, updateInterval: 50 });
         directive.applyStreamsConfigDiff(cfg2);
 
         // DataService should NOT have been called again (base reused)
@@ -397,7 +396,7 @@ describe('WidgetStreamsDirective', () => {
 
     it('suppresses leading bootstrap null values when configured', async () => {
         vi.useFakeTimers();
-        const cfg = makeCfg({ path: 'env.bootstrap', source: null, pathType: 'number', sampleTime: 50, suppressBootstrapNull: true });
+        const cfg = makeCfg({ path: 'env.bootstrap', source: null, pathType: 'number', updateInterval: 50, suppressBootstrapNull: true });
         directive.setStreamsConfig(cfg);
 
         const hits: (number | null)[] = [];
@@ -414,7 +413,7 @@ describe('WidgetStreamsDirective', () => {
 
     it('still emits later null values after the first non-null when suppressBootstrapNull is enabled', async () => {
         vi.useFakeTimers();
-        const cfg = makeCfg({ path: 'env.bootstrap-reset', source: null, pathType: 'number', sampleTime: 30, suppressBootstrapNull: true });
+        const cfg = makeCfg({ path: 'env.bootstrap-reset', source: null, pathType: 'number', updateInterval: 30, suppressBootstrapNull: true });
         directive.setStreamsConfig(cfg);
 
         const hits: (number | null)[] = [];
@@ -434,21 +433,21 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('treats suppressBootstrapNull as part of the path signature', () => {
-        const cfg1 = makeCfg({ path: 'env.sig', source: null, pathType: 'number', sampleTime: 50, suppressBootstrapNull: false });
+        const cfg1 = makeCfg({ path: 'env.sig', source: null, pathType: 'number', updateInterval: 50, suppressBootstrapNull: false });
         directive.setStreamsConfig(cfg1);
         directive.observe('p', () => { });
 
         expect(dataSvc.calls.length).toBe(1);
 
-        const cfg2 = makeCfg({ path: 'env.sig', source: null, pathType: 'number', sampleTime: 50, suppressBootstrapNull: true });
+        const cfg2 = makeCfg({ path: 'env.sig', source: null, pathType: 'number', updateInterval: 50, suppressBootstrapNull: true });
         directive.applyStreamsConfigDiff(cfg2);
 
         expect(dataSvc.calls.length).toBe(1);
     });
 
-    it('applies sampleTime: emits initial immediately and latest per interval', async () => {
+    it('applies updateInterval: emits initial immediately and latest per interval', async () => {
         vi.useFakeTimers();
-        const cfg = makeCfg({ path: 'env.sample', source: null, pathType: 'string', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'env.sample', source: null, pathType: 'string', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const hits: string[] = [];
@@ -473,7 +472,7 @@ describe('WidgetStreamsDirective', () => {
         // Silence noisy console logs from timeout/retry handling to keep test output clean
         vi.spyOn(console, 'log');
         // Configure a very short timeout (seconds) so the test runs fast
-        const cfg = makeCfg({ path: 'env.to', source: null, pathType: 'string', sampleTime: 100, displayName: 'Test', enableTimeout: true, dataTimeout: 0.02 });
+        const cfg = makeCfg({ path: 'env.to', source: null, pathType: 'string', updateInterval: 100, displayName: 'Test', enableTimeout: true, dataTimeout: 0.02 });
         directive.setStreamsConfig(cfg);
 
         const hits: string[] = [];
@@ -490,7 +489,7 @@ describe('WidgetStreamsDirective', () => {
     it('forwards a configured non-default source into timeoutPathObservable', async () => {
         vi.useFakeTimers();
         vi.spyOn(console, 'log');
-        const cfg = makeCfg({ path: 'env.to', source: 'n2k-1', pathType: 'string', sampleTime: 100, displayName: 'Test', enableTimeout: true, dataTimeout: 0.02 });
+        const cfg = makeCfg({ path: 'env.to', source: 'n2k-1', pathType: 'string', updateInterval: 100, displayName: 'Test', enableTimeout: true, dataTimeout: 0.02 });
         directive.setStreamsConfig(cfg);
 
         const hits: string[] = [];
@@ -504,7 +503,7 @@ describe('WidgetStreamsDirective', () => {
 
     it('applies a structural convertUnitTo to numeric values (initial + sampled)', async () => {
         vi.useFakeTimers();
-        const cfg = makeCfg({ path: 'env.units', source: null, pathType: 'number', sampleTime: 50, convertUnitTo: 'x10', showConvertUnitTo: false });
+        const cfg = makeCfg({ path: 'env.units', source: null, pathType: 'number', updateInterval: 50, convertUnitTo: 'x10', showConvertUnitTo: false });
         directive.setStreamsConfig(cfg);
 
         const hits: number[] = [];
@@ -524,7 +523,7 @@ describe('WidgetStreamsDirective', () => {
         unitsSvc.pathMeasures.set('env.disp', 'x10');
         // Stored convertUnitTo is ignored for a display path (no showConvertUnitTo:false); the
         // server-resolved measure wins for BOTH the conversion and the value's measure tag.
-        const cfg = makeCfg({ path: 'env.disp', source: null, pathType: 'number', convertUnitTo: 'noop', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'env.disp', source: null, pathType: 'number', convertUnitTo: 'noop', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: IPathUpdate[] = [];
@@ -538,7 +537,7 @@ describe('WidgetStreamsDirective', () => {
 
     it('re-emits the last value in the new unit when the resolved measure changes (late meta)', () => {
         unitsSvc.pathMeasures.set('env.late', 'noop'); // starts as an identity measure
-        const cfg = makeCfg({ path: 'env.late', source: null, pathType: 'number', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'env.late', source: null, pathType: 'number', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const values: unknown[] = [];
@@ -556,7 +555,7 @@ describe('WidgetStreamsDirective', () => {
 
     it('falls back to the stored unit for a display path while the resolved measure is still unitless', () => {
         unitsSvc.pathMeasures.set('env.pre', 'unitless'); // no unit meta resolved yet
-        const cfg = makeCfg({ path: 'env.pre', source: null, pathType: 'number', convertUnitTo: 'x10', sampleTime: 50 });
+        const cfg = makeCfg({ path: 'env.pre', source: null, pathType: 'number', convertUnitTo: 'x10', updateInterval: 50 });
         directive.setStreamsConfig(cfg);
 
         const received: IPathUpdate[] = [];
@@ -572,7 +571,7 @@ describe('WidgetStreamsDirective', () => {
 
     it('supports observer-level min/max compounding with sampling', async () => {
         vi.useFakeTimers();
-        const cfg = makeCfg({ path: 'env.stats', source: null, pathType: 'number', sampleTime: 40 });
+        const cfg = makeCfg({ path: 'env.stats', source: null, pathType: 'number', updateInterval: 40 });
         directive.setStreamsConfig(cfg);
 
         const stats = { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY, values: [] as number[] };
@@ -612,10 +611,10 @@ describe('WidgetStreamsDirective', () => {
         expect(stats.max).toBe(12);
     });
 
-    it('updates sampling cadence when sampleTime changes without resubscribing base', async () => {
+    it('updates sampling cadence when updateInterval changes without resubscribing base', async () => {
         vi.useFakeTimers();
-        // Initial sampleTime: 100ms
-        const cfg1 = makeCfg({ path: 'env.cadence', source: null, pathType: 'string', sampleTime: 100 });
+        // Initial updateInterval: 100ms
+        const cfg1 = makeCfg({ path: 'env.cadence', source: null, pathType: 'string', updateInterval: 100 });
         directive.setStreamsConfig(cfg1);
 
         const hits: string[] = [];
@@ -638,8 +637,8 @@ describe('WidgetStreamsDirective', () => {
         await vi.advanceTimersByTimeAsync(20);
         expect(hits).toEqual(['A', 'C']);
 
-        // Change only sampleTime to 30ms; base identity (path+source) unchanged
-        const cfg2 = makeCfg({ path: 'env.cadence', source: null, pathType: 'string', sampleTime: 30 });
+        // Change only updateInterval to 30ms; base identity (path+source) unchanged
+        const cfg2 = makeCfg({ path: 'env.cadence', source: null, pathType: 'string', updateInterval: 30 });
         directive.applyStreamsConfigDiff(cfg2);
 
         // DataService should NOT have been called again (no new base subscription)
@@ -662,14 +661,51 @@ describe('WidgetStreamsDirective', () => {
         expect(hits).toEqual(['A', 'C', 'D', 'E', 'F']);
     });
 
+    it('falls back to a 1000ms cadence when updateInterval is absent (Number(undefined) → NaN)', async () => {
+        vi.useFakeTimers();
+        const cfg = makeCfg({ path: 'env.fallback', source: null, pathType: 'string' });
+        delete (cfg as { updateInterval?: number }).updateInterval;
+        directive.setStreamsConfig(cfg);
+
+        const hits: string[] = [];
+        directive.observe('p', u => hits.push(String(u?.data?.value)));
+
+        const subj = dataSvc.subjects.get('env.fallback|default')!;
+        subj.next({ data: { value: 'A', timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+        subj.next({ data: { value: 'B', timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+        // Well inside the 1000ms window: only the immediate initial emission.
+        await vi.advanceTimersByTimeAsync(500);
+        expect(hits).toEqual(['A']);
+        // Cross the 1000ms boundary: latest ('B') is emitted.
+        await vi.advanceTimersByTimeAsync(600);
+        expect(hits).toEqual(['A', 'B']);
+    });
+
+    it('falls back to 1000ms when updateInterval is non-positive (0 → the <=0 branch)', async () => {
+        vi.useFakeTimers();
+        const cfg = makeCfg({ path: 'env.zero', source: null, pathType: 'string', updateInterval: 0 });
+        directive.setStreamsConfig(cfg);
+
+        const hits: string[] = [];
+        directive.observe('p', u => hits.push(String(u?.data?.value)));
+
+        const subj = dataSvc.subjects.get('env.zero|default')!;
+        subj.next({ data: { value: 'A', timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+        subj.next({ data: { value: 'B', timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(hits).toEqual(['A']);
+        await vi.advanceTimersByTimeAsync(600);
+        expect(hits).toEqual(['A', 'B']);
+    });
+
     it('releases the old base exactly once when the source rebinds', () => {
-        const cfg1 = makeCfg({ path: 'env.rebind', source: null, pathType: 'string', sampleTime: 50 });
+        const cfg1 = makeCfg({ path: 'env.rebind', source: null, pathType: 'string', updateInterval: 50 });
         directive.setStreamsConfig(cfg1);
         directive.observe('p', () => { });
         expect(dataSvc.calls).toEqual([{ path: 'env.rebind', source: 'default' }]);
         expect(dataSvc.releases).toEqual([]);
 
-        const cfg2 = makeCfg({ path: 'env.rebind', source: 'n2k', pathType: 'string', sampleTime: 50 });
+        const cfg2 = makeCfg({ path: 'env.rebind', source: 'n2k', pathType: 'string', updateInterval: 50 });
         directive.applyStreamsConfigDiff(cfg2);
 
         // The old (default) base is released once; the new (n2k) base is acquired.
@@ -680,19 +716,19 @@ describe('WidgetStreamsDirective', () => {
         ]);
     });
 
-    it('does NOT release or re-acquire the base on a sampleTime or convertUnitTo change (the trap)', () => {
-        const cfg1 = makeCfg({ path: 'env.trap', source: null, pathType: 'number', sampleTime: 100 });
+    it('does NOT release or re-acquire the base on an updateInterval or convertUnitTo change (the trap)', () => {
+        const cfg1 = makeCfg({ path: 'env.trap', source: null, pathType: 'number', updateInterval: 100 });
         directive.setStreamsConfig(cfg1);
         directive.observe('p', () => { });
         expect(dataSvc.calls.length).toBe(1);
 
         // Same base identity (path+source): pipeline rebuilds, but releasing here would over-release
         // a live registration, so the base must be neither released nor re-acquired.
-        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.trap', source: null, pathType: 'number', sampleTime: 30 }));
+        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.trap', source: null, pathType: 'number', updateInterval: 30 }));
         expect(dataSvc.calls.length).toBe(1);
         expect(dataSvc.releases).toEqual([]);
 
-        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.trap', source: null, pathType: 'number', sampleTime: 30, convertUnitTo: 'x10' }));
+        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.trap', source: null, pathType: 'number', updateInterval: 30, convertUnitTo: 'x10' }));
         expect(dataSvc.calls.length).toBe(1);
         expect(dataSvc.releases).toEqual([]);
     });
@@ -735,14 +771,14 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('does NOT release or re-acquire the base on a timeout-setting change (rootChanged rebuild)', () => {
-        directive.setStreamsConfig(makeCfg({ path: 'env.root', source: null, pathType: 'string', sampleTime: 50, enableTimeout: false, dataTimeout: 5 }));
+        directive.setStreamsConfig(makeCfg({ path: 'env.root', source: null, pathType: 'string', updateInterval: 50, enableTimeout: false, dataTimeout: 5 }));
         directive.observe('p', () => { });
         expect(dataSvc.calls.length).toBe(1);
 
         // A dataTimeout change flips the ROOT signature, taking the distinct rootChanged branch that
         // force-rebuilds every path's pipeline even though the per-path signature is unchanged. baseKey
         // (path+source) is still identical, so the base must be neither released nor re-acquired.
-        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.root', source: null, pathType: 'string', sampleTime: 50, enableTimeout: false, dataTimeout: 7 }));
+        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.root', source: null, pathType: 'string', updateInterval: 50, enableTimeout: false, dataTimeout: 7 }));
         expect(dataSvc.calls.length).toBe(1);
         expect(dataSvc.releases).toEqual([]);
     });
@@ -842,7 +878,7 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
         vi.useFakeTimers();
         vi.spyOn(console, 'log'); // silence timeout/retry logs
         const cfg = makeCfg({
-            path: 'env.ttl', source: null, pathType: 'number', sampleTime: 50,
+            path: 'env.ttl', source: null, pathType: 'number', updateInterval: 50,
             suppressBootstrapNull: true, enableTimeout: true, dataTimeout: 0.02
         });
         directive.setStreamsConfig(cfg);

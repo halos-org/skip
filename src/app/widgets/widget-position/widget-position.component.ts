@@ -62,11 +62,11 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
         pathType: 'object',
         isPathConfigurable: true,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: null,
-        sampleTime: 500
+        pathSkUnitsFilter: null
       }
     },
     color: 'contrast',
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5
   };

@@ -573,6 +573,114 @@ describe('ConfigurationUpgradeService', () => {
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
     });
 
+    it('v16 upgrade collapses per-path sampleTime into one widget-level updateInterval (min) and stamps v17', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 16 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    // uniform per-path cadence -> that value
+                    { input: { widgetProperties: { type: 'widget-numeric', config: {
+                        paths: { numericPath: { path: 'self.navigation.speedOverGround', pathType: 'number', sampleTime: 500 } }
+                    } } } },
+                    // divergent per-path cadence -> the minimum (most responsive)
+                    { input: { widgetProperties: { type: 'widget-racer-line', config: {
+                        paths: {
+                            a: { path: 'self.a', pathType: 'number', sampleTime: 1000 },
+                            b: { path: 'self.b', pathType: 'number', sampleTime: 500 }
+                        }
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(16);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(17);
+        const numeric = written.dashboards[0].configuration[0].input.widgetProperties.config;
+        expect(numeric.updateInterval).toBe(500);
+        expect(numeric.paths.numericPath.sampleTime).toBeUndefined();
+        const racer = written.dashboards[0].configuration[1].input.widgetProperties.config;
+        expect(racer.updateInterval).toBe(500);
+        expect(racer.paths.a.sampleTime).toBeUndefined();
+        expect(racer.paths.b.sampleTime).toBeUndefined();
+    });
+
+    it('v16 upgrade defaults updateInterval to 1000 with no valid sampleTime, tolerates array/missing paths, stamps v17', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 16 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    // paths present but none carry a valid sampleTime -> default 1000
+                    { input: { widgetProperties: { type: 'widget-text', config: {
+                        paths: { stringPath: { path: 'self.some.string', pathType: 'string' } }
+                    } } } },
+                    // array-form paths iterate too (Object.values)
+                    { input: { widgetProperties: { type: 'widget-boolean-switch', config: { paths: [
+                        { path: 'self.sw', pathType: 'boolean', sampleTime: 500 }
+                    ] } } } },
+                    // no paths at all -> left untouched (no updateInterval)
+                    { input: { widgetProperties: { type: 'widget-iframe', config: { widgetUrl: 'https://x' } } } },
+                    // missing widgetProperties -> skipped, not crashed on
+                    { input: {} }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(16);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(17);
+        const cfgs = written.dashboards[0].configuration;
+        expect(cfgs[0].input.widgetProperties.config.updateInterval).toBe(1000);
+        expect(cfgs[1].input.widgetProperties.config.updateInterval).toBe(500);
+        expect(cfgs[2].input.widgetProperties.config.updateInterval).toBeUndefined();
+    });
+
+    it('v16 upgrade skips a slot that is not at version 16 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 15 },
+            theme: { themeName: '' },
+            dashboards: []
+        });
+
+        await service.runUpgrade(16);
+
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('v16 upgrade excludes non-positive sampleTime from the min (0 and negative ignored, valid value wins)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 16 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-numeric', config: {
+                        paths: {
+                            a: { path: 'self.a', pathType: 'number', sampleTime: 0 },
+                            b: { path: 'self.b', pathType: 'number', sampleTime: -5 },
+                            c: { path: 'self.c', pathType: 'number', sampleTime: 500 }
+                        }
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(16);
+
+        const cfg = mockStorage.setConfig.mock.calls.at(-1)![2].dashboards[0].configuration[0].input.widgetProperties.config;
+        expect(cfg.updateInterval).toBe(500);
+        expect(cfg.paths.a.sampleTime).toBeUndefined();
+        expect(cfg.paths.b.sampleTime).toBeUndefined();
+        expect(cfg.paths.c.sampleTime).toBeUndefined();
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([

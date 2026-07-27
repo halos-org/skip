@@ -137,8 +137,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         pathType: "string",
         isPathConfigurable: false,
         showPathSkUnitsFilter: false,
-        convertUnitTo: "",
-        sampleTime: 500
+        convertUnitTo: ""
       },
       "autopilotMode": {
         description: "Autopilot Mode",
@@ -147,8 +146,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         pathType: "string",
         isPathConfigurable: false,
         showPathSkUnitsFilter: false,
-        convertUnitTo: "",
-        sampleTime: 500
+        convertUnitTo: ""
       },
       "autopilotEngaged": {
         description: "Autopilot Engaged",
@@ -157,8 +155,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         pathType: "boolean",
         isPathConfigurable: false,
         showPathSkUnitsFilter: false,
-        convertUnitTo: "",
-        sampleTime: 500
+        convertUnitTo: ""
       },
       "autopilotV2Target": {
         description: "Autopilot API v2 Target",
@@ -169,8 +166,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         showConvertUnitTo: false,
         isPathConfigurable: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 'rad',
-        sampleTime: 500
+        pathSkUnitsFilter: 'rad'
       },
       "autopilotTargetHeading": {
         description: "Autopilot Target Magnetic Heading",
@@ -181,8 +177,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         showConvertUnitTo: false,
         isPathConfigurable: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 'rad',
-        sampleTime: 500
+        pathSkUnitsFilter: 'rad'
       },
       "autopilotTargetWindHeading": {
         description: "Autopilot Target Apparent Wind Angle",
@@ -193,8 +188,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         showConvertUnitTo: false,
         isPathConfigurable: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 'rad',
-        sampleTime: 500
+        pathSkUnitsFilter: 'rad'
       },
       "rudderAngle": {
         description: "Rudder Angle",
@@ -205,8 +199,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         showConvertUnitTo: false,
         isPathConfigurable: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 'rad',
-        sampleTime: 500
+        pathSkUnitsFilter: 'rad'
       },
       "courseXte": {
         description: "Cross Track Error",
@@ -218,8 +211,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         showConvertUnitTo: false,
         showPathSkUnitsFilter: true,
         pathRequired: false,
-        pathSkUnitsFilter: 'm',
-        sampleTime: 500
+        pathSkUnitsFilter: 'm'
       },
       "headingMag": {
         description: "Magnetic Heading",
@@ -231,8 +223,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
-        showConvertUnitTo: false,
-        sampleTime: 500
+        showConvertUnitTo: false
       },
       "headingTrue": {
         description: "True Heading",
@@ -244,8 +235,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
-        showConvertUnitTo: false,
-        sampleTime: 500
+        showConvertUnitTo: false
       },
       "windAngleApparent": {
         description: "Apparent Wind Angle",
@@ -257,8 +247,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
-        showConvertUnitTo: false,
-        sampleTime: 500
+        showConvertUnitTo: false
       },
       "windAngleTrueWater": {
         description: "Wind Angle True Water",
@@ -270,8 +259,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
-        showConvertUnitTo: false,
-        sampleTime: 500
+        showConvertUnitTo: false
       }
     },
     autopilot : { // Will be set during API detection in widget Options
@@ -283,6 +271,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       pluginId: null,
       modes: null // Default modes for V1
     },
+    updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
   };
@@ -441,6 +430,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     config: {
       displayName: "Next WPT",
       filterSelfPaths: true,
+      updateInterval: 500,
       paths: {
         "longPath": {
           description: "Longitude",
@@ -451,8 +441,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
           convertUnitTo: "longitudeMin",
           showConvertUnitTo: false,
           showPathSkUnitsFilter: true,
-          pathSkUnitsFilter: null,
-          sampleTime: 500
+          pathSkUnitsFilter: null
         },
         "latPath": {
           description: "Latitude",
@@ -463,8 +452,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
           convertUnitTo: "latitudeMin",
           showConvertUnitTo: false,
           showPathSkUnitsFilter: true,
-          pathSkUnitsFilter: null,
-          sampleTime: 500
+          pathSkUnitsFilter: null
         }
       },
       color: this.embedWidgetColor,
@@ -478,6 +466,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     config: {
       displayName: "TTWpt",
       filterSelfPaths: true,
+      updateInterval: 500,
       paths: {
         numericPath: {
           description: "Time To Waypoint",
@@ -488,8 +477,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
           convertUnitTo: "D HH:MM:SS",
           showConvertUnitTo: false,
           showPathSkUnitsFilter: true,
-          pathSkUnitsFilter: null,
-          sampleTime: 500
+          pathSkUnitsFilter: null
         }
       },
       showMax: false,
@@ -509,14 +497,14 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     config: {
       displayName: "ETA",
       filterSelfPaths: true,
+      updateInterval: 500,
       paths: {
         gaugePath: {
           description: "Estimated Time Of Arrival Date",
           path: "self.navigation.course.calcValues.estimatedTimeOfArrival",
           source: "default",
           pathType: "Date",
-          isPathConfigurable: true,
-          sampleTime: 500
+          isPathConfigurable: true
         }
       },
       dateFormat: "EEE HH:mm",
@@ -532,6 +520,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     config : {
       displayName  : "DTWpt",
       filterSelfPaths  : true,
+      updateInterval  : 500,
       paths  : {
         numericPath  : {
           description  : "Distance To Waypoint",
@@ -541,8 +530,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
           isPathConfigurable  : true,
           convertUnitTo  : "nm",
           showPathSkUnitsFilter  : true,
-          pathSkUnitsFilter  : null,
-          sampleTime  : 500
+          pathSkUnitsFilter  : null
         }
       },
       showMax  : false,
@@ -562,6 +550,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     config: {
       displayName: "XTE",
       filterSelfPaths: true,
+      updateInterval: 500,
       paths: {
         numericPath: {
           description: "Cross Track Error",
@@ -571,8 +560,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
           isPathConfigurable: true,
           convertUnitTo: "m",
           showPathSkUnitsFilter: true,
-          pathSkUnitsFilter: null,
-          sampleTime: 500
+          pathSkUnitsFilter: null
         }
       },
       showMax: false,

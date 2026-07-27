@@ -37,8 +37,7 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       },
       appWindAngle: {
         description: 'Apparent Wind Angle',
@@ -50,8 +49,7 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       },
       appWindSpeed: {
         description: 'Apparent Wind Speed',
@@ -62,8 +60,7 @@ export class WidgetWindComponent implements OnDestroy {
         pathRequired: true,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
-        convertUnitTo: 'knots',
-        sampleTime: 1000
+        convertUnitTo: 'knots'
       },
       trueWindAngle: {
         description: 'True Wind Angle',
@@ -75,8 +72,7 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       },
       trueWindSpeed: {
         description: 'True Wind Speed',
@@ -87,8 +83,7 @@ export class WidgetWindComponent implements OnDestroy {
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
-        convertUnitTo: 'knots',
-        sampleTime: 1000
+        convertUnitTo: 'knots'
       },
       courseOverGround: {
         description: 'True Course Over Ground',
@@ -100,8 +95,7 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         showConvertUnitTo: false,
-        convertUnitTo: 'deg',
-        sampleTime: 1000
+        convertUnitTo: 'deg'
       },
       nextWaypointBearing: {
         description: 'Next Waypoint True Bearing',
@@ -113,8 +107,7 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       },
       set: {
         description: 'True Drift Set',
@@ -126,8 +119,7 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       },
       drift: {
         description: 'Drift Speed Impact',
@@ -138,8 +130,7 @@ export class WidgetWindComponent implements OnDestroy {
         pathRequired: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
-        convertUnitTo: 'knots',
-        sampleTime: 1000
+        convertUnitTo: 'knots'
       }
     },
     compassModeEnabled: true,
@@ -154,6 +145,7 @@ export class WidgetWindComponent implements OnDestroy {
     twsEnable: true,
     twaEnable: true,
     sailSetupEnable: false,
+    updateInterval: 1000,
     enableTimeout: false,
     dataTimeout: 5
   };

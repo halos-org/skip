@@ -222,13 +222,13 @@ export const DefaultDashboard: Dashboard[] = [
                   "path": "self.navigation.state",
                   "source": "default",
                   "pathType": "string",
-                  "isPathConfigurable": true,
-                  "sampleTime": 500
+                  "isPathConfigurable": true
                 }
               },
               "color": "pink",
               "enableTimeout": false,
-              "dataTimeout": 5
+              "dataTimeout": 5,
+              "updateInterval": 500
             }
           }
         },
@@ -262,8 +262,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "celsius",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -277,7 +276,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "green",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -363,8 +363,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "showPathSkUnitsFilter": true,
                   "pathSkUnitsFilter": null,
-                  "convertUnitTo": "rpm",
-                  "sampleTime": 500
+                  "convertUnitTo": "rpm"
                 }
               },
               "displayScale": {
@@ -387,7 +386,8 @@ export const DefaultDashboard: Dashboard[] = [
               "enableTimeout": false,
               "color": "contrast",
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -419,8 +419,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "celsius",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -434,7 +433,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "orange",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -466,8 +466,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "celsius",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -481,7 +480,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "orange",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -513,8 +513,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "celsius",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -528,7 +527,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "orange",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -560,8 +560,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "liter",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -575,7 +574,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "purple",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -763,13 +763,13 @@ export const DefaultDashboard: Dashboard[] = [
                   "path": "self.propulsion.main.state",
                   "source": "default",
                   "pathType": "string",
-                  "isPathConfigurable": true,
-                  "sampleTime": 500
+                  "isPathConfigurable": true
                 }
               },
               "color": "contrast",
               "enableTimeout": false,
-              "dataTimeout": 5
+              "dataTimeout": 5,
+              "updateInterval": 500
             }
           }
         },
@@ -834,8 +834,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "deg",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -849,7 +848,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "orange",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -881,8 +881,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 100
+                  "showConvertUnitTo": false
                 },
                 "appWindAngle": {
                   "description": "Apparent Wind Angle",
@@ -894,8 +893,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 100
+                  "showConvertUnitTo": false
                 },
                 "appWindSpeed": {
                   "description": "Apparent Wind Speed",
@@ -906,8 +904,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathRequired": true,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "m/s",
-                  "convertUnitTo": "m/s",
-                  "sampleTime": 100
+                  "convertUnitTo": "m/s"
                 },
                 "trueWindAngle": {
                   "description": "True Wind Angle",
@@ -919,8 +916,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 100
+                  "showConvertUnitTo": false
                 },
                 "trueWindSpeed": {
                   "description": "True Wind Speed",
@@ -931,8 +927,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathRequired": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "m/s",
-                  "convertUnitTo": "m/s",
-                  "sampleTime": 100
+                  "convertUnitTo": "m/s"
                 },
                 "courseOverGround": {
                   "description": "True Course Over Ground",
@@ -944,8 +939,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "showConvertUnitTo": false,
-                  "convertUnitTo": "deg",
-                  "sampleTime": 100
+                  "convertUnitTo": "deg"
                 },
                 "nextWaypointBearing": {
                   "description": "Next Waypoint True Bearing",
@@ -957,8 +951,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 1000
+                  "showConvertUnitTo": false
                 },
                 "set": {
                   "description": "True Drift Set",
@@ -970,8 +963,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 100
+                  "showConvertUnitTo": false
                 },
                 "drift": {
                   "description": "Drift Speed Impact",
@@ -982,8 +974,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathRequired": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "m/s",
-                  "convertUnitTo": "knots",
-                  "sampleTime": 100
+                  "convertUnitTo": "knots"
                 }
               },
               "compassModeEnabled": true,
@@ -999,7 +990,8 @@ export const DefaultDashboard: Dashboard[] = [
               "twaEnable": true,
               "sailSetupEnable": false,
               "enableTimeout": false,
-              "dataTimeout": 5
+              "dataTimeout": 5,
+              "updateInterval": 1000
             }
           }
         }
@@ -1030,8 +1022,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "deg",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -1045,7 +1036,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "yellow",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -1077,8 +1069,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "knots",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -1092,7 +1083,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "contrast",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -1124,8 +1116,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": true,
                   "convertUnitTo": "knots",
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "showMax": false,
@@ -1139,7 +1130,8 @@ export const DefaultDashboard: Dashboard[] = [
               "color": "blue",
               "enableTimeout": false,
               "dataTimeout": 5,
-              "ignoreZones": false
+              "ignoreZones": false,
+              "updateInterval": 500
             }
           }
         }
@@ -1313,7 +1305,6 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "number",
                   "isPathConfigurable": false,
                   "convertUnitTo": "deg",
-                  "sampleTime": 1000,
                   "pathRequired": true
                 }
               },
@@ -1326,7 +1317,8 @@ export const DefaultDashboard: Dashboard[] = [
               "numDecimal": 0,
               "color": "contrast",
               "enableTimeout": true,
-              "dataTimeout": 5
+              "dataTimeout": 5,
+              "updateInterval": 1000
             }
           }
         }
@@ -1358,8 +1350,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
-                  "convertUnitTo": "deg",
-                  "sampleTime": 1000
+                  "convertUnitTo": "deg"
                 },
                 "gaugeRollPath": {
                   "description": "Attitude Roll Data",
@@ -1370,8 +1361,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
-                  "convertUnitTo": "deg",
-                  "sampleTime": 1000
+                  "convertUnitTo": "deg"
                 }
               },
               "gauge": {
@@ -1382,7 +1372,8 @@ export const DefaultDashboard: Dashboard[] = [
                 "invertRoll": false
               },
               "enableTimeout": true,
-              "dataTimeout": 5
+              "dataTimeout": 5,
+              "updateInterval": 1000
             }
           }
         }
@@ -1412,13 +1403,13 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "object",
                   "isPathConfigurable": true,
                   "showPathSkUnitsFilter": false,
-                  "pathSkUnitsFilter": null,
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": null
                 }
               },
               "color": "contrast",
               "enableTimeout": false,
-              "dataTimeout": 5
+              "dataTimeout": 5,
+              "updateInterval": 500
             }
           }
         }
@@ -1446,8 +1437,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "string",
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
-                  "convertUnitTo": "",
-                  "sampleTime": 500
+                  "convertUnitTo": ""
                 },
                 "autopilotMode": {
                   "description": "Autopilot Mode",
@@ -1456,8 +1446,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "string",
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
-                  "convertUnitTo": "",
-                  "sampleTime": 500
+                  "convertUnitTo": ""
                 },
                 "autopilotEngaged": {
                   "description": "Autopilot Engaged",
@@ -1466,8 +1455,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "boolean",
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
-                  "convertUnitTo": "",
-                  "sampleTime": 500
+                  "convertUnitTo": ""
                 },
                 "autopilotV2Target": {
                   "description": "Autopilot API v2 Target",
@@ -1477,8 +1465,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "convertUnitTo": "deg",
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
-                  "pathSkUnitsFilter": "rad",
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": "rad"
                 },
                 "autopilotTargetHeading": {
                   "description": "Autopilot Target Magnetic Heading",
@@ -1488,8 +1475,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "convertUnitTo": "deg",
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
-                  "pathSkUnitsFilter": "rad",
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": "rad"
                 },
                 "autopilotTargetWindHeading": {
                   "description": "Autopilot Target Apparent Wind Angle",
@@ -1499,8 +1485,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "convertUnitTo": "deg",
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
-                  "pathSkUnitsFilter": "rad",
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": "rad"
                 },
                 "rudderAngle": {
                   "description": "Rudder Angle",
@@ -1510,8 +1495,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "convertUnitTo": "deg",
                   "isPathConfigurable": false,
                   "showPathSkUnitsFilter": false,
-                  "pathSkUnitsFilter": "rad",
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": "rad"
                 },
                 "courseXte": {
                   "description": "Cross Track Error",
@@ -1522,8 +1506,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "convertUnitTo": "m",
                   "showPathSkUnitsFilter": true,
                   "pathRequired": false,
-                  "pathSkUnitsFilter": "m",
-                  "sampleTime": 500
+                  "pathSkUnitsFilter": "m"
                 },
                 "headingMag": {
                   "description": "Magnetic Heading",
@@ -1535,8 +1518,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathRequired": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 500
+                  "showConvertUnitTo": false
                 },
                 "headingTrue": {
                   "description": "True Heading",
@@ -1548,8 +1530,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathRequired": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 500
+                  "showConvertUnitTo": false
                 },
                 "windAngleApparent": {
                   "description": "Apparent Wind Angle",
@@ -1561,8 +1542,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathRequired": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 500
+                  "showConvertUnitTo": false
                 },
                 "windAngleTrueWater": {
                   "description": "Wind Angle True Water",
@@ -1574,8 +1554,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathRequired": false,
                   "showPathSkUnitsFilter": false,
                   "pathSkUnitsFilter": "rad",
-                  "showConvertUnitTo": false,
-                  "sampleTime": 500
+                  "showConvertUnitTo": false
                 }
               },
               "autopilot": {
@@ -1588,7 +1567,8 @@ export const DefaultDashboard: Dashboard[] = [
                 "modes": []
               },
               "enableTimeout": false,
-              "dataTimeout": 5
+              "dataTimeout": 5,
+              "updateInterval": 500
             }
           }
         }

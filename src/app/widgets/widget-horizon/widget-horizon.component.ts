@@ -78,8 +78,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       },
       gaugeRollPath: {
         description: 'Attitude Roll Data',
@@ -91,8 +90,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         convertUnitTo: 'deg',
-        showConvertUnitTo: false,
-        sampleTime: 1000
+        showConvertUnitTo: false
       }
     },
     gauge: {
@@ -102,6 +100,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
       invertPitch: false,
       invertRoll: false
     },
+    updateInterval: 1000,
     enableTimeout: true,
     dataTimeout: 5
   };

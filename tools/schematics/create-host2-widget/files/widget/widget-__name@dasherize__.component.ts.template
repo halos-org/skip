@@ -33,11 +33,11 @@ export class <%= className %> implements AfterViewInit {
         pathRequired: true,
         convertUnitTo: null,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: null,
-        sampleTime: 1000
+        pathSkUnitsFilter: null
       }
     },
     filterSelfPaths: true,
+    updateInterval: 1000,
     enableTimeout: false,
     dataTimeout: 5<% if (zonesSupport) { %>,
     ignoreZones: false<%= todoBlock ? " // TODO: Signal K Zones support: delete if disabling zones should not be a widget Option users can configure." : "" %><% } %>
