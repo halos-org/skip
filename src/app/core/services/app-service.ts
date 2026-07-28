@@ -90,12 +90,9 @@ export class AppService {
     );
 
     effect(() => {
-      if (this._theme() === 'light-theme') {
-        document.body.classList.toggle('light-theme', this._theme() === 'light-theme');
-      } else {
-        // Remove the light theme class if it exists
-        document.body.classList.remove('light-theme');
-      }
+      // Night mode forces a dark base, so light-theme only applies outside it.
+      const applyLight = this._theme() === 'light-theme' && !this.isNightMode();
+      document.body.classList.toggle('light-theme', applyLight);
       // Re-snapshot the theme CSS custom properties so widgets (which draw from the
       // JS snapshot, not live CSS) recolor without a reload. getComputedStyle here
       // forces a synchronous style recalc, so the class change above is reflected.
@@ -207,17 +204,14 @@ export class AppService {
 
   public toggleDayNightMode(): void {
     if (this.isNightMode()) {
+      // Night mode always uses a dark base, regardless of the selected theme.
+      document.body.classList.remove('light-theme');
       if (this._redNightMode()) {
         document.body.classList.toggle('night-theme', true);
         this.setBrightness(1, false);
       } else {
         this.setBrightness(this._settings.getNightModeBrightness(), true);
         document.body.classList.remove('night-theme');
-        if (this._theme() === 'light-theme') {
-          document.body.classList.toggle('light-theme', this._theme() === 'light-theme');
-        } else {
-          document.body.classList.remove('light-theme');
-        }
       }
 
     } else {
