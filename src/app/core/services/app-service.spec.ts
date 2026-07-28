@@ -145,22 +145,39 @@ describe('AppService', () => {
       expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toContain('sepia(0.5)');
     });
 
-    it('keeps the light-theme class in night mode when the theme is light', () => {
+    it('forces a dark base (removes light-theme) in night mode even when the theme is light', () => {
       settings.themeName.set('light-theme');
       const service = createService();
       service.isNightMode.set(true);
       service.toggleDayNightMode();
-      expect(document.body.classList.contains('light-theme')).toBe(true);
+      expect(document.body.classList.contains('light-theme')).toBe(false);
     });
 
     it('applies the red night theme at full brightness when red night mode is on', () => {
+      settings.themeName.set('light-theme');
       settings.redNightMode.set(true);
       const service = createService();
       service.isNightMode.set(true);
       service.toggleDayNightMode();
       expect(document.body.classList.contains('night-theme')).toBe(true);
+      expect(document.body.classList.contains('light-theme')).toBe(false);
       expect(document.body.style.getPropertyValue('--skip-nightModeBrightness')).toBe('1');
       expect(document.body.style.getPropertyValue('--skip-nightModeFilters')).toBe('');
+    });
+
+    it('keeps the dark base when the theme is switched to light while night mode is active', () => {
+      const service = createService();
+      service.isNightMode.set(true);
+      service.toggleDayNightMode();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+
+      settings.themeName.set('light-theme');
+      TestBed.tick();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+
+      service.isNightMode.set(false);
+      service.toggleDayNightMode();
+      expect(document.body.classList.contains('light-theme')).toBe(true);
     });
 
     it('publishes a fresh theme color snapshot on each toggle', () => {
