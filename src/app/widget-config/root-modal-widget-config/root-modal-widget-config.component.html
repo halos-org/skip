@@ -20,6 +20,13 @@
               <span matTextSuffix>ms</span>
               <mat-hint>How often the widget refreshes its reading on screen. Lower is more responsive but does more work; it does not change how often data is received.</mat-hint>
             </mat-form-field>
+            @if ((widgetConfig?.enableTimeout !== undefined)) {
+              <mat-checkbox
+                name="enableTimeout"
+                [formControl]="enableTimeoutToControl">
+                  Blank the reading after 5s without data
+              </mat-checkbox>
+            }
           </div>
         }
         @if ((widgetConfig?.datachartPath !== undefined)) {

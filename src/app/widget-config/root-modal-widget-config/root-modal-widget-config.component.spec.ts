@@ -418,7 +418,7 @@ describe('ModalWidgetComponent updateInterval Display-tab placement', () => {
   // An all-fixed-path widget: hasConfigurablePaths is false, so the Paths tab (where the cadence
   // control used to live) is suppressed and no path-control-config is rendered. displayName routes it
   // to the general Display body. This is the exact case the relocation fixes.
-  const allFixedConfig = { displayName: 'X', updateInterval: 500, paths: {
+  const allFixedConfig = { displayName: 'X', updateInterval: 500, enableTimeout: false, paths: {
     p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false }
   } } as unknown as IWidgetSvcConfig;
 
@@ -435,12 +435,14 @@ describe('ModalWidgetComponent updateInterval Display-tab placement', () => {
     ensureTestIconsReady();
   });
 
-  // The cadence input must render on the always-shown Display tab even when the Paths tab is gone —
-  // pre-relocation it lived in paths-options and vanished with the suppressed tab.
-  it('renders the updateInterval input on the Display tab when the Paths tab is suppressed', () => {
+  // The cadence input and the stale-data-timeout toggle must render on the always-shown Display tab
+  // even when the Paths tab is gone — pre-relocation both lived in paths-options and vanished with the
+  // suppressed tab.
+  it('renders the updateInterval input and enableTimeout toggle on the Display tab when the Paths tab is suppressed', () => {
     const fixture = TestBed.createComponent(RootModalWidgetConfigComponent);
     fixture.detectChanges();
     expect(fixture.componentInstance.hasConfigurablePaths).toBe(false);
     expect(fixture.nativeElement.querySelector('input[name="updateInterval"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('mat-checkbox[name="enableTimeout"]')).toBeTruthy();
   });
 });

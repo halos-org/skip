@@ -319,6 +319,10 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return this.configControl('updateInterval') as UntypedFormControl;
   }
 
+  get enableTimeoutToControl(): UntypedFormControl {
+    return this.configControl('enableTimeout') as UntypedFormControl;
+  }
+
   get dateTimezoneToControl(): FormControl<string> {
     return this.configControl('dateTimezone') as FormControl<string>;
   }
