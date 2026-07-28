@@ -1,30 +1,3 @@
-<div class="widget-options-grid">
-  <mat-form-field>
-    <mat-label>Display update interval</mat-label>
-    <input type="number" matNativeControl placeholder="Interval in milliseconds..."
-      name="updateInterval"
-      [formControl]="updateInterval()"
-      min="100"
-      required>
-    <span matTextSuffix>ms</span>
-    <mat-hint>How often the widget refreshes its reading on screen. Lower is more responsive but does more work; it does not change how often data is received.</mat-hint>
-  </mat-form-field>
-  <mat-checkbox
-    name="enableTimeout"
-    [formControl]="enableTimeout()">
-      Enable Widget Data TTL
-  </mat-checkbox>
-  <mat-form-field>
-    <mat-label>TTL Timeout For Paths</mat-label>
-    <input type="number" matNativeControl placeholder="Time in seconds..."
-      name="dataTimeout"
-      [formControl]="dataTimeout()"
-      min="2"
-      required>
-    <span matTextSuffix>Seconds</span>
-    <mat-hint>When data stops arriving for this long, the widget clears its reading instead of holding the last value. For a path shared by several sources, it clears only once every source has gone quiet.</mat-hint>
-  </mat-form-field>
-</div>
 <ng-container [formGroup]="pathsGroup">
   @if(isArray()) {
     @for (group of pathControlGroups; track $index) {

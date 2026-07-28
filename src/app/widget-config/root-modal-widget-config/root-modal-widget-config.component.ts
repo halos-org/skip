@@ -318,14 +318,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return entries.some(p => p?.isPathConfigurable !== false || (p?.pathOptions?.length ?? 0) > 0);
   }
 
-  get dataTimeoutToControl(): UntypedFormControl {
-    return this.configControl('dataTimeout') as UntypedFormControl;
-  }
-
-  get enableTimeoutToControl(): UntypedFormControl {
-    return this.configControl('enableTimeout') as UntypedFormControl;
-  }
-
   get updateIntervalToControl(): UntypedFormControl {
     return this.configControl('updateInterval') as UntypedFormControl;
   }
