@@ -114,7 +114,7 @@ export class AppService {
       // Re-snapshot the theme CSS custom properties so widgets (which draw from the
       // JS snapshot, not live CSS) recolor without a reload. getComputedStyle here
       // forces a synchronous style recalc, so the class change above is reflected.
-      this._cssThemeColorRoles = this.readThemeCssRoleVariables();
+      this.refreshThemeSnapshot();
     });
 
     effect(() => {
@@ -146,7 +146,7 @@ export class AppService {
       });
     });
 
-    this._cssThemeColorRoles = this.readThemeCssRoleVariables();
+    this.refreshThemeSnapshot();
 
     this.browserVersion.set(this.getBrowserVersion());
     this.osVersion.set(this.getOSVersion());
@@ -196,8 +196,12 @@ export class AppService {
       zoneAlarm: computedStyle.getPropertyValue('--skip-zone-alarm-color').trim(),
       zoneEmergency: computedStyle.getPropertyValue('--skip-zone-emergency-color').trim(),
     };
-    this.cssThemeColorRoles$.next(cssThemeRolesColor);
     return cssThemeRolesColor;
+  }
+
+  private refreshThemeSnapshot(): void {
+    this._cssThemeColorRoles = this.readThemeCssRoleVariables();
+    this.cssThemeColorRoles$.next(this._cssThemeColorRoles);
   }
 
   public get cssThemeColors() : ITheme {
@@ -237,7 +241,7 @@ export class AppService {
       document.body.classList.toggle('light-theme', this.resolveIsLightTheme());
       this.setBrightness(1, false);
     }
-    this._cssThemeColorRoles = this.readThemeCssRoleVariables();
+    this.refreshThemeSnapshot();
   }
 
   /**
