@@ -186,6 +186,46 @@ describe('GestureDirective', () => {
         expect(swipeLeftCount).toBe(0);
     });
 
+    it('claims touch-move only while tracking a gesture (stops the fling that swallows the next tap)', () => {
+        component.mode = 'all';
+        syncFixture();
+        const touchMovePrevented = () => {
+            const e = new Event('touchmove', { bubbles: true, cancelable: true });
+            hostEl.dispatchEvent(e);
+            return e.defaultPrevented;
+        };
+
+        // Idle (not tracking): touch-move passes through, so scrolling in dialogs/sheets is unaffected.
+        expect(touchMovePrevented()).toBe(false);
+
+        // A gesture starts on pointerdown -> subsequent touch-moves are claimed so the browser
+        // recognises no scroll/fling (a fling would make Chromium suppress the click of the tap that
+        // stops it, losing a flick-to-reveal-then-tap).
+        dispatchPointerEvent(hostEl, 'pointerdown', { clientX: 50, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+        expect(touchMovePrevented()).toBe(true);
+
+        // After release, tracking ends -> touch-move passes through again.
+        dispatchPointerEvent(hostEl, 'pointerup', { clientX: 50, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+        expect(touchMovePrevented()).toBe(false);
+    });
+
+    it('yields touch-move to a scrollable descendant so routed pages/lists keep touch-scrolling', () => {
+        component.mode = 'all';
+        syncFixture();
+        // A scrollable child with content overflowing (jsdom has no layout, so stub the metrics).
+        const scroller = document.createElement('div');
+        scroller.style.overflowY = 'auto';
+        Object.defineProperty(scroller, 'scrollHeight', { value: 400, configurable: true });
+        Object.defineProperty(scroller, 'clientHeight', { value: 100, configurable: true });
+        hostEl.appendChild(scroller);
+
+        // Gesture tracking, but the touch is inside the scroller -> NOT claimed, so the browser scrolls.
+        dispatchPointerEvent(hostEl, 'pointerdown', { clientX: 50, clientY: 20, pointerId: POINTER_ID, pointerType: 'touch' });
+        const onScroller = new Event('touchmove', { bubbles: true, cancelable: true });
+        scroller.dispatchEvent(onScroller);
+        expect(onScroller.defaultPrevented).toBe(false);
+    });
+
     it('emits doubletap for two taps within interval', () => {
         component.mode = 'press';
         component.enableDoubleTap = true;
