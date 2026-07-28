@@ -319,6 +319,19 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
     expect(ctrl.valid).toBe(true);
   });
 
+  // Effort D: updateInterval moved to the always-shown Display tab, so it must be reachable even for a
+  // widget with no configurable paths (Paths tab suppressed via hasConfigurablePaths) — the case that
+  // hid it before. Prove the control exists independent of path configurability.
+  it('exposes updateIntervalToControl for an all-fixed-path widget whose Paths tab is suppressed', () => {
+    const cfg = { updateInterval: 500, paths: {
+      p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false }
+    } } as unknown as IWidgetSvcConfig;
+    const component = buildForm(cfg);
+    expect(component.hasConfigurablePaths).toBe(false); // Paths tab is gone
+    expect(component.updateIntervalToControl).toBeTruthy(); // yet the cadence control survives
+    expect(component.updateIntervalToControl.value).toBe(500);
+  });
+
   // Regression (#430): the Paths tab renders for any multiChildCtrls widget and binds a REQUIRED
   // updateInterval control; a widget whose DEFAULT_CONFIG omits updateInterval yields a null control
   // and paths-options binds [formControl]=null, throwing on render. Prove the shipped array-form
