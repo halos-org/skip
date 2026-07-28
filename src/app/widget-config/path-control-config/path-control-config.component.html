@@ -1,6 +1,6 @@
 <div [formGroup]="pathFormGroup()" class="flex-container rounded-card rounded-card-color">
   <div class="flex-field-100">
-    <span [style.color]="pathFormGroup().controls['path'].disabled ? 'rgba(255,255,255,0.5)' : ''">{{pathFormGroup().value.description}}</span>
+    <span [style.color]="pathFormGroup().controls['path'].disabled ? 'var(--mat-sys-on-surface-variant)' : ''">{{pathFormGroup().value.description}}</span>
   </div>
 
   @if (pathFormGroup().value.pathOptions?.length) {
