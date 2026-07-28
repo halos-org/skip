@@ -4,6 +4,7 @@ import { WidgetPositionComponent } from '../app/widgets/widget-position/widget-p
 import { WidgetWindComponent } from '../app/widgets/widget-windsteer/widget-windsteer.component';
 import { WidgetRacesteerComponent } from '../app/widgets/widget-racesteer/widget-racesteer.component';
 import { WidgetWindTrendsChartComponent } from '../app/widgets/widget-windtrends-chart/widget-windtrends-chart.component';
+import { WidgetAutopilotComponent } from '../app/widgets/widget-autopilot/widget-autopilot.component';
 
 // The shipped seed is stamped at LATEST_APP_CONFIG_VERSION, so config migrations never run on a
 // fresh install/profile. A widget whose path shape drifts from its DEFAULT_CONFIG therefore ships
@@ -68,6 +69,24 @@ describe('DefaultDashboard seed', () => {
       for (const [slot, seedPath] of Object.entries(paths)) {
         expect(seedPath.path, `seed wind-steer ${slot}.path`).toBe(defaults[slot]?.path);
         expect(seedPath.isPathConfigurable, `seed wind-steer ${slot}.isPathConfigurable`).toBe(defaults[slot]?.isPathConfigurable);
+      }
+    }
+  });
+
+  // Effort C: autopilot's seed must match its slimmed DEFAULT_CONFIG — every path fixed and the dead
+  // windAngleTrueWater slot gone from both. The seed's copy carried its own drift (angleTrueGround
+  // under a "True Water" description) before this; a re-export must not resurrect it.
+  it('seeds widget-autopilot with every path fixed, matching DEFAULT_CONFIG, and no windAngleTrueWater', () => {
+    const seedWidgets = seededWidgetsOfType('widget-autopilot');
+    expect(seedWidgets.length).toBeGreaterThan(0);
+    const defaults = WidgetAutopilotComponent.DEFAULT_CONFIG.paths as Record<string, { path?: string; isPathConfigurable?: boolean }>;
+    expect(defaults['windAngleTrueWater']).toBeUndefined(); // dropped from the default
+    for (const widget of seedWidgets) {
+      const paths = (widget.input?.widgetProperties?.config?.paths ?? {}) as Record<string, { path?: string; isPathConfigurable?: boolean }>;
+      expect(paths['windAngleTrueWater']).toBeUndefined(); // and from the seed
+      for (const [slot, seedPath] of Object.entries(paths)) {
+        expect(seedPath.isPathConfigurable, `seed autopilot ${slot}.isPathConfigurable`).toBe(false);
+        expect(seedPath.path, `seed autopilot ${slot}.path`).toBe(defaults[slot]?.path);
       }
     }
   });

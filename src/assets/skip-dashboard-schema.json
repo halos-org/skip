@@ -541,7 +541,7 @@
   },
   "meta": {
     "configFileVersion": 11,
-    "configVersion": 18,
+    "configVersion": 19,
     "schemaVersion": 1,
     "skipVersion": "1.0.5"
   },
@@ -753,7 +753,7 @@
           "headingMag": {
             "convertUnitTo": "deg",
             "description": "Magnetic Heading",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.navigation.headingMagnetic",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
@@ -765,7 +765,7 @@
           "headingTrue": {
             "convertUnitTo": "deg",
             "description": "True Heading",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.navigation.headingTrue",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
@@ -788,20 +788,8 @@
           "windAngleApparent": {
             "convertUnitTo": "deg",
             "description": "Apparent Wind Angle",
-            "isPathConfigurable": true,
+            "isPathConfigurable": false,
             "path": "self.environment.wind.angleApparent",
-            "pathRequired": false,
-            "pathSkUnitsFilter": "rad",
-            "pathType": "number",
-            "showConvertUnitTo": false,
-            "showPathSkUnitsFilter": false,
-            "source": "default"
-          },
-          "windAngleTrueWater": {
-            "convertUnitTo": "deg",
-            "description": "Wind Angle True Water",
-            "isPathConfigurable": true,
-            "path": "self.environment.wind.angleTrueWater",
             "pathRequired": false,
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
@@ -922,7 +910,7 @@
           "defaultPath": "self.navigation.headingMagnetic",
           "description": "Magnetic Heading",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathOptions": null,
           "pathRequired": false,
           "pathType": "number",
@@ -934,7 +922,7 @@
           "defaultPath": "self.navigation.headingTrue",
           "description": "True Heading",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathOptions": null,
           "pathRequired": false,
           "pathType": "number",
@@ -946,23 +934,11 @@
           "defaultPath": "self.environment.wind.angleApparent",
           "description": "Apparent Wind Angle",
           "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
+          "isPathConfigurable": false,
           "pathOptions": null,
           "pathRequired": false,
           "pathType": "number",
           "slot": "windAngleApparent",
-          "source": "default"
-        },
-        {
-          "defaultConvertUnitTo": "deg",
-          "defaultPath": "self.environment.wind.angleTrueWater",
-          "description": "Wind Angle True Water",
-          "expectedSkUnit": "rad",
-          "isPathConfigurable": true,
-          "pathOptions": null,
-          "pathRequired": false,
-          "pathType": "number",
-          "slot": "windAngleTrueWater",
           "source": "default"
         }
       ],
