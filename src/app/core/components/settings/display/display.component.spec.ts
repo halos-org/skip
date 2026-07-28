@@ -102,6 +102,29 @@ describe('SettingsNotificationsComponent', () => {
         expect(component).toBeTruthy();
     });
 
+    it('maps a legacy empty stored theme to Dark in the picker', () => {
+        // SettingsServiceMock.getThemeName() returns '' (legacy dark)
+        expect(component['themeMode']()).toBe('dark-theme');
+    });
+
+    it('loads a stored system theme into the picker unchanged', () => {
+        const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+        vi.spyOn(settings, 'getThemeName').mockReturnValue('system');
+        const fx = TestBed.createComponent(SettingsDisplayComponent);
+        fx.detectChanges();
+        expect(fx.componentInstance['themeMode']()).toBe('system');
+    });
+
+    it('saves the selected theme mode verbatim', async () => {
+        const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+        const setThemeName = vi.spyOn(settings, 'setThemeName');
+        component['themeMode'].set('system');
+        component['saveAllSettings']();
+        await flushPromises();
+        await flushPromises();
+        expect(setThemeName).toHaveBeenCalledWith('system');
+    });
+
     it('shows single warning prompt with Ok action when plugin is installed but not enabled/configured', async () => {
         // Toggle auto night mode on
         component['isAutoNightModeSupported']({ checked: true, source: {} as MatSlideToggle });

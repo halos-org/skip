@@ -485,8 +485,14 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
     expect(patchSpy).not.toHaveBeenCalled();
   });
 
-  it('a null loaded theme is not applied: the default (empty) theme name stays', () => {
+  it('a null loaded theme is not applied: the default (light) theme name stays', () => {
     const { service, patchSpy } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
+    expect(service.getThemeName()).toBe('light-theme');
+    expect(patchSpy).not.toHaveBeenCalled();
+  });
+
+  it('a stored legacy empty theme is preserved (dark), not flipped to the light default', () => {
+    const { service, patchSpy } = setupHydrated({ app: loadedAppConfig(), theme: { themeName: '' }, dashboards: [] });
     expect(service.getThemeName()).toBe('');
     expect(patchSpy).not.toHaveBeenCalled();
   });
@@ -601,7 +607,7 @@ describe('SettingsService — resetSettings (characterization)', () => {
     expect(scope).toBe('user');
     expect(name).toBe('profileA');
     expect(cfg.app).toEqual({ ...DefaultAppConfig });
-    expect(cfg.theme).toEqual({ themeName: '' });
+    expect(cfg.theme).toEqual({ themeName: 'light-theme' });
     expect(cfg.dashboards).toEqual([]);
   });
 
@@ -716,7 +722,7 @@ describe('SettingsService — getDefault* localStorage side effects (characteriz
     const theme = service.loadConfigFromLocalStorage('themeConfig');
 
     expect(theme).not.toBe(DefaultThemeConfig);
-    expect(theme).toEqual({ themeName: '' });
+    expect(theme).toEqual({ themeName: 'light-theme' });
     expect(localStorage.getItem('skip.themeConfig')).toBeNull();
   });
 });

@@ -19,7 +19,7 @@ import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.c
 import { REMOTE_CONFIG_FILE_VERSION, LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from '../constants/config-versions.const';
 
 
-const defaultTheme = '';
+const defaultTheme = 'light-theme';
 @Injectable({
   providedIn: 'root'
 })
