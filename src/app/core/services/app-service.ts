@@ -1,4 +1,4 @@
-import { effect, inject, Injectable, signal, untracked } from '@angular/core';
+import { DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
 import { BehaviorSubject } from 'rxjs';
@@ -70,9 +70,12 @@ export class AppService {
   private readonly _data = inject(DataService);
   private readonly _iconRegistry = inject(MatIconRegistry);
   private readonly _sanitizer = inject(DomSanitizer);
+  private readonly _destroyRef = inject(DestroyRef);
   public isNightMode = signal<boolean>(false);
   private _useAutoNightMode = this._settings.autoNightMode;
   private _theme = this._settings.themeName;
+  // Tracks the OS colour-scheme so the 'system' theme choice can follow it live.
+  private readonly _prefersDark = signal<boolean>(false);
   private _redNightMode = this._settings.redNightMode;
   private _environmentMode = toSignal(this._data.subscribePath(this.MODE_PATH, 'default'));
 
@@ -89,9 +92,24 @@ export class AppService {
       this._sanitizer.bypassSecurityTrustResourceUrl('assets/svg/icons.svg')
     );
 
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+      this._prefersDark.set(prefersDark.matches);
+      const onSchemeChange = (e: MediaQueryListEvent) => this._prefersDark.set(e.matches);
+      // Legacy Safari/WebView return a MediaQueryList that isn't an EventTarget (no
+      // addEventListener) — fall back to the deprecated addListener rather than crash boot.
+      if (typeof prefersDark.addEventListener === 'function') {
+        prefersDark.addEventListener('change', onSchemeChange);
+        this._destroyRef.onDestroy(() => prefersDark.removeEventListener('change', onSchemeChange));
+      } else if (typeof prefersDark.addListener === 'function') {
+        prefersDark.addListener(onSchemeChange);
+        this._destroyRef.onDestroy(() => prefersDark.removeListener(onSchemeChange));
+      }
+    }
+
     effect(() => {
       // Night mode forces a dark base, so light-theme only applies outside it.
-      const applyLight = this._theme() === 'light-theme' && !this.isNightMode();
+      const applyLight = this.resolveIsLightTheme() && !this.isNightMode();
       document.body.classList.toggle('light-theme', applyLight);
       // Re-snapshot the theme CSS custom properties so widgets (which draw from the
       // JS snapshot, not live CSS) recolor without a reload. getComputedStyle here
@@ -216,12 +234,21 @@ export class AppService {
 
     } else {
       document.body.classList.remove('night-theme');
-      if (this._theme() === 'light-theme') {
-        document.body.classList.toggle('light-theme', this._theme() === 'light-theme');
-      }
+      document.body.classList.toggle('light-theme', this.resolveIsLightTheme());
       this.setBrightness(1, false);
     }
     this._cssThemeColorRoles = this.readThemeCssRoleVariables();
+  }
+
+  /**
+   * Resolves the selected theme choice to whether the light theme applies.
+   * 'system' follows the OS colour-scheme; legacy '' and 'dark-theme' are dark.
+   */
+  private resolveIsLightTheme(): boolean {
+    const theme = this._theme();
+    if (theme === 'light-theme') return true;
+    if (theme === 'system') return !this._prefersDark();
+    return false;
   }
 
   /**

@@ -45,15 +45,19 @@
           </mat-panel-title>
           @if (!isPhonePortrait().matches) {
             <mat-panel-description>
-              Choose your preferred high-contrast theme.
+              Choose light, dark, or follow the device theme.
             </mat-panel-description>
           }
         </mat-expansion-panel-header>
-        <mat-slide-toggle class="full-width"
-          [(ngModel)]="isLightTheme"
-          name="isLightTheme">
-            Enable light theme for brighter display settings.
-        </mat-slide-toggle>
+        <mat-button-toggle-group class="full-width theme-toggle"
+          [(ngModel)]="themeMode"
+          name="themeMode"
+          aria-label="Theme"
+          hideSingleSelectionIndicator>
+          @for (mode of themeModes; track mode.value) {
+            <mat-button-toggle [value]="mode.value">{{ mode.label }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
       </mat-expansion-panel>
       <mat-expansion-panel>
         <mat-expansion-panel-header>

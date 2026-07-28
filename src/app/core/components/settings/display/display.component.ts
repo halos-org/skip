@@ -14,6 +14,8 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule, MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { ThemeMode, THEME_MODES } from '../../../constants/themes.const';
 
 
 @Component({
@@ -27,12 +29,13 @@ import { MatSlideToggleModule, MatSlideToggleChange } from '@angular/material/sl
         MatSliderModule,
         MatExpansionModule,
         MatInputModule,
-        MatSlideToggleModule
+        MatSlideToggleModule,
+        MatButtonToggleModule
     ],
 })
 export class SettingsDisplayComponent implements OnInit {
   private readonly DERIVED_DATA_PLUGIN_ID = 'derived-data';
-  private readonly LIGHT_THEME_NAME = "light-theme";
+  protected readonly themeModes = THEME_MODES;
   private readonly displayForm = viewChild<NgForm>('displayForm');
   private readonly app = inject(AppService);
   private readonly toast = inject(ToastService);
@@ -44,7 +47,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected nightBrightness = signal<number>(0.27);
   protected autoNightMode = model<boolean>(false);
   protected isRedNightMode = model<boolean>(false);
-  protected isLightTheme = model<boolean>(false);
+  protected themeMode = model<ThemeMode>('dark-theme');
   protected isRemoteControl = model<boolean>(false);
   protected instanceName = model<string>('');
   protected browserTabTitle = model<string>('Skip');
@@ -60,7 +63,8 @@ export class SettingsDisplayComponent implements OnInit {
   ngOnInit() {
     this.nightBrightness.set(this.settings.getNightModeBrightness());
     this.autoNightMode.set(this.settings.getAutoNightMode());
-    this.isLightTheme.set(this.settings.getThemeName() === this.LIGHT_THEME_NAME);
+    const storedTheme = this.settings.getThemeName();
+    this.themeMode.set(storedTheme === 'light-theme' || storedTheme === 'system' ? storedTheme : 'dark-theme');
     this.isRedNightMode.set(this.settings.getRedNightMode());
     this.isRemoteControl.set(this.settings.getIsRemoteControl());
     this.instanceName.set(this.settings.getInstanceName());
@@ -101,11 +105,7 @@ export class SettingsDisplayComponent implements OnInit {
     if (!this.app.isNightMode()) {
       this.app.setBrightness(1);
     }
-    if (this.isLightTheme()) {
-    this.settings.setThemeName(this.LIGHT_THEME_NAME);
-    } else {
-      this.settings.setThemeName("");
-    }
+    this.settings.setThemeName(this.themeMode());
     this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());
     this.settings.setKeepScreenAwake(this.keepScreenAwake());

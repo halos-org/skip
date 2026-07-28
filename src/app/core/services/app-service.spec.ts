@@ -23,6 +23,31 @@ const modeUpdate = (value: string): IPathUpdate => ({
   state: States.Normal
 });
 
+// Installs a controllable prefers-color-scheme matchMedia fake and returns a setter
+// that flips `matches` and emits a `change` event, so 'system' theme re-resolution
+// can be exercised (the global test.ts stub is static with no working change events).
+function installPrefersDarkMatchMedia(matches: boolean): { setMatches: (m: boolean) => void } {
+  let current = matches;
+  const listeners = new Set<(e: MediaQueryListEvent) => void>();
+  const mql = {
+    get matches() { return current; },
+    media: '(prefers-color-scheme: dark)',
+    onchange: null,
+    addEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) => { listeners.add(cb); },
+    removeEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) => { listeners.delete(cb); },
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  };
+  Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => mql });
+  return {
+    setMatches: (m: boolean) => {
+      current = m;
+      listeners.forEach(cb => cb({ matches: m } as MediaQueryListEvent));
+    }
+  };
+}
+
 describe('AppService', () => {
   let settings: SettingsServiceMock;
   let envMode$: BehaviorSubject<IPathUpdate>;
@@ -91,6 +116,18 @@ describe('AppService', () => {
       expect(document.body.classList.contains('light-theme')).toBe(true);
     });
 
+    it('resolves a legacy empty theme name to dark (no light-theme class)', () => {
+      settings.themeName.set(''); // legacy stored value — the no-migration back-compat invariant
+      createService();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+    });
+
+    it('resolves an explicit dark-theme to dark (no light-theme class)', () => {
+      settings.themeName.set('dark-theme');
+      createService();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+    });
+
     it('removes the light-theme class when the theme changes away from light-theme', () => {
       settings.themeName.set('light-theme');
       createService();
@@ -107,6 +144,77 @@ describe('AppService', () => {
       const after = service.cssThemeColorRoles$.getValue();
       expect(after).not.toBe(before);
       expect(service.cssThemeColors).toBe(after);
+    });
+  });
+
+  describe('system theme (prefers-color-scheme)', () => {
+    let originalMatchMedia: typeof window.matchMedia;
+    beforeEach(() => { originalMatchMedia = window.matchMedia; });
+    afterEach(() => {
+      Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia });
+    });
+
+    it('resolves the system theme to light when the OS prefers light', () => {
+      installPrefersDarkMatchMedia(false);
+      settings.themeName.set('system');
+      createService();
+      expect(document.body.classList.contains('light-theme')).toBe(true);
+    });
+
+    it('resolves the system theme to dark when the OS prefers dark', () => {
+      installPrefersDarkMatchMedia(true);
+      settings.themeName.set('system');
+      createService();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+    });
+
+    it('re-resolves the system theme live when the OS colour-scheme changes', () => {
+      const mm = installPrefersDarkMatchMedia(false);
+      settings.themeName.set('system');
+      createService();
+      expect(document.body.classList.contains('light-theme')).toBe(true);
+
+      mm.setMatches(true);
+      TestBed.tick();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+    });
+
+    it('keeps a dark base for the system theme in night mode regardless of OS preference', () => {
+      installPrefersDarkMatchMedia(false); // OS prefers light...
+      settings.themeName.set('system');
+      const service = createService();
+      service.isNightMode.set(true);
+      service.toggleDayNightMode();
+      expect(document.body.classList.contains('light-theme')).toBe(false); // ...but night forces dark
+    });
+
+    it('stops following the OS after switching from system to an explicit theme', () => {
+      const mm = installPrefersDarkMatchMedia(false); // OS light -> system resolves light
+      settings.themeName.set('system');
+      createService();
+      expect(document.body.classList.contains('light-theme')).toBe(true);
+
+      settings.themeName.set('dark-theme');
+      TestBed.tick();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+
+      // OS colour-scheme changes must be ignored now that an explicit theme is selected.
+      mm.setMatches(true);
+      TestBed.tick();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+      mm.setMatches(false);
+      TestBed.tick();
+      expect(document.body.classList.contains('light-theme')).toBe(false);
+    });
+
+    it('constructs without crashing when MediaQueryList lacks addEventListener (legacy WebView)', () => {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: () => ({ matches: true, media: '', addListener: () => undefined, removeListener: () => undefined })
+      });
+      settings.themeName.set('system');
+      expect(() => createService()).not.toThrow();
+      expect(document.body.classList.contains('light-theme')).toBe(false); // matches:true -> dark
     });
   });
 

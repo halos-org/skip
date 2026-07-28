@@ -15,7 +15,7 @@ export const DefaultAppConfig: Readonly<IAppConfig> = {
 }
 
 export const DefaultThemeConfig: IThemeConfig = {
-  "themeName": ""
+  "themeName": "light-theme"
 }
 
 export const defaultConfig: IConfig = {
