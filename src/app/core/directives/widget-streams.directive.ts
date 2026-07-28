@@ -5,7 +5,7 @@ import { IWidgetSvcConfig, DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfac
 import { Observable, Observer, Subject, delayWhen, filter, map, retryWhen, sampleTime, tap, throwError, timeout, timer, takeUntil, take, merge, combineLatest, distinctUntilChanged, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-/** Fixed stale-data TTL (ms) for every widget whose enableTimeout is on. No longer user-configurable. */
+/** Fixed stale-data TTL (ms) applied to every widget whose enableTimeout is on; not user-configurable. */
 const FIXED_DATA_TIMEOUT_MS = 5000;
 
 @Directive({
@@ -24,7 +24,7 @@ const FIXED_DATA_TIMEOUT_MS = 5000;
  * Key Features:
  * - Fast first emission (take(1)) merged with sampled stream for immediate render
  * - Automatic unit conversion for numeric paths via UnitsService
- * - Optional timeout + retry handling (enableTimeout, dataTimeout config)
+ * - Optional stale-data timeout (gated by the enableTimeout flag; fixed 5s TTL) + retry handling
  * - Path validation: null/undefined/empty paths trigger cleanup
  * - Signature tracking: per-path (path + pathType + convertUnitTo + source + bootstrap null policy); the widget-level update cadence lives in the root signature
  *
@@ -302,7 +302,7 @@ export class WidgetStreamsDirective implements OnDestroy {
    *
    * Behavior:
   * - Compares path signatures (path + pathType + convertUnitTo + source + bootstrap null policy)
-   * - Compares root signature (widget-level settings: enableTimeout + dataTimeout + updateInterval)
+   * - Compares root signature (widget-level settings: enableTimeout + updateInterval)
    * - Only rebuilds subscriptions for paths with changed signatures
    * - Removes subscriptions for deleted paths
    * - Preserves unchanged subscriptions for performance

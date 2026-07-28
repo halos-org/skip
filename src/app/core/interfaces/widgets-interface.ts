@@ -255,7 +255,10 @@ export interface IWidgetSvcConfig {
    * When several sources feed the same path, a timeout blanks the widget only once every source has gone silent; while any source is still live the reading is kept.
    */
   enableTimeout?: boolean;
-  /** Sets data stream no-data timeout notification in minutes */
+  /**
+   * Inert: no longer read at runtime. The stale-data TTL is a fixed 5s constant; whether a widget
+   * applies it is the enableTimeout flag. Retained on stored configs to avoid a config-shape change.
+   */
   dataTimeout?: number;
   /**
    * The widget's display-update cadence, in milliseconds. This throttles how often the widget

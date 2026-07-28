@@ -201,9 +201,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
             case "path": groups.addControl(key, new UntypedFormControl(value));
               break;
 
-            case "dataTimeout": groups.addControl(key, new UntypedFormControl(value, Validators.required));
-              break;
-
             case "updateInterval": groups.addControl(key, new UntypedFormControl(value, [Validators.required, Validators.min(MIN_UPDATE_INTERVAL_MS)]));
               break;
 
