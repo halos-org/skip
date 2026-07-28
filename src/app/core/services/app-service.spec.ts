@@ -98,6 +98,16 @@ describe('AppService', () => {
       TestBed.tick();
       expect(document.body.classList.contains('light-theme')).toBe(false);
     });
+
+    it('publishes a fresh theme color snapshot when the theme changes', () => {
+      const service = createService();
+      const before = service.cssThemeColorRoles$.getValue();
+      settings.themeName.set('light-theme');
+      TestBed.tick();
+      const after = service.cssThemeColorRoles$.getValue();
+      expect(after).not.toBe(before);
+      expect(service.cssThemeColors).toBe(after);
+    });
   });
 
   describe('setBrightness', () => {

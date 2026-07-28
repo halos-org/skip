@@ -96,6 +96,10 @@ export class AppService {
         // Remove the light theme class if it exists
         document.body.classList.remove('light-theme');
       }
+      // Re-snapshot the theme CSS custom properties so widgets (which draw from the
+      // JS snapshot, not live CSS) recolor without a reload. getComputedStyle here
+      // forces a synchronous style recalc, so the class change above is reflected.
+      this._cssThemeColorRoles = this.readThemeCssRoleVariables();
     });
 
     effect(() => {
