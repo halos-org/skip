@@ -153,6 +153,9 @@ export class GestureDirective {
   private startY = 0;
   private startTime = 0;
   private tracking = false;
+  /** Per-gesture cache: whether to claim touch-moves (block the fling) or yield to a scrollable child. */
+  private touchClaimDecided = false;
+  private claimTouchMoves = false;
   private longPressTimer: number | null = null;
   private pressFired = false;
   // Track which lanes this instance acquired for current pointer
@@ -218,6 +221,11 @@ export class GestureDirective {
       el.addEventListener('pointerdown', this.onPointerDown, { passive: false, capture: true });
       // Movement: both pointermove and pointerrawupdate feed the same handler to keep behavior consistent.
       el.addEventListener('pointermove', this.onPointerMove, { passive: true, capture: true });
+      // Claim touch-move while a gesture is being tracked so the browser recognises no scroll/fling.
+      // touch-action:none stops the scroll but NOT the fling: a fast flick still registers a fling, and
+      // Chromium then swallows the click of the tap that stops it — so a flick-to-reveal followed by an
+      // immediate button tap loses that tap. Non-passive is required to preventDefault.
+      el.addEventListener('touchmove', this.onTouchMove, { passive: false, capture: true });
       // raw updates provide higher-fidelity movement in Chrome; ignored by other browsers
       el.addEventListener('pointerrawupdate', this.onPointerRawUpdate as EventListener, { passive: true, capture: true } as AddEventListenerOptions);
       // Use capture for touch/pen reliability; for mouse, pointerup in bubble keeps native click working
@@ -337,6 +345,7 @@ export class GestureDirective {
     this.destroyRef.onDestroy(() => {
         el.removeEventListener('pointerdown', this.onPointerDown, { capture: true } as AddEventListenerOptions);
         el.removeEventListener('pointermove', this.onPointerMove, { capture: true } as AddEventListenerOptions);
+        el.removeEventListener('touchmove', this.onTouchMove, { capture: true } as AddEventListenerOptions);
         el.removeEventListener('pointerrawupdate', this.onPointerRawUpdate as EventListener, { capture: true } as AddEventListenerOptions);
         // pointerup was added without capture; remove without capture
         el.removeEventListener('pointerup', this.onPointerUp);
@@ -544,6 +553,7 @@ export class GestureDirective {
     this.pointerId = ev.pointerId;
     ownersMap.set(ev.pointerId, owners);
     this.tracking = true;
+    this.touchClaimDecided = false;
     this.pressFired = false;
     this.currentPointerType = ev.pointerType || null;
     this.lockedAxis = null;
@@ -733,6 +743,38 @@ export class GestureDirective {
   }
 
   private onPointerMove = (ev: PointerEvent) => this.handlePointerMotion(ev, 'move');
+
+  /**
+   * While tracking a gesture, prevent the browser from turning the touch into a scroll/fling — a fast
+   * flick otherwise registers a fling even under touch-action:none, and Chromium then swallows the
+   * click of the tap that stops it (a flick-to-reveal then an immediate button tap loses that tap).
+   * But YIELD when the touch is inside a scrollable descendant so routed pages (settings/remote/help)
+   * and lists still touch-scroll — mirrors the wheel yield in scroll-nav.directive. Decided once per
+   * gesture (the touch target is stable for the sequence) to avoid per-move layout reads.
+   */
+  private onTouchMove = (ev: TouchEvent): void => {
+    if (!this.tracking || !ev.cancelable) return;
+    if (!this.touchClaimDecided) {
+      this.touchClaimDecided = true;
+      this.claimTouchMoves = !this.hasScrollableAncestor(ev.target);
+    }
+    if (this.claimTouchMoves) ev.preventDefault();
+  };
+
+  /** True if any element from `target` up to the host is a scroll container with content overflowing. */
+  private hasScrollableAncestor(target: EventTarget | null): boolean {
+    let el = target instanceof Element ? target : null;
+    const host = this.host.nativeElement;
+    while (el && el !== host) {
+      if (el instanceof HTMLElement) {
+        const style = getComputedStyle(el);
+        if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) return true;
+        if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && el.scrollWidth > el.clientWidth) return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
 
   // Chrome sends pointerrawupdate for high-frequency movement; mirror pointermove logic via shared handler
   private onPointerRawUpdate = (ev: PointerEvent) => this.handlePointerMotion(ev, 'raw');
