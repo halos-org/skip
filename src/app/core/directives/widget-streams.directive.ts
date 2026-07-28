@@ -5,6 +5,9 @@ import { IWidgetSvcConfig, DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfac
 import { Observable, Observer, Subject, delayWhen, filter, map, retryWhen, sampleTime, tap, throwError, timeout, timer, takeUntil, take, merge, combineLatest, distinctUntilChanged, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
+/** Fixed stale-data TTL (ms) applied to every widget whose enableTimeout is on; not user-configurable. */
+const FIXED_DATA_TIMEOUT_MS = 5000;
+
 @Directive({
   selector: '[widget-streams]',
   exportAs: 'widgetStreams'
@@ -21,7 +24,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
  * Key Features:
  * - Fast first emission (take(1)) merged with sampled stream for immediate render
  * - Automatic unit conversion for numeric paths via UnitsService
- * - Optional timeout + retry handling (enableTimeout, dataTimeout config)
+ * - Optional stale-data timeout (gated by the enableTimeout flag; fixed 5s TTL) + retry handling
  * - Path validation: null/undefined/empty paths trigger cleanup
  * - Signature tracking: per-path (path + pathType + convertUnitTo + source + bootstrap null policy); the widget-level update cadence lives in the root signature
  *
@@ -81,7 +84,7 @@ export class WidgetStreamsDirective implements OnDestroy {
     if (!cfg) return 'none';
     // updateInterval is widget-level, so it lives in the root signature: a cadence change rebuilds
     // every path's pipeline (the base observable is reused; only the sampling stage is rebuilt).
-    return `timeout:${cfg.enableTimeout ? '1' : '0'}:${cfg.dataTimeout ?? ''}|update:${cfg.updateInterval ?? ''}`;
+    return `timeout:${cfg.enableTimeout ? '1' : '0'}|update:${cfg.updateInterval ?? ''}`;
   }
 
   private ensureStreamsMap(): void {
@@ -145,7 +148,7 @@ export class WidgetStreamsDirective implements OnDestroy {
     const base$ = this.streams!.get(pathName)!;
 
     const enableTimeout = !!cfg.enableTimeout;
-    const dataTimeout = (cfg.dataTimeout ?? 5) * 1000;
+    const dataTimeout = FIXED_DATA_TIMEOUT_MS;
     const retryDelay = 5000;
     const timeoutErrorMsg = `[Widget] ${cfg.displayName} - ${dataTimeout / 1000} second data update timeout reached for `;
     const retryErrorMsg = `[Widget] ${cfg.displayName} - Retrying in ${retryDelay / 1000} seconds`;
@@ -299,7 +302,7 @@ export class WidgetStreamsDirective implements OnDestroy {
    *
    * Behavior:
   * - Compares path signatures (path + pathType + convertUnitTo + source + bootstrap null policy)
-   * - Compares root signature (widget-level settings: enableTimeout + dataTimeout + updateInterval)
+   * - Compares root signature (widget-level settings: enableTimeout + updateInterval)
    * - Only rebuilds subscriptions for paths with changed signatures
    * - Removes subscriptions for deleted paths
    * - Preserves unchanged subscriptions for performance

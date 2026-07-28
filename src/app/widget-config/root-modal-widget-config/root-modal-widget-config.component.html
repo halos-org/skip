@@ -8,6 +8,27 @@
             <span class="warning fa fa-exclamation-circle"></span>
           } Display
         </ng-template>
+        @if ((widgetConfig?.updateInterval !== undefined)) {
+          <div class="display-content tab-content">
+            <mat-form-field>
+              <mat-label>Display update interval</mat-label>
+              <input type="number" matNativeControl placeholder="Interval in milliseconds..."
+                name="updateInterval"
+                [formControl]="updateIntervalToControl"
+                min="100"
+                required>
+              <span matTextSuffix>ms</span>
+              <mat-hint>How often the widget refreshes its reading on screen. Lower is more responsive but does more work; it does not change how often data is received.</mat-hint>
+            </mat-form-field>
+            @if ((widgetConfig?.enableTimeout !== undefined)) {
+              <mat-checkbox
+                name="enableTimeout"
+                [formControl]="enableTimeoutToControl">
+                  Blank the reading after 5s without data
+              </mat-checkbox>
+            }
+          </div>
+        }
         @if ((widgetConfig?.datachartPath !== undefined)) {
           <div class="flex-container">
             <div class="panel-group">
@@ -780,9 +801,6 @@
             <paths-options
               formGroupName="paths"
               [isArray]="isPathArray"
-              [enableTimeout]="enableTimeoutToControl"
-              [dataTimeout]="dataTimeoutToControl"
-              [updateInterval]="updateIntervalToControl"
               [filterSelfPaths]="filterSelfPathsToControl"
               [addPathEvent]="addPathEvent"
               [delPathEvent]="delPathEvent"

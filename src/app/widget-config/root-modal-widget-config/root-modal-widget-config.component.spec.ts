@@ -319,6 +319,19 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
     expect(ctrl.valid).toBe(true);
   });
 
+  // updateInterval lives on the always-shown Display tab, so it must be reachable even for a widget
+  // with no configurable paths (its Paths tab is suppressed via hasConfigurablePaths). The control
+  // must exist independent of path configurability.
+  it('exposes updateIntervalToControl for an all-fixed-path widget whose Paths tab is suppressed', () => {
+    const cfg = { updateInterval: 500, paths: {
+      p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false }
+    } } as unknown as IWidgetSvcConfig;
+    const component = buildForm(cfg);
+    expect(component.hasConfigurablePaths).toBe(false); // Paths tab is gone
+    expect(component.updateIntervalToControl).toBeTruthy(); // yet the cadence control survives
+    expect(component.updateIntervalToControl.value).toBe(500);
+  });
+
   // Regression (#430): the Paths tab renders for any multiChildCtrls widget and binds a REQUIRED
   // updateInterval control; a widget whose DEFAULT_CONFIG omits updateInterval yields a null control
   // and paths-options binds [formControl]=null, throwing on render. Prove the shipped array-form
@@ -397,5 +410,39 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
       }
     }
     expect(sawFixed).toBe(true); // autopilot does carry fixed internal paths
+  });
+});
+
+describe('ModalWidgetComponent updateInterval Display-tab placement', () => {
+  const dialogRefSpy = { close: vi.fn() };
+  // An all-fixed-path widget: hasConfigurablePaths is false, so the Paths tab (where the cadence
+  // control used to live) is suppressed and no path-control-config is rendered. displayName routes it
+  // to the general Display body. This is the exact case the relocation fixes.
+  const allFixedConfig = { displayName: 'X', updateInterval: 500, enableTimeout: false, paths: {
+    p: { description: 'X', path: 'self.x', source: 'default', pathType: 'number', isPathConfigurable: false }
+  } } as unknown as IWidgetSvcConfig;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [RootModalWidgetConfigComponent],
+      providers: [
+        { provide: UnitsService, useValue: { getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }) } },
+        { provide: AppService, useValue: { configurableThemeColors: [] } },
+        { provide: MAT_DIALOG_DATA, useValue: allFixedConfig },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+      ],
+    }).compileComponents();
+    ensureTestIconsReady();
+  });
+
+  // The cadence input and the stale-data-timeout toggle must render on the always-shown Display tab
+  // even when the Paths tab is gone — pre-relocation both lived in paths-options and vanished with the
+  // suppressed tab.
+  it('renders the updateInterval input and enableTimeout toggle on the Display tab when the Paths tab is suppressed', () => {
+    const fixture = TestBed.createComponent(RootModalWidgetConfigComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.hasConfigurablePaths).toBe(false);
+    expect(fixture.nativeElement.querySelector('input[name="updateInterval"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('mat-checkbox[name="enableTimeout"]')).toBeTruthy();
   });
 });

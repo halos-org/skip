@@ -471,25 +471,24 @@ describe('WidgetStreamsDirective', () => {
         vi.useFakeTimers();
         // Silence noisy console logs from timeout/retry handling to keep test output clean
         vi.spyOn(console, 'log');
-        // Configure a very short timeout (seconds) so the test runs fast
+        // The TTL is a fixed 5 s (no longer configurable); a stored dataTimeout is ignored.
         const cfg = makeCfg({ path: 'env.to', source: null, pathType: 'string', updateInterval: 100, displayName: 'Test', enableTimeout: true, dataTimeout: 0.02 });
         directive.setStreamsConfig(cfg);
 
         const hits: string[] = [];
         directive.observe('p', u => hits.push(String(u?.data?.value)));
 
-        // Do not emit anything; advance virtual time beyond 20ms to trigger timeout
-        await vi.advanceTimersByTimeAsync(30);
+        // Do not emit anything; advance virtual time beyond the fixed 5 s window to trigger timeout.
+        await vi.advanceTimersByTimeAsync(5100);
         expect(dataSvc.timeoutCalls.length).toBe(1);
-        // dataTimeout (0.02 s) is threaded through as the ms window; compute it the same way the
-        // directive does so the assertion is exact regardless of float representation.
-        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'default', pathType: 'string', dataTimeoutMs: 0.02 * 1000 });
+        // The window is the fixed constant, not the stored (0.02 s) dataTimeout.
+        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'default', pathType: 'string', dataTimeoutMs: 5000 });
     });
 
     it('forwards a configured non-default source into timeoutPathObservable', async () => {
         vi.useFakeTimers();
         vi.spyOn(console, 'log');
-        const cfg = makeCfg({ path: 'env.to', source: 'n2k-1', pathType: 'string', updateInterval: 100, displayName: 'Test', enableTimeout: true, dataTimeout: 0.02 });
+        const cfg = makeCfg({ path: 'env.to', source: 'n2k-1', pathType: 'string', updateInterval: 100, displayName: 'Test', enableTimeout: true });
         directive.setStreamsConfig(cfg);
 
         const hits: string[] = [];
@@ -497,8 +496,8 @@ describe('WidgetStreamsDirective', () => {
 
         // The stream's effective source must reach the reset so a source-bound widget
         // clears its own registration, not the default bucket (#206).
-        await vi.advanceTimersByTimeAsync(30);
-        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'n2k-1', pathType: 'string', dataTimeoutMs: 0.02 * 1000 });
+        await vi.advanceTimersByTimeAsync(5100);
+        expect(dataSvc.timeoutCalls[0]).toEqual({ path: 'env.to', source: 'n2k-1', pathType: 'string', dataTimeoutMs: 5000 });
     });
 
     it('applies a structural convertUnitTo to numeric values (initial + sampled)', async () => {
@@ -771,14 +770,14 @@ describe('WidgetStreamsDirective', () => {
     });
 
     it('does NOT release or re-acquire the base on a timeout-setting change (rootChanged rebuild)', () => {
-        directive.setStreamsConfig(makeCfg({ path: 'env.root', source: null, pathType: 'string', updateInterval: 50, enableTimeout: false, dataTimeout: 5 }));
+        directive.setStreamsConfig(makeCfg({ path: 'env.root', source: null, pathType: 'string', updateInterval: 50, enableTimeout: false }));
         directive.observe('p', () => { });
         expect(dataSvc.calls.length).toBe(1);
 
-        // A dataTimeout change flips the ROOT signature, taking the distinct rootChanged branch that
+        // An enableTimeout change flips the ROOT signature, taking the distinct rootChanged branch that
         // force-rebuilds every path's pipeline even though the per-path signature is unchanged. baseKey
         // (path+source) is still identical, so the base must be neither released nor re-acquired.
-        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.root', source: null, pathType: 'string', updateInterval: 50, enableTimeout: false, dataTimeout: 7 }));
+        directive.applyStreamsConfigDiff(makeCfg({ path: 'env.root', source: null, pathType: 'string', updateInterval: 50, enableTimeout: true }));
         expect(dataSvc.calls.length).toBe(1);
         expect(dataSvc.releases).toEqual([]);
     });
@@ -892,8 +891,10 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
         await vi.advanceTimersByTimeAsync(10);
         expect(hits).toEqual([500]);
 
-        // Engine stops: no more data. Let the TTL fire and the retry resubscribe (retryDelay = 5s).
-        await vi.advanceTimersByTimeAsync(5100);
+        // Engine stops: no more data. Let the fixed 5 s TTL fire, then the retry resubscribe
+        // (retryDelay = 5s) — the resubscribe is where suppressBootstrapNull would re-show the stale
+        // value, so advance past both (~10 s) to prove the reset holds through it.
+        await vi.advanceTimersByTimeAsync(10100);
 
         expect(dataSvc.timeoutCalls.length).toBeGreaterThanOrEqual(1);
         // The widget must be reset to null ("--"), not left showing the stale 500.

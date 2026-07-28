@@ -3,8 +3,6 @@ import { FormGroupDirective, UntypedFormArray, UntypedFormBuilder, UntypedFormCo
 import type { IDynamicControl, IWidgetPath } from '../../core/interfaces/widgets-interface';
 import { ObjectKeysPipe } from '../../core/pipes/object-keys.pipe';
 import { PathControlConfigComponent } from '../path-control-config/path-control-config.component';
-import { MatInput } from '@angular/material/input';
-import { MatFormField, MatLabel, MatSuffix, MatHint } from '@angular/material/form-field';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { IAddNewPathObject } from '../boolean-multicontrol-options/boolean-multicontrol-options.component';
 
@@ -18,7 +16,7 @@ export interface IAddNewPath {
     selector: 'paths-options',
     templateUrl: './paths-options.component.html',
     styleUrls: ['./paths-options.component.scss'],
-    imports: [MatCheckbox, FormsModule, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSuffix, MatHint, PathControlConfigComponent, ObjectKeysPipe]
+    imports: [MatCheckbox, FormsModule, ReactiveFormsModule, PathControlConfigComponent, ObjectKeysPipe]
 })
 export class PathsOptionsComponent implements OnInit, OnChanges {
   private rootFormGroup = inject(FormGroupDirective);
@@ -26,9 +24,6 @@ export class PathsOptionsComponent implements OnInit, OnChanges {
 
   readonly formGroupName = input.required<string>();
   readonly isArray = input.required<boolean>();
-  readonly enableTimeout = input.required<UntypedFormControl>();
-  readonly dataTimeout = input.required<UntypedFormControl>();
-  readonly updateInterval = input.required<UntypedFormControl>();
   readonly filterSelfPaths = input.required<UntypedFormControl>();
   readonly addPathEvent = input<IAddNewPathObject>();
   readonly delPathEvent = input<string>();

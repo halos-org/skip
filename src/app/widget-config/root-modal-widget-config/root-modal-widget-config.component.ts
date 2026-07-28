@@ -201,9 +201,6 @@ export class RootModalWidgetConfigComponent implements OnInit {
             case "path": groups.addControl(key, new UntypedFormControl(value));
               break;
 
-            case "dataTimeout": groups.addControl(key, new UntypedFormControl(value, Validators.required));
-              break;
-
             case "updateInterval": groups.addControl(key, new UntypedFormControl(value, [Validators.required, Validators.min(MIN_UPDATE_INTERVAL_MS)]));
               break;
 
@@ -318,16 +315,12 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return entries.some(p => p?.isPathConfigurable !== false || (p?.pathOptions?.length ?? 0) > 0);
   }
 
-  get dataTimeoutToControl(): UntypedFormControl {
-    return this.configControl('dataTimeout') as UntypedFormControl;
+  get updateIntervalToControl(): UntypedFormControl {
+    return this.configControl('updateInterval') as UntypedFormControl;
   }
 
   get enableTimeoutToControl(): UntypedFormControl {
     return this.configControl('enableTimeout') as UntypedFormControl;
-  }
-
-  get updateIntervalToControl(): UntypedFormControl {
-    return this.configControl('updateInterval') as UntypedFormControl;
   }
 
   get dateTimezoneToControl(): FormControl<string> {

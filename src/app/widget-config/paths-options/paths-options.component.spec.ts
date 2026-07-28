@@ -33,9 +33,6 @@ describe('PathsOptionsComponent', () => {
     const set = fixture.componentRef.setInput.bind(fixture.componentRef) as (k: string, v: unknown) => void;
     set('formGroupName', 'paths');
     set('isArray', true);
-    set('enableTimeout', new UntypedFormControl(false));
-    set('dataTimeout', new UntypedFormControl(0));
-    set('updateInterval', new UntypedFormControl(500));
     set('filterSelfPaths', new UntypedFormControl(false));
     fixture.detectChanges();
   });
