@@ -808,6 +808,68 @@ describe('ConfigurationUpgradeService', () => {
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
     });
 
+    it('v18 upgrade fixes autopilot pickers, deletes the dead windAngleTrueWater slot, keeps the source, stamps v19', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 18 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-autopilot', config: {
+                        paths: {
+                            headingMag: { path: 'self.navigation.headingMagnetic', isPathConfigurable: true, source: 'a-pinned-compass' },
+                            headingTrue: { path: 'self.navigation.headingTrue', isPathConfigurable: true },
+                            windAngleApparent: { path: 'self.environment.wind.angleApparent', isPathConfigurable: true },
+                            windAngleTrueWater: { path: 'self.environment.wind.angleTrueGround', isPathConfigurable: true },
+                            autopilotState: { path: 'self.steering.autopilot.state', isPathConfigurable: false }
+                        }
+                    } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(18);
+
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(19);
+        const paths = written.dashboards[0].configuration[0].input.widgetProperties.config.paths;
+        // redundant pickers fixed, path unchanged so the pinned source is kept (no starvation risk)
+        expect(paths.headingMag.isPathConfigurable).toBe(false);
+        expect(paths.headingMag.path).toBe('self.navigation.headingMagnetic');
+        expect(paths.headingMag.source).toBe('a-pinned-compass');
+        expect(paths.headingTrue.isPathConfigurable).toBe(false);
+        expect(paths.windAngleApparent.isPathConfigurable).toBe(false);
+        // dead slot deleted outright (a base+user merge would otherwise resurrect the orphan)
+        expect(paths.windAngleTrueWater).toBeUndefined();
+        // internal fixed path untouched
+        expect(paths.autopilotState.isPathConfigurable).toBe(false);
+    });
+
+    it('v18 upgrade leaves a non-autopilot widget untouched, still stamps v19', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 18 },
+            theme: { themeName: '' },
+            dashboards: [
+                { id: 'd0', configuration: [
+                    { input: { widgetProperties: { type: 'widget-numeric', config: { paths: { numericPath: { path: 'self.foo', isPathConfigurable: true } } } } } }
+                ] }
+            ]
+        });
+
+        await service.runUpgrade(18);
+        const written = mockStorage.setConfig.mock.calls.at(-1)![2];
+        expect(written.app.configVersion).toBe(19);
+        expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths.numericPath.isPathConfigurable).toBe(true);
+    });
+
+    it('v18 upgrade skips a slot that is not at version 18 (no re-stamp)', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({ app: { configVersion: 17 }, theme: { themeName: '' }, dashboards: [] });
+        await service.runUpgrade(18);
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([

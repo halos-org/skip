@@ -72,6 +72,13 @@ describe('extractWidgetSchemas', () => {
     expect(appWind?.pathOptions).toBeNull();
   });
 
+  it('drops the dead windAngleTrueWater slot and leaves autopilot with no configurable path (Effort C)', () => {
+    const slots = bySelector('widget-autopilot')?.pathSlots ?? [];
+    expect(slots.length).toBeGreaterThan(0);
+    expect(slots.some((s) => s.slot === 'windAngleTrueWater')).toBe(false);
+    expect(slots.every((s) => s.isPathConfigurable === false)).toBe(true);
+  });
+
   it('gives non-record widgets no path slots', () => {
     expect(bySelector('widget-data-chart')?.pathSlots).toEqual([]);
     expect(bySelector('widget-boolean-switch')?.pathSlots).toEqual([]);
