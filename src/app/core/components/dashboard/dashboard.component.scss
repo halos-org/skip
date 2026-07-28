@@ -47,14 +47,14 @@
 .cancel {
   @include mat.fab-overrides((
     container-color: var(--mat-sys-primary),
-    foreground-color: var(--mat-sys-background),
+    foreground-color: var(--mat-sys-on-primary),
   ));
 }
 
 .save {
   @include mat.fab-overrides((
     container-color: var(--mat-sys-primary-fixed),
-    foreground-color: var(--mat-sys-background),
+    foreground-color: var(--mat-sys-on-primary-fixed),
   ));
 }
 

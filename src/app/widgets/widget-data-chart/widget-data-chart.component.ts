@@ -458,7 +458,7 @@ export class WidgetDataChartComponent implements OnDestroy {
               position: "start",
               padding: 4,
               color: this.getThemeColors().chartValue,
-              backgroundColor: 'rgba(63,63,63,0.7)'
+              backgroundColor: 'rgba(63,63,63,0.0)'
             }
           }
         }
