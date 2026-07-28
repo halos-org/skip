@@ -392,24 +392,16 @@ describe('ModalWidgetComponent leaf control/path shapes (#25 Phase 2a)', () => {
     expect(buildForm(cfg).hasConfigurablePaths).toBe(false);
   });
 
-  // The decoupling is general, not wind-only (accepted): a non-wind mixed-path widget (autopilot has
-  // configurable heading paths alongside fixed internal state/mode/rudder paths) now exposes an
-  // editable Data Source on its fixed paths too, with only the `path` control disabled. Pin that so
-  // Effort C revisits it deliberately rather than a regression flipping it back.
-  it('autopilot (non-wind mixed-path): every path keeps an editable Source; fixed paths disable only path', () => {
+  // Effort C: autopilot's redundant top-level pickers were fixed, leaving every path fixed with no
+  // choice, so hasConfigurablePaths is false and the Paths tab is suppressed (#417) — autopilot joins
+  // heel-gauge/horizon as a no-Paths-tab widget, config living on its dedicated select-autopilot tab.
+  it('autopilot: every path is fixed after Effort C, so the Paths tab is suppressed (#417)', () => {
     const component = buildForm(WidgetAutopilotComponent.DEFAULT_CONFIG);
-    expect(component.hasConfigurablePaths).toBe(true);
+    expect(component.hasConfigurablePaths).toBe(false);
+    // Sanity: it genuinely has paths (not the empty-paths edge), they are just all fixed.
     const pathGroups = Object.values((component.formMaster.get('paths') as UntypedFormGroup).controls) as UntypedFormGroup[];
     expect(pathGroups.length).toBeGreaterThan(0);
-    let sawFixed = false;
-    for (const g of pathGroups) {
-      expect(g.get('source')!.enabled).toBe(true);
-      if (g.get('isPathConfigurable')!.value === false) {
-        sawFixed = true;
-        expect(g.get('path')!.disabled).toBe(true);
-      }
-    }
-    expect(sawFixed).toBe(true); // autopilot does carry fixed internal paths
+    expect(pathGroups.every(g => g.get('isPathConfigurable')!.value === false)).toBe(true);
   });
 });
 

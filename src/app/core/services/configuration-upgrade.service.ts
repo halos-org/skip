@@ -27,6 +27,7 @@ const V15_MIGRATION_OUTPUT_VERSION = 15;
 const V16_MIGRATION_OUTPUT_VERSION = 16;
 const V17_MIGRATION_OUTPUT_VERSION = 17;
 const V18_MIGRATION_OUTPUT_VERSION = 18;
+const V19_MIGRATION_OUTPUT_VERSION = 19;
 
 /**
  * v17 -> v18 target shape for the wind-family widgets' swept paths, keyed by runtime widget `type`
@@ -61,6 +62,13 @@ const V18_WIND_PATH_DEFAULTS: Record<string, Record<string, { path: string; isPa
     trueWindSpeed: { path: 'self.environment.wind.speedTrue', isPathConfigurable: false },
   },
 };
+
+// v18 -> v19: widget-autopilot's redundant top-level pickers. heading is governed by the
+// autopilot.headingDirectionTrue toggle (not a picker) and apparent wind angle has no alternative, so
+// these become fixed; windAngleTrueWater was configured but never observed (dead UI) and is removed.
+// Paths are unchanged, so a pinned source stays valid and is kept.
+const V19_AUTOPILOT_FIXED_SLOTS = ['headingMag', 'headingTrue', 'windAngleApparent'];
+const V19_AUTOPILOT_REMOVED_SLOTS = ['windAngleTrueWater'];
 
 // SK-02 / #21: the delta parser stopped fabricating dotted child paths for compound leaves, so a
 // stored widget path pointing at a sub-field of one of these leaves must be rewritten to the whole
@@ -371,6 +379,30 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
+    } else if (version === 18) {
+      // Remote (Signal K) configs. v18 slots live in the same active file version as v11..v17.
+      try {
+        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+
+        for (const item of configsList) {
+          try {
+            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
+            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V19_MIGRATION_OUTPUT_VERSION}.`);
+            const migratedConfig = this.migrateOneAppVersion(config, 18);
+            if (!migratedConfig) continue; // skip if not a v18 slot
+
+            await this._storage.setConfig(item.scope, item.name, migratedConfig);
+          } catch (error) {
+            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
+          }
+        }
+        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
+        setTimeout(() => this._settings.reloadApp(), 1500);
+      } catch (error) {
+        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
+        this.upgrading.set(false);
+      }
+
     } else {
       // LocalStorage upgrade path for config version 10
       const localStorageConfig: v10IConfig = {
@@ -504,6 +536,7 @@ export class ConfigurationUpgradeService {
       case 15: return this.upgradeConfigV15toV16(config);
       case 16: return this.upgradeConfigV16toV17(config);
       case 17: return this.upgradeConfigV17toV18(config);
+      case 18: return this.upgradeConfigV18toV19(config);
       default: return null;
     }
   }
@@ -970,6 +1003,61 @@ export class ConfigurationUpgradeService {
       return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
     } catch (error) {
       this.pushError(`[Upgrade Service] Error upgrading v17->v18: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * v18 -> v19: slim widget-autopilot's path config. Make its redundant top-level pickers fixed
+   * (heading is governed by the autopilot.headingDirectionTrue toggle, not a path picker; apparent
+   * wind angle has no alternative) and DELETE the never-observed windAngleTrueWater slot. Paths are
+   * unchanged, so a pinned source stays valid and is kept. The dead slot is deleted outright because
+   * the runtime base+user merge would otherwise resurrect a stored orphan key.
+   */
+  private upgradeConfigV18toV19(config: IConfig): IConfig | null {
+    try {
+      const appConfig = config.app;
+      if (!appConfig || appConfig.configVersion !== 18) {
+        this.pushError(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v18 config. Skipping...`);
+        return null;
+      }
+
+      let changed = 0;
+      if (Array.isArray(config.dashboards)) {
+        for (const dash of config.dashboards) {
+          if (!dash || !Array.isArray(dash.configuration)) continue;
+          for (const widget of dash.configuration) {
+            const wp = (widget as { input?: { widgetProperties?: {
+              type?: unknown;
+              config?: { paths?: unknown };
+            } } })?.input?.widgetProperties;
+            if (!wp || wp.type !== 'widget-autopilot') continue;
+            const paths = wp.config?.paths;
+            if (!paths || typeof paths !== 'object') continue;
+            const pathMap = paths as Record<string, Record<string, unknown>>;
+            for (const slot of V19_AUTOPILOT_FIXED_SLOTS) {
+              if (pathMap[slot] && typeof pathMap[slot] === 'object') {
+                pathMap[slot]['isPathConfigurable'] = false;
+                changed++;
+              }
+            }
+            for (const slot of V19_AUTOPILOT_REMOVED_SLOTS) {
+              if (slot in pathMap) {
+                delete pathMap[slot];
+                changed++;
+              }
+            }
+          }
+        }
+      }
+      if (changed) {
+        this.pushMsg(`[Upgrade] Slimmed ${changed} autopilot path field(s).`);
+      }
+
+      appConfig.configVersion = V19_MIGRATION_OUTPUT_VERSION;
+      return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
+    } catch (error) {
+      this.pushError(`[Upgrade Service] Error upgrading v18->v19: ${(error as Error).message}`);
       return null;
     }
   }
