@@ -1,38 +1,29 @@
-<div class="dashboard-manage" [class.compact]="compact()" cdkDropList cdkDropListOrientation="mixed" (cdkDropListDropped)="drop($event)">
+<div class="page-list" cdkDropList cdkDropListOrientation="vertical" (cdkDropListDropped)="drop($event)">
   @for (dashboard of _dashboard.dashboards(); track dashboard.id; let index = $index) {
-    <div class="dashboard-card dashboard-item"
-      skipGestures
-      [mode]="'editor'"
-      [enableTap]="true"
-      [enablePress]="false"
-      [enableDoubleTap]="false"
-      matRipple
-      cdkDrag
-      cdkDragBoundary=".dashboard-manage"
-      (cdkDragStarted)="dragStart()" (cdkDragEnded)="dragEnd()"
-      (tap)="onTileTap(index, $event)"
-      tabindex="0"
-      [attr.aria-label]="dashboard.name"
-      (keydown.enter)="onTileKey(index, $event)"
-      (keydown.space)="onTileKey(index, $event)">
-      <div class="item-index">{{index + 1}}</div>
-      <div >
-        <mat-icon class="dashboard-icon"
-          [svgIcon]="dashboard.icon || 'dashboard'"
-          [style.width.px]="iconSizePx()"
-          [style.height.px]="iconSizePx()"
-          aria-hidden="false"
-        ></mat-icon>
+    <div class="page-row" cdkDrag cdkDragBoundary=".page-list"
+      (cdkDragStarted)="dragStart()" (cdkDragEnded)="dragEnd()">
+      <button mat-icon-button class="drag-handle" cdkDragHandle
+        aria-label="Drag to reorder page" tabindex="-1">
+        <mat-icon>drag_indicator</mat-icon>
+      </button>
+      <div class="page-row-body"
+        matRipple
+        (click)="onTileTap(index, $event)"
+        tabindex="0"
+        role="button"
+        [attr.aria-label]="dashboard.name"
+        (keydown.enter)="onTileKey(index, $event)"
+        (keydown.space)="onTileKey(index, $event)">
+        <div class="item-index">{{ index + 1 }}</div>
+        <mat-icon class="page-icon" [svgIcon]="dashboard.icon || 'dashboard'" aria-hidden="false"></mat-icon>
+        <span class="page-name">{{ dashboard.name }}</span>
       </div>
-      <p class="dashboard-name">{{dashboard.name}}</p>
     </div>
   }
-  <div class="dashboard-card dashboard-item-add dashboard-add-btn" (click)="addDashboard()" (keydown)="addDashboard()" tabindex="0">
-    <button mat-fab >
-      <mat-icon>add_box</mat-icon>
-    </button>
-    <p style="margin-top: 10px;"><i>Add Page</i></p>
-  </div>
+  <button class="page-add" (click)="addDashboard()">
+    <mat-icon>add_box</mat-icon>
+    <span class="page-name"><i>Add Page</i></span>
+  </button>
 </div>
 
 <action-menu #actionMenu [items]="pageActions" (selected)="onPageAction($event)" />

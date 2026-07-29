@@ -39,10 +39,10 @@ describe('PageManagerBottomSheetComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('embeds the page editor in its compact layout', () => {
+  it('embeds the page editor as a vertical list', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('dashboards-editor')).not.toBeNull();
-    expect(el.querySelector('.dashboard-manage.compact')).not.toBeNull();
+    expect(el.querySelector('.page-list')).not.toBeNull();
   });
 
   it('dismisses the sheet when closed', () => {
