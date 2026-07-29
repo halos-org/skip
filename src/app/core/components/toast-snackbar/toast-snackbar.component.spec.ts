@@ -36,6 +36,14 @@ describe('ToastSnackbarComponent', () => {
         expect((actionButton.nativeElement as HTMLButtonElement).textContent?.trim()).toBe('Enable Plugin');
     });
 
+    it('renders the message on the toast-message styling hook (anchors the night-mode override)', () => {
+        createComponent({ message: 'Saved', severity: 'success' });
+
+        const label = fixture.debugElement.query(By.css('div[matSnackBarLabel].toast-message'));
+        expect(label).toBeTruthy();
+        expect((label.nativeElement as HTMLElement).textContent?.trim()).toBe('Saved');
+    });
+
     it('does not render action button when action is missing', () => {
         createComponent({ message: 'Saved', severity: 'success' });
 
