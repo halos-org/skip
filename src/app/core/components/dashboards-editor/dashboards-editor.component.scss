@@ -1,156 +1,107 @@
 :host {
   display: block;
   width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  scroll-behavior: smooth;
 }
 
-.dashboard-manage {
+/* Vertical page list for the page-manager bottom sheet. The sheet itself is the
+   scroll container (Material caps it at 80vh); rows are reordered via the drag
+   handle only, so a vertical swipe on the row body scrolls the sheet instead of
+   being captured as a drag. */
+.page-list {
   box-sizing: border-box;
-  padding: 0px 60px;
-  width: 100%;
-  height: 100%;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-around;
-  overflow-y: auto;
-  scroll-behavior: smooth;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px 12px;
 }
 
-.dashboard-card {
-  position: relative;
-  height: 200px;
-  width: 300px;
-  margin: 10px;
-  border-radius: 15px;
-  padding: 10px;
-  align-content: center;
-  text-align: center;
+.page-row {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  background-color: var(--mat-sys-surface-container-highest);
   border: 2px solid transparent;
 }
 
-@media (max-width: 600px) and (orientation: portrait) {
-  .dashboard-manage {
-    padding: 0px 70px;
-  }
-
-  .dashboard-card {
-    height: 175px;
-  }
+.drag-handle {
+  flex: 0 0 auto;
+  color: var(--mat-sys-on-surface-variant);
+  cursor: grab;
 }
 
-.dashboard-item {
-  background-color: var(--mat-sys-surface-container-highest);
+.page-row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 0;
+  border-radius: 10px;
   cursor: pointer;
+  outline: none;
 }
 
-.dashboard-item:hover {
-  border: 2px solid var(--mat-sys-outline);
-}
-
-.dashboard-item-add {
-  background-color: var(--mat-sys-surface-container);
-  cursor: pointer;
-}
-
-.dashboard-item-add:hover {
-  border: 2px solid var(--mat-sys-outline);
-}
-
-.dashboard-add-btn {
-  align-content: center;
-  text-align: center;
-  border: dashed 1px var(--mat-sys-outline);
+.page-row-body:hover,
+.page-row-body:focus-visible {
+  background-color: var(--mat-sys-surface-container-high);
 }
 
 .item-index {
-  position: absolute;
-  top: 20px;
-  left: 20px;
+  flex: 0 0 auto;
   display: inline-flex;
-  flex-wrap: wrap;
-  height: 42px;
-  width: 42px;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 28px;
   background-color: var(--skip-contrast-dim-color);
   color: var(--mat-sys-surface-bright);
   border-radius: 25%;
-  align-content: center;
-  align-items: center;
-  justify-content: center;
   font-weight: bold;
-  font-size: 1.25em;
-  z-index: 1;
+  font-size: 0.95em;
 }
 
-.dashboard-icon {
-  opacity: 0.5;
+.page-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  opacity: 0.6;
 }
 
-.dashboard-name {
-  margin-top: 10px;
-  margin-bottom: 0;
-  font-size: 1.1em;
+.page-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Compact single-row strip for the page-manager bottom sheet. */
-:host.compact {
-  height: auto;
-  overflow-y: hidden;
+.page-add {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: dashed 1px var(--mat-sys-outline);
+  border-radius: 10px;
+  background-color: var(--mat-sys-surface-container);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.dashboard-manage.compact {
-  height: auto;
-  padding: 4px 12px 12px;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-
-  .dashboard-card {
-    flex: 0 0 auto;
-    height: 112px;
-    width: 128px;
-    margin: 6px;
-    border-radius: 10px;
-    padding: 6px;
-  }
-
-  .item-index {
-    top: 8px;
-    left: 8px;
-    height: 26px;
-    width: 26px;
-    font-size: 0.9em;
-  }
-
-  .dashboard-name {
-    margin-top: 4px;
-    font-size: 0.85em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .dashboard-add-btn button {
-    transform: scale(0.75);
-  }
-}
-
-@media (max-width: 600px) and (orientation: portrait) {
-  .dashboard-manage.compact {
-    padding: 4px 12px 12px;
-
-    .dashboard-card {
-      height: 112px;
-    }
-  }
+.page-add:hover,
+.page-add:focus-visible {
+  background-color: var(--mat-sys-surface-container-high);
 }
 
 .cdk-drag-preview {
   box-sizing: border-box;
-  border-radius: 4px;
+  border-radius: 10px;
+  background-color: var(--mat-sys-surface-container-highest);
   box-shadow: 0 5px 5px -3px var(--mat-sys-on-primary-container),
               0 8px 10px 1px var(--mat-sys-on-primary-container),
               0 3px 14px 2px var(--mat-sys-on-primary-container);

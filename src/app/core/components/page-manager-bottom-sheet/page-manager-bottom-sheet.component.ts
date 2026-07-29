@@ -5,11 +5,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { DashboardsEditorComponent } from '../dashboards-editor/dashboards-editor.component';
 
 /**
- * Bottom-sheet host for page management in edit mode. Presents the same page ops
- * as the (retiring) full-page actions editor — add / drag-reorder / rename /
- * duplicate / delete — as a compact horizontal card strip suited to a Pi-class
- * touch display. The management logic itself lives in {@link DashboardsEditorComponent},
- * rendered here in its compact layout.
+ * Bottom-sheet host for page management in edit mode. Presents the page ops —
+ * add / drag-reorder / rename / duplicate / delete — as a vertical, scrollable
+ * list suited to a phone-sized touch display. The management logic itself lives
+ * in {@link DashboardsEditorComponent}.
  */
 @Component({
   selector: 'page-manager-bottom-sheet',

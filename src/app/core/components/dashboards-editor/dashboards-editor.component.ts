@@ -1,10 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, viewChild } from '@angular/core';
-import { GestureDirective } from '../../directives/gesture.directive';
+import { ChangeDetectionStrategy, Component, inject, viewChild } from '@angular/core';
 import { Dashboard, DashboardService } from '../../services/dashboard.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { DialogService } from '../../services/dialog.service';
-import { CdkDropList, CdkDrag, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDropList, CdkDrag, CdkDragHandle, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { uiEventService } from '../../services/uiEvent.service';
 import { MatRippleModule } from '@angular/material/core';
 import { ActionMenuComponent } from '../action-menu/action-menu.component';
@@ -14,19 +13,14 @@ import { ActionMenuItem } from '../action-menu/action-menu-item';
 @Component({
   selector: 'dashboards-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatIconModule, CdkDropList, CdkDrag, MatRippleModule, GestureDirective, ActionMenuComponent],
+  imports: [MatButtonModule, MatIconModule, CdkDropList, CdkDrag, CdkDragHandle, MatRippleModule, ActionMenuComponent],
   templateUrl: './dashboards-editor.component.html',
   styleUrl: './dashboards-editor.component.scss',
-  host: { '[class.compact]': 'compact()' }
 })
 export class DashboardsEditorComponent {
   protected _dashboard = inject(DashboardService);
   private _uiEvent = inject(uiEventService);
   private _dialog = inject(DialogService);
-
-  /** Compact single-row layout for the page-manager bottom sheet; full tiled grid otherwise. */
-  public readonly compact = input<boolean>(false);
-  protected readonly iconSizePx = computed(() => this.compact() ? 40 : 72);
 
   private readonly _actionMenu = viewChild.required(ActionMenuComponent);
   /** The tile whose action menu is currently open. */
@@ -52,15 +46,12 @@ export class DashboardsEditorComponent {
   }
 
   /**
-   * A single tap on a page tile opens its action menu at the tap point. Tap vs.
-   * drag is arbitrated by the gesture directive's movement threshold — a reorder
-   * moves past the tap slop and emits no tap, so it never reaches here. (Gating
-   * on the shared isDragging signal instead would swallow a legitimate tap whose
-   * minor travel already tripped cdkDrag's lower start threshold.)
+   * A click on a page row opens its action menu at the pointer. Reordering is
+   * confined to the drag handle, so the row body keeps touch-action:auto and a
+   * vertical swipe scrolls the list instead of being captured as a drag.
    */
-  protected onTileTap(index: number, e: Event | CustomEvent): void {
-    const center = (e as CustomEvent).detail?.center as { x: number; y: number } | undefined;
-    this.openMenu(index, center?.x ?? 0, center?.y ?? 0);
+  protected onTileTap(index: number, e: MouseEvent): void {
+    this.openMenu(index, e.clientX, e.clientY);
   }
 
   /** Keyboard equivalent: open the action menu centered on the focused tile. */
