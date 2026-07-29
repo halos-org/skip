@@ -6,7 +6,7 @@ import { ActivatedRouteSnapshot, convertToParamMap, NavigationEnd, Router } from
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 import { SettingsService } from './settings.service';
-import { Dashboard, DashboardService, widgetOperation } from './dashboard.service';
+import { Dashboard, DashboardService, IPageSwitchTrigger, widgetOperation } from './dashboard.service';
 import { EmbedModeService } from './embed-mode.service';
 import { StorageService } from './storage.service';
 
@@ -233,6 +233,60 @@ describe('DashboardService', () => {
       expect(updated.id).toBe('d-0');
       expect(updated.configuration).toBe(config);
       expect(service.dashboards()[1].name).toBe('Two');
+    });
+  });
+
+  describe('page-switch trigger', () => {
+    const trigger: IPageSwitchTrigger = { path: 'self.navigation.state', value: 'sailing' };
+
+    it('sets a trigger on the target page only when update is given one', () => {
+      setup([makeDashboard('d-0', 'One'), makeDashboard('d-1', 'Two')]);
+      service.update(0, 'One', 'dashboard-dashboard', trigger);
+      expect(service.dashboards()[0].trigger).toEqual(trigger);
+      expect(service.dashboards()[1].trigger).toBeUndefined();
+    });
+
+    it('leaves an existing trigger untouched when update omits the argument', () => {
+      setup([makeDashboard('d-0', 'One')]);
+      service.update(0, 'One', 'icon', trigger);
+      service.update(0, 'Renamed', 'icon-2');
+      expect(service.dashboards()[0].name).toBe('Renamed');
+      expect(service.dashboards()[0].trigger).toEqual(trigger);
+    });
+
+    it('clears the trigger when update is given null', () => {
+      setup([makeDashboard('d-0', 'One')]);
+      service.update(0, 'One', 'icon', trigger);
+      service.update(0, 'One', 'icon', null);
+      expect(service.dashboards()[0].trigger).toBeUndefined();
+    });
+
+    it('clears the trigger when given an empty path or value', () => {
+      setup([makeDashboard('d-0', 'One')]);
+      service.update(0, 'One', 'icon', trigger);
+      service.update(0, 'One', 'icon', { path: '', value: '' });
+      expect(service.dashboards()[0].trigger).toBeUndefined();
+    });
+
+    it('does not copy the trigger onto a duplicated page', () => {
+      setup([{ ...makeDashboard('d-src', 'Source', [makeWidget('w-src')]), trigger }]);
+      service.duplicate(0, 'Copy', 'icon');
+      expect(service.dashboards()[0].trigger).toEqual(trigger);
+      expect(service.dashboards()[1].trigger).toBeUndefined();
+    });
+
+    it('adds new pages without a trigger', () => {
+      setup();
+      service.add('Fresh', []);
+      expect(service.dashboards().at(-1)!.trigger).toBeUndefined();
+    });
+
+    it('persists the trigger through the save effect', () => {
+      setup([makeDashboard('d-0', 'One')]);
+      service.update(0, 'One', 'icon', trigger);
+      TestBed.tick();
+      const lastSaved = settings.saveDashboards.mock.lastCall![0];
+      expect(lastSaved[0].trigger).toEqual(trigger);
     });
   });
 
