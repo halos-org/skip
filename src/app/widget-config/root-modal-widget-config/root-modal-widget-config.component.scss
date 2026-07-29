@@ -9,8 +9,10 @@
 }
 
 .display-content {
+  // Content height, not 100%: a tab can stack several .display-content blocks
+  // (e.g. the update-interval block plus the main options block). Forcing each to
+  // full height makes the first fill the scroll area and pushes the rest off-screen.
   display: block;
-  height: 100%;
   width: 100%;
   padding-top: 15px;
   padding-bottom: 10px;
