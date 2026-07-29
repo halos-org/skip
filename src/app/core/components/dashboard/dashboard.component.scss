@@ -49,6 +49,12 @@
     container-color: var(--mat-sys-primary),
     foreground-color: var(--mat-sys-on-primary),
   ));
+  // The night theme sets a global dark --mat-icon-color that would otherwise win over
+  // the FAB foreground for the glyph; pin the icon to on-primary so it stays legible on
+  // the (dark-red, in night) primary container. No-op in light/dark where they match.
+  @include mat.icon-overrides((
+    color: var(--mat-sys-on-primary),
+  ));
 }
 
 .save {
