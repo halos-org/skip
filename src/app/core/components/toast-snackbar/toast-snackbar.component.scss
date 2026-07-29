@@ -85,3 +85,14 @@
     height: 18px;
   }
 }
+
+// The night palette's inverse-on-surface is dark and doubles as a background fill in other
+// components, so it can't be brightened globally — re-point it for the toast subtree only.
+// .toast-message is needed because matSnackBarLabel carries its own colour resolved above this scope.
+:host-context(.night-theme) {
+  --mat-sys-inverse-on-surface: #ffdad4;
+  .toast,
+  .toast-message {
+    color: var(--mat-sys-inverse-on-surface);
+  }
+}

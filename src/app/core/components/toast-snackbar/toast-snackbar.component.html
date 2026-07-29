@@ -6,7 +6,7 @@
      @if (severity() !== "message") {
       <div class="toast-title">{{ title() }}</div>
      }
-    <div matSnackBarLabel>{{ data.message }}</div>
+    <div matSnackBarLabel class="toast-message">{{ data.message }}</div>
     @if (hasAction()) {
       <div class="button-group">
         <button matButton="tonal" matSnackBarAction (click)="onActionClick()">{{ data.action }}</button>
