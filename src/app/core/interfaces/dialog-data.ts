@@ -1,4 +1,5 @@
 import { ComponentType } from "@angular/cdk/portal";
+import type { IPageSwitchTrigger } from "../services/dashboard.service";
 
 export interface DialogConfirmationData {
   title: string;
@@ -28,6 +29,10 @@ export interface DialogDashboardPageEditorData {
   title: string;
   name: string;
   icon?: string;
+  /** When true, the dialog shows the auto-show trigger editor (edit flow only). */
+  enableTrigger?: boolean;
+  /** Current auto-show trigger for the edit flow; null/undefined = none. Read back on save. */
+  trigger?: IPageSwitchTrigger | null;
   confirmBtnText?: string;
   cancelBtnText: string;
 }

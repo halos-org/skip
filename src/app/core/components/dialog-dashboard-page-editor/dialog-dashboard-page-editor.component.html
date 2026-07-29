@@ -21,6 +21,41 @@
         <select-icon [iconFile]="'assets/svg/icons.svg'" [currentIcon]="data.icon" (selectedIcon)="onIconSelected($event)"></select-icon>
       </div>
     </div>
+    @if (data.enableTrigger) {
+      <div class="field-margin trigger-section">
+        <mat-checkbox name="triggerEnabled" [(ngModel)]="triggerEnabled">
+          Auto-show this page on a Signal K value
+        </mat-checkbox>
+        @if (triggerEnabled) {
+          <div class="field-wrapper">
+            <mat-form-field class="field-flex">
+              <mat-label>Signal K path</mat-label>
+              <input matInput name="triggerPath" [(ngModel)]="triggerPath" (ngModelChange)="onPathChange()"
+                     [matAutocomplete]="pathAuto" aria-label="Auto-show Signal K path"/>
+              <mat-autocomplete #pathAuto="matAutocomplete">
+                @for (path of filteredPaths; track path) {
+                  <mat-option [value]="path">{{ path }}</mat-option>
+                }
+              </mat-autocomplete>
+              <mat-hint>e.g. self.navigation.state</mat-hint>
+            </mat-form-field>
+          </div>
+          <div class="field-wrapper">
+            <mat-form-field class="field-flex">
+              <mat-label>Value</mat-label>
+              <input matInput name="triggerValue" [(ngModel)]="triggerValue"
+                     [matAutocomplete]="valueAuto" aria-label="Auto-show trigger value"/>
+              <mat-autocomplete #valueAuto="matAutocomplete">
+                @for (option of filteredValueOptions; track option.value) {
+                  <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                }
+              </mat-autocomplete>
+              <mat-hint>e.g. sailing</mat-hint>
+            </mat-form-field>
+          </div>
+        }
+      </div>
+    }
   </mat-dialog-content>
   <mat-dialog-actions align="end">
     <button mat-flat-button [mat-dialog-close]="false">{{data.cancelBtnText}}</button>

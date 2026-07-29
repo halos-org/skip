@@ -90,11 +90,13 @@ export class DashboardsEditorComponent {
       title: 'Page Options',
       name: dashboard.name ?? '',
       icon: dashboard.icon || 'dashboard-dashboard',
+      enableTrigger: true,
+      trigger: dashboard.trigger ?? null,
       confirmBtnText: 'Save',
       cancelBtnText: 'Cancel'
     }).afterClosed().subscribe(data => {
       if (!data) { return } //clicked cancel
-      this._dashboard.update(itemIndex, data.name, data.icon);
+      this._dashboard.update(itemIndex, data.name, data.icon, data.trigger ?? null);
     });
   }
 
