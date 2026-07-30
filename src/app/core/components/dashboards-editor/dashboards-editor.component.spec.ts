@@ -30,7 +30,7 @@ describe('DashboardsEditorComponent', () => {
   };
   let confirm$: Subject<boolean>;
   /** Result the (mocked) page-editor dialog emits on close; null = cancelled. */
-  let editorResult: { name: string; icon: string } | null;
+  let editorResult: { name: string; icon: string; trigger?: { path: string; value: string } | null } | null;
   let open: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
@@ -102,9 +102,27 @@ describe('DashboardsEditorComponent', () => {
     call('onTileTap', 0, clickAt({ x: 0, y: 0 }));
     call('onPageAction', 'edit');
     expect(dialog.openDashboardPageEditorDialog).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Page Options', name: 'Sailing' })
+      expect.objectContaining({ title: 'Page Options', name: 'Sailing', enableTrigger: true })
     );
-    expect(dashboard.update).toHaveBeenCalledWith(0, 'Sailing (renamed)', 'dashboard-map');
+    // No trigger returned -> cleared (null), preserving the four-arg update contract.
+    expect(dashboard.update).toHaveBeenCalledWith(0, 'Sailing (renamed)', 'dashboard-map', null);
+  });
+
+  it('forwards an auto-show trigger returned by the editor to update()', () => {
+    const trigger = { path: 'self.navigation.state', value: 'sailing' };
+    editorResult = { name: 'Sailing', icon: 'dashboard-sailing', trigger };
+    call('onTileTap', 0, clickAt({ x: 0, y: 0 }));
+    call('onPageAction', 'edit');
+    expect(dashboard.update).toHaveBeenCalledWith(0, 'Sailing', 'dashboard-sailing', trigger);
+  });
+
+  it('passes the existing trigger into the editor dialog', () => {
+    dashboard.dashboards.set([{ ...pages[0], trigger: { path: 'self.navigation.state', value: 'sailing' } }, pages[1]]);
+    call('onTileTap', 0, clickAt({ x: 0, y: 0 }));
+    call('onPageAction', 'edit');
+    expect(dialog.openDashboardPageEditorDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ trigger: { path: 'self.navigation.state', value: 'sailing' } })
+    );
   });
 
   it('routes the duplicate action and applies the result', () => {

@@ -12,11 +12,20 @@ import { EmbedModeService } from './embed-mode.service';
 import { StorageService } from './storage.service';
 import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
 
+/** An optional rule that auto-shows a page when a Signal K path reaches a value. */
+export interface IPageSwitchTrigger {
+  /** Full self-prefixed Signal K path, e.g. `self.navigation.state`. */
+  path: string;
+  /** The value (as a string) the path must equal to switch to this page. */
+  value: string;
+}
+
 export interface Dashboard {
   id: string
   name?: string;
   icon?: string;
   configuration?: NgGridStackWidget[] | [];
+  trigger?: IPageSwitchTrigger;
 }
 
 export interface widgetOperation {
@@ -213,13 +222,29 @@ export class DashboardService {
    *  - change the dashboard id
    *  - alter the widget configuration array
    *
+   * The optional page-switch `trigger` follows three-state semantics:
+   *  - a valid `{ path, value }` (both non-empty) sets it,
+   *  - `null` or an empty path/value clears it,
+   *  - `undefined` (argument omitted) leaves any existing trigger untouched.
+   *
    * @param itemIndex Index of the dashboard to update (0-based).
    * @param name New display name.
    * @param icon New icon key (fallback to 'dashboard-dashboard').
+   * @param trigger New auto-show trigger, `null`/empty to clear, omitted to leave as-is.
    */
-  public update(itemIndex: number, name: string, icon: string): void {
-    this.dashboards.update(dashboards => dashboards.map((dashboard, i) =>
-      i === itemIndex ? { ...dashboard, name: name, icon: icon ?? 'dashboard-dashboard' } : dashboard));
+  public update(itemIndex: number, name: string, icon: string, trigger?: IPageSwitchTrigger | null): void {
+    this.dashboards.update(dashboards => dashboards.map((dashboard, i) => {
+      if (i !== itemIndex) return dashboard;
+      const next: Dashboard = { ...dashboard, name: name, icon: icon ?? 'dashboard-dashboard' };
+      if (trigger !== undefined) {
+        if (trigger && trigger.path.trim() !== '' && trigger.value.trim() !== '') {
+          next.trigger = { path: trigger.path, value: trigger.value };
+        } else {
+          delete next.trigger;
+        }
+      }
+      return next;
+    }));
   }
 
   /**
@@ -282,6 +307,9 @@ export class DashboardService {
     newDashboard.id = UUID.create();
     newDashboard.name = newName;
     newDashboard.icon = newIcon || 'dashboard-dashboard';
+    // A page's auto-show trigger is its identity, not layout: a duplicate must not
+    // silently compete for the same Signal K state.
+    delete newDashboard.trigger;
 
     if (Array.isArray(newDashboard.configuration)) {
       newDashboard.configuration.forEach((widget: NgGridStackWidget) => {

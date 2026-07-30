@@ -43,3 +43,14 @@ max-height: max-content;
     font-weight: 400;
   }
 }
+
+.trigger-section {
+  mat-checkbox {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .field-wrapper + .field-wrapper {
+    margin-top: 12px;
+  }
+}

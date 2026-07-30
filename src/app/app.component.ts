@@ -21,6 +21,7 @@ import { EmbedModeService } from './core/services/embed-mode.service';
 import { NotificationsService } from './core/services/notifications.service';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { RemoteDashboardsService } from './core/services/remote-dashboards.service';
+import { PageSwitchService } from './core/services/page-switch.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
 import { AppNetworkInitService, IBootstrapIssue } from './core/services/app-initNetwork.service';
@@ -49,6 +50,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   private readonly _dashboard = inject(DashboardService);
   private readonly _remoteControl = inject(RemoteDashboardsService);
+  private readonly _pageSwitch = inject(PageSwitchService);
   private readonly toast = inject(ToastService);
   private readonly _reload = inject(ReloadService);
   private readonly _notifications = inject(NotificationsService);
