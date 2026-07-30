@@ -24,10 +24,14 @@ describe('SvgWindsteerComponent', () => {
             sailSetupEnabled: false,
             windSectorEnabled: false,
             driftEnabled: true,
+            driftActive: true,
             waypointEnabled: true,
             driftSet: 7,
+            driftFlow: 5,
+            driftUnit: 'kn',
             waypointAngle: 30,
-            courseOverGroundAngle: 16
+            courseOverGroundAngle: 16,
+            sogActive: true
         };
 
         Object.entries({ ...defaults, ...overrides }).forEach(([key, value]) => {
@@ -243,5 +247,67 @@ describe('SvgWindsteerComponent', () => {
         expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
         expect(component['setIndicator']().nativeElement.style.display).toBe('inline');
         expect((el.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('inline');
+    });
+
+    it('hides the bearing (waypoint) circle when no waypoint bearing is available', () => {
+        setRequiredInputs({ waypointAngle: undefined, waypointEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['wptIndicator']().nativeElement.getAttribute('display')).toBe('none');
+        expect((component as unknown as { waypointActive: () => boolean }).waypointActive()).toBe(false);
+    });
+
+    it('shows the bearing circle for a real waypoint, including a due-north (0) bearing', () => {
+        setRequiredInputs({ waypointAngle: 0, waypointEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['wptIndicator']().nativeElement.getAttribute('display')).toBe('inline');
+        expect((component as unknown as { waypointActive: () => boolean }).waypointActive()).toBe(true);
+    });
+
+    it('hides the set arrow and current readout when drift is inactive', () => {
+        setRequiredInputs({ driftActive: false, driftEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['setIndicator']().nativeElement.style.display).toBe('none');
+        expect((fixture.nativeElement.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('none');
+    });
+
+    it('shows the set arrow and current readout when drift is active', () => {
+        setRequiredInputs({ driftActive: true, driftEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['setIndicator']().nativeElement.style.display).toBe('inline');
+        expect((fixture.nativeElement.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('inline');
+    });
+
+    it('renders the drift value with its unit label', () => {
+        setRequiredInputs({ driftActive: true, driftEnabled: true, compassModeEnabled: true, driftFlow: 0.3, driftUnit: 'kn' });
+        fixture.detectChanges();
+
+        const text = (fixture.nativeElement.querySelector('#text11') as SVGTextElement).textContent ?? '';
+        expect(text).toContain('0.3');
+        expect(text).toContain('kn');
+    });
+
+    it('omits the drift unit label when no unit is resolved', () => {
+        setRequiredInputs({ driftActive: true, driftEnabled: true, compassModeEnabled: true, driftFlow: 0.3, driftUnit: '' });
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('#layerCurrent tspan')).toBeNull();
+    });
+
+    it('hides the COG arrow when SOG is inactive (boat at rest)', () => {
+        setRequiredInputs({ sogActive: false, courseOverGroundEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('none');
+    });
+
+    it('shows the COG arrow when SOG is active (underway or SOG absent)', () => {
+        setRequiredInputs({ sogActive: true, courseOverGroundEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
     });
 });

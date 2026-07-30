@@ -1,4 +1,4 @@
-import { Component, ElementRef, input, viewChild, signal, effect, untracked, ChangeDetectionStrategy, OnDestroy, NgZone, inject } from '@angular/core';
+import { Component, ElementRef, input, viewChild, signal, computed, effect, untracked, ChangeDetectionStrategy, OnDestroy, NgZone, inject } from '@angular/core';
 import { animateRotation, animateAngleTransition, animateSectorTransition, SectorAngles } from '../../core/utils/svg-animate.util';
 import { DecimalPipe } from '@angular/common';
 
@@ -28,6 +28,7 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly compassModeEnabled = input.required<boolean>();
   protected readonly courseOverGroundAngle = input<number | undefined>(undefined);
   protected readonly courseOverGroundEnabled = input.required<boolean>();
+  protected readonly sogActive = input<boolean>(true);
   protected readonly trueWindAngle = input.required<number>();
   protected readonly trueWindActive = input<boolean>(false);
   protected readonly twsEnabled = input.required<boolean>();
@@ -43,8 +44,10 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly sailSetupEnabled = input.required<boolean>();
   protected readonly windSectorEnabled = input.required<boolean>();
   protected readonly driftEnabled = input.required<boolean>();
+  protected readonly driftActive = input<boolean>(false);
   protected readonly driftSet = input<number | undefined>(undefined);
   protected readonly driftFlow = input<number | undefined>(undefined);
+  protected readonly driftUnit = input<string>('');
   protected readonly waypointAngle = input<number | undefined>(undefined);
   protected readonly waypointEnabled = input.required<boolean>();
   protected readonly trueWindMinHistoric = input<number | undefined>(undefined);
@@ -66,7 +69,12 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   protected headingValue = signal<string>("--");
   private trueWindHeading = 0;
-  protected waypointActive = signal<boolean>(false);
+  // The bearing circle is meaningful only with an active waypoint. The drift/COG visibility gates
+  // (driftActive/sogActive) are physical-speed thresholds resolved by the parent and passed in.
+  protected waypointActive = computed(() => {
+    const a = this.waypointAngle();
+    return this.waypointEnabled() && a != null && Number.isFinite(a);
+  });
 
   //laylines - Close-Hauled lines
   private portLaylinePrev = 0;
@@ -97,14 +105,6 @@ export class SvgWindsteerComponent implements OnDestroy {
   }
 
   constructor() {
-    effect(() => {
-      const waypoint = this.waypointEnabled();
-
-      untracked(() => {
-        this.waypointActive.set(waypoint);
-      });
-    });
-
     effect(() => {
       const modeEnabled = this.compassModeEnabled();
       const rawHeading = this.compassHeading();
@@ -169,14 +169,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
       untracked(() => {
         if (wptAngle == null || !Number.isFinite(wptAngle)) {
-          this.waypointActive.set(false);
           return;
-        }
-
-        if (this.waypointEnabled()) {
-          this.waypointActive.set(true);
-        } else {
-          this.waypointActive.set(false);
         }
         const isFirstWaypoint = !this.wptInitialized;
         if (isFirstWaypoint) {
