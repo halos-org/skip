@@ -1,7 +1,15 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 .fullpage-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex: 0 0 auto;
 }
 
 .page-icon {
@@ -25,10 +33,6 @@
   letter-spacing: var(--mat-dialog-subhead-tracking, var(--mat-sys-headline-small-tracking, 0.03125em));
 }
 
-.mat-mdc-dialog-content {
-  max-height: max-content;
-}
-
 .dialog-close-icon {
   display: flex;
   flex-direction: row;
@@ -47,11 +51,12 @@
   background: var(--mat-sys-surface-container-high);
 }
 
-::ng-deep .markdown-content {
+.markdown-content {
   display: block;
-  height: calc(100% - 75px);
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
-  overflow-x: scroll;
+  overflow: auto;
   padding: 25px;
   font-size: 1.1rem;
   line-height: 1.7;
