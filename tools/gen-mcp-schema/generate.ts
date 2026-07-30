@@ -134,6 +134,7 @@ function extractPathSlots(config: Record<string, unknown>): PathSlot[] {
     source: asStringOrNull(raw.source),
     pathType: asStringOrNull(raw.pathType),
     isPathConfigurable: raw.isPathConfigurable === true,
+    hideFromConfig: raw.hideFromConfig === true,
     pathOptions: asPathOptionsOrNull(raw.pathOptions),
     pathRequired: raw.pathRequired === true,
     defaultConvertUnitTo: asStringOrNull(raw.convertUnitTo),

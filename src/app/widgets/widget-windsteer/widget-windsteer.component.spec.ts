@@ -259,3 +259,53 @@ describe('WidgetWindComponent waypoint presence (#441)', () => {
     expect(wpt()).toBeUndefined();
   });
 });
+
+/**
+ * #442: the COG arrow hides at rest. That needs a speed-over-ground value the widget doesn't
+ * otherwise use — plumbed as a hidden, source-linked path and tracked in `sog`.
+ */
+describe('WidgetWindComponent speed-over-ground gating (#442)', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
+  const sog = (): number | undefined => (component as unknown as { sog: () => number | undefined }).sog();
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>({ ...WidgetWindComponent.DEFAULT_CONFIG });
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
+      ]
+    });
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick();
+  });
+
+  it('registers the SOG stream and configures it as a hidden, source-default path', () => {
+    expect(callbacks.has('speedOverGround')).toBe(true);
+    const sogPath = WidgetWindComponent.DEFAULT_CONFIG.paths?.['speedOverGround'];
+    expect(sogPath?.hideFromConfig).toBe(true);
+    expect(sogPath?.isPathConfigurable).toBe(false);
+    expect(sogPath?.source).toBe('default');
+  });
+
+  it('tracks speed-over-ground from the stream', () => {
+    callbacks.get('speedOverGround')!(update(3.2));
+    expect(sog()).toBeCloseTo(3.2);
+  });
+
+  it('reports SOG as absent (undefined), not zero, on a null update so the COG arrow keeps showing', () => {
+    callbacks.get('speedOverGround')!(update(3.2));
+    expect(sog()).toBeCloseTo(3.2);
+    callbacks.get('speedOverGround')!(update(null));
+    expect(sog()).toBeUndefined();
+  });
+});

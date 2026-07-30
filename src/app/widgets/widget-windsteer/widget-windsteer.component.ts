@@ -109,6 +109,18 @@ export class WidgetWindComponent implements OnDestroy {
         showConvertUnitTo: false,
         convertUnitTo: 'deg'
       },
+      speedOverGround: {
+        description: 'Speed Over Ground',
+        path: 'self.navigation.speedOverGround',
+        source: 'default',
+        pathType: 'number',
+        isPathConfigurable: false,
+        hideFromConfig: true,
+        pathRequired: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s',
+        convertUnitTo: 'knots'
+      },
       nextWaypointBearing: {
         description: 'Next Waypoint True Bearing',
         path: 'self.navigation.course.calcValues.bearingTrue',
@@ -177,6 +189,7 @@ export class WidgetWindComponent implements OnDestroy {
   private hasSet = false;
   private hasDrift = false;
   private hasWPT = false;
+  private hasSOG = false;
   private lastRawTrueWindAngle: number | null = null;
 
   protected currentHeading = signal(0);
@@ -192,6 +205,7 @@ export class WidgetWindComponent implements OnDestroy {
   protected trueWindSpeedUnit = computed(() => this.speedUnitSymbol(this.trueWindSpeedMeasure()));
   protected driftFlow = signal(0);
   protected driftSet = signal(0);
+  protected sog = signal<number | undefined>(undefined);
   protected waypointAngle = signal<number | undefined>(undefined);
   protected historicalWindDirection: { timestamp: number; windDirection: number; }[] = [];
   protected trueWindMinHistoric = signal<number | undefined>(undefined);
@@ -248,6 +262,19 @@ export class WidgetWindComponent implements OnDestroy {
     const next = u.data.value;
     if (!this.hasDrift || Math.abs(this.driftFlow() - next) >= this.SPEED_EPSILON) {
       this.driftFlow.set(next); this.hasDrift = true;
+    }
+  };
+  private onSOGUpdate = (u: IPathUpdate) => {
+    // Absence is distinct from zero: a boat may publish COG without SOG, and its COG arrow must
+    // still show underway. Propagate undefined for no data so only a real near-zero SOG hides it.
+    if (u.data.value == null) {
+      this.sog.set(undefined); this.hasSOG = true;
+      return;
+    }
+    const next = u.data.value;
+    const cur = this.sog();
+    if (!this.hasSOG || cur == null || Math.abs(cur - next) >= this.SPEED_EPSILON) {
+      this.sog.set(next); this.hasSOG = true;
     }
   };
   private onSetUpdate = (u: IPathUpdate) => {
@@ -333,6 +360,7 @@ export class WidgetWindComponent implements OnDestroy {
     if (!cfg) return;
     this.stream.observe('headingPath', this.onHeadingUpdate);
     this.stream.observe('courseOverGround', this.onCOGUpdate);
+    this.stream.observe('speedOverGround', this.onSOGUpdate);
     this.stream.observe('drift', this.onDriftUpdate);
     this.stream.observe('set', this.onSetUpdate);
     this.stream.observe('nextWaypointBearing', this.onWaypointUpdate);

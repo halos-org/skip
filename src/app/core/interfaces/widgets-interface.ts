@@ -654,15 +654,28 @@ export interface IWidgetPath {
   /** Only lists paths that support PUT action. Defaults to false */
   supportsPut?: boolean;
   /**
-   * Used to hide the path configuration from the Widget Options UI and exclude it from form validation.
-   * Setting this property to `false` prevents users from seeing and changing the path in the UI,
-   * and ensures the path is not included in the configuration form or its validation logic.
-   * Use this to hardcode a path configuration or for system/hidden paths.
+   * When `false`, the path itself is fixed: the path field is removed from the Widget Options UI and
+   * excluded from path validation. In the single-path (record) config form the slot still appears with
+   * its Data Source control editable, so use this for a hardcoded path whose source the user may still
+   * choose. (In the multi-control/array form a fixed path disables the whole slot, source included.) To
+   * drop the slot from the settings entirely, pair with {@link hideFromConfig}.
    *
    * Example:
-   *   isPathConfigurable: false // Path is hidden and not user-editable
+   *   isPathConfigurable: false // Path is hardcoded; Data Source stays editable (single-path form)
    */
   isPathConfigurable: boolean;
+  /**
+   * When `true`, the slot's card is not rendered in the single-path Widget Options form (no path field,
+   * no Data Source control, nothing) while the value still streams from its hardcoded `path`/`source`.
+   * Use for an internal signal a widget needs but the user should never configure (e.g. a value used
+   * only to gate another overlay's visibility, like the wind-steer SOG slot).
+   *
+   * This suppresses rendering only: the form still builds the slot's controls and still counts it toward
+   * whether the Paths tab appears, so pair it with `isPathConfigurable: false` for a fully internal path.
+   * Read from the form value, so it only takes effect where that control stays enabled (the single-path
+   * form; a multi-control/array widget disables the whole fixed slot and would drop the flag).
+   */
+  hideFromConfig?: boolean;
   /**
    * Optional: a small closed set of alternative Signal K paths this slot may point at (e.g. true vs
    * magnetic heading, water- vs ground-referenced true wind). When present, the Widget settings show

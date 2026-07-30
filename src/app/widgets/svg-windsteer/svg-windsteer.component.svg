@@ -664,7 +664,7 @@
   <g id="layerIndicators"
     style="display:inline">
     <g #cogIndicator
-      [attr.display]="courseOverGroundEnabled() && compassModeEnabled() ? 'inline' : 'none'">
+      [attr.display]="sogActive() && courseOverGroundEnabled() && compassModeEnabled() ? 'inline' : 'none'">
       <path
         class="course-over-ground"
         style="stroke-width:14.7329;stroke-linecap:square"

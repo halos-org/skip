@@ -28,6 +28,7 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly compassModeEnabled = input.required<boolean>();
   protected readonly courseOverGroundAngle = input<number | undefined>(undefined);
   protected readonly courseOverGroundEnabled = input.required<boolean>();
+  protected readonly speedOverGround = input<number | undefined>(undefined);
   protected readonly trueWindAngle = input.required<number>();
   protected readonly trueWindActive = input<boolean>(false);
   protected readonly twsEnabled = input.required<boolean>();
@@ -74,6 +75,13 @@ export class SvgWindsteerComponent implements OnDestroy {
     return this.waypointEnabled() && a != null && Number.isFinite(a);
   });
   protected driftActive = computed(() => (this.driftFlow() ?? 0) >= this.SPEED_EPSILON);
+  // A course-over-ground heading is meaningless at rest, so hide the COG arrow when SOG is zero-ish.
+  // SOG absent (boat publishes COG but not speed) is treated as "moving" so the arrow still shows;
+  // only a present, near-zero SOG hides it.
+  protected sogActive = computed(() => {
+    const s = this.speedOverGround();
+    return s == null || s >= this.SPEED_EPSILON;
+  });
 
   //laylines - Close-Hauled lines
   private portLaylinePrev = 0;

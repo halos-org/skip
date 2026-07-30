@@ -65,6 +65,16 @@ describe('PathControlConfigComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('renders the path card by default (no hideFromConfig)', () => {
+    expect(fixture.nativeElement.querySelector('.flex-container')).not.toBeNull();
+  });
+
+  it('renders no card at all when hideFromConfig is set (internal/system path)', () => {
+    pathForm.addControl('hideFromConfig', new UntypedFormControl(true));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.flex-container')).toBeNull();
+  });
+
   const enableFormFields = (setValues: boolean) =>
     (component as unknown as { enableFormFields: (v: boolean) => void }).enableFormFields(setValues);
 
