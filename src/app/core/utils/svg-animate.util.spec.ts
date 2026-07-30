@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { effectiveAnimationDuration } from './svg-animate.util';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { animateRotation, effectiveAnimationDuration } from './svg-animate.util';
 import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interface';
 
 describe('effectiveAnimationDuration', () => {
@@ -45,5 +45,29 @@ describe('effectiveAnimationDuration', () => {
     expect(effectiveAnimationDuration('500' as unknown as number)).toBe(500);
     expect(effectiveAnimationDuration('5000' as unknown as number)).toBe(DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
     expect(effectiveAnimationDuration('abc' as unknown as number)).toBe(DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
+  });
+});
+
+describe('animateRotation interpolation', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('interpolates linearly between angles, not with an ease curve', () => {
+    let transform: string | null = null;
+    const el = {
+      getAttribute: (name: string) => (name === 'transform' ? transform : null),
+      setAttribute: (name: string, value: string) => { if (name === 'transform') transform = value; }
+    } as unknown as SVGGElement;
+
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(cb => { frames.push(cb); return 1; });
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+
+    animateRotation(el, 0, 100, 1000);
+    expect(frames.length).toBeGreaterThan(0);
+
+    frames[0](1250); // 25% through a 1000ms tween
+
+    // Linear: 0 + 100 * 0.25 = 25. An ease-in-out-cubic curve would give 6.25.
+    expect(transform).toBe('rotate(25 500 500)');
   });
 });
