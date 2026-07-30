@@ -8,7 +8,7 @@
   "name": "Skip",
   "short_name": "Skip",
   "description": "An advanced and versatile marine instrumentation package to display Signal K data.",
-  "orientation": "landscape",
+  "orientation": "any",
   "icons": [
     {
       "src": "assets/manifest-icon-192.maskable.png",
