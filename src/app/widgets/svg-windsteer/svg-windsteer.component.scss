@@ -94,3 +94,11 @@ svg {
 .drift-arrow {
   stop-color: var(--skip-blue-color);
 }
+
+.crosshair {
+  fill: none;
+  stroke: var(--skip-contrast-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.38;
+}
