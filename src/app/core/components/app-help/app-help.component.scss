@@ -33,10 +33,6 @@
   letter-spacing: var(--mat-dialog-subhead-tracking, var(--mat-sys-headline-small-tracking, 0.03125em));
 }
 
-.mat-mdc-dialog-content {
-  max-height: max-content;
-}
-
 .dialog-close-icon {
   display: flex;
   flex-direction: row;
@@ -55,7 +51,7 @@
   background: var(--mat-sys-surface-container-high);
 }
 
-::ng-deep .markdown-content {
+.markdown-content {
   display: block;
   flex: 1 1 auto;
   min-height: 0;
