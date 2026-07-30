@@ -193,7 +193,7 @@ export class SvgRacesteerComponent implements OnDestroy {
           if (this.tack.oldValue === this.tack.newValue) {
             this.setRotationImmediate(this.tackIndicator().nativeElement, this.tack.newValue);
           } else {
-            animateRotation(this.tackIndicator().nativeElement, this.tack.oldValue, this.tack.newValue, this.animationDuration(), undefined, this.animationFrameIds, [600, 620]);
+            animateRotation(this.tackIndicator().nativeElement, this.tack.oldValue, this.tack.newValue, this.animationDuration(), undefined, this.animationFrameIds, [600, 620], this.ngZone);
           }
         }
         this.updateLaylines();
@@ -226,7 +226,7 @@ export class SvgRacesteerComponent implements OnDestroy {
           if (this.wpt.oldValue === this.wpt.newValue) {
             this.setRotationImmediate(this.wptIndicator().nativeElement, this.wpt.newValue);
           } else {
-            animateRotation(this.wptIndicator().nativeElement, this.wpt.oldValue, this.wpt.newValue, this.animationDuration(), undefined, this.animationFrameIds, [600, 620]);
+            animateRotation(this.wptIndicator().nativeElement, this.wpt.oldValue, this.wpt.newValue, this.animationDuration(), undefined, this.animationFrameIds, [600, 620], this.ngZone);
           }
         }
       });
