@@ -28,7 +28,7 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly compassModeEnabled = input.required<boolean>();
   protected readonly courseOverGroundAngle = input<number | undefined>(undefined);
   protected readonly courseOverGroundEnabled = input.required<boolean>();
-  protected readonly speedOverGround = input<number | undefined>(undefined);
+  protected readonly sogActive = input<boolean>(true);
   protected readonly trueWindAngle = input.required<number>();
   protected readonly trueWindActive = input<boolean>(false);
   protected readonly twsEnabled = input.required<boolean>();
@@ -44,8 +44,10 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly sailSetupEnabled = input.required<boolean>();
   protected readonly windSectorEnabled = input.required<boolean>();
   protected readonly driftEnabled = input.required<boolean>();
+  protected readonly driftActive = input<boolean>(false);
   protected readonly driftSet = input<number | undefined>(undefined);
   protected readonly driftFlow = input<number | undefined>(undefined);
+  protected readonly driftUnit = input<string>('');
   protected readonly waypointAngle = input<number | undefined>(undefined);
   protected readonly waypointEnabled = input.required<boolean>();
   protected readonly trueWindMinHistoric = input<number | undefined>(undefined);
@@ -67,20 +69,11 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   protected headingValue = signal<string>("--");
   private trueWindHeading = 0;
-  private readonly SPEED_EPSILON = 0.1; // knots
-  // An overlay is meaningful only when its underlying datum is present/non-zero: a bearing
-  // circle needs an active waypoint, the set arrow and drift readout need real current.
+  // The bearing circle is meaningful only with an active waypoint. The drift/COG visibility gates
+  // (driftActive/sogActive) are physical-speed thresholds resolved by the parent and passed in.
   protected waypointActive = computed(() => {
     const a = this.waypointAngle();
     return this.waypointEnabled() && a != null && Number.isFinite(a);
-  });
-  protected driftActive = computed(() => (this.driftFlow() ?? 0) >= this.SPEED_EPSILON);
-  // A course-over-ground heading is meaningless at rest, so hide the COG arrow when SOG is zero-ish.
-  // SOG absent (boat publishes COG but not speed) is treated as "moving" so the arrow still shows;
-  // only a present, near-zero SOG hides it.
-  protected sogActive = computed(() => {
-    const s = this.speedOverGround();
-    return s == null || s >= this.SPEED_EPSILON;
   });
 
   //laylines - Close-Hauled lines

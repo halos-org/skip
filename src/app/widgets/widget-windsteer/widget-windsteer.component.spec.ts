@@ -8,7 +8,11 @@ import { UnitsService } from '../../core/services/units.service';
 import { IPathUpdate } from '../../core/services/data.service';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 
-const unitsServiceStub = { getUnitDisplaySymbol: (measure: string | null | undefined) => measure ?? '' };
+const unitsServiceStub = {
+  getUnitDisplaySymbol: (measure: string | null | undefined) => measure ?? '',
+  // Model only what the gate needs: SI m/s in, display unit out (knots ~1.94384x; m/s identity).
+  convertToUnit: (unit: string, value: number) => unit === 'knots' ? value * 1.94384 : value
+};
 
 /**
  * Regression tests for #1066 / #1063.
@@ -269,8 +273,9 @@ describe('WidgetWindComponent speed-over-ground gating (#442)', () => {
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
   let callbacks: Map<string, (u: IPathUpdate) => void>;
 
-  const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
+  const update = (value: number | null, measure?: string): IPathUpdate => ({ data: { value, timestamp: null, measure }, state: 'normal' });
   const sog = (): number | undefined => (component as unknown as { sog: () => number | undefined }).sog();
+  const sogActive = (): boolean => (component as unknown as { sogActive: () => boolean }).sogActive();
 
   beforeEach(() => {
     options = signal<IWidgetSvcConfig | undefined>({ ...WidgetWindComponent.DEFAULT_CONFIG });
@@ -307,5 +312,67 @@ describe('WidgetWindComponent speed-over-ground gating (#442)', () => {
     expect(sog()).toBeCloseTo(3.2);
     callbacks.get('speedOverGround')!(update(null));
     expect(sog()).toBeUndefined();
+  });
+
+  it('gates the COG arrow on a 0.05 m/s SOG threshold, treating absence as moving', () => {
+    expect(sogActive()).toBe(true);                          // nothing received yet -> show
+    callbacks.get('speedOverGround')!(update(0.02, 'm/s'));  // present, below 0.05 m/s -> hide
+    expect(sogActive()).toBe(false);
+    callbacks.get('speedOverGround')!(update(0.3, 'm/s'));   // above -> show
+    expect(sogActive()).toBe(true);
+    callbacks.get('speedOverGround')!(update(null));         // GPS dropout -> absent -> show
+    expect(sogActive()).toBe(true);
+  });
+});
+
+/**
+ * #441: the current-set arrow and drift readout hide below a physical-speed threshold. The limit is
+ * defined in SI (m/s) and expressed in the value's own display unit before comparison, so the cutoff
+ * is the same real current whether the readout is in knots, m/s, or km/h.
+ */
+describe('WidgetWindComponent drift/current gating (#441)', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const update = (value: number | null, measure?: string): IPathUpdate => ({ data: { value, timestamp: null, measure }, state: 'normal' });
+  const driftActive = (): boolean => (component as unknown as { driftActive: () => boolean }).driftActive();
+  const driftUnit = (): string => (component as unknown as { driftUnit: () => string }).driftUnit();
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>({ ...WidgetWindComponent.DEFAULT_CONFIG });
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
+      ]
+    });
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick();
+  });
+
+  it('hides below 0.1 m/s and shows above it when the value is in knots', () => {
+    // 0.1 m/s -> ~0.19 kn threshold; driftFlow is the display (knots) value.
+    callbacks.get('drift')!(update(0.15, 'knots'));  // 0.15 kn < 0.19 kn
+    expect(driftActive()).toBe(false);
+    callbacks.get('drift')!(update(0.3, 'knots'));   // 0.3 kn > 0.19 kn
+    expect(driftActive()).toBe(true);
+  });
+
+  it('applies the 0.1 m/s threshold directly when the value is already in m/s', () => {
+    callbacks.get('drift')!(update(0.05, 'm/s'));
+    expect(driftActive()).toBe(false);
+    callbacks.get('drift')!(update(0.15, 'm/s'));
+    expect(driftActive()).toBe(true);
+  });
+
+  it('exposes the drift display unit for the readout label', () => {
+    callbacks.get('drift')!(update(0.4, 'knots'));
+    expect(driftUnit()).toBe('knots');
   });
 });

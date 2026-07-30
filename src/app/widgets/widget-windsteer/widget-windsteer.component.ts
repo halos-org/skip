@@ -12,6 +12,14 @@ import { UnitsService } from '../../core/services/units.service';
 // source of truth for both the default config and the missing-value fallback.
 const DEFAULT_WIND_SECTOR_WINDOW_SECONDS = 5;
 
+// Overlay auto-hide thresholds in SI (m/s). Compared against the true speed regardless of the
+// path's display unit: the current-set arrow/readout hide below DRIFT, the COG arrow below SOG.
+const DRIFT_HIDE_LIMIT_MS = 0.1;
+const SOG_HIDE_LIMIT_MS = 0.05;
+// Change-detection dedup granularity in SI (m/s): a speed signal only re-sets when it moves at least
+// this much, converted to the value's own display unit each update — never a fixed display-unit step.
+const SPEED_DEDUP_MS = 0.05;
+
 @Component({
   selector: 'widget-wind-steer',
   templateUrl: './widget-windsteer.component.html',
@@ -204,8 +212,19 @@ export class WidgetWindComponent implements OnDestroy {
   private trueWindSpeedMeasure = signal('');
   protected trueWindSpeedUnit = computed(() => this.speedUnitSymbol(this.trueWindSpeedMeasure()));
   protected driftFlow = signal(0);
+  private driftMeasure = signal('');
+  protected driftUnit = computed(() => this.speedUnitSymbol(this.driftMeasure()));
+  protected driftActive = computed(() =>
+    (this.driftFlow() ?? 0) >= this.speedInDisplayUnit(this.driftMeasure(), DRIFT_HIDE_LIMIT_MS));
   protected driftSet = signal(0);
   protected sog = signal<number | undefined>(undefined);
+  private sogMeasure = signal('');
+  // SOG absent (boat publishes COG but not speed) is treated as "moving" so the COG arrow still
+  // shows; only a present, sub-threshold SOG hides it.
+  protected sogActive = computed(() => {
+    const s = this.sog();
+    return s == null || s >= this.speedInDisplayUnit(this.sogMeasure(), SOG_HIDE_LIMIT_MS);
+  });
   protected waypointAngle = signal<number | undefined>(undefined);
   protected historicalWindDirection: { timestamp: number; windDirection: number; }[] = [];
   protected trueWindMinHistoric = signal<number | undefined>(undefined);
@@ -221,8 +240,7 @@ export class WidgetWindComponent implements OnDestroy {
   private lastUnwrapped: number | null = null;
   private lastSector: { min?: number; mid?: number; max?: number } = {};
 
-  private readonly DEG_EPSILON = 1;      // degrees
-  private readonly SPEED_EPSILON = 0.1;  // knots
+  private readonly DEG_EPSILON = 1;      // degrees — angle paths are structurally fixed to degrees
 
   constructor() {
     // Stable stream callbacks registered via effect; directive handles diffing
@@ -260,8 +278,9 @@ export class WidgetWindComponent implements OnDestroy {
   private onDriftUpdate = (u: IPathUpdate) => {
     if (u.data.value == null) u.data.value = 0;
     const next = u.data.value;
-    if (!this.hasDrift || Math.abs(this.driftFlow() - next) >= this.SPEED_EPSILON) {
+    if (!this.hasDrift || Math.abs(this.driftFlow() - next) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
       this.driftFlow.set(next); this.hasDrift = true;
+      this.driftMeasure.set(u.data.measure ?? '');
     }
   };
   private onSOGUpdate = (u: IPathUpdate) => {
@@ -273,8 +292,9 @@ export class WidgetWindComponent implements OnDestroy {
     }
     const next = u.data.value;
     const cur = this.sog();
-    if (!this.hasSOG || cur == null || Math.abs(cur - next) >= this.SPEED_EPSILON) {
+    if (!this.hasSOG || cur == null || Math.abs(cur - next) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
       this.sog.set(next); this.hasSOG = true;
+      this.sogMeasure.set(u.data.measure ?? '');
     }
   };
   private onSetUpdate = (u: IPathUpdate) => {
@@ -307,7 +327,7 @@ export class WidgetWindComponent implements OnDestroy {
   private onAppWindSpeed = (u: IPathUpdate) => {
     if (u.data.value == null) u.data.value = 0;
     const next = u.data.value;
-    if (!this.hasAWS || Math.abs(this.appWindSpeed() - next) >= this.SPEED_EPSILON) {
+    if (!this.hasAWS || Math.abs(this.appWindSpeed() - next) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
       this.appWindSpeed.set(next); this.hasAWS = true;
       this.appWindSpeedMeasure.set(u.data.measure ?? '');
     }
@@ -315,7 +335,7 @@ export class WidgetWindComponent implements OnDestroy {
   private onTrueWindSpeed = (u: IPathUpdate) => {
     if (u.data.value == null) u.data.value = 0;
     const next = u.data.value;
-    if (!this.hasTWS || Math.abs(this.trueWindSpeed() - next) >= this.SPEED_EPSILON) {
+    if (!this.hasTWS || Math.abs(this.trueWindSpeed() - next) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
       this.trueWindSpeed.set(next); this.hasTWS = true;
       this.trueWindSpeedMeasure.set(u.data.measure ?? '');
     }
@@ -474,6 +494,12 @@ export class WidgetWindComponent implements OnDestroy {
   // the label always matches the value.
   private speedUnitSymbol(measure: string): string {
     return measure && measure !== 'unitless' ? this.unitsService.getUnitDisplaySymbol(measure) : '';
+  }
+
+  // Express an SI (m/s) speed in the value's own display unit, so a threshold or change-step compares
+  // as a true physical speed regardless of the unit the value is rendered in.
+  private speedInDisplayUnit(measure: string, speedMs: number): number {
+    return measure ? (this.unitsService.convertToUnit(measure, speedMs) ?? speedMs) : speedMs;
   }
 
 }

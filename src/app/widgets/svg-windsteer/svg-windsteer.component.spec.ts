@@ -24,12 +24,14 @@ describe('SvgWindsteerComponent', () => {
             sailSetupEnabled: false,
             windSectorEnabled: false,
             driftEnabled: true,
+            driftActive: true,
             waypointEnabled: true,
             driftSet: 7,
             driftFlow: 5,
+            driftUnit: 'kn',
             waypointAngle: 30,
             courseOverGroundAngle: 16,
-            speedOverGround: 5
+            sogActive: true
         };
 
         Object.entries({ ...defaults, ...overrides }).forEach(([key, value]) => {
@@ -263,52 +265,49 @@ describe('SvgWindsteerComponent', () => {
         expect((component as unknown as { waypointActive: () => boolean }).waypointActive()).toBe(true);
     });
 
-    it('hides the set arrow and current readout when drift is below the speed epsilon', () => {
-        setRequiredInputs({ driftFlow: 0, driftEnabled: true, compassModeEnabled: true });
+    it('hides the set arrow and current readout when drift is inactive', () => {
+        setRequiredInputs({ driftActive: false, driftEnabled: true, compassModeEnabled: true });
         fixture.detectChanges();
 
         expect(component['setIndicator']().nativeElement.style.display).toBe('none');
         expect((fixture.nativeElement.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('none');
     });
 
-    it('shows the set arrow and current readout once drift exceeds the epsilon', () => {
-        setRequiredInputs({ driftFlow: 0.5, driftEnabled: true, compassModeEnabled: true });
+    it('shows the set arrow and current readout when drift is active', () => {
+        setRequiredInputs({ driftActive: true, driftEnabled: true, compassModeEnabled: true });
         fixture.detectChanges();
 
         expect(component['setIndicator']().nativeElement.style.display).toBe('inline');
         expect((fixture.nativeElement.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('inline');
     });
 
-    it('hides the COG arrow when SOG is below the speed epsilon (boat at rest)', () => {
-        setRequiredInputs({ speedOverGround: 0, courseOverGroundEnabled: true, compassModeEnabled: true });
+    it('renders the drift value with its unit label', () => {
+        setRequiredInputs({ driftActive: true, driftEnabled: true, compassModeEnabled: true, driftFlow: 0.3, driftUnit: 'kn' });
+        fixture.detectChanges();
+
+        const text = (fixture.nativeElement.querySelector('#text11') as SVGTextElement).textContent ?? '';
+        expect(text).toContain('0.3');
+        expect(text).toContain('kn');
+    });
+
+    it('omits the drift unit label when no unit is resolved', () => {
+        setRequiredInputs({ driftActive: true, driftEnabled: true, compassModeEnabled: true, driftFlow: 0.3, driftUnit: '' });
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('#layerCurrent tspan')).toBeNull();
+    });
+
+    it('hides the COG arrow when SOG is inactive (boat at rest)', () => {
+        setRequiredInputs({ sogActive: false, courseOverGroundEnabled: true, compassModeEnabled: true });
         fixture.detectChanges();
 
         expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('none');
     });
 
-    it('shows the COG arrow once SOG exceeds the epsilon (boat underway)', () => {
-        setRequiredInputs({ speedOverGround: 0.5, courseOverGroundEnabled: true, compassModeEnabled: true });
+    it('shows the COG arrow when SOG is active (underway or SOG absent)', () => {
+        setRequiredInputs({ sogActive: true, courseOverGroundEnabled: true, compassModeEnabled: true });
         fixture.detectChanges();
 
         expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
-    });
-
-    it('shows the COG arrow when SOG is absent (boat publishes COG but no speed)', () => {
-        setRequiredInputs({ speedOverGround: undefined, courseOverGroundEnabled: true, compassModeEnabled: true });
-        fixture.detectChanges();
-
-        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
-    });
-
-    it('gates drift and SOG exactly at the 0.1 kn epsilon', () => {
-        setRequiredInputs({ driftFlow: 0.1, speedOverGround: 0.1, driftEnabled: true, courseOverGroundEnabled: true, compassModeEnabled: true });
-        fixture.detectChanges();
-        expect(component['setIndicator']().nativeElement.style.display).toBe('inline');
-        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
-
-        setRequiredInputs({ driftFlow: 0.09, speedOverGround: 0.09, driftEnabled: true, courseOverGroundEnabled: true, compassModeEnabled: true });
-        fixture.detectChanges();
-        expect(component['setIndicator']().nativeElement.style.display).toBe('none');
-        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('none');
     });
 });
