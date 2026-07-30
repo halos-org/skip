@@ -601,6 +601,13 @@
       </g>
     </g>
   </g>
+  <g id="layerCrosshair"
+     style="display:inline">
+    <path class="crosshair"
+      d="M 500,48 L 500,360 M 500,640 L 500,952" />
+    <path class="crosshair"
+      d="M 48,500 L 360,500 M 640,500 L 952,500" />
+  </g>
   <g id="layerCounter">
     <g id="twsCounter"
       [style.display]="twsEnabled() ? 'inline' : 'none'">
