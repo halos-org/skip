@@ -1,6 +1,7 @@
 <svg-windsteer
   [compassHeading]="currentHeading()"
   [compassModeEnabled]="runtime.options()?.compassModeEnabled ?? true"
+  [updateInterval]="runtime.options()?.updateInterval"
   [courseOverGroundAngle]="courseOverGroundAngle()"
   [courseOverGroundEnabled]="runtime.options()?.courseOverGroundEnable ?? true"
   [sogActive]="sogActive()"

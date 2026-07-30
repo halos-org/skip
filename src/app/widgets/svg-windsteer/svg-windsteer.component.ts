@@ -1,5 +1,6 @@
 import { Component, ElementRef, input, viewChild, signal, computed, effect, untracked, ChangeDetectionStrategy, OnDestroy, NgZone, inject } from '@angular/core';
-import { animateRotation, animateAngleTransition, animateSectorTransition, SectorAngles } from '../../core/utils/svg-animate.util';
+import { animateRotation, animateAngleTransition, animateSectorTransition, effectiveAnimationDuration, SectorAngles } from '../../core/utils/svg-animate.util';
+import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 import { DecimalPipe } from '@angular/common';
 
 const angle = ([a, b], [c, d], [e, f]) => (Math.atan2(f - d, e - c) - Math.atan2(b - d, a - c) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -26,6 +27,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   protected readonly compassHeading = input.required<number>();
   protected readonly compassModeEnabled = input.required<boolean>();
+  protected readonly updateInterval = input<number | undefined>(undefined);
   protected readonly courseOverGroundAngle = input<number | undefined>(undefined);
   protected readonly courseOverGroundEnabled = input.required<boolean>();
   protected readonly sogActive = input<boolean>(true);
@@ -95,7 +97,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   private readonly CENTER = 500;
   private readonly RADIUS = 350;
-  private readonly ANIMATION_DURATION = 900;
+  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval() ?? DEFAULT_WIDGET_UPDATE_INTERVAL_MS));
   private readonly EPS_ANGLE = 1.0; // degrees, gate tiny animations
 
   private readonly ngZone = inject(NgZone);
@@ -127,7 +129,7 @@ export class SvgWindsteerComponent implements OnDestroy {
           if (isFirstCompass || this.compass.oldValue === this.compass.newValue) {
             this.setRotationImmediate(this.rotatingDial().nativeElement, -this.compass.newValue);
           } else {
-            animateRotation(this.rotatingDial().nativeElement, -this.compass.oldValue, -this.compass.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
+            animateRotation(this.rotatingDial().nativeElement, -this.compass.oldValue, -this.compass.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
           // Heading affects dial-local geometry for laylines and sectors; refresh without animation
           this.updateCloseHauledLines(false);
@@ -158,7 +160,7 @@ export class SvgWindsteerComponent implements OnDestroy {
           if (isFirstCog || this.cog.oldValue === this.cog.newValue) {
             this.setRotationImmediate(this.cogIndicator().nativeElement, this.cog.newValue);
           } else {
-            animateRotation(this.cogIndicator().nativeElement, this.cog.oldValue, this.cog.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
+            animateRotation(this.cogIndicator().nativeElement, this.cog.oldValue, this.cog.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
         }
       });
@@ -184,7 +186,7 @@ export class SvgWindsteerComponent implements OnDestroy {
           if (isFirstWaypoint || this.wpt.oldValue === this.wpt.newValue) {
             this.setRotationImmediate(this.wptIndicator().nativeElement, this.wpt.newValue);
           } else {
-            animateRotation(this.wptIndicator().nativeElement, this.wpt.oldValue, this.wpt.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
+            animateRotation(this.wptIndicator().nativeElement, this.wpt.oldValue, this.wpt.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
         }
       });
@@ -209,7 +211,7 @@ export class SvgWindsteerComponent implements OnDestroy {
           if (isFirstAwa || this.awa.oldValue === this.awa.newValue) {
             this.setRotationImmediate(this.awaIndicator().nativeElement, this.awa.newValue);
           } else {
-            animateRotation(this.awaIndicator().nativeElement, this.awa.oldValue, this.awa.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
+            animateRotation(this.awaIndicator().nativeElement, this.awa.oldValue, this.awa.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
         }
       });
@@ -238,7 +240,7 @@ export class SvgWindsteerComponent implements OnDestroy {
           if (isFirstTwa || this.twa.oldValue === this.twa.newValue) {
             this.setRotationImmediate(this.twaIndicator().nativeElement, this.twa.newValue);
           } else {
-            animateRotation(this.twaIndicator().nativeElement, this.twa.oldValue, this.twa.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
+            animateRotation(this.twaIndicator().nativeElement, this.twa.oldValue, this.twa.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
         }
         // Laylines are centered on the true wind; recompute whenever TWA changes
@@ -272,7 +274,7 @@ export class SvgWindsteerComponent implements OnDestroy {
           if (!this.setInitialized || this.set.oldValue === this.set.newValue) {
             this.setRotationImmediate(this.setIndicator().nativeElement, this.set.newValue);
           } else {
-            animateRotation(this.setIndicator().nativeElement, this.set.oldValue, this.set.newValue, this.ANIMATION_DURATION, undefined, this.animationFrameIds, undefined, this.ngZone);
+            animateRotation(this.setIndicator().nativeElement, this.set.oldValue, this.set.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
         }
       });
@@ -347,7 +349,7 @@ export class SvgWindsteerComponent implements OnDestroy {
     const id = animateAngleTransition(
       from,
       to,
-      this.ANIMATION_DURATION,
+      this.animationDuration(),
       angle => this.drawLayline(angle, isPort),
       () => { if (isPort) this.portLaylineAnimId = null; else this.stbdLaylineAnimId = null; },
       this.ngZone
@@ -463,7 +465,7 @@ export class SvgWindsteerComponent implements OnDestroy {
     const id = animateSectorTransition(
       from as SectorAngles,
       to as SectorAngles,
-      this.ANIMATION_DURATION,
+      this.animationDuration(),
       (current) => {
         const path = this.computeSectorPath(current, isPort);
         if (isPort) this.portWindSectorPath.set(path); else this.stbdWindSectorPath.set(path);
