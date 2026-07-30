@@ -1,4 +1,5 @@
 import type { NgZone } from '@angular/core';
+import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interface';
 
 /**
  * SVG Animation Utilities
@@ -33,6 +34,21 @@ import type { NgZone } from '@angular/core';
  *  const frames = new WeakMap<SVGGElement, number>();
  *  animateRotation(el, oldAngle, newAngle, 900, () => console.log('done'), frames, undefined, ngZone);
  */
+
+/**
+ * Tween duration (ms) for a per-sample needle/indicator animation, derived from the
+ * widget's updateInterval. Capped at the default cadence and never longer than one sample
+ * period, so a tween completes before the next value arrives. Passing the fixed durations
+ * these helpers used before made the animation a low-pass filter whose lag was decoupled
+ * from (and could invert) updateInterval (#466). Monotonic in the interval: a shorter
+ * cadence never yields a slower tween.
+ */
+export function effectiveAnimationDuration(updateInterval: number): number {
+  if (!Number.isFinite(updateInterval) || updateInterval <= 0) {
+    return DEFAULT_WIDGET_UPDATE_INTERVAL_MS;
+  }
+  return Math.min(updateInterval, DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
+}
 
 /**
  * Smoothly animates the rotation of an SVG <g> element from a starting angle to a target angle.
