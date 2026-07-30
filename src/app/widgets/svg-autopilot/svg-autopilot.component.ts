@@ -1,5 +1,6 @@
 import { Component, ElementRef, input, viewChild, effect, computed, untracked, signal, NgZone, inject, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
-import { animateRotation, animateRudderWidth } from '../../core/utils/svg-animate.util';
+import { animateRotation, animateRudderWidth, effectiveAnimationDuration } from '../../core/utils/svg-animate.util';
+import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 import { TApMode } from '../../core/interfaces/signalk-autopilot-interfaces';
 
 
@@ -17,6 +18,7 @@ export class SvgAutopilotComponent implements OnDestroy {
   private readonly rudderPortRect = viewChild.required<ElementRef<SVGRectElement>>('rudderPortRect');
 
   protected readonly apMode = input<TApMode>('off-line');
+  protected readonly updateInterval = input<number | undefined>(undefined);
   protected readonly targetPilotHeadingTrue = input.required<boolean>();
   protected readonly autopilotTarget = input.required<number | null>();
   protected readonly courseXte = input.required<number>();
@@ -74,7 +76,7 @@ export class SvgAutopilotComponent implements OnDestroy {
     return this.headingDirectionTrue() ? 'T' : 'M';
   });
   private animationFrames = new WeakMap<Element, number>();
-  private readonly ANIMATION_DURATION = 1000; // unified animation duration (ms)
+  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval() ?? DEFAULT_WIDGET_UPDATE_INTERVAL_MS));
   private readonly DEG_TO_PX = 16.66666667; // 30° maps to 500px, so 1° = 500/30 = 16.6667px
   private readonly ROT_CENTER: [number, number] = [500, 560.061];
   private readonly ngZone = inject(NgZone);
@@ -111,7 +113,7 @@ export class SvgAutopilotComponent implements OnDestroy {
         if (isFirst || prev === next) {
           this.setRotationImmediate(dial, -next);
         } else {
-          animateRotation(dial, -prev, -next, this.ANIMATION_DURATION, undefined, this.animationFrames, this.ROT_CENTER, this.ngZone);
+          animateRotation(dial, -prev, -next, this.animationDuration(), undefined, this.animationFrames, this.ROT_CENTER, this.ngZone);
         }
       });
     });
@@ -138,7 +140,7 @@ export class SvgAutopilotComponent implements OnDestroy {
         if (isFirst || prev === next) {
           this.setRotationImmediate(awaEl, next);
         } else {
-          animateRotation(awaEl, prev, next, this.ANIMATION_DURATION, undefined, this.animationFrames, this.ROT_CENTER, this.ngZone);
+          animateRotation(awaEl, prev, next, this.animationDuration(), undefined, this.animationFrames, this.ROT_CENTER, this.ngZone);
         }
       });
     });
@@ -238,7 +240,7 @@ export class SvgAutopilotComponent implements OnDestroy {
         starboardEl,
         this.oldRudderStbAngle,
         capped,
-        this.ANIMATION_DURATION,
+        this.animationDuration(),
         undefined,
         this.animationFrames,
         this.ngZone
@@ -247,7 +249,7 @@ export class SvgAutopilotComponent implements OnDestroy {
         portEl,
         this.oldRudderPrtAngle,
         0,
-        this.ANIMATION_DURATION,
+        this.animationDuration(),
         undefined,
         this.animationFrames,
         this.ngZone
@@ -259,7 +261,7 @@ export class SvgAutopilotComponent implements OnDestroy {
         portEl,
         this.oldRudderPrtAngle,
         capped,
-        this.ANIMATION_DURATION,
+        this.animationDuration(),
         undefined,
         this.animationFrames,
         this.ngZone
@@ -268,7 +270,7 @@ export class SvgAutopilotComponent implements OnDestroy {
         starboardEl,
         this.oldRudderStbAngle,
         0,
-        this.ANIMATION_DURATION,
+        this.animationDuration(),
         undefined,
         this.animationFrames,
         this.ngZone
