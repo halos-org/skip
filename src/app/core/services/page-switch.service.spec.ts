@@ -23,6 +23,7 @@ class DashboardStub {
   dashboards = signal<Dashboard[]>([]);
   activeDashboard = signal<number | null>(0);
   isDashboardStatic = signal<boolean>(true);
+  isPageTransitioning = signal<boolean>(false);
   navigateTo: Mock = vi.fn();
 }
 
@@ -240,11 +241,100 @@ describe('PageSwitchService', () => {
     expect(dashboard.navigateTo).toHaveBeenCalledWith(1); // immediate startup jump
     dashboard.navigateTo.mockClear();
 
-    // User swipes to another page; the state has not changed.
+    // User swipes to another page; the state has not changed. TestBed.tick() flushes the
+    // startup effect so this actually exercises the _startupHandled once-guard, not just the
+    // absence of an armed dwell.
     dashboard.activeDashboard.set(2);
+    TestBed.tick();
     dwell(); // advance well past any dwell window
 
-    expect(dashboard.navigateTo).not.toHaveBeenCalled(); // no delayed re-switch
+    expect(dashboard.navigateTo).not.toHaveBeenCalled(); // no delayed re-switch, no re-evaluate
+  });
+
+  it('treats a late first matching value (arriving after startup) as a dwelled, cued change', () => {
+    dashboard.dashboards.set([page('p0', 'Zero'), page('p1', 'Sailing', trig(STATE, 'sailing'))]);
+    dashboard.activeDashboard.set(0);
+    create(); // startup handled; STATE has no value yet
+
+    data.push(STATE, 'sailing'); // STATE's first value, arriving after startup
+    expect(dashboard.navigateTo).not.toHaveBeenCalled(); // NOT an immediate silent jump
+
+    dwell();
+    expect(dashboard.navigateTo).toHaveBeenCalledTimes(1);
+    expect(dashboard.navigateTo).toHaveBeenCalledWith(1);
+    expect(snackBar.open).toHaveBeenCalledOnce(); // cued, like any runtime change
+  });
+
+  it('a late first value on one path never silently switches to another path\'s matching page', () => {
+    dashboard.dashboards.set([
+      page('p0', 'Zero'),
+      page('p1', 'Sailing', trig(STATE, 'sailing')),
+      page('p2', 'Shallow', trig(DEPTH, '3'))
+    ]);
+    dashboard.activeDashboard.set(0);
+    data.push(STATE, 'sailing'); // sailing already true at startup
+    create();
+    expect(dashboard.navigateTo).toHaveBeenCalledWith(1); // startup jump to Sailing
+
+    dashboard.activeDashboard.set(0); // user swipes back to page 0
+    dashboard.navigateTo.mockClear();
+    snackBar.open.mockClear();
+
+    data.push(DEPTH, '5'); // DEPTH's first value, non-matching, arriving after startup
+    dwell();
+    expect(dashboard.navigateTo).not.toHaveBeenCalled(); // must NOT re-switch to the still-matching Sailing page
+  });
+
+  it('cancels a pending dwell when the trigger path is removed mid-dwell', () => {
+    dashboard.dashboards.set([page('p0', 'Zero'), page('p1', 'Sailing', trig(STATE, 'sailing'))]);
+    create();
+    baseline(STATE, 'moored');
+    data.push(STATE, 'sailing'); // arms the dwell
+
+    dashboard.dashboards.set([page('p0', 'Zero'), page('p1', 'Plain')]); // trigger removed
+    TestBed.tick();
+    dwell();
+
+    expect(dashboard.navigateTo).not.toHaveBeenCalled();
+  });
+
+  it('cancels the pending switch when the value clears to null before the dwell', () => {
+    dashboard.dashboards.set([page('p0', 'Zero'), page('p1', 'Sailing', trig(STATE, 'sailing'))]);
+    create();
+    baseline(STATE, 'moored');
+    data.push(STATE, 'sailing');
+    vi.advanceTimersByTime(PAGE_SWITCH_DWELL_MS - 1);
+    data.push(STATE, null); // cleared before it held for the dwell
+    dwell();
+
+    expect(dashboard.navigateTo).not.toHaveBeenCalled();
+  });
+
+  it('re-fires after the value clears to null and returns', () => {
+    dashboard.dashboards.set([page('p0', 'Zero'), page('p1', 'Sailing', trig(STATE, 'sailing'))]);
+    create();
+    baseline(STATE, 'moored');
+    data.push(STATE, 'sailing');
+    dwell();
+    expect(dashboard.navigateTo).toHaveBeenCalledTimes(1);
+
+    data.push(STATE, null); // cleared
+    data.push(STATE, 'sailing'); // re-asserted
+    dwell();
+    expect(dashboard.navigateTo).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not switch or cue while a page transition is in flight', () => {
+    dashboard.dashboards.set([page('p0', 'Zero'), page('p1', 'Sailing', trig(STATE, 'sailing'))]);
+    dashboard.isPageTransitioning.set(true);
+    create();
+    baseline(STATE, 'moored');
+
+    data.push(STATE, 'sailing');
+    dwell();
+
+    expect(dashboard.navigateTo).not.toHaveBeenCalled();
+    expect(snackBar.open).not.toHaveBeenCalled();
   });
 
   it('performs the startup jump once a page becomes active when the value was seeded first', () => {

@@ -92,38 +92,48 @@ export class PageSwitchService {
   }
 
   private teardown(watch: PathWatch): void {
-    if (watch.dwellTimer) clearTimeout(watch.dwellTimer);
+    this.cancelDwell(watch);
     // release() alone only decrements the shared refcount; unsubscribe stops OUR handler.
     watch.sub.unsubscribe();
     watch.release();
+  }
+
+  private cancelDwell(watch: PathWatch): void {
+    if (watch.dwellTimer) {
+      clearTimeout(watch.dwellTimer);
+      watch.dwellTimer = undefined;
+    }
   }
 
   private onUpdate(path: string, update: IPathUpdate): void {
     const watch = this._watches.get(path);
     if (!watch) return;
     const value = update.data.value;
-    if (value == null) return; // ignore the no-value seed / a path being cleared
+
+    if (value == null) {
+      // A cleared value cancels any pending switch and resets the baseline, so a later
+      // re-assertion of the same value is seen as a fresh change rather than deduped away.
+      this.cancelDwell(watch);
+      watch.value = UNSET;
+      return;
+    }
     if (Object.is(value, watch.value)) return; // dedupe replays / unchanged
+
     const firstValue = watch.value === UNSET;
     watch.value = value;
 
-    if (firstValue) {
-      // A value that was already true when we started watching is a baseline, not a change:
-      // never arm the dwell. If startup is already past (a late-arriving first value), jump to it
-      // immediately; otherwise the startup effect handles it once a page is active.
-      if (this._startupHandled) this.evaluateCurrentValues();
-      return;
-    }
+    // Before startup is handled, a path's first value is only a baseline: the startup effect
+    // performs the one-time silent jump. A first value arriving AFTER startup is a genuine
+    // (late) change and takes the normal dwell + cue path below, scoped to this path — never a
+    // global re-evaluate, which could silently switch to an unrelated already-matching page.
+    if (firstValue && !this._startupHandled) return;
 
     if (!this.hasMatchingPage(path, value)) {
-      if (watch.dwellTimer) {
-        clearTimeout(watch.dwellTimer);
-        watch.dwellTimer = undefined;
-      }
+      this.cancelDwell(watch);
       return;
     }
 
-    if (watch.dwellTimer) clearTimeout(watch.dwellTimer);
+    this.cancelDwell(watch);
     watch.dwellTimer = setTimeout(() => this.onDwellElapsed(path, value), PAGE_SWITCH_DWELL_MS);
   }
 
@@ -152,7 +162,9 @@ export class PageSwitchService {
    * passes false so opening the app lands on the right page silently.
    */
   private switchTo(idx: number, notify: boolean): void {
-    if (!this._dashboard.isDashboardStatic() || this._uiEvent.isDragging()) return;
+    // isPageTransitioning: navigateTo no-ops mid-transition, so switching then would show a
+    // "Switched to …" cue for a navigation that never happened.
+    if (!this._dashboard.isDashboardStatic() || this._uiEvent.isDragging() || this._dashboard.isPageTransitioning()) return;
     const active = this._dashboard.activeDashboard();
     if (active === null || active === idx) return;
     this._dashboard.navigateTo(idx);
@@ -163,8 +175,7 @@ export class PageSwitchService {
   }
 
   private hasMatchingPage(path: string, value: unknown): boolean {
-    return this._dashboard.dashboards().some(d =>
-      d.trigger?.path === path && this.valueMatches(value, d.trigger.value));
+    return this.matchingPageIndex(path, value) >= 0;
   }
 
   private matchingPageIndex(path: string, value: unknown): number {

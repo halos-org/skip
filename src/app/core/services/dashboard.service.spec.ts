@@ -268,6 +268,16 @@ describe('DashboardService', () => {
       expect(service.dashboards()[0].trigger).toBeUndefined();
     });
 
+    it('clears the trigger when only one of path/value is empty (half-formed)', () => {
+      setup([makeDashboard('d-0', 'One')]);
+      service.update(0, 'One', 'icon', trigger);
+      service.update(0, 'One', 'icon', { path: 'self.navigation.state', value: '' });
+      expect(service.dashboards()[0].trigger).toBeUndefined();
+      service.update(0, 'One', 'icon', trigger);
+      service.update(0, 'One', 'icon', { path: '', value: 'sailing' });
+      expect(service.dashboards()[0].trigger).toBeUndefined();
+    });
+
     it('does not copy the trigger onto a duplicated page', () => {
       setup([{ ...makeDashboard('d-src', 'Source', [makeWidget('w-src')]), trigger }]);
       service.duplicate(0, 'Copy', 'icon');
