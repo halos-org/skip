@@ -26,6 +26,7 @@ describe('SvgWindsteerComponent', () => {
             driftEnabled: true,
             waypointEnabled: true,
             driftSet: 7,
+            driftFlow: 5,
             waypointAngle: 30,
             courseOverGroundAngle: 16
         };
@@ -243,5 +244,37 @@ describe('SvgWindsteerComponent', () => {
         expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
         expect(component['setIndicator']().nativeElement.style.display).toBe('inline');
         expect((el.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('inline');
+    });
+
+    it('hides the bearing (waypoint) circle when no waypoint bearing is available', () => {
+        setRequiredInputs({ waypointAngle: undefined, waypointEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['wptIndicator']().nativeElement.getAttribute('display')).toBe('none');
+        expect((component as unknown as { waypointActive: () => boolean }).waypointActive()).toBe(false);
+    });
+
+    it('shows the bearing circle for a real waypoint, including a due-north (0) bearing', () => {
+        setRequiredInputs({ waypointAngle: 0, waypointEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['wptIndicator']().nativeElement.getAttribute('display')).toBe('inline');
+        expect((component as unknown as { waypointActive: () => boolean }).waypointActive()).toBe(true);
+    });
+
+    it('hides the set arrow and current readout when drift is below the speed epsilon', () => {
+        setRequiredInputs({ driftFlow: 0, driftEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['setIndicator']().nativeElement.style.display).toBe('none');
+        expect((fixture.nativeElement.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('none');
+    });
+
+    it('shows the set arrow and current readout once drift exceeds the epsilon', () => {
+        setRequiredInputs({ driftFlow: 0.5, driftEnabled: true, compassModeEnabled: true });
+        fixture.detectChanges();
+
+        expect(component['setIndicator']().nativeElement.style.display).toBe('inline');
+        expect((fixture.nativeElement.querySelector('#layerCurrent') as SVGGElement).style.display).toBe('inline');
     });
 });

@@ -210,3 +210,52 @@ describe('WidgetWindComponent speed unit symbol source', () => {
     expect(awsUnit()).toBe('');
   });
 });
+
+/**
+ * #441: the bearing circle must hide when no waypoint is active. The presence signal lives in the
+ * child, keyed off whether waypointAngle is null. This parent must therefore propagate the SK
+ * `null` (no destination) as absence, not coerce it to a finite 0 that reads as "bearing due north".
+ */
+describe('WidgetWindComponent waypoint presence (#441)', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
+  const wpt = (): number | undefined =>
+    (component as unknown as { waypointAngle: () => number | undefined }).waypointAngle();
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>({ ...WidgetWindComponent.DEFAULT_CONFIG });
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
+      ]
+    });
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick();
+  });
+
+  it('propagates a real waypoint bearing', () => {
+    callbacks.get('nextWaypointBearing')!(update(120));
+    expect(wpt()).toBe(120);
+  });
+
+  it('treats a zero bearing as a real value (waypoint due north)', () => {
+    callbacks.get('nextWaypointBearing')!(update(0));
+    expect(wpt()).toBe(0);
+  });
+
+  it('clears the bearing to undefined when the destination goes away (null)', () => {
+    callbacks.get('nextWaypointBearing')!(update(120));
+    expect(wpt()).toBe(120);
+    callbacks.get('nextWaypointBearing')!(update(null));
+    expect(wpt()).toBeUndefined();
+  });
+});

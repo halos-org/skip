@@ -1,4 +1,4 @@
-import { Component, ElementRef, input, viewChild, signal, effect, untracked, ChangeDetectionStrategy, OnDestroy, NgZone, inject } from '@angular/core';
+import { Component, ElementRef, input, viewChild, signal, computed, effect, untracked, ChangeDetectionStrategy, OnDestroy, NgZone, inject } from '@angular/core';
 import { animateRotation, animateAngleTransition, animateSectorTransition, SectorAngles } from '../../core/utils/svg-animate.util';
 import { DecimalPipe } from '@angular/common';
 
@@ -66,7 +66,14 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   protected headingValue = signal<string>("--");
   private trueWindHeading = 0;
-  protected waypointActive = signal<boolean>(false);
+  private readonly SPEED_EPSILON = 0.1; // knots
+  // An overlay is meaningful only when its underlying datum is present/non-zero: a bearing
+  // circle needs an active waypoint, the set arrow and drift readout need real current.
+  protected waypointActive = computed(() => {
+    const a = this.waypointAngle();
+    return this.waypointEnabled() && a != null && Number.isFinite(a);
+  });
+  protected driftActive = computed(() => (this.driftFlow() ?? 0) >= this.SPEED_EPSILON);
 
   //laylines - Close-Hauled lines
   private portLaylinePrev = 0;
@@ -97,14 +104,6 @@ export class SvgWindsteerComponent implements OnDestroy {
   }
 
   constructor() {
-    effect(() => {
-      const waypoint = this.waypointEnabled();
-
-      untracked(() => {
-        this.waypointActive.set(waypoint);
-      });
-    });
-
     effect(() => {
       const modeEnabled = this.compassModeEnabled();
       const rawHeading = this.compassHeading();
@@ -169,14 +168,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
       untracked(() => {
         if (wptAngle == null || !Number.isFinite(wptAngle)) {
-          this.waypointActive.set(false);
           return;
-        }
-
-        if (this.waypointEnabled()) {
-          this.waypointActive.set(true);
-        } else {
-          this.waypointActive.set(false);
         }
         const isFirstWaypoint = !this.wptInitialized;
         if (isFirstWaypoint) {

@@ -192,7 +192,7 @@ export class WidgetWindComponent implements OnDestroy {
   protected trueWindSpeedUnit = computed(() => this.speedUnitSymbol(this.trueWindSpeedMeasure()));
   protected driftFlow = signal(0);
   protected driftSet = signal(0);
-  protected waypointAngle = signal(0);
+  protected waypointAngle = signal<number | undefined>(undefined);
   protected historicalWindDirection: { timestamp: number; windDirection: number; }[] = [];
   protected trueWindMinHistoric = signal<number | undefined>(undefined);
   protected trueWindMidHistoric = signal<number | undefined>(undefined);
@@ -259,8 +259,13 @@ export class WidgetWindComponent implements OnDestroy {
   };
   private onWaypointUpdate = (u: IPathUpdate) => {
     const raw = u.data.value;
+    if (raw == null) {
+      this.waypointAngle.set(undefined); this.hasWPT = true;
+      return;
+    }
     const next = this.normalizeAngle(raw);
-    if (!this.hasWPT || this.angleDelta(this.waypointAngle(), next) >= this.DEG_EPSILON) {
+    const cur = this.waypointAngle();
+    if (!this.hasWPT || cur == null || this.angleDelta(cur, next) >= this.DEG_EPSILON) {
       this.waypointAngle.set(next); this.hasWPT = true;
     }
   };
