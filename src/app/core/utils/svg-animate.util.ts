@@ -22,7 +22,8 @@ import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interfa
  *  - For custom callers of animateAngleTransition / animateSectorTransition keep and cancel the returned id manually.
  *
  * Performance notes:
- *  - Easing function is cubic in/out to match existing widget feel.
+ *  - Interpolation is linear: consumers track a continuously-updating value, and an ease that
+ *    decelerates to a stop at each sample would read as stepping rather than smooth motion (#466).
  *  - Angle interpolation normalizes shortest path (avoids >180° spins) where relevant.
  *  - No setTimeout fallbacks; if you need reduced frame rate sampling, throttle at the call site.
  *
@@ -127,9 +128,6 @@ export function animateRotation(
   if (delta > 180) delta -= 360;
   if (delta < -180) delta += 360;
 
-  const easeInOutCubic = (t: number) =>
-    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
   const runOutside = (fn: () => void) => ngZone ? ngZone.runOutsideAngular(fn) : fn();
   const runInside = (fn: () => void) => ngZone ? ngZone.run(fn) : fn();
 
@@ -139,7 +137,7 @@ export function animateRotation(
     const animate = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = easeInOutCubic(progress);
+      const eased = progress;
       const current = from + delta * eased;
       element.setAttribute('transform', `rotate(${current} ${center[0]} ${center[1]})`);
       if (progress < 1) {
@@ -211,13 +209,11 @@ export function animateRudderWidth(
   runOutside(() => {
     const start = performance.now();
     const delta = to - from;
-    const easeInOutCubic = (t: number) =>
-      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
     const animate = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = easeInOutCubic(progress);
+      const eased = progress;
       const current = from + delta * eased;
       element.setAttribute('width', current.toString());
       if (progress < 1) {
@@ -235,9 +231,6 @@ export function animateRudderWidth(
 }
 
 // ---- Generic path animation helpers (laylines & sectors) ----
-
-/** Internal easing identical to other helpers */
-const _easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
 /** Normalize angle to [0,360) */
 const _norm = (a: number) => (a % 360 + 360) % 360;
@@ -286,7 +279,7 @@ export function animateAngleTransition(
     const base = _norm(from);
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1);
-      const eased = _easeInOutCubic(progress);
+      const eased = progress;
       const current = base + delta * eased;
       apply(_norm(current));
       if (progress < 1) {
@@ -341,7 +334,7 @@ export function animateSectorTransition(
     const start = performance.now();
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1);
-      const eased = _easeInOutCubic(progress);
+      const eased = progress;
       apply(_lerpSector(from, to, eased));
       if (progress < 1) {
         frameId = requestAnimationFrame(step);
