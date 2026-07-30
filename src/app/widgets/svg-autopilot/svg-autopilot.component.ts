@@ -1,6 +1,5 @@
 import { Component, ElementRef, input, viewChild, effect, computed, untracked, signal, NgZone, inject, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { animateRotation, animateRudderWidth, effectiveAnimationDuration } from '../../core/utils/svg-animate.util';
-import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 import { TApMode } from '../../core/interfaces/signalk-autopilot-interfaces';
 
 
@@ -76,7 +75,7 @@ export class SvgAutopilotComponent implements OnDestroy {
     return this.headingDirectionTrue() ? 'T' : 'M';
   });
   private animationFrames = new WeakMap<Element, number>();
-  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval() ?? DEFAULT_WIDGET_UPDATE_INTERVAL_MS));
+  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval()));
   private readonly DEG_TO_PX = 16.66666667; // 30° maps to 500px, so 1° = 500/30 = 16.6667px
   private readonly ROT_CENTER: [number, number] = [500, 560.061];
   private readonly ngZone = inject(NgZone);

@@ -39,4 +39,11 @@ describe('effectiveAnimationDuration', () => {
     expect(effectiveAnimationDuration(Number.NaN)).toBe(DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
     expect(effectiveAnimationDuration(Number.POSITIVE_INFINITY)).toBe(DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
   });
+
+  it('coerces string and undefined updateInterval from a persisted config', () => {
+    expect(effectiveAnimationDuration(undefined)).toBe(DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
+    expect(effectiveAnimationDuration('500' as unknown as number)).toBe(500);
+    expect(effectiveAnimationDuration('5000' as unknown as number)).toBe(DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
+    expect(effectiveAnimationDuration('abc' as unknown as number)).toBe(DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
+  });
 });

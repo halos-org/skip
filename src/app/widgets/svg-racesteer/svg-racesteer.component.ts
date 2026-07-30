@@ -1,7 +1,6 @@
 import { Component, ElementRef, input, viewChild, signal, effect, computed, untracked, OnDestroy, NgZone, inject, ChangeDetectionStrategy } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { animateRotation, animateAngleTransition, animateSectorTransition, effectiveAnimationDuration, type SectorAngles } from '../../core/utils/svg-animate.util';
-import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 
 const angle = ([a,b],[c,d],[e,f]) => (Math.atan2(f-d,e-c)-Math.atan2(b-d,a-c)+3*Math.PI)%(2*Math.PI)-Math.PI;
 
@@ -114,7 +113,7 @@ export class SvgRacesteerComponent implements OnDestroy {
   private readonly CENTER_X = 600;
   private readonly CENTER_Y = 620;
   private readonly RADIUS = 540;
-  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval() ?? DEFAULT_WIDGET_UPDATE_INTERVAL_MS));
+  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval()));
   protected laylinePortPath = signal<string>(`M ${this.CENTER_X},${this.CENTER_Y} ${this.CENTER_X},${this.CENTER_Y}`);
   protected laylineStbdPath = signal<string>(`M ${this.CENTER_X},${this.CENTER_Y} ${this.CENTER_X},${this.CENTER_Y}`);
   //Wind Sectors

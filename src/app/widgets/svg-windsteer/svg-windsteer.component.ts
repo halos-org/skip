@@ -1,6 +1,5 @@
 import { Component, ElementRef, input, viewChild, signal, computed, effect, untracked, ChangeDetectionStrategy, OnDestroy, NgZone, inject } from '@angular/core';
 import { animateRotation, animateAngleTransition, animateSectorTransition, effectiveAnimationDuration, SectorAngles } from '../../core/utils/svg-animate.util';
-import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 import { DecimalPipe } from '@angular/common';
 
 const angle = ([a, b], [c, d], [e, f]) => (Math.atan2(f - d, e - c) - Math.atan2(b - d, a - c) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -97,7 +96,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   private readonly CENTER = 500;
   private readonly RADIUS = 350;
-  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval() ?? DEFAULT_WIDGET_UPDATE_INTERVAL_MS));
+  private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval()));
   private readonly EPS_ANGLE = 1.0; // degrees, gate tiny animations
 
   private readonly ngZone = inject(NgZone);
