@@ -24,6 +24,7 @@
   <div class="ap-screen">
     <app-svg-autopilot
       [apMode]="apMode() ?? 'off-line'"
+      [updateInterval]="runtime.options()?.updateInterval"
       [targetPilotHeadingTrue]="runtime.options()?.autopilot?.courseDirectionTrue ?? false"
       [autopilotTarget]="autopilotTarget()"
       [courseXte]="crossTrackError() ?? 0"

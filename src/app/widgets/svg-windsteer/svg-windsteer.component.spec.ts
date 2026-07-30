@@ -48,6 +48,20 @@ describe('SvgWindsteerComponent', () => {
         component = fixture.componentInstance;
     });
 
+    it('derives the needle animation duration from updateInterval', () => {
+        setRequiredInputs({ updateInterval: 100 });
+        fixture.detectChanges();
+        expect(component['animationDuration']()).toBe(100);
+
+        fixture.componentRef.setInput('updateInterval', 5000);
+        fixture.detectChanges();
+        expect(component['animationDuration']()).toBe(1000);
+
+        fixture.componentRef.setInput('updateInterval', undefined);
+        fixture.detectChanges();
+        expect(component['animationDuration']()).toBe(1000);
+    });
+
     it('renders first values without rotation animation', () => {
         // Set up component with initial values
         setRequiredInputs();

@@ -1,4 +1,5 @@
 import type { NgZone } from '@angular/core';
+import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interface';
 
 /**
  * SVG Animation Utilities
@@ -21,7 +22,8 @@ import type { NgZone } from '@angular/core';
  *  - For custom callers of animateAngleTransition / animateSectorTransition keep and cancel the returned id manually.
  *
  * Performance notes:
- *  - Easing function is cubic in/out to match existing widget feel.
+ *  - Interpolation is linear: consumers track a continuously-updating value, and an ease that
+ *    decelerates to a stop at each sample would read as stepping rather than smooth motion (#466).
  *  - Angle interpolation normalizes shortest path (avoids >180° spins) where relevant.
  *  - No setTimeout fallbacks; if you need reduced frame rate sampling, throttle at the call site.
  *
@@ -35,9 +37,25 @@ import type { NgZone } from '@angular/core';
  */
 
 /**
+ * Tween duration (ms) for a per-sample needle/indicator animation, derived from the
+ * widget's updateInterval. Capped at the default cadence and never longer than one sample
+ * period, so a tween completes before the next value arrives. A longer duration would make
+ * the animation a low-pass filter whose lag is decoupled from (and can invert) updateInterval
+ * (#466). Monotonic in the interval: a shorter
+ * cadence never yields a slower tween.
+ */
+export function effectiveAnimationDuration(updateInterval: number | undefined): number {
+  const ms = Number(updateInterval);
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return DEFAULT_WIDGET_UPDATE_INTERVAL_MS;
+  }
+  return Math.min(ms, DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
+}
+
+/**
  * Smoothly animates the rotation of an SVG <g> element from a starting angle to a target angle.
  *
- * The function uses requestAnimationFrame for smooth animation and cubic easing for a natural feel.
+ * The function uses requestAnimationFrame for smooth animation and linear interpolation for constant-velocity tracking.
  * It can optionally manage and cancel overlapping animations for the same element using a WeakMap.
  *
  * @param element    The SVG <g> (or other) element to rotate.
@@ -111,9 +129,6 @@ export function animateRotation(
   if (delta > 180) delta -= 360;
   if (delta < -180) delta += 360;
 
-  const easeInOutCubic = (t: number) =>
-    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
   const runOutside = (fn: () => void) => ngZone ? ngZone.runOutsideAngular(fn) : fn();
   const runInside = (fn: () => void) => ngZone ? ngZone.run(fn) : fn();
 
@@ -123,8 +138,7 @@ export function animateRotation(
     const animate = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = easeInOutCubic(progress);
-      const current = from + delta * eased;
+      const current = from + delta * progress;
       element.setAttribute('transform', `rotate(${current} ${center[0]} ${center[1]})`);
       if (progress < 1) {
         const id = requestAnimationFrame(animate);
@@ -143,7 +157,7 @@ export function animateRotation(
 /**
  * Smoothly animates the width of an SVG <rect> element from a starting value to a target value.
  *
- * The function uses requestAnimationFrame for smooth animation and cubic easing for a natural feel.
+ * The function uses requestAnimationFrame for smooth animation and linear interpolation for constant-velocity tracking.
  * It can optionally manage and cancel overlapping animations for the same element using a WeakMap.
  *
  * @param element    The SVG <rect> element to animate.
@@ -195,14 +209,11 @@ export function animateRudderWidth(
   runOutside(() => {
     const start = performance.now();
     const delta = to - from;
-    const easeInOutCubic = (t: number) =>
-      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
     const animate = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = easeInOutCubic(progress);
-      const current = from + delta * eased;
+      const current = from + delta * progress;
       element.setAttribute('width', current.toString());
       if (progress < 1) {
         const id = requestAnimationFrame(animate);
@@ -220,9 +231,6 @@ export function animateRudderWidth(
 
 // ---- Generic path animation helpers (laylines & sectors) ----
 
-/** Internal easing identical to other helpers */
-const _easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
 /** Normalize angle to [0,360) */
 const _norm = (a: number) => (a % 360 + 360) % 360;
 
@@ -235,7 +243,7 @@ const _angleDeltaSigned = (from: number, to: number) => {
 };
 
 /**
- * Animates an angle value (degrees) from "from" to "to" over duration using cubic easing.
+ * Animates an angle value (degrees) from "from" to "to" over duration using linear interpolation.
  * Calls apply(currentAngle) each frame (angle already normalized to [0,360)).
  * If ngZone is provided, the loop runs outside Angular and onDone re-enters the zone.
  * Returns the requestAnimationFrame id.
@@ -270,8 +278,7 @@ export function animateAngleTransition(
     const base = _norm(from);
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1);
-      const eased = _easeInOutCubic(progress);
-      const current = base + delta * eased;
+      const current = base + delta * progress;
       apply(_norm(current));
       if (progress < 1) {
         frameId = requestAnimationFrame(step);
@@ -294,7 +301,7 @@ const _lerpSector = (a: SectorAngles, b: SectorAngles, t: number): SectorAngles 
 });
 
 /**
- * Animates sector angles (min/mid/max) with easing.
+ * Animates sector angles (min/mid/max) with linear interpolation.
  * Each frame apply(current) receives interpolated angles (not normalized for wrapping; supply original domain if needed).
  * If ngZone supplied, runs outside Angular.
  *
@@ -325,8 +332,7 @@ export function animateSectorTransition(
     const start = performance.now();
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1);
-      const eased = _easeInOutCubic(progress);
-      apply(_lerpSector(from, to, eased));
+      apply(_lerpSector(from, to, progress));
       if (progress < 1) {
         frameId = requestAnimationFrame(step);
       } else if (onDone) {
