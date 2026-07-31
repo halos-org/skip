@@ -138,7 +138,7 @@ not a profile selector.
   collide — but `isRemoteControl`/`instanceName` are per-profile today (the R8 / Unit 5 driver).
   The setter UI for these lives in `display.component`.
 
-### Conventions to honor (`.github/instructions/`)
+### Conventions to honor
 
 New app-internal types → `src/app/core/interfaces`. Service-centric; signal-based state. Tests:
 **Vitest** (`@angular/build:unit-test` + `vitest.config.ts`, jsdom, `TestBed` + `describe/it/expect`,
@@ -615,6 +615,5 @@ now per-device (R8); the remote-only v1 limitation; and that prior backups now a
   `storage.service.ts`, `settings.service.ts`, `app-initNetwork.service.ts`, `app.component.ts`,
   `config.component.*`, `remote-dashboards.service.ts`, `dashboards-editor.component.ts`,
   `dialog.service.ts`, `app-settings.interfaces.ts`, `config.blank.const.ts`.
-- Conventions: `.github/instructions/project.instructions.md`,
-  `.github/instructions/best-practices.instructions.md`, `COPILOT.md`.
+- Conventions: `CLAUDE.md`.
 - Upstream: `mxtommy/kip` (this is the `mairas/Kip` fork, `named_configs` branch).

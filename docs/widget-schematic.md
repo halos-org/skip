@@ -3,8 +3,7 @@
 Use the custom schematic to scaffold a new Host2 architecture widget.
 
 See also:
-- Policy owner: `.github/instructions/project.instructions.md` (`Widget Creation Domain Rules`)
-- Implementation companions: `.agents/skills/kip-widget-creation/SKILL.md`, `.agents/skills/kip-host2-widget/SKILL.md`
+- Widget creation rules and the Host2 widget contract: `CLAUDE.md`
 
 ### Command
 
