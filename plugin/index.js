@@ -17,6 +17,14 @@ const SKIP_URL = '/@halos-org/skip/';
 // user's own default profile.
 const SKIP_PANEL_URL = `${SKIP_URL}?embed=1`;
 
+// A widget iframe boots the same chromeless Skip on its single-widget route (`#/widget/<type>`),
+// rendering one control full-bleed against the user's own live session. The embed flag is pre-hash
+// (survives in-app navigation); the widget type is the hash route param. Read-only, bus-silent —
+// no per-instance config in this version.
+const skipWidgetUrl = (widgetType) => `${SKIP_URL}?embed=1#/widget/${widgetType}`;
+// Skip's widget type id is the component selector used in dashboard configs and the widget route.
+const WIND_STEER_TYPE = 'widget-wind-steer';
+
 module.exports = function (app) {
   let running = false;
 
@@ -26,8 +34,29 @@ module.exports = function (app) {
       description: 'Opens the Skip instrument panel inside Freeboard-SK.',
       version,
       apiVersion: '1',
+      // 'widgets' is intentionally absent: the panel is the primary contribution, so requiring widget
+      // support would drop the whole extension on hosts that lack it. Widget-capable hosts render the
+      // additive widgets[] section below; others silently omit it and keep the panel.
       requires: ['panels.iframe', 'buttons'],
       optional: [],
+      widgets: [
+        {
+          id: 'wind-steer-1x1',
+          title: 'Wind Steer',
+          type: 'iframe',
+          url: skipWidgetUrl(WIND_STEER_TYPE),
+          size: '1x1',
+          lifecycle: 'whileEnabled'
+        },
+        {
+          id: 'wind-steer-2x2',
+          title: 'Wind Steer',
+          type: 'iframe',
+          url: skipWidgetUrl(WIND_STEER_TYPE),
+          size: '2x2',
+          lifecycle: 'whileEnabled'
+        }
+      ],
       panels: [
         {
           id: 'skip-panel',

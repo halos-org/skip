@@ -52,6 +52,13 @@ export const routes: Routes = [
     loadComponent: () => import('./core/components/connection-status/connection-status.component').then(m => m.ConnectionStatusComponent),
     title: 'Skip - Connection'
   },
+  // Single-widget host for plotter-extension widget iframes: renders one widget full-bleed, no
+  // dashboard chrome (see SingleWidgetHostComponent). The type is the widget's component selector.
+  {
+    path: 'widget/:type',
+    loadComponent: () => import('./core/components/single-widget-host/single-widget-host.component').then(m => m.SingleWidgetHostComponent),
+    title: 'Skip - Widget'
+  },
   {
     path: 'help/:page',
     loadComponent: () => import('./core/components/app-help/app-help.component').then(m => m.AppHelpComponent),

@@ -8,6 +8,7 @@ interface PluginManifest {
   apiVersion: string;
   requires: string[];
   optional: string[];
+  widgets: { id: string; title: string; type: string; url: string; size: string; lifecycle: string }[];
   panels: { id: string; title: string; type: string; url: string; lifecycle: string }[];
   buttons: {
     id: string;
@@ -131,9 +132,30 @@ describe('Skip Freeboard panel plugin', () => {
     plugin.start();
     const methods = methodsOf(harness);
     const manifest = await methods.getResource(PLUGIN_ID);
+    // 'widgets' is deliberately NOT required: the panel is the extension's primary contribution, and
+    // requiring widget support would drop the whole extension (panel included) on hosts that lack it.
+    // Widget-capable hosts render the additive widgets[] section; others silently omit it.
     expect(manifest.requires).toEqual(['panels.iframe', 'buttons']);
     expect(manifest.optional).toEqual([]);
     expect(manifest.apiVersion).toBe('1');
+  });
+
+  it('contributes Wind Steer as always-on chart widgets in small and large sizes', async () => {
+    const { app, harness } = makeApp();
+    const plugin = createSkipPanelPlugin(app);
+    plugin.start();
+    const methods = methodsOf(harness);
+    const manifest = await methods.getResource(PLUGIN_ID);
+    expect(manifest.widgets.map((w) => w.id)).toEqual(['wind-steer-1x1', 'wind-steer-2x2']);
+    expect(manifest.widgets.map((w) => w.size)).toEqual(['1x1', '2x2']);
+    for (const widget of manifest.widgets) {
+      expect(widget.type).toBe('iframe');
+      expect(widget.title).toBe('Wind Steer');
+      expect(widget.lifecycle).toBe('whileEnabled');
+      // Boots Skip chromeless via the pre-hash query flag, on the single-widget hash route for the
+      // Wind Steer widget type; the hash survives the app's in-app navigation like the panel's does.
+      expect(widget.url).toBe(`${SKIP_URL}?embed=1#/widget/widget-wind-steer`);
+    }
   });
 
   it('opens Skip in an iframe panel from a map-toolbar button', async () => {

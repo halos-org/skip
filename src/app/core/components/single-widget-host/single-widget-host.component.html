@@ -1,0 +1,8 @@
+@if (widget(); as w) {
+  <widget-host2 [widgetProperties]="w" />
+} @else {
+  <div class="unknown-widget" role="alert">
+    <span class="unknown-widget__title">Unknown widget</span>
+    <span class="unknown-widget__hint">"{{ type() }}" is not a recognized Skip widget.</span>
+  </div>
+}
