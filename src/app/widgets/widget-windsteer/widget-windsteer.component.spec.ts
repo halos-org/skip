@@ -265,6 +265,91 @@ describe('WidgetWindComponent waypoint presence (#441)', () => {
 });
 
 /**
+ * #435: rudder angle drives a bar on the windsteer dial. steering.rudderAngle is +ve to starboard,
+ * and a rudder to starboard turns the boat to starboard, so the raw sign already matches the
+ * boat-turn side; invertRudder flips it for a reversed sensor. Absence (null) hides the bar
+ * entirely rather than drawing a centred zero.
+ */
+describe('WidgetWindComponent rudder angle (#435)', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
+  const rudder = (): number | null =>
+    (component as unknown as { rudderAngle: () => number | null }).rudderAngle();
+
+  const build = (cfg: Partial<IWidgetSvcConfig> = {}) => {
+    options = signal<IWidgetSvcConfig | undefined>({ ...WidgetWindComponent.DEFAULT_CONFIG, ...cfg });
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
+      ]
+    });
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick();
+  };
+
+  it('registers the rudder stream on a configurable, degree-converted path', () => {
+    build();
+    expect(callbacks.has('rudderAngle')).toBe(true);
+    const path = WidgetWindComponent.DEFAULT_CONFIG.paths?.['rudderAngle'];
+    expect(path?.isPathConfigurable).toBe(true);
+    expect(path?.convertUnitTo).toBe('deg');
+    expect(path?.path).toBe('self.steering.rudderAngle');
+  });
+
+  it('passes the raw value through by default (starboard rudder = boat turns starboard)', () => {
+    build();
+    callbacks.get('rudderAngle')!(update(10));
+    expect(rudder()).toBe(10);
+  });
+
+  it('flips the sign when invertRudder is enabled (reversed sensor)', () => {
+    build({ invertRudder: true });
+    callbacks.get('rudderAngle')!(update(10));
+    expect(rudder()).toBe(-10);
+  });
+
+  it('hides the bar (null) when the rudder value goes away', () => {
+    build();
+    callbacks.get('rudderAngle')!(update(10));
+    expect(rudder()).toBe(10);
+    callbacks.get('rudderAngle')!(update(null));
+    expect(rudder()).toBeNull();
+  });
+
+  it('re-signs the cached sample on a live invertRudder toggle (no new sample)', () => {
+    build();
+    callbacks.get('rudderAngle')!(update(10));
+    expect(rudder()).toBe(10);
+    options.set({ ...WidgetWindComponent.DEFAULT_CONFIG, invertRudder: true });
+    TestBed.tick();
+    expect(rudder()).toBe(-10);
+  });
+
+  it('keeps a centred (0) rudder present rather than coercing it to null', () => {
+    build();
+    callbacks.get('rudderAngle')!(update(0));
+    expect(rudder()).toBe(0);
+  });
+
+  it('hides the bar on a non-finite value so a NaN sample cannot stick', () => {
+    build();
+    callbacks.get('rudderAngle')!(update(NaN));
+    expect(rudder()).toBeNull();
+    callbacks.get('rudderAngle')!(update(12));
+    expect(rudder()).toBe(12);
+  });
+});
+
+/**
  * #442: the COG arrow hides at rest. That needs a speed-over-ground value the widget doesn't
  * otherwise use — plumbed as a hidden, source-linked path and tracked in `sog`.
  */

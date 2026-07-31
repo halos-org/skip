@@ -102,3 +102,22 @@ svg {
   stroke-linecap: round;
   opacity: 0.38;
 }
+
+.rudder-stbd,
+.rudder-port {
+  fill: none;
+  stroke-width: 39.6875;
+  stroke-linecap: butt;
+  stroke-dasharray: 100 100;
+  // The dial's port/starboard band colours are too dark to read on this thin bar; lift them
+  // per-theme without disturbing the shared band/sector colours.
+  filter: brightness(1.8);
+}
+
+.rudder-stbd {
+  stroke: var(--skip-starboard-color);
+}
+
+.rudder-port {
+  stroke: var(--skip-port-color);
+}

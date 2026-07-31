@@ -396,6 +396,10 @@ export interface IWidgetSvcConfig {
   twaEnable?: boolean;
   /** Used by wind Widget: enable/disable sailSetup UI feature */
   sailSetupEnable?: boolean;
+  /** Used by wind Widget: enable/disable rudder-angle bar UI feature */
+  rudderEnable?: boolean;
+  /** Used by wind Widget: flip the rudder-angle bar so it grows toward the side the boat turns */
+  invertRudder?: boolean;
 
   /** Used by autopilot Widget to configure autopilot settings */
   autopilot?: IAutopilotConfig,
