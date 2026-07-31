@@ -163,6 +163,18 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         convertUnitTo: 'knots'
+      },
+      rudderAngle: {
+        description: 'Rudder Angle',
+        path: 'self.steering.rudderAngle',
+        source: 'default',
+        pathType: 'number',
+        isPathConfigurable: true,
+        pathRequired: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad',
+        convertUnitTo: 'deg',
+        showConvertUnitTo: false
       }
     },
     compassModeEnabled: true,
@@ -177,6 +189,8 @@ export class WidgetWindComponent implements OnDestroy {
     twsEnable: true,
     twaEnable: true,
     sailSetupEnable: false,
+    rudderEnable: true,
+    invertRudder: false,
     updateInterval: 1000,
     enableTimeout: false,
     dataTimeout: 5
@@ -199,6 +213,7 @@ export class WidgetWindComponent implements OnDestroy {
   private hasWPT = false;
   private hasSOG = false;
   private lastRawTrueWindAngle: number | null = null;
+  private lastRawRudder: number | null = null;
 
   protected currentHeading = signal(0);
   protected courseOverGroundAngle = signal(0);
@@ -226,6 +241,8 @@ export class WidgetWindComponent implements OnDestroy {
     return s == null || s >= this.speedInDisplayUnit(this.sogMeasure(), SOG_HIDE_LIMIT_MS);
   });
   protected waypointAngle = signal<number | undefined>(undefined);
+  // Signed degrees, +ve = starboard (after invertRudder). null = no rudder data (bar hidden).
+  protected rudderAngle = signal<number | null>(null);
   protected historicalWindDirection: { timestamp: number; windDirection: number; }[] = [];
   protected trueWindMinHistoric = signal<number | undefined>(undefined);
   protected trueWindMidHistoric = signal<number | undefined>(undefined);
@@ -256,6 +273,8 @@ export class WidgetWindComponent implements OnDestroy {
         // offset until the next sample arrives (#73). currentHeading is read untracked to avoid
         // re-running this effect on every heading tick.
         this.applyTrueWindBase();
+        // A live invertRudder toggle must re-sign the cached sample without a new stream tick.
+        this.applyRudder();
       });
     });
   }
@@ -316,6 +335,12 @@ export class WidgetWindComponent implements OnDestroy {
       this.waypointAngle.set(next); this.hasWPT = true;
     }
   };
+  private onRudderUpdate = (u: IPathUpdate) => {
+    // A non-finite or absent value hides the bar; a real 0 keeps it present but draws nothing.
+    // Cache the raw value so a live invertRudder toggle can re-sign it without a new sample.
+    this.lastRawRudder = Number.isFinite(u.data.value) ? u.data.value : null;
+    this.applyRudder();
+  };
   private onAppWindAngle = (u: IPathUpdate) => {
     if (u.data.value == null) u.data.value = 0;
     const raw = u.data.value;
@@ -375,6 +400,22 @@ export class WidgetWindComponent implements OnDestroy {
     this.trueWindAngle.set(this.normalizeAngle(this.computeTrueWindBase(this.lastRawTrueWindAngle)));
   }
 
+  // Resolve the signed rudder angle from the last raw sample. steering.rudderAngle is +ve to
+  // starboard, and a rudder to starboard turns the boat to starboard, so the raw sign already
+  // matches the side the boat turns (green to the right); invertRudder corrects a reversed sensor.
+  private applyRudder() {
+    const raw = this.lastRawRudder;
+    if (raw == null) {
+      if (this.rudderAngle() !== null) this.rudderAngle.set(null);
+      return;
+    }
+    const signed = (this.runtime.options()?.invertRudder ?? false) ? -raw : raw;
+    const cur = this.rudderAngle();
+    if (cur == null || Math.abs(cur - signed) >= this.DEG_EPSILON) {
+      this.rudderAngle.set(signed);
+    }
+  }
+
   private registerStreams() {
     const cfg = this.runtime.options();
     if (!cfg) return;
@@ -388,6 +429,7 @@ export class WidgetWindComponent implements OnDestroy {
     this.stream.observe('appWindSpeed', this.onAppWindSpeed);
     this.stream.observe('trueWindSpeed', this.onTrueWindSpeed);
     this.stream.observe('trueWindAngle', this.onTrueWindAngle);
+    this.stream.observe('rudderAngle', this.onRudderUpdate);
   }
 
   ngOnDestroy() {

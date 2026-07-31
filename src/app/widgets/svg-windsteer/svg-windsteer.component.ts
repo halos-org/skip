@@ -54,6 +54,9 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly trueWindMinHistoric = input<number | undefined>(undefined);
   protected readonly trueWindMidHistoric = input<number | undefined>(undefined);
   protected readonly trueWindMaxHistoric = input<number | undefined>(undefined);
+  // Rudder-angle bar: signed degrees, +ve = starboard (right). null hides the bar.
+  protected readonly rudderAngle = input<number | null>(null);
+  protected readonly rudderEnabled = input<boolean>(false);
 
   protected compass: ISVGRotationObject = { oldValue: 0, newValue: 0 };
   protected twa: ISVGRotationObject = { oldValue: 0, newValue: 0 };
@@ -98,6 +101,22 @@ export class SvgWindsteerComponent implements OnDestroy {
   private readonly RADIUS = 350;
   private readonly animationDuration = computed(() => effectiveAnimationDuration(this.updateInterval()));
   private readonly EPS_ANGLE = 1.0; // degrees, gate tiny animations
+
+  // Rudder bar: the SVG holds a static 35 arc per side (pathLength 100); the reveal is the
+  // stroke-dashoffset. offset 100 = empty, 0 = full; fraction is 1:1 with the rudder angle.
+  private readonly RUDDER_MAX_DEG = 35;
+  protected readonly rudderStbdOffset = computed(() => this.rudderDashOffset(true));
+  protected readonly rudderPortOffset = computed(() => this.rudderDashOffset(false));
+  protected readonly rudderTransition = computed(() => `stroke-dashoffset ${this.animationDuration()}ms linear`);
+
+  private rudderDashOffset(starboard: boolean): number {
+    if (!this.rudderEnabled()) return 100;
+    const angle = this.rudderAngle();
+    if (angle == null || !Number.isFinite(angle)) return 100;
+    const magnitude = starboard ? Math.max(angle, 0) : Math.max(-angle, 0);
+    const fraction = Math.min(magnitude, this.RUDDER_MAX_DEG) / this.RUDDER_MAX_DEG;
+    return 100 * (1 - fraction);
+  }
 
   private readonly ngZone = inject(NgZone);
 

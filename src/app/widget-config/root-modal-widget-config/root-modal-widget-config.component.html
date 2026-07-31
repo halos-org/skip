@@ -325,6 +325,16 @@
                   Drift
                 </mat-checkbox>
               }
+              @if ((widgetConfig?.rudderEnable !== undefined)) {
+                <mat-checkbox name="rudderEnable" formControlName="rudderEnable">
+                  Rudder Angle
+                </mat-checkbox>
+              }
+              @if ((widgetConfig?.invertRudder !== undefined)) {
+                <mat-checkbox name="invertRudder" formControlName="invertRudder">
+                  Invert Rudder
+                </mat-checkbox>
+              }
               @if ((widgetConfig?.minValue !== undefined) &&
                 !formMaster.get('displayScale')) {
                 <mat-form-field>

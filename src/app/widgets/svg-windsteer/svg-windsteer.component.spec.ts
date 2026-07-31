@@ -324,4 +324,60 @@ describe('SvgWindsteerComponent', () => {
 
         expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('inline');
     });
+
+    // Rudder bar (#435): the reveal is stroke-dashoffset over a static per-side arc (pathLength 100).
+    // offset 100 = empty, 0 = full; the fraction is 1:1 with the angle, capped at 35 degrees.
+    const stbdOffset = (): number => component['rudderStbdOffset']();
+    const portOffset = (): number => component['rudderPortOffset']();
+
+    it('hides both rudder arcs (offset 100) when the feature is disabled', () => {
+        setRequiredInputs({ rudderEnabled: false, rudderAngle: 20 });
+        fixture.detectChanges();
+        expect(stbdOffset()).toBe(100);
+        expect(portOffset()).toBe(100);
+        expect(fixture.nativeElement.querySelector('#layerRudder').style.display).toBe('none');
+    });
+
+    it('hides both rudder arcs when there is no rudder data (null)', () => {
+        setRequiredInputs({ rudderEnabled: true, rudderAngle: null });
+        fixture.detectChanges();
+        expect(stbdOffset()).toBe(100);
+        expect(portOffset()).toBe(100);
+        expect(fixture.nativeElement.querySelector('#layerRudder').style.display).toBe('inline');
+    });
+
+    it('reveals the starboard arc for a positive angle and keeps port empty', () => {
+        setRequiredInputs({ rudderEnabled: true, rudderAngle: 17.5 });
+        fixture.detectChanges();
+        expect(stbdOffset()).toBeCloseTo(50);   // 17.5/35 = 0.5 revealed
+        expect(portOffset()).toBe(100);
+    });
+
+    it('reveals the port arc for a negative angle and keeps starboard empty', () => {
+        setRequiredInputs({ rudderEnabled: true, rudderAngle: -35 });
+        fixture.detectChanges();
+        expect(portOffset()).toBe(0);           // full reveal at hard-over
+        expect(stbdOffset()).toBe(100);
+    });
+
+    it('caps the reveal at 35 degrees for over-range angles', () => {
+        setRequiredInputs({ rudderEnabled: true, rudderAngle: 70 });
+        fixture.detectChanges();
+        expect(stbdOffset()).toBe(0);
+    });
+
+    it('ties the rudder reveal transition to the update interval', () => {
+        setRequiredInputs({ rudderEnabled: true, rudderAngle: 10, updateInterval: 100 });
+        fixture.detectChanges();
+        expect(component['rudderTransition']()).toBe('stroke-dashoffset 100ms linear');
+    });
+
+    it('binds the reveal to the correct per-side arc element (starboard = green/right)', () => {
+        setRequiredInputs({ rudderEnabled: true, rudderAngle: 17.5 });
+        fixture.detectChanges();
+        const stbd = fixture.nativeElement.querySelector('.rudder-stbd') as SVGPathElement;
+        const port = fixture.nativeElement.querySelector('.rudder-port') as SVGPathElement;
+        expect(parseFloat(stbd.style.strokeDashoffset)).toBeCloseTo(50);
+        expect(parseFloat(port.style.strokeDashoffset)).toBeCloseTo(100);
+    });
 });

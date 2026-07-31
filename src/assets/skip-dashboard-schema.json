@@ -2804,6 +2804,7 @@
         "driftEnable": true,
         "enableTimeout": false,
         "filterSelfPaths": true,
+        "invertRudder": false,
         "laylineAngle": 40,
         "laylineEnable": true,
         "paths": {
@@ -2897,6 +2898,18 @@
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
+          "rudderAngle": {
+            "convertUnitTo": "deg",
+            "description": "Rudder Angle",
+            "isPathConfigurable": true,
+            "path": "self.steering.rudderAngle",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "rad",
+            "pathType": "number",
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
           "set": {
             "convertUnitTo": "deg",
             "description": "True Drift Set",
@@ -2955,6 +2968,7 @@
             "source": "default"
           }
         },
+        "rudderEnable": true,
         "sailSetupEnable": false,
         "supportAutomaticHistoricalSeries": false,
         "twaEnable": true,
@@ -3127,6 +3141,19 @@
           "pathRequired": false,
           "pathType": "number",
           "slot": "drift",
+          "source": "default"
+        },
+        {
+          "defaultConvertUnitTo": "deg",
+          "defaultPath": "self.steering.rudderAngle",
+          "description": "Rudder Angle",
+          "expectedSkUnit": "rad",
+          "hideFromConfig": false,
+          "isPathConfigurable": true,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "number",
+          "slot": "rudderAngle",
           "source": "default"
         }
       ],

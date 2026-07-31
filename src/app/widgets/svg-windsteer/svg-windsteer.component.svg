@@ -608,6 +608,17 @@
     <path class="crosshair"
       d="M 48,500 L 360,500 M 640,500 L 952,500" />
   </g>
+  <g id="layerRudder"
+     [style.display]="rudderEnabled() ? 'inline' : 'none'">
+    <path class="rudder-stbd" pathLength="100"
+      [style.stroke-dashoffset]="rudderStbdOffset()"
+      [style.transition]="rudderTransition()"
+      d="M 500,969.635 A 469.635,469.635 0 0 0 769.376,884.703" />
+    <path class="rudder-port" pathLength="100"
+      [style.stroke-dashoffset]="rudderPortOffset()"
+      [style.transition]="rudderTransition()"
+      d="M 500,969.635 A 469.635,469.635 0 0 1 230.624,884.703" />
+  </g>
   <g id="layerCounter">
     <g id="twsCounter"
       [style.display]="twsEnabled() ? 'inline' : 'none'">
