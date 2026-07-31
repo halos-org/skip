@@ -44,10 +44,10 @@ body:
       required: true
   
   - type: input
-    id: kip-version
+    id: skip-version
     attributes:
-      label: KIP Version
-      description: What version of Kip are you using (Found in Settings -> Options -> Connectivity)?
+      label: Skip Version
+      description: What version of Skip are you using (Found in Settings -> Options -> Connectivity)?
       placeholder: e.g., v2.5.1
     validations:
       required: true
