@@ -214,26 +214,20 @@ Once done with your work, from your fork's working branch, make a GitHub pull re
 
 ## Development Instructions & Guidelines Documentation
 
-For comprehensive development guidance, please refer to these instruction files:
+For comprehensive development guidance, start with `CLAUDE.md`:
 
 ### Primary Instructions
-- **[CLAUDE.md](./CLAUDE.md)**: The authoritative repo guide — architecture, commands, the testing model, and fork-specific gotchas. **Start here.**
-- **[Project Instructions](./.github/instructions/project.instructions.md)**: Skip policy for architecture/domain rules, including widget creation and Host2 contracts.
-- **[Angular Instructions](./.github/instructions/angular.instructions.md)**: Modern Angular v21+ coding standards, component patterns, and framework best practices.
-- `COPILOT.md` and `.github/copilot-instructions.md` are inherited from upstream Kip — useful as loose architecture context, but partly stale; verify any command or claim against CLAUDE.md and the code.
+- **[CLAUDE.md](./CLAUDE.md)**: The authoritative repo guide — architecture, commands, the testing model, Skip's policy contracts, and fork-specific gotchas. **Start here.**
 
 ### Development Workflow
-1. **Start Here**: Read `CLAUDE.md` for architecture, commands, and the testing model; then `.github/instructions/project.instructions.md` for Skip policy contracts.
-2. **Angular Standards**: Follow `.github/instructions/angular.instructions.md` for modern Angular development.
-3. **Architecture Context**: See the Architecture section of `CLAUDE.md`; the inherited `COPILOT.md` is loose, partly-stale background only.
-4. **Setup & Build**: Use this README for project setup and build commands.
+1. **Start Here**: Read `CLAUDE.md` for architecture, commands, the testing model, and Skip's policy contracts.
+2. **Angular Standards**: Use modern Angular v21+ patterns — signals, standalone components, and the new control flow.
+3. **Setup & Build**: Use this README for project setup and build commands.
 
 ### Widget Creation Workflow
 1. Scaffold with `npm run generate:widget` (Host2 schematic-first path).
 2. Use `docs/widget-schematic.md` for CLI flags, prompting behavior, and troubleshooting.
-3. Follow Host2 runtime/stream patterns in `.agents/skills/kip-host2-widget/SKILL.md`.
-4. Apply widget creation implementation checklist from `.agents/skills/kip-widget-creation/SKILL.md`.
-5. Keep enforceable behavior aligned with `.github/instructions/project.instructions.md` (`Widget Creation Domain Rules`).
+3. Follow the Host2 runtime/stream patterns documented in `CLAUDE.md`.
 
 ### Key Priorities
 - **Widget Development**: Use Host2 patterns and scaffold with the `create-host2-widget` schematic (see `docs/widget-schematic.md`).

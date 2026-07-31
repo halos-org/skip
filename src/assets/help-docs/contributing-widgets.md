@@ -19,9 +19,7 @@ Widget creation follows a schematic-first workflow for Host2 widgets.
 
 Developer references:
 - `docs/widget-schematic.md`
-- `.github/instructions/project.instructions.md`
-- `.agents/skills/kip-widget-creation/SKILL.md`
-- `.agents/skills/kip-host2-widget/SKILL.md`
+- `CLAUDE.md` (architecture, Host2 widget contract, and widget creation rules)
 
 ## Contribution Flow
 

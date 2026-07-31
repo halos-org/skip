@@ -10,7 +10,6 @@ angular.json
 tsconfig.json
 tslint.json
 protractor.conf.js
-COPILOT.md
 eslint.config.js
 rm-npmjs-beta.sh
 
