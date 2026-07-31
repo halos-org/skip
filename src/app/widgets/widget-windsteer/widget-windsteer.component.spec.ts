@@ -106,7 +106,7 @@ describe('WidgetWindComponent live compass-mode toggle (#73)', () => {
 
 /**
  * Wind sectors and layline gating are driven by TRUE wind, not apparent wind.
- * The sector history must be fed only from the true-wind stream, and trueWindActive
+ * The sector history must be fed only from the true-wind stream, and trueWindFresh
  * must track whether the configured true-wind path is currently delivering a value.
  */
 describe('WidgetWindComponent true-wind sector source', () => {
@@ -121,7 +121,7 @@ describe('WidgetWindComponent true-wind sector source', () => {
   });
   const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
   const sampleCount = (): number => (component as unknown as { windSamples: unknown[] }).windSamples.length;
-  const active = (): boolean => (component as unknown as { trueWindActive: () => boolean }).trueWindActive();
+  const active = (): boolean => (component as unknown as { trueWindFresh: () => boolean }).trueWindFresh();
 
   beforeEach(() => {
     options = signal<IWidgetSvcConfig | undefined>(makeConfig());
@@ -148,12 +148,136 @@ describe('WidgetWindComponent true-wind sector source', () => {
     expect(sampleCount()).toBe(1); // true wind does
   });
 
-  it('tracks true-wind availability in trueWindActive', () => {
-    expect(active()).toBe(false); // nothing received yet
-    callbacks.get('trueWindAngle')!(update(40));
-    expect(active()).toBe(true);
-    callbacks.get('trueWindAngle')!(update(null));
-    expect(active()).toBe(false); // explicit null -> laylines hide
+  it('freezes true wind on a null sample and clears trueWindFresh only after the data TTL', () => {
+    const twa = (): number => (component as unknown as { trueWindAngle: () => number }).trueWindAngle();
+    vi.useFakeTimers();
+    try {
+      expect(active()).toBe(false); // nothing received yet
+      callbacks.get('trueWindAngle')!(update(40));
+      expect(active()).toBe(true);
+      const frozen = twa();
+      callbacks.get('trueWindAngle')!(update(null));
+      expect(active()).toBe(true);   // brief null -> freeze, still shown
+      expect(twa()).toBe(frozen);    // value held, not reset to 0
+      vi.advanceTimersByTime(5000);  // TTL (dataTimeout 5s) lapses with no valid sample
+      expect(active()).toBe(false);  // now hides
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * #475: absent/invalid samples must never render as 0. Each angle/speed handler freezes (holds
+ * its last value) on a null/non-finite sample, and a per-path freshness flag hides the indicator
+ * only after the data TTL (5s) lapses with no valid sample.
+ */
+describe('WidgetWindComponent freeze-then-hide on data loss (#475)', () => {
+  let component: WidgetWindComponent;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+  const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
+  const sig = (name: string): unknown => (component as unknown as Record<string, () => unknown>)[name]();
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>({ ...WidgetWindComponent.DEFAULT_CONFIG });
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
+      ]
+    });
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    TestBed.tick();
+  });
+
+  it('freezes every angle/speed path on a null sample instead of resetting it to 0', () => {
+    vi.useFakeTimers();
+    try {
+      callbacks.get('headingPath')!(update(123));
+      callbacks.get('appWindAngle')!(update(45));
+      callbacks.get('courseOverGround')!(update(20));
+      callbacks.get('trueWindSpeed')!(update(12));
+      callbacks.get('appWindSpeed')!(update(9));
+      callbacks.get('set')!(update(80));
+      callbacks.get('drift')!(update(0.4));
+      callbacks.get('headingPath')!(update(null));
+      callbacks.get('appWindAngle')!(update(null));
+      callbacks.get('courseOverGround')!(update(null));
+      callbacks.get('trueWindSpeed')!(update(null));
+      callbacks.get('appWindSpeed')!(update(null));
+      callbacks.get('set')!(update(null));
+      callbacks.get('drift')!(update(null));
+      expect(sig('currentHeading')).toBe(123);        // all frozen, none reset to 0
+      expect(sig('appWindAngle')).toBe(45);
+      expect(sig('courseOverGroundAngle')).toBe(20);
+      expect(sig('trueWindSpeed')).toBe(12);
+      expect(sig('appWindSpeed')).toBe(9);
+      expect(sig('driftSet')).toBe(80);
+      expect(sig('driftFlow')).toBe(0.4);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('marks each path fresh on valid data and hides it after the TTL', () => {
+    vi.useFakeTimers();
+    try {
+      callbacks.get('headingPath')!(update(10));
+      callbacks.get('appWindAngle')!(update(30));
+      callbacks.get('courseOverGround')!(update(20));
+      callbacks.get('trueWindSpeed')!(update(12));
+      callbacks.get('appWindSpeed')!(update(9));
+      for (const s of ['headingFresh', 'appWindFresh', 'courseFresh', 'trueWindSpeedFresh', 'appWindSpeedFresh']) {
+        expect(sig(s)).toBe(true);
+      }
+      vi.advanceTimersByTime(5000);
+      for (const s of ['headingFresh', 'appWindFresh', 'courseFresh', 'trueWindSpeedFresh', 'appWindSpeedFresh']) {
+        expect(sig(s)).toBe(false);
+      }
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('tracks drift (speed) and set (direction) freshness independently', () => {
+    vi.useFakeTimers();
+    try {
+      callbacks.get('set')!(update(80));      // only direction flows
+      expect(sig('setFresh')).toBe(true);
+      expect(sig('driftFresh')).toBe(false);  // speed never arrived -> not fresh
+      callbacks.get('drift')!(update(0.4));
+      expect(sig('driftFresh')).toBe(true);
+      vi.advanceTimersByTime(5000);           // both lapse
+      expect(sig('setFresh')).toBe(false);
+      expect(sig('driftFresh')).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('re-shows a path when data resumes after it went stale', () => {
+    vi.useFakeTimers();
+    try {
+      callbacks.get('appWindAngle')!(update(30));
+      vi.advanceTimersByTime(5000);
+      expect(sig('appWindFresh')).toBe(false);   // hidden
+      callbacks.get('appWindAngle')!(update(35)); // data resumes
+      expect(sig('appWindFresh')).toBe(true);     // shown again
+      expect(sig('appWindAngle')).toBe(35);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('re-arms freshness on each valid sample so it stays shown while data flows', () => {
+    vi.useFakeTimers();
+    try {
+      callbacks.get('appWindAngle')!(update(30));
+      vi.advanceTimersByTime(4000);
+      callbacks.get('appWindAngle')!(update(35)); // fresh sample re-arms the timer
+      vi.advanceTimersByTime(4000);               // 4s since the last valid sample
+      expect(sig('appWindFresh')).toBe(true);
+      vi.advanceTimersByTime(1500);               // now >5s since the last valid sample
+      expect(sig('appWindFresh')).toBe(false);
+    } finally { vi.useRealTimers(); }
   });
 });
 

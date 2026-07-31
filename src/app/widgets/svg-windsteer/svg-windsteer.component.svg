@@ -260,6 +260,7 @@
           cy="500"
           r="404" />
         @if (compassModeEnabled()) {
+        @if (headingFresh()) {
         <g id="dialLabelsCompass">
           <text
             xml:space="preserve"
@@ -405,6 +406,7 @@
               x="500.15503"
               y="101.96342">N</tspan></text>
         </g>
+        }
         } @else {
         <g id="dialLabelsPortStbd">
           <text
@@ -554,7 +556,7 @@
         }
       </g>
       <!-- Moved inside rotating dial so they rotate passively with the boat -->
-      <g id="LayerLayline" [style.display]="closeHauledLineEnabled() && trueWindActive() ? 'inline' : 'none'">
+      <g id="LayerLayline" [style.display]="closeHauledLineEnabled() && trueWindFresh() ? 'inline' : 'none'">
         <path id="StbdLayline"
           [attr.d]="closeHauledLineStbdPath()"
           style="fill:none;stroke-width:5;stroke-dasharray:40, 20;stroke-dashoffset:0;stroke-opacity:0.6"
@@ -594,7 +596,7 @@
           ry="17.361118" />
       </g>
       <g #setIndicator
-        [style.display]="driftActive() && driftEnabled() && compassModeEnabled() ? 'inline' : 'none'">
+        [style.display]="driftActive() && setFresh() && driftEnabled() && compassModeEnabled() ? 'inline' : 'none'">
         <path id="setArrow"
           style="fill:url(#linearGradient14);stroke:none;stroke-width:1.18648"
           d="m 563.93337,480.60403 -64.4901,-94.9673 -63.37665,95.71396 58.48691,-30.71299 0.77713,133.08346 c 0.0992,16.99331 2.52916,30.65913 5.44822,30.64209 2.91911,-0.0171 5.18926,-13.71032 5.09001,-30.70362 l -0.77782,-133.20444 z" />
@@ -635,7 +637,7 @@
         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:66.6667px;font-family:Roboto;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-anchor:middle;stroke:none;stroke-width:14.5521;stroke-miterlimit:0"
         x="903.84814"
         y="114.73512"
-        id="text42">{{ (trueWindSpeed() | number:'1.1-1') ?? '--' }}</text>
+        id="text42">{{ trueWindSpeedFresh() ? (trueWindSpeed() | number:'1.1-1') : '--' }}</text>
       <text
         xml:space="preserve"
         class="true-wind-label"
@@ -659,7 +661,7 @@
         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:66.6667px;font-family:Roboto;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-anchor:middle;stroke:none;stroke-width:14.5521;stroke-miterlimit:0"
         x="94.580925"
         y="114.63747"
-        id="text40">{{ (appWindSpeed() | number:'1.1-1') ?? '--' }}</text>
+        id="text40">{{ appWindSpeedFresh() ? (appWindSpeed() | number:'1.1-1') : '--' }}</text>
       <text
        xml:space="preserve"
        class="app-wind-label"
@@ -670,7 +672,7 @@
     </g>
   </g>
   <g id="layerCurrent"
-     [style.display]="driftActive() && driftEnabled() && compassModeEnabled() ? 'inline' : 'none'">
+     [style.display]="driftActive() && driftFresh() && driftEnabled() && compassModeEnabled() ? 'inline' : 'none'">
     <text id="text11"
        xml:space="preserve"
        class="contrast-text"
@@ -684,13 +686,13 @@
   <g id="layerIndicators"
     style="display:inline">
     <g #cogIndicator
-      [attr.display]="sogActive() && courseOverGroundEnabled() && compassModeEnabled() ? 'inline' : 'none'">
+      [attr.display]="sogActive() && courseFresh() && courseOverGroundEnabled() && compassModeEnabled() ? 'inline' : 'none'">
       <path
         class="course-over-ground"
         style="stroke-width:14.7329;stroke-linecap:square"
         d="m 506.20767,172.99458 a 6.3888631,8.8250643 0 0 1 -6.38888,8.82508 6.3888631,8.8250643 0 0 1 -6.38888,-8.82508 6.3888631,8.8250643 0 0 1 6.38888,-8.82509 6.3888631,8.8250643 0 0 1 6.38888,8.82509 z M 476.25472,30.811298 493.47058,13.265068 c 3.6173,-3.6867571 9.44162,-3.6867571 13.05892,0 l 17.21586,17.546106 c 3.6173,3.686743 3.6173,9.622786 0,13.309544 l -17.21595,17.54623 c -3.61721,3.686757 -9.44153,3.686757 -13.05893,0 L 476.25472,44.120841 c -3.6174,-3.686743 -3.6174,-9.622924 0,-13.309543 z m 17.20533,-16.510116 h 12.77766 V 173.26408 h -12.77766 z" />
     </g>
-    <g #awaIndicator>
+    <g #awaIndicator [style.display]="appWindFresh() ? 'inline' : 'none'">
       <path
          class="app-wind"
          d="m 451.77021,55.078207 42.08541,-33.202814 a 12.555638,12.555638 0.26446337 0 1 15.64423,0.07221 l 42.20046,33.930296 a 15.557694,15.557694 71.53185 0 1 5.32954,15.957795 L 504.17034,279.76529 a 2.5373267,2.5373267 0.02614114 0 1 -4.91879,-0.002 L 446.37431,70.966036 a 15.416336,15.416336 108.75875 0 1 5.3959,-15.887829 z"
@@ -703,7 +705,7 @@
          x="500"
          y="110">A</text>
     </g>
-    <g #twaIndicator [style.display]="twaEnabled() ? 'inline' : 'none'">
+    <g #twaIndicator [style.display]="twaEnabled() && trueWindFresh() ? 'inline' : 'none'">
       <path
         class="true-wind"
         d="m 451.77021,55.078207 42.08541,-33.202814 a 12.555638,12.555638 0.26446337 0 1 15.64423,0.07221 l 42.20046,33.930296 a 15.557694,15.557694 71.53185 0 1 5.32954,15.957795 L 504.17034,279.76529 a 2.5373267,2.5373267 0.02614114 0 1 -4.91879,-0.002 L 446.37431,70.966036 a 15.416336,15.416336 108.75875 0 1 5.3959,-15.887829 z"
@@ -734,7 +736,7 @@
       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:106.667px;font-family:Roboto;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-anchor:middle;stroke: none;stroke-width:5;stroke-linejoin:bevel;stroke-miterlimit:0;stroke-dasharray:none;stroke-opacity:1"
       x="511.29395"
       y="102.86786">
-      <tspan>{{ headingValue() }}<tspan>°</tspan>
+      <tspan>{{ headingFresh() ? headingValue() : '--' }}@if (headingFresh()) {<tspan>°</tspan>}
       </tspan>
     </text>
   </g>

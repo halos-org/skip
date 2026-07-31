@@ -1,4 +1,4 @@
-import { Component, OnDestroy, inject, ChangeDetectionStrategy, input, effect, untracked, signal, computed } from '@angular/core';
+import { Component, OnDestroy, inject, ChangeDetectionStrategy, input, effect, untracked, signal, computed, WritableSignal } from '@angular/core';
 import { Subscription, interval } from 'rxjs';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { SvgWindsteerComponent } from '../svg-windsteer/svg-windsteer.component';
@@ -11,6 +11,10 @@ import { UnitsService } from '../../core/services/units.service';
 // Default rolling window (seconds) for the wind-sector history; the single
 // source of truth for both the default config and the missing-value fallback.
 const DEFAULT_WIND_SECTOR_WINDOW_SECONDS = 5;
+
+// Default stale-data TTL (seconds): an indicator hides this long after its last valid sample.
+// Single source of truth for the default config and the missing/invalid-value fallback.
+const DEFAULT_DATA_TIMEOUT_SECONDS = 5;
 
 // Overlay auto-hide thresholds in SI (m/s). Compared against the true speed regardless of the
 // path's display unit: the current-set arrow/readout hide below DRIFT, the COG arrow below SOG.
@@ -193,7 +197,7 @@ export class WidgetWindComponent implements OnDestroy {
     invertRudder: false,
     updateInterval: 1000,
     enableTimeout: false,
-    dataTimeout: 5
+    dataTimeout: DEFAULT_DATA_TIMEOUT_SECONDS
   };
 
   public readonly runtime = inject(WidgetRuntimeDirective); // accessed in template
@@ -222,7 +226,7 @@ export class WidgetWindComponent implements OnDestroy {
   private appWindSpeedMeasure = signal('');
   protected appWindSpeedUnit = computed(() => this.speedUnitSymbol(this.appWindSpeedMeasure()));
   protected trueWindAngle = signal(0);
-  protected trueWindActive = signal(false);
+  protected trueWindFresh = signal(false);
   protected trueWindSpeed = signal(0);
   private trueWindSpeedMeasure = signal('');
   protected trueWindSpeedUnit = computed(() => this.speedUnitSymbol(this.trueWindSpeedMeasure()));
@@ -241,6 +245,19 @@ export class WidgetWindComponent implements OnDestroy {
     return s == null || s >= this.speedInDisplayUnit(this.sogMeasure(), SOG_HIDE_LIMIT_MS);
   });
   protected waypointAngle = signal<number | undefined>(undefined);
+  // Per-path data freshness: true while a valid sample arrived within the TTL, false after it
+  // lapses. The value signals hold their last value (freeze); these gate whether the indicator
+  // is shown, so absent/invalid data hides rather than rendering as 0. trueWindFresh (above)
+  // is the true-wind-angle member of this set.
+  protected headingFresh = signal(false);
+  protected courseFresh = signal(false);
+  protected appWindFresh = signal(false);
+  protected appWindSpeedFresh = signal(false);
+  protected trueWindSpeedFresh = signal(false);
+  // Current/drift has two independent paths: drift = speed (readout), set = direction (arrow).
+  // Each tracks its own freshness so a stalled half hides rather than showing a frozen value.
+  protected driftFresh = signal(false);
+  protected setFresh = signal(false);
   // Signed degrees, +ve = starboard (after invertRudder). null = no rudder data (bar hidden).
   protected rudderAngle = signal<number | null>(null);
   protected historicalWindDirection: { timestamp: number; windDirection: number; }[] = [];
@@ -258,6 +275,26 @@ export class WidgetWindComponent implements OnDestroy {
   private lastSector: { min?: number; mid?: number; max?: number } = {};
 
   private readonly DEG_EPSILON = 1;      // degrees — angle paths are structurally fixed to degrees
+
+  // On each valid sample a path's active flag is set true and its hide-timer re-armed; when the
+  // timer fires (no valid sample within the TTL) the flag goes false and the indicator hides.
+  // Independent of the streams-directive enableTimeout, so it works whether that is on or off.
+  private readonly freshnessTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private dataTtlMs(): number {
+    const cfg = this.runtime.options();
+    const configured = cfg?.dataTimeout;
+    const base = (typeof configured === 'number' && configured > 0 ? configured : DEFAULT_DATA_TIMEOUT_SECONDS) * 1000;
+    // Never shorter than twice the sample cadence, so a healthy but slow-updating stream cannot
+    // lapse between samples and flicker the indicator.
+    const cadence = typeof cfg?.updateInterval === 'number' && cfg.updateInterval > 0 ? cfg.updateInterval : 0;
+    return Math.max(base, cadence * 2);
+  }
+  private markFresh(key: string, active: WritableSignal<boolean>): void {
+    active.set(true);
+    const existing = this.freshnessTimers.get(key);
+    if (existing) clearTimeout(existing);
+    this.freshnessTimers.set(key, setTimeout(() => active.set(false), this.dataTtlMs()));
+  }
 
   constructor() {
     // Stable stream callbacks registered via effect; directive handles diffing
@@ -281,24 +318,29 @@ export class WidgetWindComponent implements OnDestroy {
 
   // Stable callbacks -------------------------------------------------
   private onHeadingUpdate = (u: IPathUpdate) => {
-    if (u.data.value == null) u.data.value = 0;
-    const next = this.normalizeAngle(u.data.value);
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;   // freeze on absent/invalid
+    const next = this.normalizeAngle(raw);
+    this.markFresh('heading', this.headingFresh);
     if (!this.hasHeading || this.angleDelta(this.currentHeading(), next) >= this.DEG_EPSILON) {
       this.currentHeading.set(next); this.hasHeading = true;
     }
   };
   private onCOGUpdate = (u: IPathUpdate) => {
-    if (u.data.value == null) u.data.value = 0;
-    const next = this.normalizeAngle(u.data.value);
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;
+    const next = this.normalizeAngle(raw);
+    this.markFresh('cog', this.courseFresh);
     if (!this.hasCOG || this.angleDelta(this.courseOverGroundAngle(), next) >= this.DEG_EPSILON) {
       this.courseOverGroundAngle.set(next); this.hasCOG = true;
     }
   };
   private onDriftUpdate = (u: IPathUpdate) => {
-    if (u.data.value == null) u.data.value = 0;
-    const next = u.data.value;
-    if (!this.hasDrift || Math.abs(this.driftFlow() - next) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
-      this.driftFlow.set(next); this.hasDrift = true;
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;
+    this.markFresh('drift', this.driftFresh);
+    if (!this.hasDrift || Math.abs(this.driftFlow() - raw) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
+      this.driftFlow.set(raw); this.hasDrift = true;
       this.driftMeasure.set(u.data.measure ?? '');
     }
   };
@@ -317,8 +359,10 @@ export class WidgetWindComponent implements OnDestroy {
     }
   };
   private onSetUpdate = (u: IPathUpdate) => {
-    if (u.data.value == null) u.data.value = 0;
-    const next = this.normalizeAngle(u.data.value);
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;
+    const next = this.normalizeAngle(raw);
+    this.markFresh('set', this.setFresh);
     if (!this.hasSet || this.angleDelta(this.driftSet(), next) >= this.DEG_EPSILON) {
       this.driftSet.set(next); this.hasSet = true;
     }
@@ -342,41 +386,43 @@ export class WidgetWindComponent implements OnDestroy {
     this.applyRudder();
   };
   private onAppWindAngle = (u: IPathUpdate) => {
-    if (u.data.value == null) u.data.value = 0;
     const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;
     const next = this.normalizeAngle(raw);
+    this.markFresh('awa', this.appWindFresh);
     if (!this.hasAWA || this.angleDelta(this.appWindAngle(), next) >= this.DEG_EPSILON) {
       this.appWindAngle.set(next); this.hasAWA = true;
     }
   };
   private onAppWindSpeed = (u: IPathUpdate) => {
-    if (u.data.value == null) u.data.value = 0;
-    const next = u.data.value;
-    if (!this.hasAWS || Math.abs(this.appWindSpeed() - next) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
-      this.appWindSpeed.set(next); this.hasAWS = true;
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;
+    this.markFresh('aws', this.appWindSpeedFresh);
+    if (!this.hasAWS || Math.abs(this.appWindSpeed() - raw) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
+      this.appWindSpeed.set(raw); this.hasAWS = true;
       this.appWindSpeedMeasure.set(u.data.measure ?? '');
     }
   };
   private onTrueWindSpeed = (u: IPathUpdate) => {
-    if (u.data.value == null) u.data.value = 0;
-    const next = u.data.value;
-    if (!this.hasTWS || Math.abs(this.trueWindSpeed() - next) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
-      this.trueWindSpeed.set(next); this.hasTWS = true;
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;
+    this.markFresh('tws', this.trueWindSpeedFresh);
+    if (!this.hasTWS || Math.abs(this.trueWindSpeed() - raw) >= this.speedInDisplayUnit(u.data.measure ?? '', SPEED_DEDUP_MS)) {
+      this.trueWindSpeed.set(raw); this.hasTWS = true;
       this.trueWindSpeedMeasure.set(u.data.measure ?? '');
     }
   };
   private onTrueWindAngle = (u: IPathUpdate) => {
-    const present = u.data.value != null;
-    if (u.data.value == null) u.data.value = 0;
-    this.lastRawTrueWindAngle = u.data.value;
-    this.trueWindActive.set(present);
-    const next = this.normalizeAngle(this.computeTrueWindBase(u.data.value));
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;   // freeze; the TTL timer hides after lapse
+    this.lastRawTrueWindAngle = raw;
+    this.markFresh('twa', this.trueWindFresh);
+    const next = this.normalizeAngle(this.computeTrueWindBase(raw));
     if (!this.hasTWA || this.angleDelta(this.trueWindAngle(), next) >= this.DEG_EPSILON) {
       this.trueWindAngle.set(next); this.hasTWA = true;
     }
-    const cfg = this.runtime.options();
-    if (present && cfg?.windSectorEnable) {
-      this.addHistoricalWindDirection(this.normalizeAngle(this.computeTrueWindDirection(u.data.value)));
+    if (this.runtime.options()?.windSectorEnable) {
+      this.addHistoricalWindDirection(this.normalizeAngle(this.computeTrueWindDirection(raw)));
     }
   };
 
@@ -434,6 +480,8 @@ export class WidgetWindComponent implements OnDestroy {
 
   ngOnDestroy() {
     this.stopWindSectors();
+    this.freshnessTimers.forEach(clearTimeout);
+    this.freshnessTimers.clear();
   }
 
   private startWindSectors() {
