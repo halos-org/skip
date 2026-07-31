@@ -122,7 +122,7 @@ describe('SvgWindsteerComponent', () => {
             appWindAngle: 20, // deliberately different from true wind
             closeHauledLineEnabled: true,
             laylineAngle: 30,
-            trueWindActive: true
+            trueWindFresh: true
         });
         fixture.detectChanges();
 
@@ -137,12 +137,12 @@ describe('SvgWindsteerComponent', () => {
     });
 
     it('hides laylines when true wind is unavailable', () => {
-        setRequiredInputs({ closeHauledLineEnabled: true, laylineAngle: 30, trueWindActive: false });
+        setRequiredInputs({ closeHauledLineEnabled: true, laylineAngle: 30, trueWindFresh: false });
         fixture.detectChanges();
         const layer = fixture.nativeElement.querySelector('#LayerLayline') as SVGGElement;
         expect(layer.style.display).toBe('none');
 
-        fixture.componentRef.setInput('trueWindActive', true);
+        fixture.componentRef.setInput('trueWindFresh', true);
         fixture.detectChanges();
         expect(layer.style.display).toBe('inline');
     });
@@ -159,7 +159,7 @@ describe('SvgWindsteerComponent', () => {
             trueWindMinHistoric: 100,
             trueWindMidHistoric: 110,
             trueWindMaxHistoric: 120,
-            trueWindActive: true
+            trueWindFresh: true
         });
         fixture.detectChanges();
 
@@ -180,7 +180,7 @@ describe('SvgWindsteerComponent', () => {
             trueWindMinHistoric: 100,
             trueWindMidHistoric: 110,
             trueWindMaxHistoric: 120,
-            trueWindActive: true
+            trueWindFresh: true
         });
         fixture.detectChanges();
 
@@ -195,7 +195,7 @@ describe('SvgWindsteerComponent', () => {
             trueWindAngle: 40, // boat-relative TWA in simple mode
             closeHauledLineEnabled: true,
             laylineAngle: 30,
-            trueWindActive: true
+            trueWindFresh: true
         });
         fixture.detectChanges();
 
@@ -216,7 +216,7 @@ describe('SvgWindsteerComponent', () => {
             trueWindMinHistoric: 100,
             trueWindMidHistoric: 110,
             trueWindMaxHistoric: 120,
-            trueWindActive: true
+            trueWindFresh: true
         });
         fixture.detectChanges();
         expect((component as unknown as { portWindSectorPath: () => string }).portWindSectorPath()).not.toBe('');
@@ -379,5 +379,56 @@ describe('SvgWindsteerComponent', () => {
         const port = fixture.nativeElement.querySelector('.rudder-port') as SVGPathElement;
         expect(parseFloat(stbd.style.strokeDashoffset)).toBeCloseTo(50);
         expect(parseFloat(port.style.strokeDashoffset)).toBeCloseTo(100);
+    });
+
+    // Freeze-then-hide gating (#475): indicators hide / blank when their path is stale.
+    it('hides the compass labels and blanks the heading readout when heading is stale', () => {
+        setRequiredInputs({ compassModeEnabled: true, headingFresh: false });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('#dialLabelsCompass')).toBeNull();
+        expect(fixture.nativeElement.querySelector('#layerHeading text').textContent).toContain('--');
+    });
+
+    it('shows the compass labels when heading is fresh', () => {
+        setRequiredInputs({ compassModeEnabled: true, headingFresh: true });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('#dialLabelsCompass')).not.toBeNull();
+    });
+
+    it('hides the AWA needle when apparent wind is stale', () => {
+        setRequiredInputs({ appWindFresh: false });
+        fixture.detectChanges();
+        expect(component['awaIndicator']().nativeElement.style.display).toBe('none');
+    });
+
+    it('shows "--" for a stale true-wind-speed readout instead of 0', () => {
+        setRequiredInputs({ twsEnabled: true, trueWindSpeed: 12, trueWindSpeedFresh: false });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('#text42').textContent).toContain('--');
+    });
+
+    it('shows "--" for a stale apparent-wind-speed readout instead of 0', () => {
+        setRequiredInputs({ awsEnabled: true, appWindSpeed: 10, appWindSpeedFresh: false });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('#text40').textContent).toContain('--');
+    });
+
+    it('hides the COG arrow when course data is stale', () => {
+        setRequiredInputs({ courseOverGroundEnabled: true, compassModeEnabled: true, sogActive: true, courseFresh: false });
+        fixture.detectChanges();
+        expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('none');
+    });
+
+    it('hides the TWA needle when true wind is stale', () => {
+        setRequiredInputs({ twaEnabled: true, trueWindFresh: false });
+        fixture.detectChanges();
+        expect(component['twaIndicator']().nativeElement.style.display).toBe('none');
+    });
+
+    it('hides the set arrow when set (direction) is stale but keeps the drift readout gate independent', () => {
+        setRequiredInputs({ driftEnabled: true, driftActive: true, compassModeEnabled: true, setFresh: false, driftFresh: true });
+        fixture.detectChanges();
+        expect(component['setIndicator']().nativeElement.style.display).toBe('none');
+        expect(fixture.nativeElement.querySelector('#layerCurrent').style.display).toBe('inline');
     });
 });

@@ -31,7 +31,7 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly courseOverGroundEnabled = input.required<boolean>();
   protected readonly sogActive = input<boolean>(true);
   protected readonly trueWindAngle = input.required<number>();
-  protected readonly trueWindActive = input<boolean>(false);
+  protected readonly trueWindFresh = input<boolean>(false);
   protected readonly twsEnabled = input.required<boolean>();
   protected readonly twaEnabled = input.required<boolean>();
   protected readonly trueWindSpeed = input.required<number>();
@@ -57,6 +57,15 @@ export class SvgWindsteerComponent implements OnDestroy {
   // Rudder-angle bar: signed degrees, +ve = starboard (right). null hides the bar.
   protected readonly rudderAngle = input<number | null>(null);
   protected readonly rudderEnabled = input<boolean>(false);
+  // Per-path data freshness: false once a path has had no valid sample within the TTL, so the
+  // matching indicator hides instead of showing a frozen/zero value. (trueWindFresh above is TWA.)
+  protected readonly headingFresh = input<boolean>(true);
+  protected readonly courseFresh = input<boolean>(true);
+  protected readonly appWindFresh = input<boolean>(true);
+  protected readonly appWindSpeedFresh = input<boolean>(true);
+  protected readonly trueWindSpeedFresh = input<boolean>(true);
+  protected readonly driftFresh = input<boolean>(true);
+  protected readonly setFresh = input<boolean>(true);
 
   protected compass: ISVGRotationObject = { oldValue: 0, newValue: 0 };
   protected twa: ISVGRotationObject = { oldValue: 0, newValue: 0 };
