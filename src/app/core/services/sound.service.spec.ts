@@ -20,6 +20,7 @@ class FakeGain {
 class FakeAudioContext {
   static instances: FakeAudioContext[] = [];
   static autoResume = true;
+  static decodeFailures = 0; // number of initial decodeAudioData calls that reject
 
   state: 'suspended' | 'running' | 'closed' = 'suspended';
   currentTime = 0;
@@ -31,7 +32,10 @@ class FakeAudioContext {
 
   createBufferSource(): FakeSource { const s = new FakeSource(); this.sources.push(s); return s; }
   createGain(): FakeGain { return new FakeGain(); }
-  decodeAudioData = vi.fn(async () => ({} as AudioBuffer));
+  decodeAudioData = vi.fn(async () => {
+    if (FakeAudioContext.decodeFailures > 0) { FakeAudioContext.decodeFailures--; throw new Error('decode failed'); }
+    return {} as AudioBuffer;
+  });
   resume = vi.fn(async () => {
     if (FakeAudioContext.autoResume) { this.state = 'running'; this.onstatechange?.(); }
   });
@@ -52,6 +56,7 @@ describe('SoundService', () => {
     vi.unstubAllGlobals();
     FakeAudioContext.instances = [];
     FakeAudioContext.autoResume = true;
+    FakeAudioContext.decodeFailures = 0;
   });
 
   describe('without Web Audio support', () => {
@@ -125,6 +130,26 @@ describe('SoundService', () => {
       const source = ctx().sources.at(-1)!;
       svc.stopLoop();
       expect(source.stop).toHaveBeenCalled();
+    });
+
+    it('retries a transient decode failure and eventually starts the loop', async () => {
+      stubWebAudio();
+      FakeAudioContext.decodeFailures = 1; // first decode rejects; the retry must recover
+      const svc = new SoundService();
+      svc.playLoop('alarm');
+      await vi.waitFor(() => expect(ctx().sources.at(-1)?.start).toHaveBeenCalled(), { timeout: 2000 });
+      expect(ctx().sources.at(-1)!.loop).toBe(true);
+    });
+
+    it('plays a one-shot that does not loop and disconnects when it ends', async () => {
+      stubWebAudio();
+      const svc = new SoundService();
+      svc.playOnce('notification', 0.3);
+      await vi.waitFor(() => expect(ctx().sources.at(-1)?.start).toHaveBeenCalled());
+      const source = ctx().sources.at(-1)!;
+      expect(source.loop).toBe(false);
+      source.onended?.();
+      expect(source.disconnect).toHaveBeenCalled();
     });
   });
 });

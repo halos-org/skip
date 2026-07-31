@@ -14,6 +14,8 @@ type AudioContextCtor = new () => AudioContext;
 @Injectable({ providedIn: 'root' })
 export class SoundService {
   private static readonly PRELOAD = ['alert', 'warn', 'alarm', 'emergency'];
+  private static readonly LOOP_DECODE_RETRIES = 3;
+  private static readonly RETRY_DELAY_MS = 500;
 
   private ctx: AudioContext | null = null;
   private readonly buffers = new Map<string, AudioBuffer>();
@@ -47,8 +49,21 @@ export class SoundService {
     this.stopLoop();
     const token = ++this.loopToken;
     this.resume(ctx);
+    this.startLoop(key, gain, token, SoundService.LOOP_DECODE_RETRIES);
+  }
+
+  private startLoop(key: string, gain: number, token: number, retriesLeft: number): void {
     void this.getBuffer(key).then(buffer => {
-      if (token !== this.loopToken || !buffer || !this.ctx) return;
+      if (token !== this.loopToken || !this.ctx) return; // superseded by a newer stop/switch
+      if (!buffer) {
+        // A transient fetch/decode failure must not leave a safety alarm permanently silent.
+        if (retriesLeft > 0) {
+          setTimeout(() => {
+            if (token === this.loopToken) this.startLoop(key, gain, token, retriesLeft - 1);
+          }, SoundService.RETRY_DELAY_MS);
+        }
+        return;
+      }
       const source = this.play(buffer, gain, true);
       this.current = { key, source };
     });

@@ -57,6 +57,7 @@ export class ToastService {
 
     this.lastSnack.set(snack);
     if (silent || this.soundDisabled()) return ref;
+    // If the browser blocks playback, SoundService raises `blocked`; the prompt is surfaced by NotificationsService.
     this.sound.playOnce('notification', 0.3);
     return ref;
   }

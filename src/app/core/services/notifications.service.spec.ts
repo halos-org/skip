@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { signal, Signal, WritableSignal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INotification, INotificationInfo, NotificationsService } from './notifications.service';
@@ -8,6 +8,7 @@ import { SettingsService } from './settings.service';
 import { SignalkRequestsService } from './signalk-requests.service';
 import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { SoundService } from './sound.service';
+import { ToastService } from './toast.service';
 import { INotificationConfig } from '../interfaces/app-settings.interfaces';
 import { ISignalKDataValueUpdate, ISignalKNotification, ISkMetadata, Methods, States, TMethod, TState } from '../interfaces/signalk-interfaces';
 import { IMeta } from '../interfaces/app-interfaces';
@@ -59,8 +60,9 @@ describe('NotificationsService', () => {
     playLoop: ReturnType<typeof vi.fn>;
     stopLoop: ReturnType<typeof vi.fn>;
     playOnce: ReturnType<typeof vi.fn>;
-    blocked: Signal<boolean>;
+    blocked: WritableSignal<boolean>;
   };
+  let toast: { show: ReturnType<typeof vi.fn>; dismiss: ReturnType<typeof vi.fn> };
 
   function setup(initialConfig: INotificationConfig = makeConfig()): void {
     configSignal = signal<INotificationConfig>(initialConfig);
@@ -81,6 +83,9 @@ describe('NotificationsService', () => {
       putRequest: putRequest as SignalkRequestsService['putRequest'],
     };
     sound = { playLoop: vi.fn(), stopLoop: vi.fn(), playOnce: vi.fn(), blocked: signal(false) };
+    const dismiss = vi.fn();
+    const show = vi.fn().mockReturnValue({ afterDismissed: () => new Subject<void>().asObservable(), dismiss });
+    toast = { show, dismiss };
 
     TestBed.configureTestingModule({
       providers: [
@@ -89,6 +94,7 @@ describe('NotificationsService', () => {
         { provide: SignalkRequestsService, useValue: requestsStub },
         { provide: ConnectionStateMachine, useValue: { state$: connectionState$.asObservable() } },
         { provide: SoundService, useValue: sound as unknown as SoundService },
+        { provide: ToastService, useValue: { show } as unknown as ToastService },
       ],
     });
     service = TestBed.inject(NotificationsService);
@@ -316,6 +322,37 @@ describe('NotificationsService', () => {
 
       service.mutePlayer(false);
       expect(latestInfo()).toMatchObject({ audioSev: 4, isMuted: false });
+    });
+  });
+
+  describe('SoundService delegation', () => {
+    it('plays the mapped alarm track through SoundService, and stops on clear', () => {
+      setup();
+      notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
+      expect(sound.playLoop).toHaveBeenCalledWith('alarm', 1);
+
+      notificationMsg$.next(makeDelta('notifications.a', makeValue(States.Emergency, [Methods.Visual, Methods.Sound])));
+      expect(sound.playLoop).toHaveBeenCalledWith('emergency', 1);
+
+      sound.stopLoop.mockClear();
+      notificationMsg$.next(makeDelta('notifications.a', null));
+      expect(sound.stopLoop).toHaveBeenCalled();
+    });
+  });
+
+  describe('audio-blocked prompt', () => {
+    it('shows the prompt when audio is blocked and dismisses it on unblock', () => {
+      setup();
+      expect(toast.show).not.toHaveBeenCalled();
+
+      sound.blocked.set(true);
+      TestBed.tick();
+      expect(toast.show).toHaveBeenCalledTimes(1);
+      expect(String(toast.show.mock.calls[0][0])).toContain('blocked');
+
+      sound.blocked.set(false);
+      TestBed.tick();
+      expect(toast.dismiss).toHaveBeenCalled();
     });
   });
 

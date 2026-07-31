@@ -17,7 +17,6 @@ import { TMethod, ISignalKDataValueUpdate, ISkMetadata, ISignalKNotification, St
 import { IMeta } from '../interfaces/app-interfaces';
 
 const alarmTrack = {
-  1000: 'notification', // filler / silent (stop)
   1001: 'alert',
   1002: 'warn',
   1003: 'alarm',
@@ -53,6 +52,7 @@ export class NotificationsService implements OnDestroy {
   private settings = inject(SettingsService);
   private toastService = inject(ToastService);
   private audioBlockedNotificationShown = false;
+  private _audioBlockedRef: ReturnType<ToastService['show']> | null = null;
   private data = inject(DataService);
   private requests = inject(SignalkRequestsService);
   private connectionStateMachine = inject(ConnectionStateMachine);
@@ -110,6 +110,7 @@ export class NotificationsService implements OnDestroy {
 
     effect(() => {
       if (this.sound.blocked()) this.showAudioBlockedPrompt();
+      else this.dismissAudioBlockedPrompt();
     });
   }
 
@@ -412,8 +413,9 @@ export class NotificationsService implements OnDestroy {
     if (this._activeAlarmSoundtrack === trackId) return;
     this._activeAlarmSoundtrack = trackId;
 
+    // trackId 1000 (silent) has no asset, so the guard stops the loop for it and any unmapped id.
     const name = alarmTrack[trackId];
-    if (!name || trackId === 1000) {
+    if (!name) {
       this.sound.stopLoop();
       return;
     }
@@ -423,13 +425,18 @@ export class NotificationsService implements OnDestroy {
   private showAudioBlockedPrompt(): void {
     if (this.audioBlockedNotificationShown) return;
     this.audioBlockedNotificationShown = true;
-    const blockRef = this.toastService.show(
-      'Alarm sounds blocked by browser. Tap anywhere to enable audio.',
+    this._audioBlockedRef = this.toastService.show(
+      'Sounds blocked by the browser. Tap anywhere to enable audio.',
       0, true, 'warn'
     );
-    blockRef.afterDismissed().subscribe(() => {
+    this._audioBlockedRef.afterDismissed().subscribe(() => {
       this.audioBlockedNotificationShown = false;
+      this._audioBlockedRef = null;
     });
+  }
+
+  private dismissAudioBlockedPrompt(): void {
+    this._audioBlockedRef?.dismiss();
   }
 
   /**
