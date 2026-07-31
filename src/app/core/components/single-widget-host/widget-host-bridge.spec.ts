@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installLongPress } from './widget-removal-bridge';
+import { installLongPress } from './widget-host-bridge';
 
 // jsdom lacks a PointerEvent constructor; a MouseEvent carries clientX/clientY, and isPrimary is
 // added so the handler's primary-pointer guard passes.

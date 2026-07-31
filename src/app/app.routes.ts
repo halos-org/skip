@@ -62,6 +62,13 @@ export const routes: Routes = [
     loadComponent: () => import('./core/components/single-widget-host/single-widget-host.component').then(m => m.SingleWidgetHostComponent),
     title: 'Skip - Widget'
   },
+  // Settings panel iframe for a plotter-extension widget: reuses the widget-options UI over the bus.
+  {
+    path: 'widget-config/:type',
+    canActivate: [embedRequiredGuard],
+    loadComponent: () => import('./core/components/widget-config-panel/widget-config-panel.component').then(m => m.WidgetConfigPanelComponent),
+    title: 'Skip - Widget settings'
+  },
   {
     path: 'help/:page',
     loadComponent: () => import('./core/components/app-help/app-help.component').then(m => m.AppHelpComponent),

@@ -5,7 +5,7 @@ import { BehaviorSubject } from 'rxjs';
 import { SingleWidgetHostComponent } from './single-widget-host.component';
 import { WidgetService } from '../../services/widget.service';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
-import { WidgetRemovalBridge } from './widget-removal-bridge';
+import { WidgetHostBridge } from './widget-host-bridge';
 import { embedRequiredGuard } from '../../guards/embed-required-route.guard';
 import { routes } from '../../../app.routes';
 import type { IWidget } from '../../interfaces/widgets-interface';
@@ -33,7 +33,8 @@ describe('SingleWidgetHostComponent', () => {
   // Only these selectors are "registered" for the class-logic tests; getWidgetName mirrors
   // WidgetService's undefined-for-unknown contract, which the component uses as its existence check.
   const KNOWN = new Set([MANIFEST_WIDGET_TYPE]);
-  const bridge = { enable: vi.fn(), disable: vi.fn() };
+  // config() returns null so the reconfigure effect is a no-op in these tests.
+  const bridge = { enable: vi.fn(), disable: vi.fn(), config: () => null };
 
   function configure(type: string) {
     bridge.enable.mockClear();
@@ -43,7 +44,7 @@ describe('SingleWidgetHostComponent', () => {
       providers: [
         { provide: ActivatedRoute, useValue: makeRoute(type) },
         { provide: WidgetService, useValue: { getWidgetName: (sel: string) => (KNOWN.has(sel) ? 'Wind Steer' : undefined) } },
-        { provide: WidgetRemovalBridge, useValue: bridge }
+        { provide: WidgetHostBridge, useValue: bridge }
       ]
     });
   }
@@ -85,7 +86,7 @@ describe('SingleWidgetHostComponent', () => {
 
   // Drive the lifecycle directly rather than detectChanges, so the heavy Host2 graph is never
   // rendered (the rest of the suite relies on the same no-render boundary).
-  it('enables the host removal bridge for a hosted widget and disables it on destroy', () => {
+  it('enables the host bridge for a hosted widget and disables it on destroy', () => {
     configure(MANIFEST_WIDGET_TYPE);
     const c = TestBed.createComponent(SingleWidgetHostComponent).componentInstance;
     c.ngOnInit();
@@ -94,7 +95,7 @@ describe('SingleWidgetHostComponent', () => {
     expect(bridge.disable).toHaveBeenCalledTimes(1);
   });
 
-  it('does not enable the removal bridge for the unknown-widget fallback', () => {
+  it('does not enable the host bridge for the unknown-widget fallback', () => {
     configure('widget-does-not-exist');
     const c = TestBed.createComponent(SingleWidgetHostComponent).componentInstance;
     c.ngOnInit();
