@@ -5,6 +5,7 @@ import { Injectable, OnDestroy, effect, inject } from '@angular/core';
 import { BehaviorSubject, map, Observable, Subscription } from 'rxjs';
 import { SettingsService } from "./settings.service";
 import { ToastService } from './toast.service';
+import { SoundService } from './sound.service';
 import { INotificationConfig } from '../interfaces/app-settings.interfaces';
 import { DefaultNotificationConfig } from '../../../default-config/config.blank.notification.const';
 import { SignalkRequestsService } from './signalk-requests.service';
@@ -16,7 +17,6 @@ import { TMethod, ISignalKDataValueUpdate, ISkMetadata, ISignalKNotification, St
 import { IMeta } from '../interfaces/app-interfaces';
 
 const alarmTrack = {
-  1000: 'notification', // filler / silent (stop)
   1001: 'alert',
   1002: 'warn',
   1003: 'alarm',
@@ -52,9 +52,11 @@ export class NotificationsService implements OnDestroy {
   private settings = inject(SettingsService);
   private toastService = inject(ToastService);
   private audioBlockedNotificationShown = false;
+  private _audioBlockedRef: ReturnType<ToastService['show']> | null = null;
   private data = inject(DataService);
   private requests = inject(SignalkRequestsService);
   private connectionStateMachine = inject(ConnectionStateMachine);
+  private sound = inject(SoundService);
 
   private static readonly ALARM_SEVERITIES: IAlarmSeverities = {
     normal: { sound: 0, visual: 0 },
@@ -83,9 +85,6 @@ export class NotificationsService implements OnDestroy {
   private _notifications$ = new BehaviorSubject<INotification[]>([]);
   private _alarmsInfo$ = new BehaviorSubject<IAlarmInfo>({ audioSev: 0, visualSev: 0, alarmCount: 0, isMuted: false });
 
-  // --- HTMLAudioElement (audio) state ----------------------------------------
-  // Cache one player per track id and reuse across switches.
-  private _players = new Map<number, HTMLAudioElement>();
   private _activeAlarmSoundtrack: number | null = null;
   private _isMuted = false;
 
@@ -109,8 +108,10 @@ export class NotificationsService implements OnDestroy {
       this._wasConnected = connected;
     });
 
-    // Pre-cache silent track player
-    this.getPlayer(1000);
+    effect(() => {
+      if (this.sound.blocked()) this.showAudioBlockedPrompt();
+      else this.dismissAudioBlockedPrompt();
+    });
   }
 
   private applyNotificationConfig(config: INotificationConfig): void {
@@ -393,81 +394,49 @@ export class NotificationsService implements OnDestroy {
     );
   }
 
-  private getPlayer(track: number): HTMLAudioElement {
-    const existing = this._players.get(track);
-    if (existing) return existing;
-    const name = alarmTrack[track];
-    if (!name) {
-      console.warn('[Notification Service] Unknown track id', track);
-      return this.getPlayer(1000);
-    }
-    const player = new Audio(`assets/${name}.mp3`);
-    player.preload = 'auto';
-    player.loop = true;
-    player.muted = this._isMuted;
-    this._players.set(track, player);
-    return player;
-  }
-
   /**
-   * Mutes/unmutes the currently playing alarm sound (if any).
-   *
-   * Also updates the emitted alarm summary (`isMuted`) and may influence computed audio severity.
+   * Mutes/unmutes alarm sound. Mute is severity-driven: with `_isMuted` set, `getNotificationSeverity`
+   * zeroes audio severity, so `updateNotificationsState` stops the active track via `playAlarm(1000)`.
    */
   mutePlayer(state: boolean) {
-    if (this._activeAlarmSoundtrack != null && this._activeAlarmSoundtrack !== 1000) {
-      const p = this._players.get(this._activeAlarmSoundtrack);
-      if (p) p.muted = state;
-    }
     this._isMuted = state;
     this.updateNotificationsState();
   }
 
   /**
-   * Switches the active looping alarm track.
+   * Switches the active looping alarm track through the SoundService.
    *
    * Track ids map to: 1000=stop/silent, 1001=alert, 1002=warn, 1003=alarm, 1004=emergency.
-   * This stops the previously active audio player (but keeps it cached for reuse).
+   * Re-selecting the active track is a no-op, so an unchanged alarm never restarts its tone.
    */
   playAlarm(trackId: number) {
     if (this._activeAlarmSoundtrack === trackId) return;
+    this._activeAlarmSoundtrack = trackId;
 
-    // Stop previous track (do not unload to allow reuse)
-    if (this._activeAlarmSoundtrack != null) {
-      const prev = this._players.get(this._activeAlarmSoundtrack);
-      if (prev) {
-        prev.pause();
-        prev.currentTime = 0;
-      }
-    }
-
-    if (trackId === 1000) {
-      this._activeAlarmSoundtrack = 1000;
+    // trackId 1000 (silent) has no asset, so the guard stops the loop for it and any unmapped id.
+    const name = alarmTrack[trackId];
+    if (!name) {
+      this.sound.stopLoop();
       return;
     }
+    this.sound.playLoop(name, 1);
+  }
 
-    const player = this.getPlayer(trackId);
-    this._activeAlarmSoundtrack = trackId;
-    player.muted = this._isMuted;
-    player.currentTime = 0;
-    player.play().catch(err => {
-      // Autoplay blocked by browser policy - requires user interaction first
-      console.debug('Alarm audio playback blocked:', err.message);
-      if (!this.audioBlockedNotificationShown) {
-        this.audioBlockedNotificationShown = true;
-        // Show persistent toast requiring user interaction to dismiss
-        const blockRef = this.toastService.show(
-          'Alarm sounds blocked by browser. Closing this message will enable audio.',
-          0, // No timeout - requires user to close
-          true, // Silent to avoid recursion
-          'warn'
-        );
-        // Reset flag when user dismisses, allowing audio to work after interaction
-        blockRef.afterDismissed().subscribe(() => {
-          this.audioBlockedNotificationShown = false;
-        });
-      }
+  private showAudioBlockedPrompt(): void {
+    if (this.audioBlockedNotificationShown) return;
+    this.audioBlockedNotificationShown = true;
+    this._audioBlockedRef = this.toastService.show(
+      'Sounds blocked by the browser. Tap anywhere to enable audio.',
+      0, true, 'warn'
+    );
+    this._audioBlockedRef.afterDismissed().subscribe(() => {
+      this.audioBlockedNotificationShown = false;
+      this._audioBlockedRef = null;
     });
+  }
+
+  private dismissAudioBlockedPrompt(): void {
+    this._audioBlockedRef?.dismiss();
   }
 
   /**
@@ -488,16 +457,7 @@ export class NotificationsService implements OnDestroy {
     this._notifications$.complete();
     this._alarmsInfo$.complete();
 
-    // Stop and release all cached audio players
-    for (const p of this._players.values()) {
-      try {
-        p.pause();
-        p.currentTime = 0;
-        p.src = '';
-      } catch {
-        // ignore audio cleanup errors
-      }
-    }
-    this._players.clear();
+    // Stop this service's alarm track only; the shared SoundService context is not ours to close.
+    this.sound.stopLoop();
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, computed, signal, inject } from '@angular/core';
 import { MatSnackBar, MatSnackBarRef } from '@angular/material/snack-bar';
 import { SettingsService } from './settings.service';
+import { SoundService } from './sound.service';
 import { ToastSnackbarComponent, type ToastSeverity, type ToastSnackbarData } from '../components/toast-snackbar/toast-snackbar.component';
 
 export interface SnackItem {
@@ -15,9 +16,8 @@ export interface SnackItem {
 export class ToastService {
   private readonly snackBar = inject(MatSnackBar);
   private readonly app = inject(SettingsService);
+  private readonly sound = inject(SoundService);
   private readonly soundDisabled = computed(() => this.app.notificationConfig().sound.disableSound);
-  private toastAudio: HTMLAudioElement | null = null;
-  private audioBlockedNotificationShown = false;
 
   // last snack for diagnostics/other UI (not a queue)
   public readonly lastSnack = signal<SnackItem | null>(null);
@@ -57,33 +57,8 @@ export class ToastService {
 
     this.lastSnack.set(snack);
     if (silent || this.soundDisabled()) return ref;
-    if (!this.toastAudio) {
-      this.toastAudio = new Audio('assets/notification.mp3');
-      this.toastAudio.preload = 'auto';
-      this.toastAudio.volume = 0.3;
-    }
-    // restart sound for rapid successive notifications
-    this.toastAudio.currentTime = 0;
-    this.toastAudio.play().catch(err => {
-      // Autoplay blocked by browser policy - requires user interaction first
-      console.debug('Toast audio playback blocked:', err.message);
-      if (!this.audioBlockedNotificationShown) {
-        this.audioBlockedNotificationShown = true;
-        // Show persistent toast requiring user interaction to dismiss
-        const blockRef = this.snackBar.openFromComponent(ToastSnackbarComponent, {
-          duration: 0, // No timeout - requires user to close
-          verticalPosition: 'top',
-          data: {
-            message: 'Sound notifications blocked by browser. Closing this message will enable audio.',
-            severity: 'warn'
-          } as ToastSnackbarData
-        });
-        // Reset flag when user dismisses, allowing audio to work after interaction
-        blockRef.afterDismissed().subscribe(() => {
-          this.audioBlockedNotificationShown = false;
-        });
-      }
-    });
+    // If the browser blocks playback, SoundService raises `blocked`; the prompt is surfaced by NotificationsService.
+    this.sound.playOnce('notification', 0.3);
     return ref;
   }
 }

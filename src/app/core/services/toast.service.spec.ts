@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { MatSnackBar, MatSnackBarRef } from '@angular/material/snack-bar';
 
 import { ToastService } from './toast.service';
 import { SettingsService } from './settings.service';
+import { SoundService } from './sound.service';
 import { ToastSnackbarComponent } from '../components/toast-snackbar/toast-snackbar.component';
 
 class MatSnackBarMock {
@@ -14,20 +15,21 @@ class MatSnackBarMock {
     } as unknown as MatSnackBarRef<ToastSnackbarComponent>));
 }
 
-class SettingsServiceMock {
-    public readonly notificationConfig = signal({ sound: { disableSound: true } });
-}
-
 describe('ToastService', () => {
     let service: ToastService;
     let snackBar: MatSnackBarMock;
+    let sound: { playOnce: ReturnType<typeof vi.fn> };
+    let config: WritableSignal<{ sound: { disableSound: boolean } }>;
 
     beforeEach(() => {
+        config = signal({ sound: { disableSound: false } });
+        sound = { playOnce: vi.fn() };
         TestBed.configureTestingModule({
             providers: [
                 ToastService,
                 { provide: MatSnackBar, useClass: MatSnackBarMock },
-                { provide: SettingsService, useClass: SettingsServiceMock }
+                { provide: SettingsService, useValue: { notificationConfig: config } },
+                { provide: SoundService, useValue: sound }
             ]
         });
         service = TestBed.inject(ToastService);
@@ -56,5 +58,21 @@ describe('ToastService', () => {
         expect(lastSnack).toBeTruthy();
         expect(lastSnack?.action).toBe('Enable Plugin');
         expect(lastSnack?.severity).toBe('warn');
+    });
+
+    it('plays the notification sound once when not silent and sound is enabled', () => {
+        service.show('Anchor dragging', 5000, false, 'warn');
+        expect(sound.playOnce).toHaveBeenCalledWith('notification', 0.3);
+    });
+
+    it('does not play sound when silent', () => {
+        service.show('Saved', 1000, true);
+        expect(sound.playOnce).not.toHaveBeenCalled();
+    });
+
+    it('does not play sound when sound is disabled', () => {
+        config.set({ sound: { disableSound: true } });
+        service.show('Anchor dragging', 5000, false, 'warn');
+        expect(sound.playOnce).not.toHaveBeenCalled();
     });
 });
