@@ -51,7 +51,10 @@ export class WidgetConfigPanelComponent implements OnInit, OnDestroy {
     const widgetName = this.widgetService.getWidgetName(type);
     if (widgetName === undefined) return;
 
-    const saved = await this.connectAndLoad();
+    // Load the widget component so its static DEFAULT_CONFIG is cached: this iframe never renders the
+    // widget, so getDefaultConfig would otherwise be empty and the options form would have no fields.
+    // Runs alongside the host connect.
+    const [saved] = await Promise.all([this.connectAndLoad(), this.widgetService.getComponentType(type)]);
     if (this.disposed) return;
 
     const current = saved ?? this.widgetService.getDefaultConfig(type) ?? {} as IWidgetSvcConfig;
