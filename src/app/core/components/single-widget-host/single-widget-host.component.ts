@@ -13,9 +13,11 @@ import { UUID } from '../../utils/uuid.util';
  * the iframe into a chart anchor cell, and this host fills it with one widget wired to the app's own
  * live Signal K session. The widget type is the component selector (e.g. `widget-wind-steer`).
  *
- * Read-only by construction: under embed the dashboard is force-locked, so Host2's edit/options/
- * history affordances are inert. There is no per-instance configuration in this version — the widget
- * shows its default paths.
+ * Read-only: the route is embed-only (`embedRequiredGuard`), and under embed the dashboard is
+ * force-locked, so Host2's edit and options affordances never activate. (Host2's history long-press
+ * gesture is enabled while locked, but Wind Steer is not history-eligible, so it is a no-op — a
+ * future history-eligible widget hosted here would need that gesture suppressed.) There is no
+ * per-instance configuration in this version — the widget shows its default paths.
  */
 @Component({
   selector: 'app-single-widget-host',
@@ -35,12 +37,10 @@ export class SingleWidgetHostComponent {
     { initialValue: this.route.snapshot.paramMap.get('type') ?? '' }
   );
 
-  /** True when the requested type is a registered Skip widget. */
-  protected readonly known = computed(() => this.widgetService.getWidgetName(this.type()) !== undefined);
-
   /**
-   * The IWidget to host, or null for an unrecognized type. Recomputes only when the type changes, so
-   * Host2's plain `@Input` reference stays stable across change detection (its OnPush relies on that).
+   * The IWidget to host, or null for an unrecognized type (which renders the fallback tile).
+   * Recomputes only when the type changes, so Host2's plain `@Input` reference stays stable across
+   * change detection (its OnPush relies on that).
    */
   protected readonly widget = computed<IWidget | null>(() => {
     const type = this.type();
