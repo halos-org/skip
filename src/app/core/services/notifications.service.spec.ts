@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
+import { signal, Signal, WritableSignal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INotification, INotificationInfo, NotificationsService } from './notifications.service';
@@ -7,6 +7,7 @@ import { DataService } from './data.service';
 import { SettingsService } from './settings.service';
 import { SignalkRequestsService } from './signalk-requests.service';
 import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
+import { SoundService } from './sound.service';
 import { INotificationConfig } from '../interfaces/app-settings.interfaces';
 import { ISignalKDataValueUpdate, ISignalKNotification, ISkMetadata, Methods, States, TMethod, TState } from '../interfaces/signalk-interfaces';
 import { IMeta } from '../interfaces/app-interfaces';
@@ -54,6 +55,12 @@ describe('NotificationsService', () => {
   let connectionState$: Subject<ConnectionState>;
   let putRequest: ReturnType<typeof vi.fn>;
   let service: NotificationsService;
+  let sound: {
+    playLoop: ReturnType<typeof vi.fn>;
+    stopLoop: ReturnType<typeof vi.fn>;
+    playOnce: ReturnType<typeof vi.fn>;
+    blocked: Signal<boolean>;
+  };
 
   function setup(initialConfig: INotificationConfig = makeConfig()): void {
     configSignal = signal<INotificationConfig>(initialConfig);
@@ -73,6 +80,7 @@ describe('NotificationsService', () => {
     const requestsStub: Partial<SignalkRequestsService> = {
       putRequest: putRequest as SignalkRequestsService['putRequest'],
     };
+    sound = { playLoop: vi.fn(), stopLoop: vi.fn(), playOnce: vi.fn(), blocked: signal(false) };
 
     TestBed.configureTestingModule({
       providers: [
@@ -80,6 +88,7 @@ describe('NotificationsService', () => {
         { provide: DataService, useValue: dataStub },
         { provide: SignalkRequestsService, useValue: requestsStub },
         { provide: ConnectionStateMachine, useValue: { state$: connectionState$.asObservable() } },
+        { provide: SoundService, useValue: sound as unknown as SoundService },
       ],
     });
     service = TestBed.inject(NotificationsService);
@@ -99,10 +108,6 @@ describe('NotificationsService', () => {
 
   function activeTrack(): number | null {
     return (service as unknown as { _activeAlarmSoundtrack: number | null })._activeAlarmSoundtrack;
-  }
-
-  function alarmPlayer(track: number): HTMLAudioElement {
-    return (service as unknown as { _players: Map<number, HTMLAudioElement> })._players.get(track)!;
   }
 
   describe('alarm state aggregation from deltas', () => {
@@ -401,9 +406,8 @@ describe('NotificationsService', () => {
       expect(latestNotifications()).toHaveLength(1);
       expect(activeTrack()).toBe(1003);
 
-      const player = alarmPlayer(1003);
-      const playSpy = vi.spyOn(player, 'play');
-      const pauseSpy = vi.spyOn(player, 'pause');
+      sound.playLoop.mockClear();
+      sound.stopLoop.mockClear();
 
       vi.useFakeTimers();
       // A drop must not clear; the reconnect that follows must not blank or silence the alarm.
@@ -414,15 +418,15 @@ describe('NotificationsService', () => {
       expect(activeTrack()).toBe(1003);
 
       // The snapshot re-delivers the same still-active alarm: recognised as the existing entry, not
-      // cleared-and-re-added, so the looping player is never paused/restarted.
+      // cleared-and-re-added, so the looping track is never stopped/restarted.
       notificationMsg$.next(makeDelta('notifications.bilge', makeValue(States.Alarm, [Methods.Visual, Methods.Sound])));
       vi.runOnlyPendingTimers();
 
       expect(latestNotifications()).toHaveLength(1);
       expect(latestInfo().alarmCount).toBe(1);
       expect(activeTrack()).toBe(1003);
-      expect(playSpy).not.toHaveBeenCalled();
-      expect(pauseSpy).not.toHaveBeenCalled();
+      expect(sound.playLoop).not.toHaveBeenCalled();
+      expect(sound.stopLoop).not.toHaveBeenCalled();
     });
 
     it('sweeps a notification the server no longer reports once the snapshot settles', () => {
@@ -494,7 +498,7 @@ describe('NotificationsService', () => {
       expect(latestNotifications()).toHaveLength(1);
       expect(activeTrack()).toBe(1003);
 
-      const pauseSpy = vi.spyOn(alarmPlayer(1003), 'pause');
+      sound.stopLoop.mockClear();
 
       vi.useFakeTimers();
       connectionState$.next(ConnectionState.Disconnected);
@@ -508,7 +512,7 @@ describe('NotificationsService', () => {
       expect(latestNotifications().map(n => n.path)).toContain('notifications.bilge');
       expect(latestInfo().alarmCount).toBe(1);
       expect(activeTrack()).toBe(1003);
-      expect(pauseSpy).not.toHaveBeenCalled();
+      expect(sound.stopLoop).not.toHaveBeenCalled();
     });
 
     it('does not reconcile or clear notifications while the connection stays up', () => {
