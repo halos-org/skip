@@ -2,13 +2,13 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ActivatedRoute, Route, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { SingleWidgetHostComponent } from './single-widget-host.component';
+import { SingleWidgetHostComponent, applySavedConfig } from './single-widget-host.component';
 import { WidgetService } from '../../services/widget.service';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
 import { WidgetHostBridge } from './widget-host-bridge';
 import { embedRequiredGuard } from '../../guards/embed-required-route.guard';
 import { routes } from '../../../app.routes';
-import type { IWidget } from '../../interfaces/widgets-interface';
+import type { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 
 // The widget type the plotter-extension manifest (plugin/index.js WIND_STEER_TYPE) and the
 // `#/widget/:type` route target. Kept here as the app-side end of that cross-file string contract.
@@ -43,9 +43,12 @@ describe('SingleWidgetHostComponent', () => {
       imports: [SingleWidgetHostComponent],
       providers: [
         { provide: ActivatedRoute, useValue: makeRoute(type) },
-        { provide: WidgetService, useValue: { getWidgetName: (sel: string) => (KNOWN.has(sel) ? 'Wind Steer' : undefined) } },
-        { provide: WidgetHostBridge, useValue: bridge }
+        { provide: WidgetService, useValue: { getWidgetName: (sel: string) => (KNOWN.has(sel) ? 'Wind Steer' : undefined) } }
       ]
+    });
+    // The bridge is component-scoped (providers on the component), so override there, not at module level.
+    TestBed.overrideComponent(SingleWidgetHostComponent, {
+      set: { providers: [{ provide: WidgetHostBridge, useValue: bridge }] }
     });
   }
 
@@ -117,5 +120,28 @@ describe('SingleWidgetHostComponent', () => {
     expect(route, 'route "widget/:type" is missing — the manifest widget URL would fall through to page/0').toBeDefined();
     expect(route?.loadComponent).toBeTypeOf('function');
     expect(route?.canActivate).toContain(embedRequiredGuard);
+  });
+
+  it('exposes the embed-only widget-config route (the manifest configPanel URL target)', () => {
+    const route = routes.find((r: Route) => r.path === 'widget-config/:type');
+    expect(route, 'route "widget-config/:type" is missing — the manifest config URL would fall through to page/0').toBeDefined();
+    expect(route?.loadComponent).toBeTypeOf('function');
+    expect(route?.canActivate).toContain(embedRequiredGuard);
+  });
+});
+
+describe('applySavedConfig', () => {
+  it('reconfigures the host when both a config and a host are present', () => {
+    const host = { reconfigure: vi.fn() };
+    const cfg = { updateInterval: 2000 } as IWidgetSvcConfig;
+    applySavedConfig(cfg, host);
+    expect(host.reconfigure).toHaveBeenCalledWith(cfg);
+  });
+
+  it('does nothing when the config or the host is absent', () => {
+    const host = { reconfigure: vi.fn() };
+    applySavedConfig(null, host);
+    applySavedConfig({} as IWidgetSvcConfig, undefined);
+    expect(host.reconfigure).not.toHaveBeenCalled();
   });
 });

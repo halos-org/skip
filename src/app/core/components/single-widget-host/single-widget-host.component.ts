@@ -8,6 +8,11 @@ import { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 import { UUID } from '../../utils/uuid.util';
 import { WidgetHostBridge } from './widget-host-bridge';
 
+/** Apply a saved per-instance config to the mounted host, once both are available. */
+export function applySavedConfig(cfg: IWidgetSvcConfig | null, host: Pick<WidgetHost2Component, 'reconfigure'> | undefined): void {
+  if (cfg && host) host.reconfigure(cfg);
+}
+
 /**
  * Renders a single Skip widget full-bleed, outside any dashboard. This is the target of the
  * plotter-extension widget iframes (`#/widget/<type>` under `?embed=1`): a Freeboard-SK host sizes
@@ -28,6 +33,7 @@ import { WidgetHostBridge } from './widget-host-bridge';
   imports: [WidgetHost2Component],
   templateUrl: './single-widget-host.component.html',
   styleUrl: './single-widget-host.component.scss',
+  providers: [WidgetHostBridge],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SingleWidgetHostComponent implements OnInit, OnDestroy {
@@ -57,11 +63,7 @@ export class SingleWidgetHostComponent implements OnInit, OnDestroy {
   constructor() {
     // Apply the user's saved per-instance config (and later edits) to the mounted tile once both the
     // config and the host are available. Host2 renders its defaults first, then adopts the overlay.
-    effect(() => {
-      const cfg = this.bridge.config();
-      const host = this.host();
-      if (cfg && host) host.reconfigure(cfg);
-    });
+    effect(() => applySavedConfig(this.bridge.config(), this.host()));
   }
 
   ngOnInit(): void {

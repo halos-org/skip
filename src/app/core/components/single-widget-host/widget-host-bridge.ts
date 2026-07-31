@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy, Signal, signal } from '@angular/core';
+import { Injectable, Signal, signal } from '@angular/core';
 import type { ExtensionClient } from 'signalk-plotterext-bus/extension';
 import type { IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 
@@ -8,6 +8,15 @@ const MOVE_SLOP_PX = 10;
 // Per-instance state key holding the user's saved widget config overlay. Shared with the config
 // panel (WidgetConfigPanelComponent), which writes the same key.
 export const WIDGET_CONFIG_STATE_KEY = 'config';
+
+/**
+ * The wire contract for a config value read from host state: an object is treated as a config
+ * overlay, anything else (missing, null, or a non-object) as "no saved config". Single-sourced here
+ * so the widget (which applies it) and the config panel (which seeds its form from it) agree.
+ */
+export function parseStoredConfig(value: unknown): IWidgetSvcConfig | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as IWidgetSvcConfig) : null;
+}
 
 /**
  * Detect a press-and-hold anywhere in the widget iframe and invoke `onLongPress`. Listeners are
@@ -62,9 +71,12 @@ export function installLongPress(onLongPress: () => void): () => void {
  *
  * This is the only use of the bus — the widget's data still comes from Skip's own same-origin Signal K
  * session. Opened outside a host (a direct URL) the handshake times out and this is inert.
+ *
+ * Scoped to the single-widget host component (not root): its state is the lifetime of one hosted
+ * widget instance, and a fresh instance per mount avoids stale config leaking across a remount.
  */
-@Injectable({ providedIn: 'root' })
-export class WidgetHostBridge implements OnDestroy {
+@Injectable()
+export class WidgetHostBridge {
   private client: ExtensionClient | null = null;
   private removeListeners: (() => void) | null = null;
   private unsubscribeState: (() => Promise<void>) | null = null;
@@ -92,10 +104,6 @@ export class WidgetHostBridge implements OnDestroy {
     this.client = null;
   }
 
-  ngOnDestroy(): void {
-    this.disable();
-  }
-
   private async connect(): Promise<void> {
     try {
       const { connectExtension } = await import('signalk-plotterext-bus/extension');
@@ -114,8 +122,7 @@ export class WidgetHostBridge implements OnDestroy {
     if (!this.client) return;
     try {
       const values = await this.client.state.get([WIDGET_CONFIG_STATE_KEY]);
-      const cfg = values[WIDGET_CONFIG_STATE_KEY];
-      this._config.set(cfg && typeof cfg === 'object' ? (cfg as IWidgetSvcConfig) : null);
+      this._config.set(parseStoredConfig(values[WIDGET_CONFIG_STATE_KEY]));
     } catch {
       // Host has no state capability, or the read failed: keep whatever config we last applied.
     }

@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
+import { cloneDeep, merge } from 'lodash-es';
 import type { ExtensionClient } from 'signalk-plotterext-bus/extension';
 import { DialogService } from '../../services/dialog.service';
 import { WidgetService } from '../../services/widget.service';
 import { IWidgetSvcConfig } from '../../interfaces/widgets-interface';
-import { WIDGET_CONFIG_STATE_KEY } from '../single-widget-host/widget-host-bridge';
+import { WIDGET_CONFIG_STATE_KEY, parseStoredConfig } from '../single-widget-host/widget-host-bridge';
 
 /**
  * Build the widget-options dialog's close handler: Save (a result config) persists it to host state;
@@ -57,7 +58,10 @@ export class WidgetConfigPanelComponent implements OnInit, OnDestroy {
     const [saved] = await Promise.all([this.connectAndLoad(), this.widgetService.getComponentType(type)]);
     if (this.disposed) return;
 
-    const current = saved ?? this.widgetService.getDefaultConfig(type) ?? {} as IWidgetSvcConfig;
+    // Seed the form with the saved config merged onto the CURRENT default (like the tile applies it),
+    // so fields added by a later Skip version are present and editable, not dropped.
+    const defaults = this.widgetService.getDefaultConfig(type) ?? {} as IWidgetSvcConfig;
+    const current = saved ? merge(cloneDeep(defaults), saved) : defaults;
     const ref = this.dialog.openWidgetOptions({
       title: 'Widget Settings',
       config: { ...current, widgetName },
@@ -65,7 +69,7 @@ export class WidgetConfigPanelComponent implements OnInit, OnDestroy {
       cancelBtnText: 'Cancel'
     });
     const onClosed = makeConfigResultHandler(
-      (cfg) => { void this.client?.state.set({ [WIDGET_CONFIG_STATE_KEY]: cfg }); },
+      (cfg) => { void this.client?.state.set({ [WIDGET_CONFIG_STATE_KEY]: cfg }).catch(() => { /* host lacks state / write failed: config not persisted */ }); },
       () => { void this.client?.call('ui.closePanel').catch(() => { /* no host */ }); }
     );
     ref.afterClosed()
@@ -87,8 +91,7 @@ export class WidgetConfigPanelComponent implements OnInit, OnDestroy {
       if (this.disposed) { client.close(); return null; }
       this.client = client;
       const values = await client.state.get([WIDGET_CONFIG_STATE_KEY]);
-      const cfg = values[WIDGET_CONFIG_STATE_KEY];
-      return cfg && typeof cfg === 'object' ? (cfg as IWidgetSvcConfig) : null;
+      return parseStoredConfig(values[WIDGET_CONFIG_STATE_KEY]);
     } catch {
       // No host (direct-URL open) or handshake timeout: fall back to defaults; Save is inert.
       return null;
