@@ -38,7 +38,10 @@ module.exports = function (app) {
       // support would drop the whole extension on hosts that lack it. Widget-capable hosts render the
       // additive widgets[] section below; others silently omit it and keep the panel.
       requires: ['panels.iframe', 'buttons'],
-      optional: [],
+      // 'widgets' is declared optional (not required): it announces the widget contribution to hosts
+      // that gate rendering on the declared capability, while keeping the extension — and its panel —
+      // available on hosts without widget support.
+      optional: ['widgets'],
       widgets: [
         {
           id: 'wind-steer-1x1',

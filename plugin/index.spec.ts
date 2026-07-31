@@ -136,7 +136,9 @@ describe('Skip Freeboard panel plugin', () => {
     // requiring widget support would drop the whole extension (panel included) on hosts that lack it.
     // Widget-capable hosts render the additive widgets[] section; others silently omit it.
     expect(manifest.requires).toEqual(['panels.iframe', 'buttons']);
-    expect(manifest.optional).toEqual([]);
+    // 'widgets' is optional, not required: it announces the widget contribution without gating the
+    // whole extension (panel included) on hosts that lack widget support.
+    expect(manifest.optional).toEqual(['widgets']);
     expect(manifest.apiVersion).toBe('1');
   });
 
