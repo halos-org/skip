@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ActivatedRoute, Route, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { SingleWidgetHostComponent } from './single-widget-host.component';
 import { WidgetService } from '../../services/widget.service';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
+import { WidgetRemovalBridge } from './widget-removal-bridge';
 import { embedRequiredGuard } from '../../guards/embed-required-route.guard';
 import { routes } from '../../../app.routes';
 import type { IWidget } from '../../interfaces/widgets-interface';
@@ -32,13 +33,17 @@ describe('SingleWidgetHostComponent', () => {
   // Only these selectors are "registered" for the class-logic tests; getWidgetName mirrors
   // WidgetService's undefined-for-unknown contract, which the component uses as its existence check.
   const KNOWN = new Set([MANIFEST_WIDGET_TYPE]);
+  const bridge = { enable: vi.fn(), disable: vi.fn() };
 
   function configure(type: string) {
+    bridge.enable.mockClear();
+    bridge.disable.mockClear();
     TestBed.configureTestingModule({
       imports: [SingleWidgetHostComponent],
       providers: [
         { provide: ActivatedRoute, useValue: makeRoute(type) },
-        { provide: WidgetService, useValue: { getWidgetName: (sel: string) => (KNOWN.has(sel) ? 'Wind Steer' : undefined) } }
+        { provide: WidgetService, useValue: { getWidgetName: (sel: string) => (KNOWN.has(sel) ? 'Wind Steer' : undefined) } },
+        { provide: WidgetRemovalBridge, useValue: bridge }
       ]
     });
   }
@@ -76,6 +81,24 @@ describe('SingleWidgetHostComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Unknown widget');
     expect(text).toContain('widget-does-not-exist');
+  });
+
+  // Drive the lifecycle directly rather than detectChanges, so the heavy Host2 graph is never
+  // rendered (the rest of the suite relies on the same no-render boundary).
+  it('enables the host removal bridge for a hosted widget and disables it on destroy', () => {
+    configure(MANIFEST_WIDGET_TYPE);
+    const c = TestBed.createComponent(SingleWidgetHostComponent).componentInstance;
+    c.ngOnInit();
+    expect(bridge.enable).toHaveBeenCalledTimes(1);
+    c.ngOnDestroy();
+    expect(bridge.disable).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not enable the removal bridge for the unknown-widget fallback', () => {
+    configure('widget-does-not-exist');
+    const c = TestBed.createComponent(SingleWidgetHostComponent).componentInstance;
+    c.ngOnInit();
+    expect(bridge.enable).not.toHaveBeenCalled();
   });
 
   // Binds the two ends of the cross-file string contract so a rename fails CI instead of shipping an

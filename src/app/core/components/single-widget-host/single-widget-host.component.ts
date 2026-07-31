@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { map } from 'rxjs/operators';
@@ -6,6 +6,7 @@ import { WidgetHost2Component } from '../widget-host2/widget-host2.component';
 import { WidgetService } from '../../services/widget.service';
 import { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 import { UUID } from '../../utils/uuid.util';
+import { WidgetRemovalBridge } from './widget-removal-bridge';
 
 /**
  * Renders a single Skip widget full-bleed, outside any dashboard. This is the target of the
@@ -18,6 +19,9 @@ import { UUID } from '../../utils/uuid.util';
  * gesture is enabled while locked, but Wind Steer is not history-eligible, so it is a no-op — a
  * future history-eligible widget hosted here would need that gesture suppressed.) There is no
  * per-instance configuration in this version — the widget shows its default paths.
+ *
+ * The widget is removable: `WidgetRemovalBridge` relays a long-press to the host so Freeboard-SK can
+ * open its remove dialog (the host offers no other remove path for a placed widget).
  */
 @Component({
   selector: 'app-single-widget-host',
@@ -26,9 +30,10 @@ import { UUID } from '../../utils/uuid.util';
   styleUrl: './single-widget-host.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class SingleWidgetHostComponent {
+export class SingleWidgetHostComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly widgetService = inject(WidgetService);
+  private readonly removalBridge = inject(WidgetRemovalBridge);
 
   // The widget type (component selector) from the route. A param signal keeps it correct even if the
   // component is ever reused across navigations; in practice each iframe loads one fixed URL.
@@ -47,4 +52,13 @@ export class SingleWidgetHostComponent {
     if (this.widgetService.getWidgetName(type) === undefined) return null;
     return { uuid: UUID.create(), type, config: {} as IWidgetSvcConfig };
   });
+
+  ngOnInit(): void {
+    // Only a really-hosted widget needs the remove affordance; the unknown-type fallback does not.
+    if (this.widget()) this.removalBridge.enable();
+  }
+
+  ngOnDestroy(): void {
+    this.removalBridge.disable();
+  }
 }

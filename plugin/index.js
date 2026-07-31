@@ -19,8 +19,9 @@ const SKIP_PANEL_URL = `${SKIP_URL}?embed=1`;
 
 // A widget iframe boots the same chromeless Skip on its single-widget route (`#/widget/<type>`),
 // rendering one control full-bleed against the user's own live session. The embed flag is pre-hash
-// (survives in-app navigation); the widget type is the hash route param. Read-only, bus-silent —
-// no per-instance config in this version.
+// (survives in-app navigation); the widget type is the hash route param. Read-only; data comes from
+// Skip's own session, and the plotter-extension bus is used only to relay the long-press that opens
+// the host's remove dialog. No per-instance config in this version.
 const skipWidgetUrl = (widgetType) => `${SKIP_URL}?embed=1#/widget/${widgetType}`;
 // Skip's widget type id is the component selector used in dashboard configs and the widget route.
 const WIND_STEER_TYPE = 'widget-wind-steer';

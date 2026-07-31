@@ -138,6 +138,7 @@
     "@signalk/server-api": "^2.22.0",
     "hls.js": "^1.6.16",
     "piexifjs": "^1.0.6",
+    "signalk-plotterext-bus": "^0.11.0",
     "sk-ais-status-plugin": "^1.0.0"
   }
 }
