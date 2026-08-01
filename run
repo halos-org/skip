@@ -94,17 +94,33 @@ if [ -n "$(ls -A "$sysdir" 2>/dev/null)" ]; then
 fi
 PREP
 
-  # Ship only the package's runtime payload: the webapp (public/), the bundled
-  # plugin referenced by "main" (plugin/), and its manifest (package.json).
+  # Ship the package's runtime payload: the webapp (public/) and its manifest
+  # (package.json). This is a webapp-only package -- the Freeboard-SK plugin lives
+  # in the separate @halos-org/skip-freeboard-panel package with its own deploy.
   echo "==> Syncing build to ${target}..."
   rsync -rlpt --delete public/ "${dest}${sysdir}/public/"
-  rsync -rlpt --delete plugin/ "${dest}${sysdir}/plugin/"
   rsync -lpt package.json "${dest}${sysdir}/package.json"
 
-  echo "==> Linking, registering the dependency, and restarting Signal K..."
+  echo "==> Linking, registering the dependency, and (re)starting Signal K if needed..."
   "${runner[@]}" "$pkg" "$slug" "$data" <<'REMOTE'
 set -o errexit -o nounset -o pipefail
 pkg="$1"; slug="$2"; data="$3"
+
+# Traefik base URL + device CA (HTTPS, port 4430). Never the container's :3000 --
+# host networking only exposes that incidentally; all access goes via Traefik.
+ca=/usr/local/share/ca-certificates/halos-ca.crt
+domain=$(hostname -d 2>/dev/null || true)
+[ -z "$domain" ] && domain=$(awk '/^search/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
+base="https://$(hostname)${domain:+.$domain}:4430"
+
+# Is the webapp already mounted? Signal K registers a webapp mount only at server
+# start (node_modules keyword scan). For an already-served package a content-only
+# update needs no restart -- express.static serves the new public/ from disk per
+# request. Only a first install (not yet mounted) needs a restart to register it.
+was_mounted=no
+if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "\"$pkg\""; then
+  was_mounted=yes
+fi
 
 # Link into node_modules exactly as npm does for a file: dependency (scope-aware).
 # Remove any existing entry first: when the package is already present as a real
@@ -139,20 +155,23 @@ else:
     print(" ", pkg, "already registered")
 PY
 
-sudo docker restart signalk-server
+# Remove a stale bundled plugin/ tree from a prior (pre-webapp-only) deploy.
+rm -rf "${data}/system-plugins/${slug}/plugin"
 
-# Verify through Traefik (HTTPS, device CA). Never the container's :3000 port --
-# host networking only exposes that incidentally; all access goes via Traefik.
-ca=/usr/local/share/ca-certificates/halos-ca.crt
-domain=$(hostname -d 2>/dev/null || true)
-[ -z "$domain" ] && domain=$(awk '/^search/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
-base="https://$(hostname)${domain:+.$domain}:4430"
-echo "  waiting for Signal K at ${base} ..."
-for _ in $(seq 1 25); do
-  if curl -sf --max-time 10 --cacert "$ca" "${base}/skServer/webapps" >/dev/null 2>&1; then break; fi
-  sleep 3
-done
-if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "$pkg"; then
+if [ "$was_mounted" = yes ]; then
+  echo "  ${pkg} already mounted; skipping restart (express.static serves the new build on next request)"
+else
+  echo "  ${pkg} not yet mounted; restarting Signal K to register the webapp mount..."
+  sudo docker restart signalk-server
+  echo "  waiting for Signal K at ${base} ..."
+  for _ in $(seq 1 25); do
+    if curl -sf --max-time 10 --cacert "$ca" "${base}/skServer/webapps" >/dev/null 2>&1; then break; fi
+    sleep 3
+  done
+fi
+
+# Verify through Traefik.
+if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "\"$pkg\""; then
   echo "  OK: ${pkg} is served by Signal K (listed in /skServer/webapps)"
 else
   echo "  WARN: ${pkg} not listed at ${base}/skServer/webapps"
@@ -163,6 +182,9 @@ REMOTE
 
   echo ""
   echo "Deployed ${pkg} to ${target}; see the Traefik verify result above."
+  echo "Note: this ships the webapp only. The Freeboard-SK panel is the separate"
+  echo "@halos-org/skip-freeboard-panel package -- deploy it too if this device needs"
+  echo "the Freeboard toolbar button."
 }
 
 ################################################################################

@@ -25,11 +25,13 @@ runs:
     - name: Verify npm package contents
       shell: bash
       # Assert the publish tarball (package.json `files`) contains the built
-      # webapp and the plugin entry `main` points at — catches a broken files
-      # glob, missing build output, or a dangling main before a real publish.
+      # webapp and stays webapp-only — catches a broken files glob, missing build
+      # output, or a re-bundled server plugin (plugin/) before a real publish.
+      # The Freeboard-SK plugin lives in @halos-org/skip-freeboard-panel now.
       run: |
         files=$(npm pack --dry-run --json \
           | node -e 'const p=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(p[0].files.map(x=>x.path).join("\n"))')
-        echo "$files" | grep -qx 'plugin/index.js' || { echo "::error::npm package missing plugin/index.js (main entry)"; exit 1; }
         echo "$files" | grep -q '^public/' || { echo "::error::npm package missing public/ (webapp build output)"; exit 1; }
-        echo "npm package contents verified"
+        if echo "$files" | grep -q '^plugin/'; then echo "::error::npm package must stay webapp-only but ships plugin/ (re-bundled server plugin?)"; exit 1; fi
+        node -e 'const p=require("./package.json"); if(p.main){console.error("::error::package.json has a main entry — @halos-org/skip must stay webapp-only");process.exit(1)} if((p.keywords||[]).includes("signalk-node-server-plugin")){console.error("::error::package.json has the signalk-node-server-plugin keyword — must stay webapp-only");process.exit(1)}'
+        echo "npm package contents verified (webapp-only)"
