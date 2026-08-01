@@ -17,6 +17,17 @@ const SKIP_URL = '/@halos-org/skip/';
 // user's own default profile.
 const SKIP_PANEL_URL = `${SKIP_URL}?embed=1`;
 
+// A widget iframe boots the same chromeless Skip on its single-widget route (`#/widget/<type>`),
+// rendering one control full-bleed against the user's own live session. The embed flag is pre-hash
+// (survives in-app navigation); the widget type is the hash route param. Data comes from Skip's own
+// session; the plotter-extension bus carries only the long-press that opens the host's remove/settings
+// dialog and the per-instance config. The settings iframe is served on the widget-config route.
+const skipWidgetUrl = (widgetType) => `${SKIP_URL}?embed=1#/widget/${widgetType}`;
+const skipWidgetConfigUrl = (widgetType) => `${SKIP_URL}?embed=1#/widget-config/${widgetType}`;
+// Skip's widget type id is the component selector used in dashboard configs and the widget route.
+const WIND_STEER_TYPE = 'widget-wind-steer';
+const WIND_STEER_CONFIG_PANEL = 'wind-steer-config';
+
 module.exports = function (app) {
   let running = false;
 
@@ -26,8 +37,35 @@ module.exports = function (app) {
       description: 'Opens the Skip instrument panel inside Freeboard-SK.',
       version,
       apiVersion: '1',
+      // 'widgets' is intentionally absent: the panel is the primary contribution, so requiring widget
+      // support would drop the whole extension on hosts that lack it. Widget-capable hosts render the
+      // additive widgets[] section below; others silently omit it and keep the panel.
       requires: ['panels.iframe', 'buttons'],
-      optional: [],
+      // 'widgets' is declared optional (not required): it announces the widget contribution to hosts
+      // that gate rendering on the declared capability, while keeping the extension — and its panel —
+      // available on hosts without widget support. 'state' is optional too: without it the widget
+      // still works, it just cannot persist per-instance settings.
+      optional: ['widgets', 'state'],
+      widgets: [
+        {
+          id: 'wind-steer-1x1',
+          title: 'Wind Steer',
+          type: 'iframe',
+          url: skipWidgetUrl(WIND_STEER_TYPE),
+          size: '1x1',
+          configPanel: WIND_STEER_CONFIG_PANEL,
+          lifecycle: 'whileEnabled'
+        },
+        {
+          id: 'wind-steer-2x2',
+          title: 'Wind Steer',
+          type: 'iframe',
+          url: skipWidgetUrl(WIND_STEER_TYPE),
+          size: '2x2',
+          configPanel: WIND_STEER_CONFIG_PANEL,
+          lifecycle: 'whileEnabled'
+        }
+      ],
       panels: [
         {
           id: 'skip-panel',
@@ -35,6 +73,13 @@ module.exports = function (app) {
           type: 'iframe',
           url: SKIP_PANEL_URL,
           lifecycle: 'keepAlive'
+        },
+        {
+          id: WIND_STEER_CONFIG_PANEL,
+          title: 'Wind Steer settings',
+          type: 'iframe',
+          url: skipWidgetConfigUrl(WIND_STEER_TYPE),
+          lifecycle: 'onOpen'
         }
       ],
       buttons: [

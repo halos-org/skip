@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { DashboardComponent } from './core/components/dashboard/dashboard.component';
 import { embedBlockedGuard } from './core/guards/embed-route.guard';
+import { embedRequiredGuard } from './core/guards/embed-required-route.guard';
 
 export const routes: Routes = [
   {
@@ -51,6 +52,22 @@ export const routes: Routes = [
     canActivate: [embedBlockedGuard],
     loadComponent: () => import('./core/components/connection-status/connection-status.component').then(m => m.ConnectionStatusComponent),
     title: 'Skip - Connection'
+  },
+  // Single-widget host for plotter-extension widget iframes: renders one widget full-bleed, no
+  // dashboard chrome (see SingleWidgetHostComponent). The type is the widget's component selector.
+  // Embed-only, so read-only is route-enforced (under embed the dashboard is force-locked).
+  {
+    path: 'widget/:type',
+    canActivate: [embedRequiredGuard],
+    loadComponent: () => import('./core/components/single-widget-host/single-widget-host.component').then(m => m.SingleWidgetHostComponent),
+    title: 'Skip - Widget'
+  },
+  // Settings panel iframe for a plotter-extension widget: reuses the widget-options UI over the bus.
+  {
+    path: 'widget-config/:type',
+    canActivate: [embedRequiredGuard],
+    loadComponent: () => import('./core/components/widget-config-panel/widget-config-panel.component').then(m => m.WidgetConfigPanelComponent),
+    title: 'Skip - Widget settings'
   },
   {
     path: 'help/:page',

@@ -218,6 +218,15 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   }
 
   /**
+   * Apply a new user config to the already-mounted widget, re-diffing streams/metadata — the same
+   * path the options dialog uses. For hosts that reconfigure at runtime without a dialog (the
+   * plotter-extension single-widget host applying a config saved in another iframe).
+   */
+  public reconfigure(cfg: IWidgetSvcConfig): void {
+    this.applyRuntimeConfig(cfg);
+  }
+
+  /**
    * Reinitialize runtime from the dashboard's saved config for this widget.
    * Runs during dashboard cancel flow to restore pre-edit UI state.
    */
