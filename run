@@ -118,7 +118,7 @@ base="https://$(hostname)${domain:+.$domain}:4430"
 # update needs no restart -- express.static serves the new public/ from disk per
 # request. Only a first install (not yet mounted) needs a restart to register it.
 was_mounted=no
-if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "$pkg"; then
+if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "\"$pkg\""; then
   was_mounted=yes
 fi
 
@@ -155,6 +155,9 @@ else:
     print(" ", pkg, "already registered")
 PY
 
+# Remove a stale bundled plugin/ tree from a prior (pre-webapp-only) deploy.
+rm -rf "${data}/system-plugins/${slug}/plugin"
+
 if [ "$was_mounted" = yes ]; then
   echo "  ${pkg} already mounted; skipping restart (express.static serves the new build on next request)"
 else
@@ -168,7 +171,7 @@ else
 fi
 
 # Verify through Traefik.
-if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "$pkg"; then
+if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "\"$pkg\""; then
   echo "  OK: ${pkg} is served by Signal K (listed in /skServer/webapps)"
 else
   echo "  WARN: ${pkg} not listed at ${base}/skServer/webapps"
@@ -179,6 +182,9 @@ REMOTE
 
   echo ""
   echo "Deployed ${pkg} to ${target}; see the Traefik verify result above."
+  echo "Note: this ships the webapp only. The Freeboard-SK panel is the separate"
+  echo "@halos-org/skip-freeboard-panel package -- deploy it too if this device needs"
+  echo "the Freeboard toolbar button."
 }
 
 ################################################################################
