@@ -238,10 +238,10 @@ For comprehensive development guidance, start with `CLAUDE.md`:
 Skip is open-source under the MIT license, built by the community and 100% free. Contribute to the project on [GitHub](https://github.com/halos-org/skip)!
 
 # Connect, Share, and Support
-Report issues and request features on [Skip's GitHub project](https://github.com/halos-org/skip/issues). The upstream Kip community chats on [Discord](https://discord.gg/AMDYT2DQga).
+Report issues and request features on [Skip's GitHub project](https://github.com/halos-org/skip/issues). For chat, join the #skip channel on the [Signal K Discord](https://discord.gg/uuZrwz4dCS).
 
 ## About Skip
-Skip is a [HaLOS](https://halos.fi) fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin. It adds standard Signal K session/SSO authentication and account-independent named profiles, and diverges from upstream as it evolves. The webapp is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)).
+Skip is a Signal K marine instrument panel that originated as a fork of [Kip](https://github.com/mxtommy/Kip) by Thomas St.Pierre and David Godin. It is now an independent project: it adds standard Signal K session/SSO authentication and account-independent named profiles, and has diverged from Kip as it evolves. It is served at `/@halos-org/skip/`. Licensed under MIT (see [LICENSE](LICENSE)).
 
 # Features, Ideas, Bugs
 See [Skip's GitHub project](https://github.com/halos-org/skip/issues) for the latest feature requests and bug reports.
