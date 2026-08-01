@@ -10,8 +10,8 @@ import { embedRequiredGuard } from '../../guards/embed-required-route.guard';
 import { routes } from '../../../app.routes';
 import type { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 
-// The widget type the plotter-extension manifest (plugin/index.js WIND_STEER_TYPE) and the
-// `#/widget/:type` route target. Kept here as the app-side end of that cross-file string contract.
+// The widget type the plotter-extension manifest (@halos-org/skip-freeboard-panel WIND_STEER_TYPE)
+// and the `#/widget/:type` route target. Kept here as the app-side end of that cross-package string contract.
 const MANIFEST_WIDGET_TYPE = 'widget-wind-steer';
 
 // Reaches the protected signals under test without rendering the template (which would instantiate

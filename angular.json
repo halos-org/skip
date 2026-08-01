@@ -110,8 +110,6 @@
             "lintFilePatterns": [
               "src/**/*.ts",
               "src/**/*.html",
-              "plugin/**/*.ts",
-              "plugin/**/*.js",
               "tools/gen-mcp-schema/**/*.ts"
             ]
           }
