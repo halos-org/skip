@@ -8,6 +8,7 @@
 * The Connectivity settings show your Signal K session identity in same-origin mode (including a read-only-session indicator) instead of a credential form.
 * Security: the Signal K login password is no longer stored in the browser; it is used only in memory to obtain a session token.
 ## Fixes
+* Saving Display settings no longer discards your changes when Automatic Night Mode cannot be enabled. Previously, if that feature was switched on while the Signal K Derived Data plugin was missing or unreachable, the failed dependency check abandoned the whole save — theme, browser tab title, brightness and the rest were silently lost, and the error message mentioned only night mode. Everything unrelated to the plugin now saves as asked; only automatic night mode is held back, and its stored value is left as it was. Fixes #498
 * OIDC/SSO users could not sign in to KIP because it required a server-local password they do not have; same-origin SSO mode resolves this.
 ## Behavior changes
 * Cross-origin token sign-in: the Signal K server provides no token-refresh endpoint, so the stored password is no longer re-sent to renew a session. The session token still persists across browser reloads until it expires; when it expires you are prompted to sign in again.
