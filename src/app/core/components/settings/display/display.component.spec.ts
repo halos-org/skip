@@ -117,10 +117,19 @@ describe('SettingsNotificationsComponent', () => {
         expect(fx.componentInstance['themeMode']()).toBe('system');
     });
 
-    it('loads and saves the automatic-toolbar-reveal preference (#495)', async () => {
+    it('loads a stored automatic-toolbar-reveal opt-out into the toggle (#495)', () => {
+        // The stored value must differ from the model's own default, or the assertion passes with
+        // the ngOnInit hydration deleted.
+        const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+        vi.spyOn(settings, 'getAutoRevealToolbar').mockReturnValue(false);
+        const fx = TestBed.createComponent(SettingsDisplayComponent);
+        fx.detectChanges();
+        expect(fx.componentInstance['autoRevealToolbar']()).toBe(false);
+    });
+
+    it('saves the automatic-toolbar-reveal preference (#495)', async () => {
         const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
         const setAutoRevealToolbar = vi.spyOn(settings, 'setAutoRevealToolbar');
-        expect(component['autoRevealToolbar']()).toBe(true);
 
         component['autoRevealToolbar'].set(false);
         component['saveAllSettings']();

@@ -143,10 +143,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       this.chrome.reveal();
     });
 
-    // With automatic reveal off (#495) the toolbar must also not linger from the boot dwell the
-    // visibility service opens on construction. Depends on the setting alone, so it never fires on a
-    // page change — retracting there would snap the bar shut under a user who revealed it by hand
-    // and is navigating with its page icons.
+    // The visibility service opens a boot dwell on construction; with automatic reveal off (#495),
+    // retract it. Keyed on the setting alone, so a hand-revealed toolbar survives page changes.
     effect(() => {
       if (!this.settings.autoRevealToolbar()) this.chrome.hide();
     });

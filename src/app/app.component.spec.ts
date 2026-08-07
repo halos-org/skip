@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, Subject } from 'rxjs';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { AppComponent } from './app.component';
 import { ConnectionState, IConnectionStatus } from './core/services/connection-state-machine.service';
 import { AppNetworkInitService } from './core/services/app-initNetwork.service';
@@ -335,11 +335,15 @@ describe('AppComponent', () => {
   });
 
   describe('automatic toolbar reveal opt-out (#495)', () => {
-    // The setting lives on the real root SettingsService the component injects; flipping the signal
-    // through its setter would also queue a server write, so the read side is stubbed directly.
-    function withAutoReveal(enabled: boolean): void {
+    // The setting lives on the real root SettingsService the component injects; driving it through
+    // the setter would also queue a server write, so the read side is stubbed. The stub must be
+    // backed by a real signal — a plain mockReturnValue leaves the effects with no reactive
+    // dependency, which silently makes every assertion below unfalsifiable.
+    function withAutoReveal(enabled: boolean): WritableSignal<boolean> {
+      const flag = signal(enabled);
       const settings = TestBed.inject(SettingsService);
-      vi.spyOn(settings, 'autoRevealToolbar').mockReturnValue(enabled);
+      vi.spyOn(settings, 'autoRevealToolbar').mockImplementation(() => flag());
+      return flag;
     }
 
     afterEach(() => vi.restoreAllMocks());
@@ -372,15 +376,31 @@ describe('AppComponent', () => {
       expect(chrome.hide).not.toHaveBeenCalled();
     });
 
-    it('does not re-hide on later page changes, so a manual reveal survives navigation', () => {
-      withAutoReveal(false);
+    it('retracts the toolbar when the setting is turned off at runtime', () => {
+      const flag = withAutoReveal(true);
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
+      chrome.hide.mockClear();
+
+      flag.set(false);
+      fixture.detectChanges();
+
+      expect(chrome.hide).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves an explicit reveal standing across a page change while the setting is off', () => {
+      withAutoReveal(false);
+      const fixture = TestBed.createComponent(AppComponent);
+      const app = fixture.componentInstance as unknown as { onChromeIntent: (i: 'reveal' | 'hide') => void };
+      fixture.detectChanges();
+      app.onChromeIntent('reveal');
+      chrome.revealed.set(true);
       chrome.hide.mockClear();
 
       dashboard.activeDashboard.set(1);
       fixture.detectChanges();
 
+      expect(chrome.reveal).toHaveBeenCalledTimes(1);
       expect(chrome.hide).not.toHaveBeenCalled();
     });
   });
