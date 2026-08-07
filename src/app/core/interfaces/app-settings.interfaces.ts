@@ -33,6 +33,7 @@ export interface IAppConfig {
   notificationConfig: INotificationConfig;
   browserTabTitle?: string;
   keepScreenAwake?: boolean;
+  autoRevealToolbar?: boolean;
 }
 
 export interface IThemeConfig {

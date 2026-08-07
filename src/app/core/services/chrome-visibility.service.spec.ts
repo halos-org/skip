@@ -75,6 +75,45 @@ describe('ChromeVisibilityService', () => {
     expect(service.revealed()).toBe(false);
   });
 
+  describe('automatic reveal opt-out (#495)', () => {
+    it('revealAuto() reveals while automatic reveal is on', () => {
+      vi.advanceTimersByTime(CHROME_BOOT_DWELL_MS);
+      service.revealAuto();
+      expect(service.revealed()).toBe(true);
+    });
+
+    it('revealAuto() is a no-op while automatic reveal is off', () => {
+      service.setAutoReveal(false);
+      service.revealAuto();
+      expect(service.revealed()).toBe(false);
+    });
+
+    it('switching automatic reveal off retracts the boot dwell', () => {
+      expect(service.revealed()).toBe(true);
+      service.setAutoReveal(false);
+      expect(service.revealed()).toBe(false);
+      // The boot timer must not fire later and leave stale state behind.
+      vi.advanceTimersByTime(CHROME_BOOT_DWELL_MS);
+      expect(service.revealed()).toBe(false);
+    });
+
+    it('an explicit reveal() still works while automatic reveal is off', () => {
+      service.setAutoReveal(false);
+      service.reveal();
+      expect(service.revealed()).toBe(true);
+      // Still transient: the idle timer governs an explicit reveal as it always did.
+      vi.advanceTimersByTime(CHROME_IDLE_HIDE_MS);
+      expect(service.revealed()).toBe(false);
+    });
+
+    it('switching automatic reveal back on restores revealAuto()', () => {
+      service.setAutoReveal(false);
+      service.setAutoReveal(true);
+      service.revealAuto();
+      expect(service.revealed()).toBe(true);
+    });
+  });
+
   it('ref-counts nested suppressors', () => {
     service.reveal();
     service.suppressHide();

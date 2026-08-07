@@ -136,6 +136,29 @@
           }
         </p>
       </mat-expansion-panel>
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Toolbar
+          </mat-panel-title>
+          @if (!isPhonePortrait().matches) {
+            <mat-panel-description>
+              Choose whether the toolbar slides down on its own.
+            </mat-panel-description>
+          }
+        </mat-expansion-panel-header>
+        <mat-slide-toggle class="full-width sliders"
+          [(ngModel)]="autoRevealToolbar"
+          name="autoRevealToolbar"
+          aria-describedby="auto-reveal-toolbar-helper">
+          Show the toolbar automatically
+        </mat-slide-toggle>
+        <p id="auto-reveal-toolbar-helper" class="mat-body-small" role="note">
+          The toolbar appears at startup and on every page change, then hides again. With this off it appears only
+          when you ask for it, which suits a display you only watch. Applies to every display using this
+          configuration profile.
+        </p>
+      </mat-expansion-panel>
     </mat-accordion>
     <br />
     <mat-accordion>
