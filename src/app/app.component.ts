@@ -135,18 +135,18 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       }
     });
 
+    // Hand the "show the toolbar automatically" setting to the service that owns chrome visibility,
+    // which gates its own boot dwell and every revealAuto() below on it (#495).
+    effect(() => {
+      this.chrome.setAutoReveal(this.settings.autoRevealToolbar());
+    });
+
     // Reveal the auto-hiding toolbar on every page change: its page-icon strip
     // is the transient page-position indicator. Fires for swipe, hotkey, tap and
     // remote navigation alike, since all route through the activeDashboard signal.
     effect(() => {
-      if (!this.settings.autoRevealToolbar() || this._dashboard.activeDashboard() === null) return;
-      this.chrome.reveal();
-    });
-
-    // The visibility service opens a boot dwell on construction; with automatic reveal off (#495),
-    // retract it. Keyed on the setting alone, so a hand-revealed toolbar survives page changes.
-    effect(() => {
-      if (!this.settings.autoRevealToolbar()) this.chrome.hide();
+      if (this._dashboard.activeDashboard() === null) return;
+      this.chrome.revealAuto();
     });
 
     // initialize dashboardVisible from current URL

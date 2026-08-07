@@ -24,11 +24,17 @@ export const CHROME_HOVER_DWELL_MS = 200;
  * Hiding can be suppressed (ref-counted) while a popup/dialog is open or focus
  * is inside the toolbar, so it never disappears out from under the user.
  * State is never persisted.
+ *
+ * The two reveals the app makes on the user's behalf — the boot dwell and the per-page-change
+ * reveal — go through {@link revealAuto} and can be switched off wholesale via
+ * {@link setAutoReveal}. {@link reveal} always shows the toolbar, so every user-initiated route to
+ * it keeps working regardless.
  */
 @Injectable({ providedIn: 'root' })
 export class ChromeVisibilityService {
   private readonly _revealed = signal(true);
   private readonly _peeking = signal(false);
+  private autoReveal = true;
 
   /** True while the full toolbar is shown. */
   public readonly revealed = this._revealed.asReadonly();
@@ -48,6 +54,24 @@ export class ChromeVisibilityService {
   public reveal(): void {
     this._revealed.set(true);
     this.scheduleHide(CHROME_IDLE_HIDE_MS);
+  }
+
+  /**
+   * Reveal on the app's own initiative. No-op while automatic reveal is off, so a display that is
+   * only watched never has the toolbar appear unbidden (#495).
+   */
+  public revealAuto(): void {
+    if (this.autoReveal) this.reveal();
+  }
+
+  /**
+   * Set whether the app may reveal the toolbar on its own. Switching it off also retracts the boot
+   * dwell this service opens on construction, which is otherwise still on screen when the setting
+   * arrives from the user's stored config.
+   */
+  public setAutoReveal(enabled: boolean): void {
+    this.autoReveal = enabled;
+    if (!enabled) this.hide();
   }
 
   /** Hide the toolbar immediately, unless hiding is currently suppressed. */

@@ -66,6 +66,8 @@ describe('AppComponent', () => {
   let chrome: {
     revealed: ReturnType<typeof signal<boolean>>;
     reveal: ReturnType<typeof vi.fn>;
+    revealAuto: ReturnType<typeof vi.fn>;
+    setAutoReveal: ReturnType<typeof vi.fn>;
     hide: ReturnType<typeof vi.fn>;
     pulsePeek: ReturnType<typeof vi.fn>;
   };
@@ -90,7 +92,7 @@ describe('AppComponent', () => {
       setKeepAwake: vi.fn(),
     };
     appService = { toggleNightMode: vi.fn() };
-    chrome = { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() };
+    chrome = { revealed: signal(false), reveal: vi.fn(), revealAuto: vi.fn(), setAutoReveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() };
     toast = { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) };
     reloadService = { reload: vi.fn() };
     appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'none' });
@@ -348,60 +350,55 @@ describe('AppComponent', () => {
 
     afterEach(() => vi.restoreAllMocks());
 
-    it('does not reveal on a page change while automatic reveal is off', () => {
-      withAutoReveal(false);
-      const fixture = TestBed.createComponent(AppComponent);
-      fixture.detectChanges();
-      chrome.reveal.mockClear();
-
-      dashboard.activeDashboard.set(1);
-      fixture.detectChanges();
-
-      expect(chrome.reveal).not.toHaveBeenCalled();
-    });
-
-    it('retracts the service boot reveal while automatic reveal is off', () => {
+    it('hands the stored setting to the visibility service at boot', () => {
       withAutoReveal(false);
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
 
-      expect(chrome.hide).toHaveBeenCalled();
+      expect(chrome.setAutoReveal).toHaveBeenCalledWith(false);
     });
 
-    it('leaves the toolbar alone at boot while automatic reveal is on', () => {
-      withAutoReveal(true);
-      const fixture = TestBed.createComponent(AppComponent);
-      fixture.detectChanges();
-
-      expect(chrome.hide).not.toHaveBeenCalled();
-    });
-
-    it('retracts the toolbar when the setting is turned off at runtime', () => {
+    it('hands a runtime change of the setting to the service', () => {
       const flag = withAutoReveal(true);
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
-      chrome.hide.mockClear();
+      chrome.setAutoReveal.mockClear();
 
       flag.set(false);
       fixture.detectChanges();
 
-      expect(chrome.hide).toHaveBeenCalledTimes(1);
+      expect(chrome.setAutoReveal).toHaveBeenCalledWith(false);
     });
 
-    it('leaves an explicit reveal standing across a page change while the setting is off', () => {
+    // The gate lives in the service, so the page-change reveal is opt-out-able only for as long as
+    // it goes through revealAuto(); routing it back to reveal() would silently ignore the setting.
+    it('routes the page-change reveal through the service gate, not the unconditional reveal', () => {
       withAutoReveal(false);
       const fixture = TestBed.createComponent(AppComponent);
-      const app = fixture.componentInstance as unknown as { onChromeIntent: (i: 'reveal' | 'hide') => void };
       fixture.detectChanges();
-      app.onChromeIntent('reveal');
-      chrome.revealed.set(true);
-      chrome.hide.mockClear();
+      chrome.reveal.mockClear();
+      chrome.revealAuto.mockClear();
 
       dashboard.activeDashboard.set(1);
       fixture.detectChanges();
 
+      expect(chrome.revealAuto).toHaveBeenCalledTimes(1);
+      expect(chrome.reveal).not.toHaveBeenCalled();
+    });
+
+    // Explicit intents stay ungated: they are the routes a user takes to bring the toolbar back
+    // once automatic reveal is off.
+    it('leaves an explicit reveal intent unconditional while the setting is off', () => {
+      withAutoReveal(false);
+      const fixture = TestBed.createComponent(AppComponent);
+      const app = fixture.componentInstance as unknown as { onChromeIntent: (i: 'reveal' | 'hide') => void };
+      fixture.detectChanges();
+      chrome.reveal.mockClear();
+
+      app.onChromeIntent('reveal');
+
       expect(chrome.reveal).toHaveBeenCalledTimes(1);
-      expect(chrome.hide).not.toHaveBeenCalled();
+      expect(chrome.revealAuto).not.toHaveBeenCalled();
     });
   });
 
@@ -409,12 +406,12 @@ describe('AppComponent', () => {
     it('reveals the toolbar when the active page changes', () => {
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
-      chrome.reveal.mockClear();
+      chrome.revealAuto.mockClear();
 
       dashboard.activeDashboard.set(1);
       fixture.detectChanges();
 
-      expect(chrome.reveal).toHaveBeenCalledTimes(1);
+      expect(chrome.revealAuto).toHaveBeenCalledTimes(1);
     });
 
     it('reveals again on each subsequent page change', () => {
@@ -422,12 +419,12 @@ describe('AppComponent', () => {
       fixture.detectChanges();
       dashboard.activeDashboard.set(1);
       fixture.detectChanges();
-      chrome.reveal.mockClear();
+      chrome.revealAuto.mockClear();
 
       dashboard.activeDashboard.set(2);
       fixture.detectChanges();
 
-      expect(chrome.reveal).toHaveBeenCalledTimes(1);
+      expect(chrome.revealAuto).toHaveBeenCalledTimes(1);
     });
 
     it('does not reveal on a transition to no active page', () => {
@@ -435,12 +432,12 @@ describe('AppComponent', () => {
       fixture.detectChanges();
       dashboard.activeDashboard.set(1);
       fixture.detectChanges();
-      chrome.reveal.mockClear();
+      chrome.revealAuto.mockClear();
 
       dashboard.activeDashboard.set(null);
       fixture.detectChanges();
 
-      expect(chrome.reveal).not.toHaveBeenCalled();
+      expect(chrome.revealAuto).not.toHaveBeenCalled();
     });
   });
 
@@ -507,7 +504,7 @@ describe('AppComponent — embed mode chrome', () => {
         { provide: DashboardService, useValue: dashboard },
         { provide: uiEventService, useValue: uiEvent },
         { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
-        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), revealAuto: vi.fn(), setAutoReveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
         { provide: ToastService, useValue: { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) } },
         { provide: ReloadService, useValue: { reload: vi.fn() } },
         { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } },
@@ -572,7 +569,7 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
         { provide: DashboardService, useValue: dashboard },
         { provide: uiEventService, useValue: uiEvent },
         { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
-        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), revealAuto: vi.fn(), setAutoReveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
         { provide: ToastService, useValue: toast },
         { provide: ReloadService, useValue: { reload: vi.fn() } },
         { provide: EmbedModeService, useValue: { embed: () => opts.embed, profile: () => null } },
@@ -680,7 +677,7 @@ describe('AppComponent — embed boot performs zero server-config writes (#216 E
         { provide: AppNetworkInitService, useValue: appNetworkInitServiceStub },
         { provide: uiEventService, useValue: uiEvent },
         { provide: AppService, useValue: { toggleNightMode: vi.fn() } },
-        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
+        { provide: ChromeVisibilityService, useValue: { revealed: signal(false), reveal: vi.fn(), revealAuto: vi.fn(), setAutoReveal: vi.fn(), hide: vi.fn(), pulsePeek: vi.fn() } },
         { provide: ToastService, useValue: { show: vi.fn().mockReturnValue({ onAction: () => new Subject() }) } },
         { provide: ReloadService, useValue: { reload: vi.fn() } },
         { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } },
