@@ -139,8 +139,16 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     // is the transient page-position indicator. Fires for swipe, hotkey, tap and
     // remote navigation alike, since all route through the activeDashboard signal.
     effect(() => {
-      if (this._dashboard.activeDashboard() === null) return;
+      if (!this.settings.autoRevealToolbar() || this._dashboard.activeDashboard() === null) return;
       this.chrome.reveal();
+    });
+
+    // With automatic reveal off (#495) the toolbar must also not linger from the boot dwell the
+    // visibility service opens on construction. Depends on the setting alone, so it never fires on a
+    // page change — retracting there would snap the bar shut under a user who revealed it by hand
+    // and is navigating with its page icons.
+    effect(() => {
+      if (!this.settings.autoRevealToolbar()) this.chrome.hide();
     });
 
     // initialize dashboardVisible from current URL

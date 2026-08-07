@@ -40,6 +40,7 @@ class SettingsServiceMock {
     public getBrowserTabTitle() { return 'Skip'; }
     public getDisablePathValidation() { return false; }
     public getKeepScreenAwake() { return true; }
+    public getAutoRevealToolbar() { return true; }
     public setAutoNightMode(): void { }
     public setRedNightMode(): void { }
     public setNightModeBrightness(): void { }
@@ -49,6 +50,7 @@ class SettingsServiceMock {
     public setBrowserTabTitle(): void { }
     public setDisablePathValidation(): void { }
     public setKeepScreenAwake(): void { }
+    public setAutoRevealToolbar(): void { }
 }
 
 class PluginConfigClientServiceMock {
@@ -113,6 +115,19 @@ describe('SettingsNotificationsComponent', () => {
         const fx = TestBed.createComponent(SettingsDisplayComponent);
         fx.detectChanges();
         expect(fx.componentInstance['themeMode']()).toBe('system');
+    });
+
+    it('loads and saves the automatic-toolbar-reveal preference (#495)', async () => {
+        const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+        const setAutoRevealToolbar = vi.spyOn(settings, 'setAutoRevealToolbar');
+        expect(component['autoRevealToolbar']()).toBe(true);
+
+        component['autoRevealToolbar'].set(false);
+        component['saveAllSettings']();
+        await flushPromises();
+        await flushPromises();
+
+        expect(setAutoRevealToolbar).toHaveBeenCalledWith(false);
     });
 
     it('saves the selected theme mode verbatim', async () => {

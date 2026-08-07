@@ -53,6 +53,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected browserTabTitle = model<string>('Skip');
   protected isPathValidationDisabled = model<boolean>(this.settings.getDisablePathValidation());
   protected keepScreenAwake = model<boolean>(true);
+  protected autoRevealToolbar = model<boolean>(true);
   // Guards concurrent plugin enable checks to avoid stale promise handlers mutating state
   private _pluginCheckSeq = 0;
 
@@ -70,6 +71,7 @@ export class SettingsDisplayComponent implements OnInit {
     this.instanceName.set(this.settings.getInstanceName());
     this.browserTabTitle.set(this.settings.getBrowserTabTitle());
     this.keepScreenAwake.set(this.settings.getKeepScreenAwake());
+    this.autoRevealToolbar.set(this.settings.getAutoRevealToolbar());
   }
 
   protected saveAllSettings():void {
@@ -109,6 +111,7 @@ export class SettingsDisplayComponent implements OnInit {
     this.settings.setBrowserTabTitle(this.browserTabTitle());
     this.settings.setDisablePathValidation(this.isPathValidationDisabled());
     this.settings.setKeepScreenAwake(this.keepScreenAwake());
+    this.settings.setAutoRevealToolbar(this.autoRevealToolbar());
     this.displayForm()?.form.markAsPristine();
     this.toast.show("Configuration saved", 1000, true, 'message');
   }

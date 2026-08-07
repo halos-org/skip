@@ -212,6 +212,15 @@ describe('SettingsService — storage routing (server applicationData only)', ()
     expect(patchSpy).toHaveBeenCalledWith('IAppConfig', expect.objectContaining({ browserTabTitle: 'Helm' }));
     expect(localStorage.getItem('skip.appConfig')).toBeNull();
   });
+
+  it('setAutoRevealToolbar persists the flag in the app blob (#495)', () => {
+    const { service, patchSpy } = setup();
+
+    service.setAutoRevealToolbar(false);
+
+    expect(patchSpy).toHaveBeenCalledWith('IAppConfig', expect.objectContaining({ autoRevealToolbar: false }));
+    expect(service.getAutoRevealToolbar()).toBe(false);
+  });
 });
 
 describe('SettingsService — config save failure reporting', () => {
@@ -400,7 +409,7 @@ describe('SettingsService — default config isolation', () => {
 
 describe('SettingsService — hydration (pushSettings) characterization', () => {
   const APP_CONFIG_KEYS = [
-    'autoNightMode', 'browserTabTitle', 'configVersion', 'keepScreenAwake',
+    'autoNightMode', 'autoRevealToolbar', 'browserTabTitle', 'configVersion', 'keepScreenAwake',
     'nightModeBrightness', 'notificationConfig', 'redNightMode'
   ];
 
@@ -430,6 +439,17 @@ describe('SettingsService — hydration (pushSettings) characterization', () => 
   it('honors a stored keepScreenAwake=false (#359)', () => {
     const { service } = setupHydrated({ app: { ...loadedAppConfig(), keepScreenAwake: false }, theme: null, dashboards: [] });
     expect(service.getKeepScreenAwake()).toBe(false);
+  });
+
+  it('hydrates autoRevealToolbar to true when the stored config omits it (#495)', () => {
+    const { service, patchSpy } = setupHydrated({ app: loadedAppConfig(), theme: null, dashboards: [] });
+    expect(service.getAutoRevealToolbar()).toBe(true);
+    expect(patchSpy).not.toHaveBeenCalled();
+  });
+
+  it('honors a stored autoRevealToolbar=false (#495)', () => {
+    const { service } = setupHydrated({ app: { ...loadedAppConfig(), autoRevealToolbar: false }, theme: null, dashboards: [] });
+    expect(service.getAutoRevealToolbar()).toBe(false);
   });
 
   // The persist-on-missing bootstrap fields: exactly these three (widgetHistoryDisabled was

@@ -39,9 +39,11 @@ export class SettingsService {
   private readonly _instanceName = signal<string>('');
   private readonly _browserTabTitle = signal<string>('Skip');
   private readonly _keepScreenAwake = signal<boolean>(true);
+  private readonly _autoRevealToolbar = signal<boolean>(true);
 
   public readonly themeName = this._themeName.asReadonly();
   public readonly keepScreenAwake = this._keepScreenAwake.asReadonly();
+  public readonly autoRevealToolbar = this._autoRevealToolbar.asReadonly();
   public readonly notificationConfig = this._notificationConfig.asReadonly();
   public readonly autoNightMode = this._autoNightMode.asReadonly();
   public readonly redNightMode = this._redNightMode.asReadonly();
@@ -254,6 +256,7 @@ export class SettingsService {
     this._redNightMode.set(app.redNightMode === undefined ? false : app.redNightMode);
     this._nightModeBrightness.set(app.nightModeBrightness === undefined ? 0.2 : app.nightModeBrightness);
     this._keepScreenAwake.set(app.keepScreenAwake === undefined ? true : app.keepScreenAwake);
+    this._autoRevealToolbar.set(app.autoRevealToolbar === undefined ? true : app.autoRevealToolbar);
 
     // Embed is strictly read-only: the in-memory defaults above are applied, but the persist-on-missing
     // self-heal write is suppressed so a framed read-only boot never PATCHes the profile's app config.
@@ -364,6 +367,15 @@ export class SettingsService {
 
   public getKeepScreenAwake(): boolean {
     return this.keepScreenAwake();
+  }
+
+  public setAutoRevealToolbar(enabled: boolean) {
+    this._autoRevealToolbar.set(enabled);
+    this.saveAppConfig();
+  }
+
+  public getAutoRevealToolbar(): boolean {
+    return this.autoRevealToolbar();
   }
 
   // Red night mode
@@ -527,7 +539,8 @@ export class SettingsService {
       nightModeBrightness: this.nightModeBrightness(),
       notificationConfig: this.notificationConfig(),
       browserTabTitle: this.browserTabTitle(),
-      keepScreenAwake: this.keepScreenAwake()
+      keepScreenAwake: this.keepScreenAwake(),
+      autoRevealToolbar: this.autoRevealToolbar()
     }
     return storageObject;
   }

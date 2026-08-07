@@ -334,6 +334,57 @@ describe('AppComponent', () => {
     });
   });
 
+  describe('automatic toolbar reveal opt-out (#495)', () => {
+    // The setting lives on the real root SettingsService the component injects; flipping the signal
+    // through its setter would also queue a server write, so the read side is stubbed directly.
+    function withAutoReveal(enabled: boolean): void {
+      const settings = TestBed.inject(SettingsService);
+      vi.spyOn(settings, 'autoRevealToolbar').mockReturnValue(enabled);
+    }
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('does not reveal on a page change while automatic reveal is off', () => {
+      withAutoReveal(false);
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      chrome.reveal.mockClear();
+
+      dashboard.activeDashboard.set(1);
+      fixture.detectChanges();
+
+      expect(chrome.reveal).not.toHaveBeenCalled();
+    });
+
+    it('retracts the service boot reveal while automatic reveal is off', () => {
+      withAutoReveal(false);
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+
+      expect(chrome.hide).toHaveBeenCalled();
+    });
+
+    it('leaves the toolbar alone at boot while automatic reveal is on', () => {
+      withAutoReveal(true);
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+
+      expect(chrome.hide).not.toHaveBeenCalled();
+    });
+
+    it('does not re-hide on later page changes, so a manual reveal survives navigation', () => {
+      withAutoReveal(false);
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      chrome.hide.mockClear();
+
+      dashboard.activeDashboard.set(1);
+      fixture.detectChanges();
+
+      expect(chrome.hide).not.toHaveBeenCalled();
+    });
+  });
+
   describe('page-change toolbar reveal', () => {
     it('reveals the toolbar when the active page changes', () => {
       const fixture = TestBed.createComponent(AppComponent);
