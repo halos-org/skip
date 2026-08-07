@@ -92,8 +92,18 @@ export class SettingsDisplayComponent implements OnInit {
     this.applyAndSaveSettings();
   }
 
-  private applyAndSaveSettings(): void {
-    this.settings.setAutoNightMode(this.autoNightMode());
+  /**
+   * @param autoNightRefused True when the dependency check turned the night-mode request down. The
+   * rest of the page is unrelated to that plugin, so it still saves (#498); only automatic night
+   * mode is held back — and its *stored* value is left as it was rather than overwritten with the
+   * reset toggle, so a transient plugin-API failure cannot quietly disable a working setup. The
+   * success toast is held back too: the refusal is on screen as a persistent snackbar, and
+   * MatSnackBar shows one at a time.
+   */
+  private applyAndSaveSettings(autoNightRefused = false): void {
+    if (!autoNightRefused) {
+      this.settings.setAutoNightMode(this.autoNightMode());
+    }
     this.settings.setRedNightMode(this.isRedNightMode());
     this.settings.setNightModeBrightness(this.nightBrightness());
     this.settings.setIsRemoteControl(this.isRemoteControl());
@@ -113,7 +123,9 @@ export class SettingsDisplayComponent implements OnInit {
     this.settings.setKeepScreenAwake(this.keepScreenAwake());
     this.settings.setAutoRevealToolbar(this.autoRevealToolbar());
     this.displayForm()?.form.markAsPristine();
-    this.toast.show("Configuration saved", 1000, true, 'message');
+    if (!autoNightRefused) {
+      this.toast.show("Configuration saved", 1000, true, 'message');
+    }
   }
 
   private async validateAndSaveSettings(seq: number): Promise<void> {
@@ -122,10 +134,11 @@ export class SettingsDisplayComponent implements OnInit {
 
     if (isValid) {
       this.applyAndSaveSettings();
-    } else {
-      // Reset toggle and abort save
-      this.autoNightMode.set(false);
+      return;
     }
+
+    this.autoNightMode.set(false);
+    this.applyAndSaveSettings(true);
   }
 
   protected isAutoNightModeSupported(e: MatSlideToggleChange): void {
