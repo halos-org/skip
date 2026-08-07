@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, Subject, of } from 'rxjs';
 import { signal } from '@angular/core';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { ToastService } from '../../../services/toast.service';
@@ -24,10 +24,22 @@ class AppServiceMock {
 }
 
 class ToastServiceMock {
+    // Prompts resolve as "dismissed without action" (the user declined) unless a test pushes to
+    // `action$` first. Without a live action stream the accept-the-prompt path is unreachable, and
+    // with it the only route that ever stores autoNightMode = true.
+    public readonly action$ = new Subject<void>();
     public show = vi.fn().mockReturnValue({
-        onAction: () => EMPTY,
+        onAction: () => this.action$,
         afterDismissed: () => of({ dismissedByAction: false })
     });
+
+    /** Answer the next prompt with its action button instead of a dismissal. */
+    public acceptNextPrompt(): void {
+        this.show.mockReturnValueOnce({
+            onAction: () => of(undefined),
+            afterDismissed: () => EMPTY
+        });
+    }
 }
 
 class SettingsServiceMock {
@@ -227,22 +239,52 @@ describe('SettingsNotificationsComponent', () => {
             expect(setBrowserTabTitle).toHaveBeenCalledWith('Helm');
         });
 
-        it('leaves the stored automatic night mode untouched rather than writing the reset toggle', async () => {
+        it('writes back the stored night mode rather than the refused request', async () => {
             withMissingPlugin();
             const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
             const setAutoNightMode = vi.spyOn(settings, 'setAutoNightMode');
+            const setRedNightMode = vi.spyOn(settings, 'setRedNightMode');
 
             await saveWithNightModeRequested();
 
-            expect(setAutoNightMode).not.toHaveBeenCalled();
+            expect(setRedNightMode).toHaveBeenCalled(); // the save ran at all
+            expect(setAutoNightMode).toHaveBeenCalledWith(false); // stored value, not the request
             expect(component['autoNightMode']()).toBe(false);
+        });
+
+        it('keeps a working night-mode setup on through a transient plugin-API failure', async () => {
+            // The scenario the refusal path exists for: night mode is already on and stored, and
+            // the check fails for a reason that says nothing about the requirement being unmet.
+            const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+            vi.spyOn(settings, 'getAutoNightMode').mockReturnValue(true);
+            const pluginService = TestBed.inject(PluginConfigClientService) as unknown as PluginConfigClientServiceMock;
+            pluginService.getPlugin.mockResolvedValue({
+                ok: false,
+                error: { reason: 'server-error', message: 'upstream timeout' }
+            });
+            const fx = TestBed.createComponent(SettingsDisplayComponent);
+            fx.detectChanges();
+            const setAutoNightMode = vi.spyOn(settings, 'setAutoNightMode');
+
+            fx.componentInstance['saveAllSettings']();
+            await flushPromises();
+            await flushPromises();
+
+            // Neither this save nor the next one may turn it off: the toggle still agrees with the
+            // store, so a following save re-runs the check instead of writing an off state.
+            expect(setAutoNightMode).toHaveBeenCalledWith(true);
+            expect(setAutoNightMode).not.toHaveBeenCalledWith(false);
+            expect(fx.componentInstance['autoNightMode']()).toBe(true);
         });
 
         it('leaves the refusal on screen instead of replacing it with a success toast', async () => {
             withMissingPlugin();
+            const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+            const setThemeName = vi.spyOn(settings, 'setThemeName');
 
             await saveWithNightModeRequested();
 
+            expect(setThemeName).toHaveBeenCalled(); // the save ran at all
             // MatSnackBar shows one at a time, so a success toast would dismiss the persistent
             // explanation of what was refused and then vanish on its own timer.
             expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('Derived Data'), 0, false, 'error');
@@ -259,6 +301,56 @@ describe('SettingsNotificationsComponent', () => {
             await saveWithNightModeRequested();
 
             expect(setThemeName).toHaveBeenCalledWith('system');
+        });
+
+        it('confirms the save when the prompt was merely declined, since nothing else is on screen', async () => {
+            // Declining closes the prompt snackbar, so unlike a failure there is no persistent
+            // message left to protect — suppressing the confirmation would leave no feedback at all.
+            await saveWithNightModeRequested();
+
+            expect(toast.show).toHaveBeenCalledWith('Configuration saved', 1000, true, 'message');
+        });
+    });
+
+    describe('an accepted automatic-night-mode prompt', () => {
+        it('stores night mode on once the plugin has been enabled and configured', async () => {
+            toast.acceptNextPrompt();
+            const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+            const pluginService = TestBed.inject(PluginConfigClientService) as unknown as PluginConfigClientServiceMock;
+            const setAutoNightMode = vi.spyOn(settings, 'setAutoNightMode');
+
+            component['isAutoNightModeSupported']({ checked: true, source: {} as MatSlideToggle });
+            component['saveAllSettings']();
+            await flushPromises();
+            await flushPromises();
+
+            expect(pluginService.savePluginConfig).toHaveBeenCalledWith('derived-data', {
+                configuration: { sun: true },
+                enabled: true
+            });
+            expect(setAutoNightMode).toHaveBeenCalledWith(true);
+        });
+
+        it('holds night mode back, but still saves the rest, when enabling the plugin fails', async () => {
+            toast.acceptNextPrompt();
+            const settings = TestBed.inject(SettingsService) as unknown as SettingsServiceMock;
+            const pluginService = TestBed.inject(PluginConfigClientService) as unknown as PluginConfigClientServiceMock;
+            pluginService.savePluginConfig.mockResolvedValue({
+                ok: false,
+                error: { reason: 'server-error', message: 'write rejected' }
+            });
+            const setAutoNightMode = vi.spyOn(settings, 'setAutoNightMode');
+            const setBrowserTabTitle = vi.spyOn(settings, 'setBrowserTabTitle');
+            component['browserTabTitle'].set('Helm');
+
+            component['isAutoNightModeSupported']({ checked: true, source: {} as MatSlideToggle });
+            component['saveAllSettings']();
+            await flushPromises();
+            await flushPromises();
+
+            expect(setBrowserTabTitle).toHaveBeenCalledWith('Helm');
+            expect(setAutoNightMode).toHaveBeenCalledWith(false);
+            expect(toast.show).not.toHaveBeenCalledWith('Configuration saved', 1000, true, 'message');
         });
     });
 

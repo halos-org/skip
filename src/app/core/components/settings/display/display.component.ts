@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, viewChild, signal, Signal, model } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, DestroyRef, inject, OnInit, viewChild, signal, Signal, model } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver, Breakpoints, BreakpointState } from '@angular/cdk/layout';
 import { AppService } from '../../../services/app-service';
 import { ToastService } from '../../../services/toast.service';
@@ -16,6 +16,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule, MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ThemeMode, THEME_MODES } from '../../../constants/themes.const';
+
+/**
+ * What the Automatic Night Mode dependency check concluded. The two refusals differ only in what
+ * the user can already see: 'explained' left a persistent snackbar on screen, 'declined' means the
+ * user dismissed the prompt and nothing is showing.
+ */
+type AutoNightOutcome = 'granted' | 'explained' | 'declined';
 
 
 @Component({
@@ -43,6 +50,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected readonly uiEvent = inject(uiEventService);
   private readonly responsive = inject(BreakpointObserver);
   private readonly pluginConfig = inject(PluginConfigClientService);
+  private readonly destroyRef = inject(DestroyRef);
   protected isPhonePortrait: Signal<BreakpointState>;
   protected nightBrightness = signal<number>(0.27);
   protected autoNightMode = model<boolean>(false);
@@ -82,9 +90,12 @@ export class SettingsDisplayComponent implements OnInit {
       return;
     }
 
+    // Any save supersedes a check still in flight, whether or not it starts one of its own —
+    // otherwise a stale check resolves later and writes this form's state a second time.
+    const seq = ++this._pluginCheckSeq;
+
     // If auto night mode is enabled, validate plugin requirements before saving
     if (this.autoNightMode()) {
-      const seq = ++this._pluginCheckSeq;
       void this.validateAndSaveSettings(seq);
       return;
     }
@@ -93,17 +104,12 @@ export class SettingsDisplayComponent implements OnInit {
   }
 
   /**
-   * @param autoNightRefused True when the dependency check turned the night-mode request down. The
-   * rest of the page is unrelated to that plugin, so it still saves (#498); only automatic night
-   * mode is held back — and its *stored* value is left as it was rather than overwritten with the
-   * reset toggle, so a transient plugin-API failure cannot quietly disable a working setup. The
-   * success toast is held back too: the refusal is on screen as a persistent snackbar, and
-   * MatSnackBar shows one at a time.
+   * @param announce Whether to confirm the save. Suppressed when a persistent snackbar is already
+   * explaining what was turned down: MatSnackBar shows one at a time, so the confirmation would
+   * dismiss the explanation and then vanish on its own timer.
    */
-  private applyAndSaveSettings(autoNightRefused = false): void {
-    if (!autoNightRefused) {
-      this.settings.setAutoNightMode(this.autoNightMode());
-    }
+  private applyAndSaveSettings(announce = true): void {
+    this.settings.setAutoNightMode(this.autoNightMode());
     this.settings.setRedNightMode(this.isRedNightMode());
     this.settings.setNightModeBrightness(this.nightBrightness());
     this.settings.setIsRemoteControl(this.isRemoteControl());
@@ -123,22 +129,23 @@ export class SettingsDisplayComponent implements OnInit {
     this.settings.setKeepScreenAwake(this.keepScreenAwake());
     this.settings.setAutoRevealToolbar(this.autoRevealToolbar());
     this.displayForm()?.form.markAsPristine();
-    if (!autoNightRefused) {
+    if (announce) {
       this.toast.show("Configuration saved", 1000, true, 'message');
     }
   }
 
   private async validateAndSaveSettings(seq: number): Promise<void> {
-    const isValid = await this.validateAndHandleAutoNightRequirement(seq);
+    const outcome = await this.validateAndHandleAutoNightRequirement(seq);
     if (seq !== this._pluginCheckSeq) return;
 
-    if (isValid) {
-      this.applyAndSaveSettings();
-      return;
+    if (outcome !== 'granted') {
+      // Show what is stored, not the request that was turned down. Forcing the toggle off instead
+      // would put the form, the stored config and AppService's live night-mode effect into three
+      // different states, and the next save — which skips the check entirely once the toggle reads
+      // off — would write that off state anyway.
+      this.autoNightMode.set(this.settings.getAutoNightMode());
     }
-
-    this.autoNightMode.set(false);
-    this.applyAndSaveSettings(true);
+    this.applyAndSaveSettings(outcome !== 'explained');
   }
 
   protected isAutoNightModeSupported(e: MatSlideToggleChange): void {
@@ -146,9 +153,9 @@ export class SettingsDisplayComponent implements OnInit {
     this.autoNightMode.set(e.checked);
   }
 
-  private async validateAndHandleAutoNightRequirement(seq: number): Promise<boolean> {
+  private async validateAndHandleAutoNightRequirement(seq: number): Promise<AutoNightOutcome> {
     const pluginResult = await this.pluginConfig.getPlugin(this.DERIVED_DATA_PLUGIN_ID);
-    if (seq !== this._pluginCheckSeq) return false;
+    if (seq !== this._pluginCheckSeq) return 'declined';
 
     if (!pluginResult.ok) {
       const pluginFailure = pluginResult as IPluginApiFailure;
@@ -159,7 +166,7 @@ export class SettingsDisplayComponent implements OnInit {
           false,
           'error'
         );
-        return false;
+        return 'explained';
       }
 
       this.toast.show(
@@ -168,7 +175,7 @@ export class SettingsDisplayComponent implements OnInit {
         false,
         'error'
       );
-      return false;
+      return 'explained';
     }
 
     const plugin = pluginResult.data;
@@ -176,7 +183,7 @@ export class SettingsDisplayComponent implements OnInit {
     const isSunFlagEnabled = this.readBooleanByPath(plugin.state.configuration, sunFlagPath) === true;
 
     if (plugin.state.enabled && isSunFlagEnabled) {
-      return true;
+      return 'granted';
     }
 
     // Build precise message based on what needs to be changed
@@ -192,22 +199,28 @@ export class SettingsDisplayComponent implements OnInit {
       message = "To enable Automatic Night Mode, the environment.sun path in the Derived Data plugin must be activated. Do you wish to activate the path?";
     }
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<AutoNightOutcome>((resolve) => {
       const promptRef = this.toast.show(message, 0, false, 'warn', 'Ok');
 
-      promptRef.onAction().subscribe(() => {
-        void this.enableAndConfigureAutoNight(plugin, sunFlagPath, seq, resolve);
-      });
+      // Tied to the component: leaving /settings with the prompt open must not resolve later and
+      // write a destroyed form's state over whatever the user has saved since.
+      promptRef.onAction()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => {
+          void this.enableAndConfigureAutoNight(plugin, sunFlagPath, seq, resolve);
+        });
 
-      promptRef.afterDismissed().subscribe((dismissal) => {
-        if (!dismissal.dismissedByAction) {
-          resolve(false);
-        }
-      });
+      promptRef.afterDismissed()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((dismissal) => {
+          if (!dismissal.dismissedByAction) {
+            resolve('declined');
+          }
+        });
     });
   }
 
-  private async enableAndConfigureAutoNight(plugin: ISignalkPlugin, sunFlagPath: string[], seq: number, resolve: (value: boolean) => void): Promise<void> {
+  private async enableAndConfigureAutoNight(plugin: ISignalkPlugin, sunFlagPath: string[], seq: number, resolve: (value: AutoNightOutcome) => void): Promise<void> {
     const nextConfiguration = this.cloneConfig(plugin.state.configuration);
     this.writeBooleanByPath(nextConfiguration, sunFlagPath, true);
 
@@ -217,7 +230,7 @@ export class SettingsDisplayComponent implements OnInit {
     });
 
     if (seq !== this._pluginCheckSeq) {
-      resolve(false);
+      resolve('declined');
       return;
     }
 
@@ -229,12 +242,12 @@ export class SettingsDisplayComponent implements OnInit {
         false,
         'error'
       );
-      resolve(false);
+      resolve('explained');
       return;
     }
 
     this.toast.show('Automatic Night Mode dependency enabled and configured.', 3000, true, 'success');
-    resolve(true);
+    resolve('granted');
   }
 
   private resolveEnvironmentSunFlagPath(configuration: Record<string, unknown>): string[] {
