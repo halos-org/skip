@@ -37,26 +37,26 @@
   <!-- -1 / +1 buttons row -->
   <div [style.display]="adjustHdgBtnVisibility() || (apMode() === 'nav' && this.dodgeModeActive()) ? 'block' : 'none'">
     <button mat-flat-button [disabled]="apBtnDisabled()" class="ap-btn"
-      aria-label="Turn 1 degree to port" (click)="buildAndSendCommand('-1')">
+      (click)="buildAndSendCommand('-1')">
       <span class="label">-1°</span>
     </button>
   </div>
   <div [style.display]="adjustHdgBtnVisibility() || (apMode() === 'nav' && this.dodgeModeActive()) ? 'block' : 'none'">
     <button mat-flat-button [disabled]="apBtnDisabled()" class="ap-btn"
-      aria-label="Turn 1 degree to starboard" (click)="buildAndSendCommand('+1')">
+      (click)="buildAndSendCommand('+1')">
       <span class="label">+1°</span>
     </button>
   </div>
   <!-- -10 / +10 buttons row -->
   <div [style.display]="adjustHdgBtnVisibility() || (apMode() === 'nav' && this.dodgeModeActive()) ? 'block' : 'none'">
     <button mat-flat-button [disabled]="apBtnDisabled()" class="ap-btn"
-      aria-label="Turn 10 degrees to port" (click)="buildAndSendCommand('-10')">
+      (click)="buildAndSendCommand('-10')">
       <span class="label">-10°</span>
     </button>
   </div>
   <div [style.display]="adjustHdgBtnVisibility() || (apMode() === 'nav' && this.dodgeModeActive()) ? 'block' : 'none'">
     <button mat-flat-button [disabled]="apBtnDisabled()" class="ap-btn"
-      aria-label="Turn 10 degrees to starboard" (click)="buildAndSendCommand('+10')">
+      (click)="buildAndSendCommand('+10')">
       <span class="label">+10°</span>
     </button>
   </div>

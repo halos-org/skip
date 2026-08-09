@@ -173,7 +173,7 @@ describe('WidgetAutopilotComponent', () => {
   const controls = (fixture: ComponentFixture<WidgetAutopilotComponent>) =>
     [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.ap-btn')];
 
-  it('gives every control a pronounceable accessible name', () => {
+  it('gives every control a non-empty accessible name', () => {
     // Angular Material marks mat-icon aria-hidden unless given an explicit value, so a control's
     // label must not live inside one or the control has no name at all.
     for (const mode of ['auto', 'wind', 'route', 'nav']) {
@@ -181,7 +181,9 @@ describe('WidgetAutopilotComponent', () => {
       // Every control is in the DOM in every mode; visibility is a `display` binding on the wrapper.
       expect(found.length, mode).toBe(10);
       for (const btn of found) {
-        expect(accessibleName(btn), `${mode}: ${btn.outerHTML}`).toMatch(/[a-z]/i);
+        // An aria-label must not replace visible text (WCAG 2.5.3 Label in Name), so the degree
+        // controls are named by "-1°" and carry no letters; a name is required, letters are not.
+        expect(accessibleName(btn), `${mode}: ${btn.outerHTML}`).not.toBe('');
         expect(btn.querySelector('mat-icon'), mode).toBeNull();
         expect(btn.querySelector('svg text'), mode).toBeNull();
       }

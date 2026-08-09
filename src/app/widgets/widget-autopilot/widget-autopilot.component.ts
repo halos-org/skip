@@ -1104,13 +1104,15 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       direction = "Port";
       this.actionToBeConfirmed = cmd;
     } else if (cmd === "tackToStarboard") {
-      direction = "Starboard";
+      direction = "Stbd";
       this.actionToBeConfirmed = cmd;
     } else {
       this.actionToBeConfirmed = "";
       return;
     }
 
+    // Quotes the button's own label; a prompt naming a control that is not on screen is worse
+    // than useless under a five-second countdown.
     const message = `Repeat [Tack ${direction}] key to confirm`;
     this.startConfirmCmd(cmd, message);
   }
