@@ -9,6 +9,7 @@ import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
 import { LATEST_APP_CONFIG_VERSION, REMOTE_CONFIG_FILE_VERSION } from '../constants/config-versions.const';
+import { removeLocalStorageItem, setLocalStorageItem } from '../utils/local-storage.util';
 
 // The app-config schema version the legacy v10/v11 transforms produce. Pinned on purpose:
 // bumping LATEST_APP_CONFIG_VERSION must not change what these transforms stamp — a newer
@@ -425,9 +426,9 @@ export class ConfigurationUpgradeService {
 
       this.migrateUseNeedleToEnableNeedle(dashboards);
 
-      localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(transformedApp));
-      localStorage.setItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(dashboards));
-      localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(transformedTheme));
+      setLocalStorageItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(transformedApp));
+      setLocalStorageItem(LOCAL_CONFIG_KEYS.dashboardsConfig, JSON.stringify(dashboards));
+      setLocalStorageItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(transformedTheme));
       setTimeout(() => this._settings.reloadApp(), 1500);
       this.upgrading.set(false);
     }
@@ -479,10 +480,10 @@ export class ConfigurationUpgradeService {
       localStorageConfig.app.configVersion = MIGRATION_OUTPUT_VERSION; // baseline fresh
       localStorageConfig.app.nightModeBrightness = 0.27;
       localStorageConfig.theme.themeName = '';
-      localStorage.setItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(localStorageConfig.app));
-      localStorage.setItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(localStorageConfig.theme));
-      localStorage.removeItem(LOCAL_CONFIG_KEYS.widgetConfig);
-      localStorage.removeItem(LOCAL_CONFIG_KEYS.layoutConfig);
+      setLocalStorageItem(LOCAL_CONFIG_KEYS.appConfig, JSON.stringify(localStorageConfig.app));
+      setLocalStorageItem(LOCAL_CONFIG_KEYS.themeConfig, JSON.stringify(localStorageConfig.theme));
+      removeLocalStorageItem(LOCAL_CONFIG_KEYS.widgetConfig);
+      removeLocalStorageItem(LOCAL_CONFIG_KEYS.layoutConfig);
       this.upgrading.set(false);
     }
   }

@@ -23,6 +23,7 @@ import { EmbedModeService } from './embed-mode.service';
 import { PROFILE_NAME_PATTERN } from './profile.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
 import { REMOTE_CONFIG_FILE_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
+import { getLocalStorageItem, setLocalStorageItem } from '../utils/local-storage.util';
 
 const CONNECTION_CONFIG_KEY = LOCAL_CONFIG_KEYS.connectionConfig;
 export type TBootstrapStatus = 'starting' | 'ready' | 'degraded';
@@ -359,7 +360,7 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   private setLocalStorageConfig(): void {
-    localStorage.setItem(CONNECTION_CONFIG_KEY, JSON.stringify(this.config));
+    setLocalStorageItem(CONNECTION_CONFIG_KEY, JSON.stringify(this.config));
   }
 
   /**
@@ -386,7 +387,7 @@ export class AppNetworkInitService implements OnDestroy {
       : (remoteConfig?.app as unknown as { isRemoteControl?: boolean; instanceName?: string }) ?? null;
     if (!app) {
       try {
-        app = JSON.parse(localStorage.getItem(LOCAL_CONFIG_KEYS.appConfig) ?? 'null');
+        app = JSON.parse(getLocalStorageItem(LOCAL_CONFIG_KEYS.appConfig) ?? 'null');
       } catch {
         app = null;
       }
@@ -399,7 +400,7 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   private loadLocalStorageConfig(): void {
-    const stored = localStorage.getItem(CONNECTION_CONFIG_KEY);
+    const stored = getLocalStorageItem(CONNECTION_CONFIG_KEY);
     const parsedConfig: IConnectionConfig | null = stored ? JSON.parse(stored) : null;
 
     if (!parsedConfig) {
