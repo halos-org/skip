@@ -12,6 +12,15 @@ import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { States } from '../../core/interfaces/signalk-interfaces';
 
+/** Measures whose value arrives already formatted as a string, so it is drawn verbatim. */
+const PRE_FORMATTED_MEASURES = ['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'];
+/** Measures whose '%' this widget appends to the value text itself. */
+const PERCENT_MEASURES = ['percent', 'percentraw'];
+/** Measures that must not put a symbol in the label row: it is already in the value, or there is none. */
+const UNLABELLED_MEASURES = new Set([...PRE_FORMATTED_MEASURES, ...PERCENT_MEASURES, 'ratio']);
+/** Fraction of the tile height given to the label row. */
+const LABEL_ROW_FRACTION = 0.1;
+
 @Component({
   selector: 'widget-numeric',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -207,10 +216,16 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
       onResize: (w, h) => {
         this.cssWidth = w;
         this.cssHeight = h;
-        this.calculateMaxMinTextDimensions();
         this.drawWidget();
       },
     });
+    // The label row is laid out from measured text, and a cold boot measures the fallback font:
+    // drop the cached bitmap once the web font settles so the row is re-fitted to real metrics.
+    this.canvas.whenFontsReady().then(() => {
+      if (this.isDestroyed) return;
+      this.foregroundBitmap = null;
+      this.drawWidget();
+    }).catch(() => { /* ignore */ });
   }
 
   ngAfterViewInit(): void {
@@ -225,11 +240,31 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     }
   }
 
+  private labelRowHeight(): number {
+    return Math.round(this.cssHeight * LABEL_ROW_FRACTION);
+  }
+
+  /**
+   * Baseline the label and the unit sit on, which is also the bottom edge of their band: everything
+   * below it belongs to the value, and {@link drawValue} sizes and centres itself off this number.
+   */
+  private labelBaselineY(): number {
+    return this.canvas.EDGE_BUFFER + this.labelRowHeight();
+  }
+
+  /** Top edge of the band {@link drawMinMax} writes into, or the card bottom when it draws nothing. */
+  private valueBoxBottom(): number {
+    const cfg = this.runtime.options();
+    return (cfg?.showMin || cfg?.showMax) ? this.cssHeight - this.maxMinMaxTextHeight : this.cssHeight;
+  }
+
   private calculateMaxMinTextDimensions(): void {
-    this.maxValueTextWidth = Math.floor(this.cssWidth * 0.85);
-    this.maxValueTextHeight = Math.floor(this.cssHeight * 0.70);
     this.maxMinMaxTextWidth = Math.floor(this.cssWidth * 0.57);
     this.maxMinMaxTextHeight = Math.floor(this.cssHeight * 0.1);
+    // The value owns the card between the label row and the min/max row. This is an em box and
+    // glyphs fill about 70% of it, so the fitted text keeps clear of both.
+    this.maxValueTextWidth = Math.floor(this.cssWidth * 0.90);
+    this.maxValueTextHeight = Math.max(1, Math.floor(this.valueBoxBottom() - this.labelBaselineY()));
   }
 
   private updateMiniChartVisibility(): void {
@@ -267,13 +302,13 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     const cfg = this.runtime.options();
     if (!cfg) return;
     const unit = this.effectiveUnit();
-    const marginX = 10 * this.canvas.scaleFactor;
-    const marginY = 5 * this.canvas.scaleFactor;
     const displayName = cfg.displayName ?? 'Gauge Label';
     // Background-color halo: invisible over the empty card, carves the value out only where the
     // floored label/unit overlap it. Requires the label/unit to be composited above the value below.
     const haloColor = this.theme()?.cardColor || undefined;
     const fgText = displayName + '|' + unit;
+    // The boxes track the min/max rows, which a config edit can toggle without a resize.
+    this.calculateMaxMinTextDimensions();
 
     if (!this.foregroundBitmap ||
         this.foregroundBitmap.width !== this.canvasElement.width ||
@@ -283,35 +318,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
         ctx,
         this.cssWidth,
         this.cssHeight,
-        (bitmapCtx) => {
-          this.canvas['drawTitleInternal'](
-            bitmapCtx,
-            displayName,
-            this.labelColor(),
-            'normal',
-            this.cssWidth,
-            this.cssHeight,
-            0.1,
-            haloColor,
-            this.canvas.MIN_LABEL_PX
-          );
-          if (unit && !['unitless', 'percent', 'percentraw', 'ratio', 'latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin'].includes(unit)) {
-            this.canvas.drawText(
-              bitmapCtx,
-              this.unitsService.getUnitDisplaySymbol(unit),
-              this.cssWidth - marginX,
-              this.cssHeight - marginY,
-              Math.floor(this.cssWidth * 0.25),
-              Math.floor(this.cssHeight * 0.15),
-              'bold',
-              this.valueColor,
-              'end',
-              'bottom',
-              haloColor,
-              this.canvas.MIN_UNIT_PX
-            );
-          }
-        }
+        (bitmapCtx) => this.drawLabelRow(bitmapCtx, displayName, unit, haloColor)
       );
       this.foregroundBitmapText = fgText;
     }
@@ -325,13 +332,85 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     this.canvas.drawTextBitmap(ctx, this.foregroundBitmap, this.cssWidth, this.cssHeight);
   }
 
+  /**
+   * Label and unit share the top band — one in each corner — so chrome costs the tile a single row
+   * and the value keeps everything below it. Both sit on the band's bottom edge as a common
+   * baseline, which lines them up even though the unit is set bold and at its own size. The unit
+   * gets its share of the row first: it is the shorter of the two and the one the reading needs.
+   */
+  private drawLabelRow(ctx: CanvasRenderingContext2D, displayName: string, unit: string, haloColor: string | undefined): void {
+    const edge = this.canvas.EDGE_BUFFER;
+    const rowHeight = this.labelRowHeight();
+    const baselineY = this.labelBaselineY();
+    const unitBoxWidth = Math.floor(this.cssWidth * 0.25);
+    const symbol = UNLABELLED_MEASURES.has(unit) ? '' : this.unitsService.getRenderableUnitSymbol(unit);
+    let labelWidth = this.cssWidth - 2 * edge;
+
+    if (symbol) {
+      const unitFontSize = this.canvas.calculateOptimalFontSize(ctx, symbol, unitBoxWidth, rowHeight, 'bold', this.canvas.MIN_UNIT_PX);
+      labelWidth -= this.canvas.measureTextWidth(symbol, `bold ${unitFontSize}px ${this.canvas.DEFAULT_FONT}`) + edge;
+    }
+
+    const label = this.truncateLabel(displayName, labelWidth);
+    if (label) {
+      this.canvas.drawText(
+        ctx,
+        label,
+        edge,
+        baselineY,
+        labelWidth,
+        rowHeight,
+        'normal',
+        this.labelColor(),
+        'left',
+        'alphabetic',
+        haloColor,
+        this.canvas.MIN_LABEL_PX
+      );
+    }
+
+    if (symbol) {
+      this.canvas.drawText(
+        ctx,
+        symbol,
+        this.cssWidth - edge,
+        baselineY,
+        unitBoxWidth,
+        rowHeight,
+        'bold',
+        this.valueColor,
+        'right',
+        'alphabetic',
+        haloColor,
+        this.canvas.MIN_UNIT_PX
+      );
+    }
+  }
+
+  /**
+   * Fits a name to its share of the row, ellipsising it and dropping it entirely when even one
+   * character will not fit. A label is never drawn below {@link CanvasService.MIN_LABEL_PX} and a
+   * floored draw carries no width cap, so anything that does not fit at that size runs into the
+   * unit. Measured and sliced by code point, so an emoji in the name cannot be cut in half.
+   */
+  private truncateLabel(text: string, maxWidth: number): string {
+    if (maxWidth <= 0) return '';
+    const font = `normal ${this.canvas.MIN_LABEL_PX}px ${this.canvas.DEFAULT_FONT}`;
+    if (this.canvas.measureTextWidth(text, font) <= maxWidth) return text;
+    const glyphs = Array.from(text);
+    while (glyphs.length > 0 && this.canvas.measureTextWidth(`${glyphs.join('')}…`, font) > maxWidth) {
+      glyphs.pop();
+    }
+    return glyphs.length > 0 ? `${glyphs.join('')}…` : '';
+  }
+
   private drawValue(ctx: CanvasRenderingContext2D): void {
     const valueText = this.getValueText();
     this.canvas.drawText(
       ctx,
       valueText,
       Math.floor(this.cssWidth / 2),
-      Math.floor((this.cssHeight / 2) * 1.15),
+      Math.floor((this.labelBaselineY() + this.valueBoxBottom()) / 2),
       this.maxValueTextWidth,
       this.maxValueTextHeight,
       'bold',
@@ -348,7 +427,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     // and a position/duration format measure arrives as a pre-formatted string — testing the stored
     // unit here would call toFixed() on that string (crash) or print a raw number for a format measure.
     const measure = this.effectiveUnit();
-    if (['latitudeSec', 'latitudeMin', 'longitudeSec', 'longitudeMin', 'D HH:MM:SS'].includes(measure)) {
+    if (PRE_FORMATTED_MEASURES.includes(measure)) {
       return dataValue.toString();
     }
     return this.applyDecorations(dataValue.toFixed(cfg?.numDecimal));
@@ -385,13 +464,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   private applyDecorations(txtValue: string): string {
     // Percent decoration follows the applied measure, not the stored convertUnitTo — same reason as
     // getValueText: a display path's value is scaled per the resolved measure, so the '%' must too.
-    switch (this.effectiveUnit()) {
-      case 'percent':
-      case 'percentraw':
-        txtValue += '%';
-        break;
-    }
-    return txtValue;
+    return PERCENT_MEASURES.includes(this.effectiveUnit()) ? `${txtValue}%` : txtValue;
   }
 
   ngOnDestroy(): void {
