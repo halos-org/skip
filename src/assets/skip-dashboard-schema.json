@@ -543,7 +543,7 @@
     "configFileVersion": 11,
     "configVersion": 19,
     "schemaVersion": 1,
-    "skipVersion": "1.3.0"
+    "skipVersion": "1.3.1"
   },
   "widgets": [
     {
