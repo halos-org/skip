@@ -50,7 +50,6 @@ class SettingsServiceMock {
     public getIsRemoteControl() { return false; }
     public getInstanceName() { return ''; }
     public getBrowserTabTitle() { return 'Skip'; }
-    public getDisablePathValidation() { return false; }
     public getKeepScreenAwake() { return true; }
     public getAutoRevealToolbar() { return true; }
     public setAutoNightMode(): void { }
@@ -60,7 +59,6 @@ class SettingsServiceMock {
     public setInstanceName(): void { }
     public setThemeName(): void { }
     public setBrowserTabTitle(): void { }
-    public setDisablePathValidation(): void { }
     public setKeepScreenAwake(): void { }
     public setAutoRevealToolbar(): void { }
 }

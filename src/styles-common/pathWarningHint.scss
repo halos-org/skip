@@ -1,0 +1,7 @@
+// A caution, not a failure: an unrecognized path may be perfectly correct with its instrument
+// switched off, and Save stays available. Deliberately not the error red, which would read as
+// "this cannot be saved". Global rather than component-scoped so the widget-config dialogs that
+// show this hint cannot drift apart on its colour.
+.mat-mdc-form-field-hint.pathWarningHint {
+  color: var(--mat-sys-tertiary);
+}

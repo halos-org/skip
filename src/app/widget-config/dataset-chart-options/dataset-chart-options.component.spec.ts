@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UntypedFormControl } from '@angular/forms';
 import { DatasetChartOptionsComponent } from './dataset-chart-options.component';
 import { DataService } from '../../core/services/data.service';
@@ -96,5 +96,80 @@ describe('DatasetChartOptionsComponent', () => {
     pathObject = { path: 'navigation.speedThroughWater', sources: src('gps.0', 'gps.1') };
     changePath(pathObject.path as string);
     expect(component.datachartSource().value).toBe('default');
+  });
+
+  // The published list is empty in this suite, so any configured path reads as unpublished (#501).
+  const mountWithPath = (path: string) => {
+    const fx = TestBed.createComponent(DatasetChartOptionsComponent);
+    const set = fx.componentRef.setInput.bind(fx.componentRef) as (k: string, v: unknown) => void;
+    const pathControl = new UntypedFormControl(path);
+    set('filterSelfPaths', new UntypedFormControl(false));
+    set('datachartPath', pathControl);
+    set('datachartSource', new UntypedFormControl({ value: '', disabled: true }));
+    set('timeScale', new UntypedFormControl(''));
+    set('period', new UntypedFormControl(''));
+    fx.detectChanges();
+    return { fixture: fx, pathControl };
+  };
+
+  const pathWarning = (fx: ComponentFixture<DatasetChartOptionsComponent>) =>
+    (fx.componentInstance as unknown as { pathWarning: () => string | null }).pathWarning();
+
+  it('leaves an unsent path valid, so Save stays available', () => {
+    const { fixture: fx, pathControl } = mountWithPath('self.steering.rudderAngle');
+    expect(pathControl.valid).toBe(true);
+    expect(pathWarning(fx)).toContain('not sending this path');
+  });
+
+  it('still invalidates an empty path', () => {
+    const { fixture: fx, pathControl } = mountWithPath('');
+    expect(pathControl.valid).toBe(false);
+    expect(pathControl.errors).toEqual({ required: true });
+    expect(pathWarning(fx)).toBeNull();
+  });
+
+  it('offers the stored source alongside "Any" when the server is not sending the path', () => {
+    // Otherwise the Source select renders enabled and required with no options at all, in exactly
+    // the case this change makes reachable.
+    pathObject = null;
+    const fx = TestBed.createComponent(DatasetChartOptionsComponent);
+    const set = fx.componentRef.setInput.bind(fx.componentRef) as (k: string, v: unknown) => void;
+    const sourceControl = new UntypedFormControl('gps.7');
+    set('filterSelfPaths', new UntypedFormControl(false));
+    set('datachartPath', new UntypedFormControl('self.steering.rudderAngle'));
+    set('datachartSource', sourceControl);
+    set('timeScale', new UntypedFormControl(''));
+    set('period', new UntypedFormControl(''));
+    fx.detectChanges();
+    const sourceList = (fx.componentInstance as unknown as { pathSources: () => string[] }).pathSources();
+    expect(sourceList).toEqual(['default', 'gps.7']);
+    expect(sourceControl.value).toBe('gps.7');
+    expect(sourceControl.enabled).toBe(true);
+  });
+
+  it('drops the previous path\'s source when a new path is typed rather than picked', async () => {
+    // An unsent path never appears in the autocomplete, so (optionSelected) never fires and
+    // changePath() never runs; the stale concrete source would otherwise be saved against it.
+    vi.useFakeTimers();
+    try {
+      pathObject = null;
+      const fx = TestBed.createComponent(DatasetChartOptionsComponent);
+      const set = fx.componentRef.setInput.bind(fx.componentRef) as (k: string, v: unknown) => void;
+      const pathControl = new UntypedFormControl('self.environment.wind.speedApparent');
+      const sourceControl = new UntypedFormControl('wind-sensor-1');
+      set('filterSelfPaths', new UntypedFormControl(false));
+      set('datachartPath', pathControl);
+      set('datachartSource', sourceControl);
+      set('timeScale', new UntypedFormControl(''));
+      set('period', new UntypedFormControl(''));
+      fx.detectChanges();
+      expect(sourceControl.value).toBe('wind-sensor-1');
+
+      pathControl.setValue('self.propulsion.port.temperature');
+      await vi.advanceTimersByTimeAsync(400);
+      expect(sourceControl.value).toBe('default');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

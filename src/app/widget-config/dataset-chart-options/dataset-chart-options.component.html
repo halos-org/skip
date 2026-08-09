@@ -18,10 +18,9 @@
         <mat-error>
           Path is required. Please enter a valid Signal K path.
         </mat-error>
-      } @else if (datachartPath().errors) {
-        <mat-error>
-          Path not recognized. Please enter a path from the server's published list.
-        </mat-error>
+      }
+      @if (pathWarning()) {
+        <mat-hint class="pathWarningHint">{{ pathWarning() }}</mat-hint>
       }
       <mat-autocomplete #pathAutoComplete="matAutocomplete" (optionSelected)="changePath($event)">
         @for (option of filteredNumericPaths(); track option.path) {
