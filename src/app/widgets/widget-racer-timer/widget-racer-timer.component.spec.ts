@@ -142,9 +142,22 @@ describe('WidgetRacerTimerComponent', () => {
       const input = host().querySelector<HTMLInputElement>('input.set-start-at');
       input!.value = '23:45:00';
       input!.dispatchEvent(new Event('input'));
-      input!.dispatchEvent(new Event('blur'));
-      fixture.detectChanges();
+      clickLabel('Set');
     };
+
+    it('sends nothing until Set is pressed, however the field is left', () => {
+      // A touch wheel picker gives the user nowhere obvious to tap to blur, so blur is not a commit.
+      setMode(4);
+      const input = host().querySelector<HTMLInputElement>('input.set-start-at');
+      input!.value = '20:40:00';
+      input!.dispatchEvent(new Event('input'));
+      input!.dispatchEvent(new Event('blur'));
+      input!.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      expect(requestsMock.putRequest).not.toHaveBeenCalled();
+      clickLabel('Set');
+      expect(requestsMock.putRequest).toHaveBeenCalled();
+    });
 
     it('does not submit an intermediate value while the field is still being typed', () => {
       // Chromium fires `change` as soon as a time input holds a complete value, so typing 20 then 4
@@ -186,5 +199,23 @@ describe('WidgetRacerTimerComponent', () => {
       fixture.detectChanges();
       expect(host().querySelector('input.set-start-at')).not.toBeNull();
     });
+  });
+
+  it('does not let a data timeout blank the field being edited', () => {
+    // enableTimeout is on with a 5s window, so an unset start time emits null repeatedly.
+    setMode(4);
+    const edit = (fixture.componentInstance as unknown as {
+      startAtTimeEdit: { set: (v: string) => void; (): string };
+    }).startAtTimeEdit;
+    edit.set('20:40:00');
+    fixture.detectChanges();
+
+    const observer = streamsMock.observe.mock.calls.find(c => c[0] === 'startTimePath')?.[1] as
+      ((pkt: { data: { value: string | null } }) => void) | undefined;
+    expect(observer, 'startTimePath was never observed').toBeTruthy();
+    observer?.({ data: { value: null } });
+    fixture.detectChanges();
+
+    expect(edit()).toBe('20:40:00');
   });
 });

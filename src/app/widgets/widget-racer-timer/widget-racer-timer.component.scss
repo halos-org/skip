@@ -127,6 +127,14 @@ $label-field-width: 13cqw;
   height: 100%;
 }
 
+// A touch wheel picker has no obvious "outside" to tap, so committing on blur left the value
+// looking entered but unsent. The button is the only commit path that reads the same on a
+// keyboard and a touch screen.
+.set-start-button {
+  flex: 0 0 auto;
+  width: 22%;
+}
+
 // The field sits on the widget's own surface and takes the theme's ink, which is the pairing every
 // theme is built around — the night theme is near-monochrome dark red, so any two of its own tokens
 // stacked give about 1.3:1. A border delineates the field instead of a fill.

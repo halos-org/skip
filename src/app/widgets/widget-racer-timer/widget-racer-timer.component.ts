@@ -148,13 +148,16 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
       if (!path) return;
       untracked(() => this.streams.observe('startTimePath', pkt => {
         const v = pkt?.data?.value as string | null;
+        // The edit field is the user's, not the stream's, while they are in it. A data timeout emits
+        // null every few seconds when no start time is set, which otherwise blanks what they typed.
+        const editing = this.mode() === 4;
         if (!v) {
           this.startAtTime.set('HH:MM:SS');
-          this.startAtTimeEdit.set('');
+          if (!editing) { this.startAtTimeEdit.set(''); }
           if (this.mode() === 2) this.mode.set(1);
         } else {
           const iso = new Date(v);
-          this.startAtTimeEdit.set(toTimeInputValue(iso));
+          if (!editing) { this.startAtTimeEdit.set(toTimeInputValue(iso)); }
           this.startAtTime.set(iso.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         }
         this.draw();
@@ -227,9 +230,10 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Commits on blur or Enter, never on `change`: a time input fires that as soon as the value is
-   * complete, which on Chromium is mid-entry — typing 20 then 4 of "20:40" makes "20:04" complete
-   * and would submit it.
+   * Commits only from the Set button or Enter. Never on `change`, which a time input fires as soon
+   * as the value is complete — on Chromium that is mid-entry, so typing 20 then 4 of "20:40" makes
+   * "20:04" complete and would submit it. Never on blur either: a touch wheel picker gives the user
+   * nowhere obvious to tap to blur, so the value looked entered but was never sent.
    */
   public setStartTime(): void {
     const entered = this.startAtTimeEdit();
