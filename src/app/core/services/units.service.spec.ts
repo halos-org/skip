@@ -39,6 +39,25 @@ describe('UnitsService', () => {
     });
   });
 
+  describe('getRenderableUnitSymbol', () => {
+    it('returns the display symbol for a measure that has one to show', () => {
+      const service = setup();
+      expect(service.getRenderableUnitSymbol('knots')).toBe('kn');
+      expect(service.getRenderableUnitSymbol('celsius')).toBe('°C');
+      expect(service.getRenderableUnitSymbol('mph')).toBe('mph');
+    });
+
+    it('returns nothing for the measures that must not print a symbol', () => {
+      const service = setup();
+      // A render site reserves room from this, so 'unitless' must not come back as its own key and
+      // the whitespace 'No unit label' measure must not come back as a blank that occupies space.
+      expect(service.getRenderableUnitSymbol('unitless')).toBe('');
+      expect(service.getRenderableUnitSymbol(' ')).toBe('');
+      expect(service.getRenderableUnitSymbol(null)).toBe('');
+      expect(service.getRenderableUnitSymbol('')).toBe('');
+    });
+  });
+
   describe('convertBetweenMeasures (affine round-trip)', () => {
     it('returns the value unchanged when from === to', () => {
       const s = setup();

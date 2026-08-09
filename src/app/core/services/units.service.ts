@@ -689,6 +689,19 @@ export class UnitsService {
   }
 
   /**
+   * The symbol to render beside a value, or '' where there is nothing to render: the boot
+   * placeholder, 'unitless', and the whitespace 'No unit label' measure. A render site that lays
+   * out around the symbol must use this rather than {@link getUnitDisplaySymbol}, whose fallback
+   * returns the measure key itself — reserving room for a blank or for the word "unitless".
+   */
+  public getRenderableUnitSymbol(measure: string | null | undefined): string {
+    if (!measure || measure === 'unitless') {
+      return '';
+    }
+    return this.getUnitDisplaySymbol(measure).trim();
+  }
+
+  /**
    * Accessor for the full conversion-group table (`_conversionList`) — every unit group
    * and its member measures. Used by the conversion-table integrity test to enumerate
    * the measures Skip knows how to convert.
