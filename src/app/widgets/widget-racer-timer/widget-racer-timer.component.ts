@@ -24,16 +24,14 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {getColors} from '../../core/utils/themeColors.utils';
 import {FormsModule} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
-import {MatIconModule} from '@angular/material/icon';
 import {MatTooltipModule} from '@angular/material/tooltip';
-import {MatInput} from '@angular/material/input';
 
 @Component({
   selector: 'widget-racer-timer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './widget-racer-timer.component.html',
   styleUrls: ['./widget-racer-timer.component.scss'],
-  imports: [FormsModule, MatButtonModule, MatIconModule, MatTooltipModule, MatInput]
+  imports: [FormsModule, MatButtonModule, MatTooltipModule]
 })
 export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   // Functional inputs
