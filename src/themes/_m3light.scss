@@ -9,18 +9,21 @@ $_background: #e1e4ec;
 
 $skip-light-color: (
   blue: #005bb5, blue-dim: #005bb5b6, blue-dimmer: #005bb578,
-  // Ink for labels on the blue/port fills; the surface `contrast` ink does not track these accents' own lightness.
+  // Ink for labels on the accent fills; the surface `contrast` ink does not track these accents' own lightness.
   on-blue: #ffffff,
   green: #007a00, green-dim: #007a00b6, green-dimmer: #007a0078,
   purple: #6a00a8, purple-dim: #6a00a8b6, purple-dimmer: #6a00a878,
   yellow: #bfa800, yellow-dim: #bfa800b6, yellow-dimmer: #bfa80078,
   pink: #b00070, pink-dim: #b00070b6, pink-dimmer: #b0007078,
   orange: #c56200, orange-dim: #c56200b6, orange-dimmer: #c5620078,
+  on-orange: #000000,
   contrast: #000000, contrast-dim: #000000b6, contrast-dimmer: #00000029,
   grey: #666666, grey-dim: #666666b6, grey-dimmer: #66666629,
+  on-grey: #ffffff,
   port: #b70000,
   on-port: #ffffff,
   starboard: #008700,
+  on-starboard: #ffffff,
   zone-nominal: #0182fa,
   zone-alert: #f0f032,
   zone-warn: #ff8534,
@@ -65,6 +68,7 @@ $pinkDimmer: map.get($skip-light-color, pink-dimmer);
 $orange: map.get($skip-light-color, orange);
 $orangeDim: map.get($skip-light-color, orange-dim);
 $orangeDimmer: map.get($skip-light-color, orange-dimmer);
+$onOrange: map.get($skip-light-color, on-orange);
 
 $contrast: map.get($skip-light-color, contrast);
 $contrastDim: map.get($skip-light-color, contrast-dim);
@@ -73,10 +77,12 @@ $contrastDimmer: map.get($skip-light-color, contrast-dimmer);
 $grey: map.get($skip-light-color, grey);
 $greyDim: map.get($skip-light-color, grey-dim);
 $greyDimmer: map.get($skip-light-color, grey-dimmer);
+$onGrey: map.get($skip-light-color, on-grey);
 
 $port: map.get($skip-light-color, port);
 $onPort: map.get($skip-light-color, on-port);
 $starboard: map.get($skip-light-color, starboard);
+$onStarboard: map.get($skip-light-color, on-starboard);
 $zone-nominal: map.get($skip-light-color, zone-nominal);
 $zone-alert: map.get($skip-light-color, zone-alert);
 $zone-warn: map.get($skip-light-color, zone-warn);

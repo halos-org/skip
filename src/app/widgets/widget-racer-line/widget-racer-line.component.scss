@@ -128,7 +128,7 @@ $label-length-width: 11cqw;
   width: 58%;
   @include mat.button-overrides((
     filled-container-color: var(--skip-grey-color),
-    filled-label-text-color: var(--skip-contrast-color)
+    filled-label-text-color: var(--skip-on-grey-color)
   ));
 }
 
@@ -137,7 +137,7 @@ $label-length-width: 11cqw;
   width: 58%;
   @include mat.button-overrides((
     filled-container-color: var(--skip-orange-color),
-    filled-label-text-color: var(--skip-contrast-color)
+    filled-label-text-color: var(--skip-on-orange-color)
   ));
 }
 
@@ -153,7 +153,7 @@ $label-length-width: 11cqw;
   flex: 1 1 auto;
   @include mat.button-overrides((
     filled-container-color: var(--skip-starboard-color),
-    filled-label-text-color: var(--skip-contrast-color)
+    filled-label-text-color: var(--skip-on-starboard-color)
   ));
 }
 
@@ -169,7 +169,7 @@ $label-length-width: 11cqw;
   flex: 1 1 auto;
   @include mat.button-overrides((
     filled-container-color: var(--skip-starboard-color),
-    filled-label-text-color: var(--skip-contrast-color)
+    filled-label-text-color: var(--skip-on-starboard-color)
   ));
 }
 

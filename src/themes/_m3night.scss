@@ -141,19 +141,23 @@ $_background: #101415;
 
 $skip-night-color: (
   blue: #520000, blue-dim: #520000b6, blue-dimmer: #260000c5,
-  // Ink for labels on the blue/port fills: the dimmest red palette tones that still clear AA, since white would
-  // cost dark adaptation and no ink darker than these accents reaches even 2:1 against them.
+  // Ink for labels on the accent fills: the dimmest palette tone that clears AA on each fill, since white would
+  // cost dark adaptation and no ink darker than these accents clears AA against them at all.
   on-blue: #e56c5b,
   green: #520000, green-dim: #520000b6, green-dimmer: #260000c5,
   purple: #520000, purple-dim: #520000b6, purple-dimmer: #260000c5,
   yellow: #520000, yellow-dim: #520000b6, yellow-dimmer: #260000c5,
   pink: #520000, pink-dim: #520000b6, pink-dimmer: #260000c5,
   orange: #520000, orange-dim: #520000b6, orange-dimmer: #260000c5,
+  on-orange: #e56c5b,
   contrast: #520000, contrast-dim: #520000b6, contrast-dimmer: #260000c5,
   grey: #520000, grey-dim: #520000b6, grey-dimmer: #260000c5,
+  on-grey: #e56c5b,
   port: #800000,
   on-port: #ff8a78,
   starboard: #005500,
+  // Starboard is the one green fill in an all-red palette, so it needs a lighter tone than the reds do.
+  on-starboard: #ffb4a8,
   zone-nominal: #001d49,
   zone-alert: #2c2c00,
   zone-warn: #441e00,
@@ -198,6 +202,7 @@ $pinkDimmer: map.get($skip-night-color, pink-dimmer);
 $orange: map.get($skip-night-color, orange);
 $orangeDim: map.get($skip-night-color, orange-dim);
 $orangeDimmer: map.get($skip-night-color, orange-dimmer);
+$onOrange: map.get($skip-night-color, on-orange);
 
 $contrast: map.get($skip-night-color, contrast);
 $contrastDim: map.get($skip-night-color, contrast-dim);
@@ -206,10 +211,12 @@ $contrastDimmer: map.get($skip-night-color, contrast-dimmer);
 $grey: map.get($skip-night-color, grey);
 $greyDim: map.get($skip-night-color, grey-dim);
 $greyDimmer: map.get($skip-night-color, grey-dimmer);
+$onGrey: map.get($skip-night-color, on-grey);
 
 $port: map.get($skip-night-color, port);
 $onPort: map.get($skip-night-color, on-port);
 $starboard: map.get($skip-night-color, starboard);
+$onStarboard: map.get($skip-night-color, on-starboard);
 $zone-nominal: map.get($skip-night-color, zone-nominal);
 $zone-alert: map.get($skip-night-color, zone-alert);
 $zone-warn: map.get($skip-night-color, zone-warn);
