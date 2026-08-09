@@ -24,16 +24,23 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {getColors} from '../../core/utils/themeColors.utils';
 import {FormsModule} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
-import {MatIconModule} from '@angular/material/icon';
 import {MatTooltipModule} from '@angular/material/tooltip';
-import {MatInput} from '@angular/material/input';
+
+/**
+ * Local wall-clock time as `input[type=time]` requires it. `toLocaleTimeString` gives "05:30:45 PM"
+ * under en-US and "17.30.45" under fi-FI; the control accepts neither and silently blanks itself.
+ */
+function toTimeInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
 
 @Component({
   selector: 'widget-racer-timer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './widget-racer-timer.component.html',
   styleUrls: ['./widget-racer-timer.component.scss'],
-  imports: [FormsModule, MatButtonModule, MatIconModule, MatTooltipModule, MatInput]
+  imports: [FormsModule, MatButtonModule, MatTooltipModule]
 })
 export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   // Functional inputs
@@ -133,12 +140,12 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
         const v = pkt?.data?.value as string | null;
         if (!v) {
           this.startAtTime.set('HH:MM:SS');
-          this.startAtTimeEdit.set('HH:MM:SS');
+          this.startAtTimeEdit.set('');
           if (this.mode() === 2) this.mode.set(1);
         } else {
           const iso = new Date(v);
-          this.startAtTimeEdit.set(iso.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-          this.startAtTime.set(this.startAtTimeEdit());
+          this.startAtTimeEdit.set(toTimeInputValue(iso));
+          this.startAtTime.set(iso.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         }
         this.draw();
       }));
@@ -205,9 +212,13 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   }
 
   public setStartTime(): void {
-    const now = new Date();
     const parts = this.startAtTimeEdit().split(':').map(Number);
-    const hours = parts[0]; const minutes = parts[1]; const seconds = parts.length >= 3 ? parts[2] : 0;
+    // A cleared field yields [0] and the placeholder yields NaNs; either would build an Invalid Date
+    // whose toISOString() throws out of the change handler. Stay in the edit mode instead.
+    if (parts.length < 2 || parts.some(part => !Number.isFinite(part))) { return; }
+    const [hours, minutes] = parts;
+    const seconds = parts.length >= 3 ? parts[2] : 0;
+    const now = new Date();
     const date = new Date(now); date.setHours(hours, minutes, seconds, 0); if (date <= now) date.setDate(date.getDate() + 1);
     this.mode.set(0);
     this.signalk.putRequest('navigation.racing.setStartTime', { command: 'set', startTime: date.toISOString() }, this.id());
