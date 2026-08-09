@@ -19,6 +19,13 @@ import { Directive, DestroyRef, ElementRef, inject, input, output } from '@angul
 import { GESTURES_DEBUG_KEY } from '../constants/config-storage.const';
 
 
+/** Controls whose own pointer handling must not be pre-empted by gesture recognition. */
+const FORM_CONTROL_SELECTOR = 'input, select, textarea, [contenteditable]:not([contenteditable="false"])';
+
+function isNativeFormControl(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(FORM_CONTROL_SELECTOR) !== null;
+}
+
 // Cancel handler metadata used for long-press cancellation listeners.
 type CancelTarget = 'el' | 'doc' | 'window';
 interface CancelHandlerEntry {
@@ -443,6 +450,15 @@ export class GestureDirective {
       return;
     }
     if (this.disableGestures()) { return; }
+    // Never recognise a gesture that starts on a native form control. Both halves of the tracking
+    // setup below are hostile to one: capture is taken on the event target, and pointerdown is
+    // preventDefault()ed to suppress the UA long-press hint — which on WebKit also suppresses the
+    // control's default action, so the field never focuses and a date/time picker never opens.
+    // Long-pressing a text field should select text, not open the widget's options.
+    if (isNativeFormControl(ev.target)) {
+      this.debug('ignoring pointerdown on a native form control', { target: this.elDesc(ev.target as Element) });
+      return;
+    }
     this.debug('pointerdown', {
       x: ev.clientX,
       y: ev.clientY,

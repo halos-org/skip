@@ -5,6 +5,7 @@ import { WidgetRacerTimerComponent } from './widget-racer-timer.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { SignalkRequestsService, skRequest } from '../../core/services/signalk-requests.service';
+import { ToastService } from '../../core/services/toast.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { CanvasService } from '../../core/services/canvas.service';
 
@@ -19,6 +20,7 @@ describe('WidgetRacerTimerComponent', () => {
     putRequest: vi.fn(() => 'req-1')
   };
   const dashboardMock = { isDashboardStatic: () => true };
+  const toastMock = { show: vi.fn() };
   // Typed so a member the widget does not have is a compile error under `npm run snc`. A member it
   // gains later still returns undefined silently — the canvas is not what these tests are about.
   const canvasMock: Partial<CanvasService> = {
@@ -34,6 +36,7 @@ describe('WidgetRacerTimerComponent', () => {
   beforeEach(async () => {
     streamsMock.observe.mockClear();
     requestsMock.putRequest.mockClear();
+    toastMock.show.mockClear();
     await TestBed.configureTestingModule({
       imports: [WidgetRacerTimerComponent],
       providers: [
@@ -41,6 +44,7 @@ describe('WidgetRacerTimerComponent', () => {
         { provide: WidgetStreamsDirective, useValue: streamsMock },
         { provide: SignalkRequestsService, useValue: requestsMock },
         { provide: DashboardService, useValue: dashboardMock },
+        { provide: ToastService, useValue: toastMock },
         { provide: CanvasService, useValue: canvasMock }
       ]
     }).compileComponents();
@@ -119,6 +123,7 @@ describe('WidgetRacerTimerComponent', () => {
     [3, '+1m', { command: 'adjust', delta: 60 }]
   ])('mode %i: %s sends %o', (mode, label, payload) => {
     requestsMock.putRequest.mockClear();
+    toastMock.show.mockClear();
     setMode(mode as number);
     clickLabel(label as string);
     expect(requestsMock.putRequest).toHaveBeenCalledWith(
@@ -142,9 +147,22 @@ describe('WidgetRacerTimerComponent', () => {
       const input = host().querySelector<HTMLInputElement>('input.set-start-at');
       input!.value = '23:45:00';
       input!.dispatchEvent(new Event('input'));
-      input!.dispatchEvent(new Event('blur'));
-      fixture.detectChanges();
+      clickLabel('Set');
     };
+
+    it('sends nothing until Set is pressed, however the field is left', () => {
+      // A touch wheel picker gives the user nowhere obvious to tap to blur, so blur is not a commit.
+      setMode(4);
+      const input = host().querySelector<HTMLInputElement>('input.set-start-at');
+      input!.value = '20:40:00';
+      input!.dispatchEvent(new Event('input'));
+      input!.dispatchEvent(new Event('blur'));
+      input!.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      expect(requestsMock.putRequest).not.toHaveBeenCalled();
+      clickLabel('Set');
+      expect(requestsMock.putRequest).toHaveBeenCalled();
+    });
 
     it('does not submit an intermediate value while the field is still being typed', () => {
       // Chromium fires `change` as soon as a time input holds a complete value, so typing 20 then 4
@@ -178,6 +196,27 @@ describe('WidgetRacerTimerComponent', () => {
         statusCodeDescription: 'Permission denied', widgetUUID: 'racer-timer-test' });
       fixture.detectChanges();
       expect(host().querySelector('input.set-start-at')).not.toBeNull();
+      expect(toastMock.show).toHaveBeenCalledWith('Permission denied', expect.anything(), false, 'error');
+    });
+
+
+    it('lets the helm retry the same time after a refusal', () => {
+      // The error toast asks for a retry; a dedupe guard used to make that press do nothing.
+      enterTime();
+      requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 403,
+        statusCodeDescription: 'Permission denied', widgetUUID: 'racer-timer-test' });
+      fixture.detectChanges();
+      requestsMock.putRequest.mockClear();
+      clickLabel('Set');
+      expect(requestsMock.putRequest).toHaveBeenCalled();
+    });
+
+    it('says why when Set is pressed on a half-entered time', () => {
+      // A time input reads as empty until every segment is filled, so this is reachable by typing.
+      setMode(4);
+      clickLabel('Set');
+      expect(requestsMock.putRequest).not.toHaveBeenCalled();
+      expect(toastMock.show).toHaveBeenCalledWith('Enter a complete time first', expect.anything(), false, 'error');
     });
 
     it('ignores a reply belonging to another request', () => {
@@ -186,5 +225,55 @@ describe('WidgetRacerTimerComponent', () => {
       fixture.detectChanges();
       expect(host().querySelector('input.set-start-at')).not.toBeNull();
     });
+  });
+
+  const startTimeObserver = () =>
+    streamsMock.observe.mock.calls.find(c => c[0] === 'startTimePath')?.[1] as
+      ((pkt: { data: { value: string | null } }) => void) | undefined;
+
+  it('fills the field from the server while the form is closed', () => {
+    setMode(0);
+    const edit = (fixture.componentInstance as unknown as {
+      startAtTimeEdit: { set: (v: string) => void; (): string };
+    }).startAtTimeEdit;
+    edit.set('');
+    const observer = startTimeObserver();
+    expect(observer, 'startTimePath was never observed').toBeTruthy();
+    const when = new Date();
+    when.setHours(21, 5, 30, 0);
+    observer?.({ data: { value: when.toISOString() } });
+    fixture.detectChanges();
+    expect(edit()).toBe('21:05:30');
+  });
+
+  it('does not let a server value overwrite the field being edited', () => {
+    setMode(4);
+    const edit = (fixture.componentInstance as unknown as {
+      startAtTimeEdit: { set: (v: string) => void; (): string };
+    }).startAtTimeEdit;
+    edit.set('20:40:00');
+    const when = new Date();
+    when.setHours(21, 5, 30, 0);
+    startTimeObserver()?.({ data: { value: when.toISOString() } });
+    fixture.detectChanges();
+    expect(edit()).toBe('20:40:00');
+  });
+
+  it('does not let a data timeout blank the field being edited', () => {
+    // enableTimeout is on with a 5s window, so an unset start time emits null repeatedly.
+    setMode(4);
+    const edit = (fixture.componentInstance as unknown as {
+      startAtTimeEdit: { set: (v: string) => void; (): string };
+    }).startAtTimeEdit;
+    edit.set('20:40:00');
+    fixture.detectChanges();
+
+    const observer = streamsMock.observe.mock.calls.find(c => c[0] === 'startTimePath')?.[1] as
+      ((pkt: { data: { value: string | null } }) => void) | undefined;
+    expect(observer, 'startTimePath was never observed').toBeTruthy();
+    observer?.({ data: { value: null } });
+    fixture.detectChanges();
+
+    expect(edit()).toBe('20:40:00');
   });
 });

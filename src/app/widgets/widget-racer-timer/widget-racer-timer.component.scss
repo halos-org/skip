@@ -127,6 +127,14 @@ $label-field-width: 13cqw;
   height: 100%;
 }
 
+// Shrinkable, unlike the mode selector: the field beside it holds a value the user is about to
+// commit, so a narrow tile takes width from the button rather than truncating the time.
+.set-start-button {
+  flex: 0 1 auto;
+  width: 22%;
+  min-width: 0;
+}
+
 // The field sits on the widget's own surface and takes the theme's ink, which is the pairing every
 // theme is built around — the night theme is near-monochrome dark red, so any two of its own tokens
 // stacked give about 1.3:1. A border delineates the field instead of a fill.

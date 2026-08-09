@@ -27,8 +27,10 @@
       <div class="start-at-field">
         <input class="set-start-at" type="time" step="1" matTooltip="Set an absolute start time"
           aria-label="Absolute start time" [(ngModel)]="startAtTimeEdit"
-          (blur)="setStartTime()" (keyup.enter)="setStartTime()">
+          (keyup.enter)="setStartTime()">
       </div>
+      <button mat-flat-button class="button primary-button set-start-button"
+        matTooltip="Apply this start time" (click)="setStartTime()"><span class="label">Set</span></button>
     }
   }
 </div>
