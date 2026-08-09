@@ -59,7 +59,6 @@ export class SettingsDisplayComponent implements OnInit {
   protected isRemoteControl = model<boolean>(false);
   protected instanceName = model<string>('');
   protected browserTabTitle = model<string>('Skip');
-  protected isPathValidationDisabled = model<boolean>(this.settings.getDisablePathValidation());
   protected keepScreenAwake = model<boolean>(true);
   protected autoRevealToolbar = model<boolean>(true);
   // Guards concurrent plugin enable checks to avoid stale promise handlers mutating state
@@ -125,7 +124,6 @@ export class SettingsDisplayComponent implements OnInit {
     }
     this.settings.setThemeName(this.themeMode());
     this.settings.setBrowserTabTitle(this.browserTabTitle());
-    this.settings.setDisablePathValidation(this.isPathValidationDisabled());
     this.settings.setKeepScreenAwake(this.keepScreenAwake());
     this.settings.setAutoRevealToolbar(this.autoRevealToolbar());
     this.displayForm()?.form.markAsPristine();

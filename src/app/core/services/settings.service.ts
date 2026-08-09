@@ -73,7 +73,6 @@ export class SettingsService {
   private _dashboards: Dashboard[] = [];
   public configUpgrade = signal<boolean>(false);
   private configVersion: number | undefined; // store actual config version from config version property in config
-  private disablePathValidation = false; // used to disable path validation in path control component in widget options.
 
   constructor() {
     console.log("[AppSettings Service] Service startup...");
@@ -434,14 +433,6 @@ export class SettingsService {
     // trims for display; this keeps the saved config clean and blank values normalized to '').
     this._browserTabTitle.set((title ?? '').trim());
     this.saveAppConfig();
-  }
-
-  public getDisablePathValidation(): boolean {
-    return this.disablePathValidation;
-  }
-
-  public setDisablePathValidation(disable: boolean) {
-    this.disablePathValidation = disable;
   }
 
   public getNightModeBrightness(): number {
