@@ -22,7 +22,6 @@ import {SignalkRequestsService} from '../../core/services/signalk-requests.servi
 import {UnitsService} from '../../core/services/units.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {MatButtonModule} from '@angular/material/button';
-import {MatIconModule} from '@angular/material/icon';
 import {ITheme} from '../../core/services/app-service';
 import {MatTooltipModule} from '@angular/material/tooltip';
 
@@ -31,7 +30,7 @@ import {MatTooltipModule} from '@angular/material/tooltip';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './widget-racer-line.component.html',
   styleUrls: ['./widget-racer-line.component.scss'],
-  imports: [MatButtonModule, MatIconModule, MatTooltipModule]
+  imports: [MatButtonModule, MatTooltipModule]
 })
 export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   // Functional inputs (Host2 contract)
