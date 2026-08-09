@@ -1,3 +1,9 @@
+<div class="gaugeHeader">
+  <span class="gaugeLabel">{{ displayName() }}</span>
+  @if (unitSymbol()) {
+    <span class="gaugeUnit">{{ unitSymbol() }}</span>
+  }
+</div>
 @if (shouldRenderGauge()) {
   <linear-gauge
     class="linearGauge"

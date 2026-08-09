@@ -21,6 +21,11 @@ import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.d
 import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
 
+/** Short axis of the gauge canvas as a fraction of its long axis. */
+const GAUGE_ASPECT_RATIO = 0.3;
+/** Breathing room kept below the canvas so the value box never touches the card edge. */
+const GAUGE_HEIGHT_INSET = 10;
+
 @Component({
   selector: 'widget-gauge-ng-linear',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -123,6 +128,8 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     return getHighlights(zones, theme, effective, this.unitsService, this.adjustedScale().min, this.adjustedScale().max);
   });
   protected displayName = computed(() => this.runtime.options()?.displayName || 'Gauge Label');
+  /** Unit symbol for the header row; blank for a measure that carries none. */
+  protected readonly unitSymbol = computed(() => this.unitsService.getRenderableUnitSymbol(this.effectiveUnit()));
 
   constructor() {
     // Observe data stream reactively
@@ -183,17 +190,16 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       });
     });
 
-    // Build / update gauge options when config/theme/scale change
+    // Build / update gauge options when config/theme/scale change. The scale itself is derived from
+    // the effective measure, so a unit change reaches the options through it.
     effect(() => {
       const theme = this.theme();
-      // include scale + effective-measure dependencies so options rebuild on scale or unit change
       const scale = this.adjustedScale();
-      const effective = this.effectiveUnit();
 
       untracked(() => {
         const cfg = this.runtime.options();
         if (!cfg || !theme) return;
-        this.buildGaugeOptions(cfg, theme, scale, effective);
+        this.buildGaugeOptions(cfg, theme, scale);
         if (this.viewReady()) {
           try {
             this.ngGauge()?.update(this.gaugeOptions);
@@ -273,7 +279,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     });
   }
 
-  private buildGaugeOptions(cfg: IWidgetSvcConfig, theme: ITheme, scale: IScale, effectiveUnit: string) {
+  private buildGaugeOptions(cfg: IWidgetSvcConfig, theme: ITheme, scale: IScale) {
     const opt = this.gaugeOptions = {} as LinearGaugeOptions;
     const isVertical = cfg.gauge?.subType === 'vertical';
     const enableNeedle = cfg.gauge?.enableNeedle;
@@ -281,7 +287,8 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     // Canvas size (defer dynamic resize until AfterViewInit)
     opt.minValue = scale.min; opt.maxValue = scale.max;
     opt.valueInt = cfg.numInt ?? 1; opt.valueDec = cfg.numDecimal ?? 2;
-    opt.title = this.displayName(); opt.fontTitleSize = 40; opt.fontTitle = 'Roboto'; opt.fontTitleWeight = 'bold';
+    // No title or units: the component renders both in its own header row, and leaving these unset
+    // stops the library reserving a band for each (top and bottom) — that height goes to the bar.
     // Bar geometry (match legacy defaults)
     opt.barLength = isVertical ? 80 : 90;
     opt.barWidth = ticks ? (enableNeedle ? 0 : 30) : 60;
@@ -291,14 +298,12 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     opt.needleStart = enableNeedle ? (isVertical ? 200 : 155) : -45;
     opt.needleEnd = enableNeedle ? (isVertical ? 175 : 180) : 55;
     opt.needleShadow = true; opt.needleSide = 'both';
-    opt.units = this.unitsService.getUnitDisplaySymbol(effectiveUnit); opt.fontUnits = 'Roboto'; opt.fontUnitsWeight = 'normal';
     opt.borders = false; opt.borderOuterWidth = 0; opt.borderMiddleWidth = 0; opt.borderInnerWidth = 0; opt.borderShadowWidth = 0; opt.borderRadius = 0;
     // Value box
     opt.valueBox = true; opt.valueBoxWidth = 35; opt.valueBoxStroke = 0; opt.valueBoxBorderRadius = 10;
     opt.colorValueBoxRect = ''; opt.colorValueBoxRectEnd = ''; opt.colorValueBoxShadow = '';
     opt.fontValueSize = 50; opt.fontValue = 'Roboto'; opt.fontValueWeight = 'bold'; opt.valueTextShadow = false;
-    opt.fontNumbers = 'Roboto'; opt.fontNumbersWeight = 'normal'; opt.fontUnitsSize = isVertical ? 40 : 35;
-    opt.colorTitle = getColors('contrast', theme).dim; opt.colorUnits = getColors('contrast', theme).dim;
+    opt.fontNumbers = 'Roboto'; opt.fontNumbersWeight = 'normal';
     opt.colorValueBoxBackground = theme.background;
     const palette = getColors(cfg.color ?? 'contrast', theme);
     // baseline colors
@@ -335,43 +340,49 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     } catch { /* ignore */ }
   }
 
+  /**
+   * Hands a size to the gauge only when both axes are positive. The library computes arc radii from
+   * these, and a non-positive value makes it throw an IndexSizeError from inside its own mutation
+   * observer — past this component's try/catch — leaving the canvas blank until the next resize.
+   */
+  private updateGaugeSize(width: number, height: number): void {
+    if (!(width > 0) || !(height > 0)) return;
+    try { this.ngGauge()?.update({ width, height } as LinearGaugeOptions); } catch { /* ignore */ }
+  }
+
   private applyInitialSize(): void {
     const el = this.gauge()?.nativeElement as HTMLElement | null;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const aspect = 0.3;
-    let height: number; let width: number;
-    const cfg = this.runtime.options();
-    const isVertical = cfg?.gauge?.subType === 'vertical';
-    if (isVertical) { height = rect.height; width = rect.height * aspect; } else { width = rect.width; height = rect.width * aspect; }
-    const resize: LinearGaugeOptions = { height, width } as LinearGaugeOptions;
-    try { this.ngGauge()?.update(resize); } catch { /* ignore */ }
+    const isVertical = this.runtime.options()?.gauge?.subType === 'vertical';
+    const width = isVertical ? rect.height * GAUGE_ASPECT_RATIO : rect.width;
+    const height = isVertical ? rect.height : rect.width * GAUGE_ASPECT_RATIO;
+    this.updateGaugeSize(width, height);
   }
 
   public onResized(evt: ResizeObserverEntry): void {
     const cfg = this.runtime.options();
     if (!cfg) return;
-    const aspectRatio = 0.3;
     const isVertical = cfg.gauge?.subType === 'vertical';
-    const resize: LinearGaugeOptions = {};
+    let width: number;
+    let height: number;
 
     if (isVertical) {
-      resize.height = evt.contentRect.height;
-      resize.width = resize.height * aspectRatio;
-      if (resize.width > evt.contentRect.width) {
-        resize.width = evt.contentRect.width;
-        resize.height = resize.width / aspectRatio;
+      height = evt.contentRect.height;
+      width = height * GAUGE_ASPECT_RATIO;
+      if (width > evt.contentRect.width) {
+        width = evt.contentRect.width;
+        height = width / GAUGE_ASPECT_RATIO;
       }
     } else {
-      resize.width = evt.contentRect.width;
-      resize.height = resize.width * aspectRatio;
-      if (resize.height > evt.contentRect.height) {
-        resize.height = evt.contentRect.height;
-        resize.width = resize.height / aspectRatio;
+      width = evt.contentRect.width;
+      height = width * GAUGE_ASPECT_RATIO;
+      if (height > evt.contentRect.height) {
+        height = evt.contentRect.height;
+        width = height / GAUGE_ASPECT_RATIO;
       }
     }
 
-    resize.height = (resize.height ?? 0) - 10;
-    try { this.ngGauge()?.update(resize); } catch { /* ignore */ }
+    this.updateGaugeSize(width, height - GAUGE_HEIGHT_INSET);
   }
 }
