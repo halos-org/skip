@@ -7,6 +7,7 @@
 @use './themes/_m3night.scss' as night;
 
 @use './styles-common/settingsTabContent.scss' as settingsTabContent;
+@use './styles-common/pathWarningHint.scss' as pathWarningHint;
 
 // Import GridStack styles
 @use "gridstack/dist/gridstack.min.css";

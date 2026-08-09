@@ -1,8 +1,8 @@
-import { Component, OnInit, OnChanges, SimpleChange, input, inject, DestroyRef } from '@angular/core';
+import { Component, OnInit, OnChanges, SimpleChange, input, inject, signal, DestroyRef } from '@angular/core';
 import { DataService } from '../../core/services/data.service';
 import { IPathMetaData } from "../../core/interfaces/app-interfaces";
 import { IConversionPathList, ISkBaseUnit, UnitsService } from '../../core/services/units.service';
-import { UntypedFormGroup, ValidatorFn, AbstractControl, ValidationErrors, FormsModule, ReactiveFormsModule, FormControl, FormGroup } from '@angular/forms';
+import { UntypedFormGroup, AbstractControl, FormsModule, ReactiveFormsModule, FormControl, FormGroup } from '@angular/forms';
 import { debounce, map, startWith } from 'rxjs/operators';
 import { BehaviorSubject, timer } from 'rxjs'
 import { MatSelect } from '@angular/material/select';
@@ -17,32 +17,7 @@ import { compare } from 'compare-versions';
 import { SignalKConnectionService } from '../../core/services/signalk-connection.service';
 import { IDynamicControl } from '../../core/interfaces/widgets-interface';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { SettingsService } from '../../core/services/settings.service';
-
-function pathRequiredOrValidMatch(getPaths: () => IPathMetaData[]): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    // If pathRequired is undefined or true, path is required and must be valid
-    const required = control.parent?.value?.pathRequired !== false;
-    const value = control.value;
-    if (required) {
-      // Required: must not be empty and must match a valid path
-      if (value === null || value === '') {
-        return { requireMatch: true };
-      }
-      const allPathsAndMeta = getPaths();
-      const pathFound = allPathsAndMeta.some(array => array.path === value);
-      return pathFound ? null : { requireMatch: true };
-    } else {
-      // Not required: valid if empty, or if matches a valid path
-      if (value === null || value === '') {
-        return null;
-      }
-      const allPathsAndMeta = getPaths();
-      const pathFound = allPathsAndMeta.some(array => array.path === value);
-      return pathFound ? null : { requireMatch: true };
-    }
-  };
-}
+import { IPathSlotRequirements, pathRequiredValidator, pathSlotWarning } from '../../core/utils/path-validators.util';
 
 @Component({
     selector: 'path-control-config',
@@ -53,7 +28,6 @@ function pathRequiredOrValidMatch(getPaths: () => IPathMetaData[]): ValidatorFn 
 export class PathControlConfigComponent implements OnInit, OnChanges {
   private readonly _data = inject(DataService);
   private readonly _units = inject(UnitsService);
-  private readonly _settings = inject(SettingsService);
   private readonly _connection = inject(SignalKConnectionService);
   private readonly _destroyRef = inject(DestroyRef);
 
@@ -63,6 +37,10 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
 
   public availablePaths: IPathMetaData[] = [];
   public filteredPaths = new BehaviorSubject<IPathMetaData[] | null>(null);
+  /** Why the configured path is not offered for this slot, or null. A caution, never a save-blocking error. */
+  public readonly pathWarning = signal<string | null>(null);
+  /** The path `source` and `convertUnitTo` were last derived for, so re-deriving needs a real path change. */
+  private _derivedForPath: string | null = null;
 
   // Sources control
   public availableSources: string[] = [];
@@ -98,14 +76,9 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
       this.showPathSkUnitsFilter = pathFormGroup.value.showPathSkUnitsFilter;
     }
 
-    // if not disabled, add path validator fn and validate
-    if (!this._settings.getDisablePathValidation()) {
-      pathFormGroup.controls['path'].setValidators([
-        pathRequiredOrValidMatch(() => this.getPaths())
-      ]);
-    }
-
+    pathFormGroup.controls['path'].setValidators([pathRequiredValidator]);
     pathFormGroup.controls['path'].updateValueAndValidity({onlySelf: true, emitEvent: false});
+    this.refreshPathWarning();
     // Subscribe to pathRequired changes to re-validate path
     if (pathFormGroup.controls['pathRequired']) {
       pathFormGroup.controls['pathRequired'].valueChanges.pipe(takeUntilDestroyed(this._destroyRef)).subscribe(() => {
@@ -125,13 +98,18 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
       map(value => this.filterPaths(value || '')))
       .pipe(takeUntilDestroyed(this._destroyRef)).subscribe(() => {
         const pathFormGroupValue = this.pathFormGroup();
+        this.refreshPathWarning();
         if (pathFormGroupValue.controls['path'].pristine) {
           return;
         } else {
+          const path = pathFormGroupValue.controls['path'].value;
           if (pathFormGroupValue.controls['path'].valid){
-            this.enableFormFields(true);
-            this.updatePathMetaBoundDisplayName(pathFormGroupValue.controls['path'].value);
-            this.updatePathMetaBoundDisplayScale(pathFormGroupValue.controls['path'].value);
+            // Any keystroke marks the control dirty, including one that lands back on the value we
+            // started from. Re-derive the dependent fields only when the path itself moved, or
+            // editing and undoing an edit would clear the source and unit this slot already had.
+            this.enableFormFields(path !== this._derivedForPath);
+            this.updatePathMetaBoundDisplayName(path);
+            this.updatePathMetaBoundDisplayScale(path);
           } else {
             this.disablePathFields();
           }
@@ -147,6 +125,7 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
         this.pathSkUnitsFilterControl.setValue(null);
       }
       pathFormGroupValue.controls['path'].updateValueAndValidity();
+      this.refreshPathWarning();
     });
   }
 
@@ -154,14 +133,20 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
     //subscribe to filterSelfPaths parent formControl changes
     if (changes['filterSelfPaths'] && !changes['filterSelfPaths'].firstChange) {
       this.pathFormGroup().controls['path'].updateValueAndValidity();
+      this.refreshPathWarning();
     }
   }
 
-  private getPaths(): IPathMetaData[] {
-    const pathType = this.pathFormGroup().controls['pathType'].value;
-    const filterSelfPaths = this.filterSelfPaths();
-    let supportsPUT = false;
+  /** Both the offered list and the path can move; recompute after either changes. */
+  private refreshPathWarning(): void {
+    const path = this.pathFormGroup().controls['path'].value;
+    this.pathWarning.set(pathSlotWarning(path, this._data.getPathObject(path), this.slotRequirements()));
+  }
+
+  /** What this slot demands of a path — the filters behind both the offered list and the warning. */
+  private slotRequirements(): IPathSlotRequirements {
     const pathFormGroup = this.pathFormGroup();
+    let supportsPUT = false;
     if (pathFormGroup.value.supportsPut) {
       let isMultiCTRLTypeLight = false;
       if (this.multiCTRLArray().length > 0) {
@@ -177,8 +162,17 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
       }
     }
 
-    const zonesOnlyPaths = pathFormGroup.value.zonesOnlyPaths ?? false;
-    return this._data.getPathsAndMetaByType(pathType, supportsPUT, zonesOnlyPaths, filterSelfPaths).sort();
+    return {
+      pathType: pathFormGroup.controls['pathType'].value,
+      supportsPutOnly: supportsPUT,
+      zonesOnly: pathFormGroup.value.zonesOnlyPaths ?? false,
+      selfOnly: this.filterSelfPaths()
+    };
+  }
+
+  private getPaths(): IPathMetaData[] {
+    const req = this.slotRequirements();
+    return this._data.getPathsAndMetaByType(req.pathType, req.supportsPutOnly, req.zonesOnly, req.selfOnly).sort();
   }
 
   public filterPaths(searchString: string) {
@@ -238,7 +232,9 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
   }
 
   private enableFormFields(setValues?: boolean): void {
-    const pathObject = this._data.getPathObject(this.pathFormGroup().controls['path'].value);
+    const path = this.pathFormGroup().controls['path'].value;
+    this._derivedForPath = path;
+    const pathObject = this._data.getPathObject(path);
     if (pathObject != null) {
       const pathFormGroup = this.pathFormGroup();
       if (pathFormGroup.controls['pathType'].value == 'number') { // convertUnitTo control not present unless pathType is number
@@ -259,8 +255,26 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
         sourceControl.setValue('default', {onlySelf: true});
       }
       sourceControl.enable({onlySelf: false});
+    } else if (path) {
+      // The server does not publish this path right now (instrument off / boat at dock). The stored
+      // source and unit conversion are still the right ones, and the dialog saves with getRawValue(),
+      // so clearing them here would be persisted the moment the user hits Save. A path the user just
+      // changed carries nothing worth keeping, so re-derive both: "Any" source, no conversion.
+      const pathFormGroup = this.pathFormGroup();
+      if (pathFormGroup.controls['pathType'].value == 'number') {
+        if (setValues) {
+          pathFormGroup.controls['convertUnitTo'].setValue('', {onlySelf: true});
+        }
+        // Enable regardless, so the control's state depends only on whether a path is configured —
+        // an earlier disablePathFields() would otherwise leave it disabled for this path alone.
+        pathFormGroup.controls['convertUnitTo'].enable({onlySelf: false});
+      }
+      if (setValues) {
+        pathFormGroup.controls['source'].setValue('default', {onlySelf: true});
+      }
+      this.setupSourceFor(path);
     } else {
-      // we don't know this path. Maybe and old saved path...
+      // No path configured at all — an optional slot left blank has nothing to source or convert.
       this.disablePathFields();
     }
   }

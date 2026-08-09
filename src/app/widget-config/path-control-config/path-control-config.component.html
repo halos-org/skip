@@ -52,7 +52,9 @@
           formControlName="path"
           [matAutocomplete]="pathAutoComplete"
         >
-        @if (pathFormGroup().value.pathRequired === false) {
+        @if (pathWarning()) {
+          <mat-hint class="pathWarningHint">{{ pathWarning() }}</mat-hint>
+        } @else if (pathFormGroup().value.pathRequired === false) {
           <mat-hint>Leave blank to disable this path.</mat-hint>
         }
         @if (pathFormGroup().value.path) {
@@ -64,10 +66,6 @@
         @if (pathFormGroup().controls['path'].errors?.['required']) {
           <mat-error>
             Path is required. Please enter a valid Signal K path.
-          </mat-error>
-        } @else if (pathFormGroup().controls['path'].errors?.['requireMatch']) {
-          <mat-error>
-            Path not recognized. Please enter a path from the server's published list.
           </mat-error>
         }
         <mat-autocomplete #pathAutoComplete="matAutocomplete">
