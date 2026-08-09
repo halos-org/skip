@@ -19,6 +19,9 @@ import { GestureDirective } from './gesture.directive';
       [enableTap]="enableTap"
       (tap)="tapCount = tapCount + 1">
       <input class="probe-input" type="time" step="1">
+      <textarea class="probe-textarea"></textarea>
+      <div class="probe-editable" contenteditable="plaintext-only"><span class="probe-nested">x</span></div>
+      <button class="probe-button" type="button">go</button>
     </div>
   `
 })
@@ -385,14 +388,54 @@ describe('GestureDirective', () => {
     describe('native form controls', () => {
         const inputEl = () => hostEl.querySelector('input.probe-input') as HTMLInputElement;
 
-        it('does not preventDefault a pointerdown on an input', () => {
+        // closest() rather than matches(), so a target nested inside a control is exempt too.
+        it.each(['input.probe-input', 'textarea.probe-textarea', '.probe-editable', '.probe-nested'])(
+            'does not preventDefault a pointerdown on %s', selector => {
+                component.mode = 'press';
+                syncFixture();
+                const event = createPointerEvent('pointerdown', {
+                    clientX: 10, clientY: 10, pointerId: POINTER_ID, pointerType: 'touch'
+                });
+                (hostEl.querySelector(selector) as Element).dispatchEvent(event);
+                expect(event.defaultPrevented).toBe(false);
+            });
+
+        // The upper bound: without this, widening the selector would disable long-press on real
+        // widget content and every assert-absence test above would still pass.
+        it('still tracks a pointerdown on a non-control child', async () => {
             component.mode = 'press';
+            component.longPressMs = 80;
             syncFixture();
+            now = 2000;
+            const button = hostEl.querySelector('button.probe-button') as HTMLElement;
+            let captured = false;
+            button.setPointerCapture = () => { captured = true; };
+            let pressCount = 0;
+            hostEl.addEventListener('press', () => { pressCount += 1; });
             const event = createPointerEvent('pointerdown', {
                 clientX: 10, clientY: 10, pointerId: POINTER_ID, pointerType: 'touch'
             });
-            inputEl().dispatchEvent(event);
-            expect(event.defaultPrevented).toBe(false);
+            vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+            button.dispatchEvent(event);
+            await vi.advanceTimersByTimeAsync(80);
+            vi.useRealTimers();
+            expect({ prevented: event.defaultPrevented, captured, pressCount })
+                .toEqual({ prevented: true, captured: true, pressCount: 1 });
+        });
+
+        // The guard returns after the pointer id is registered, so cleanup rests on pointerup
+        // reaching a host. Five older early returns rely on the same contract; pin it here.
+        it('drains the shared active-pointer set after a tap on a control', () => {
+            component.mode = 'press';
+            syncFixture();
+            const statics = GestureDirective as unknown as { _activePointers: Set<number> };
+            dispatchPointerEvent(inputEl(), 'pointerdown', {
+                clientX: 10, clientY: 10, pointerId: POINTER_ID, pointerType: 'touch'
+            });
+            dispatchPointerEvent(hostEl, 'pointerup', {
+                clientX: 10, clientY: 10, pointerId: POINTER_ID, pointerType: 'touch'
+            });
+            expect(statics._activePointers.size).toBe(0);
         });
 
         it('does not capture the pointer on an input', () => {

@@ -20,7 +20,7 @@ import { GESTURES_DEBUG_KEY } from '../constants/config-storage.const';
 
 
 /** Controls whose own pointer handling must not be pre-empted by gesture recognition. */
-const FORM_CONTROL_SELECTOR = 'input, select, textarea, option, [contenteditable=""], [contenteditable="true"]';
+const FORM_CONTROL_SELECTOR = 'input, select, textarea, [contenteditable]:not([contenteditable="false"])';
 
 function isNativeFormControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(FORM_CONTROL_SELECTOR) !== null;
