@@ -93,6 +93,8 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   // Signals
   protected labelColor = signal<string>('');
   protected mode = signal<number>(1); // mimic legacy mode state machine
+  /** The mode whose @case renders the absolute start-time form. */
+  private static readonly SET_START_TIME_MODE = 4;
   private ttsValue: number | null = null;
   private dtsValue: number | null = null;
   private valueColor = '';
@@ -101,8 +103,6 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   protected startAtTimeEdit = model<string>('');
   /** The setStartTime request we are waiting on, so an unrelated widget's reply cannot resolve it. */
   private pendingStartTimeRequest: string | null = null;
-  /** Blur fires on every exit from the field, so only a changed value is worth resending. */
-  private lastSubmittedStartTime: string | null = null;
   private pendingStartTimeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -148,9 +148,10 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
       if (!path) return;
       untracked(() => this.streams.observe('startTimePath', pkt => {
         const v = pkt?.data?.value as string | null;
-        // The edit field is the user's, not the stream's, while they are in it. A data timeout emits
-        // null every few seconds when no start time is set, which otherwise blanks what they typed.
-        const editing = this.mode() === 4;
+        // The edit field is the user's, not the stream's, while the form is open. A data timeout
+        // emits null every few seconds when no start time is set, which otherwise blanks what they
+        // typed.
+        const editing = this.mode() === WidgetRacerTimerComponent.SET_START_TIME_MODE;
         if (!v) {
           this.startAtTime.set('HH:MM:SS');
           if (!editing) { this.startAtTimeEdit.set(''); }
@@ -230,18 +231,21 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Commits only from the Set button or Enter. Never on `change`, which a time input fires as soon
-   * as the value is complete — on Chromium that is mid-entry, so typing 20 then 4 of "20:40" makes
-   * "20:04" complete and would submit it. Never on blur either: a touch wheel picker gives the user
-   * nowhere obvious to tap to blur, so the value looked entered but was never sent.
+   * The only commit paths are the Set button and Enter. `change` is unusable: a time input fires it
+   * as soon as the value is complete, which on Chromium is mid-entry — typing 20 then 4 of "20:40"
+   * makes "20:04" complete. Blur is unusable too: a touch wheel picker leaves nowhere obvious to
+   * tap, so a value would look entered and never be sent.
    */
   public setStartTime(): void {
     const entered = this.startAtTimeEdit();
-    if (entered === this.lastSubmittedStartTime) { return; }
     const parts = entered.split(':').map(Number);
-    // A cleared field yields [0] and the placeholder yields NaNs; either would build an Invalid Date
-    // whose toISOString() throws out of the change handler. Stay in the edit mode instead.
-    if (parts.length < 2 || parts.some(part => !Number.isFinite(part))) { return; }
+    // A time field reads as empty until every segment is filled, so a half-entered value arrives
+    // here as ''. Say so: with an explicit button, a silent return is indistinguishable from a
+    // broken control.
+    if (parts.length < 2 || parts.some(part => !Number.isFinite(part))) {
+      this.toast.show('Enter a complete time first', 4000, false, 'error');
+      return;
+    }
     const [hours, minutes] = parts;
     const seconds = parts.length >= 3 ? parts[2] : 0;
     const now = new Date();
@@ -249,14 +253,9 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
     // The widget holds no start time of its own — the readout shows what the race plugin publishes
     // back. Switching to it before the server answers shows a placeholder that is indistinguishable
     // from a set timer, so stay on the form until the request is settled.
-    this.lastSubmittedStartTime = entered;
+    this.clearPendingStartTimeTimer();
     this.pendingStartTimeRequest =
       this.signalk.putRequest('navigation.racing.setStartTime', { command: 'set', startTime: date.toISOString() }, this.id());
-    if (!this.pendingStartTimeRequest) {
-      this.toast.show('Could not send the start time', 4000, false, 'error');
-      return;
-    }
-    this.clearPendingStartTimeTimer();
     this.pendingStartTimeTimer = setTimeout(
       () => this.settlePendingStartTime('No reply from the race plugin; start time not set'),
       PENDING_START_TIME_TIMEOUT_MS);
