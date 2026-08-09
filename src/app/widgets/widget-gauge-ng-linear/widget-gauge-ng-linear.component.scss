@@ -9,6 +9,13 @@
 // Label and unit share one row at the top of the card, so the gauge canvas below is free of the
 // library's own title and units bands (both are left unset in buildGaugeOptions) and the bar gets
 // that height instead. Sized off the card rather than the root font so it tracks the tile.
+// Sized like the numeric widget's label row: a tenth of the tile height, with the same floors
+// (CanvasService MIN_LABEL_PX / MIN_UNIT_PX) so both stay legible in daylight on a small tile.
+// A name that outgrows the row ellipsises rather than shrinking below the floor.
+$label-min-size: 16px;
+$unit-min-size: 12px;
+$row-fraction: 10cqh;
+
 .gaugeHeader {
   display: flex;
   align-items: baseline;
@@ -20,7 +27,6 @@
   overflow: hidden;
   color: var(--skip-contrast-dim-color);
   font-family: Roboto, sans-serif;
-  font-size: clamp(11px, min(10cqh, 9cqw), 20px);
   line-height: 1.2;
 }
 
@@ -31,9 +37,14 @@
   text-overflow: ellipsis;
 }
 
+.gaugeLabel {
+  font-size: max($label-min-size, $row-fraction);
+}
+
 // The unit is the shorter of the two and the one the reading needs, so the name yields first.
 .gaugeUnit {
   flex: 0 1 auto;
+  font-size: max($unit-min-size, $row-fraction);
 }
 
 ::ng-deep linear-gauge {

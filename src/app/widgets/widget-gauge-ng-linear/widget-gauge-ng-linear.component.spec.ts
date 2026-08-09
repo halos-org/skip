@@ -112,12 +112,32 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
     }
   });
 
-  it('sizes the gauge to the short axis of its box', () => {
+  it('runs a vertical gauge the full height of its box', () => {
     component.onResized(resizeEntry(340, 400));
 
     expect(sizeUpdates).toHaveLength(1);
-    expect(sizeUpdates[0].width).toBeCloseTo(120);   // 0.3 x the 400px height
-    expect(sizeUpdates[0].height).toBeCloseTo(390);  // less the 10px inset
+    expect(sizeUpdates[0].height).toBeCloseTo(390);  // the full 400px less the 10px inset
+    expect(sizeUpdates[0].width).toBeCloseTo(120);   // thinned to a third of the length
+  });
+
+  it('runs a horizontal gauge the full width of its box, thinning it rather than shortening it', () => {
+    // A wide, short tile: keeping a fixed aspect would have cut the length to height/0.3 and left
+    // most of the card empty on either side of the bar.
+    options.set(makeConfig('horizontal'));
+    component.onResized(resizeEntry(690, 79));
+
+    expect(sizeUpdates[0].width).toBeCloseTo(690);
+    expect(sizeUpdates[0].height).toBeCloseTo(69);
+    // The library reads the orientation off which axis is longer, so the cap must hold.
+    expect(sizeUpdates[0].height as number).toBeLessThan(sizeUpdates[0].width as number);
+  });
+
+  it('caps the thickness at a third of the length on a box that is not short', () => {
+    options.set(makeConfig('horizontal'));
+    component.onResized(resizeEntry(300, 400));
+
+    expect(sizeUpdates[0].width).toBeCloseTo(300);
+    expect(sizeUpdates[0].height).toBeCloseTo(80); // 0.3 x 300, less the inset
   });
 
   it('sends the library no size at all when the header leaves the box too short to draw', () => {

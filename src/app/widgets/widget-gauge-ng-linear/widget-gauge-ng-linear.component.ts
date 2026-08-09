@@ -21,8 +21,8 @@ import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.d
 import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
 
-/** Short axis of the gauge canvas as a fraction of its long axis. */
-const GAUGE_ASPECT_RATIO = 0.3;
+/** Cap on the gauge's short axis as a fraction of its long axis, so the bar never turns squat. */
+const GAUGE_MAX_THICKNESS = 0.3;
 /** Breathing room kept below the canvas so the value box never touches the card edge. */
 const GAUGE_HEIGHT_INSET = 10;
 
@@ -350,13 +350,24 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     try { this.ngGauge()?.update({ width, height } as LinearGaugeOptions); } catch { /* ignore */ }
   }
 
+  /**
+   * The gauge runs the full length of its box and is only ever thinned across, never shortened: a
+   * bar that gave up length to keep a fixed aspect left the card mostly empty on either side of it.
+   * Capping the short axis also keeps it below the long one, which is how the library decides
+   * whether it is drawing a vertical or a horizontal gauge.
+   */
+  private gaugeSize(boxWidth: number, boxHeight: number, isVertical: boolean): { width: number; height: number } {
+    return isVertical
+      ? { width: Math.min(boxHeight * GAUGE_MAX_THICKNESS, boxWidth), height: boxHeight }
+      : { width: boxWidth, height: Math.min(boxWidth * GAUGE_MAX_THICKNESS, boxHeight) };
+  }
+
   private applyInitialSize(): void {
     const el = this.gauge()?.nativeElement as HTMLElement | null;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const isVertical = this.runtime.options()?.gauge?.subType === 'vertical';
-    const width = isVertical ? rect.height * GAUGE_ASPECT_RATIO : rect.width;
-    const height = isVertical ? rect.height : rect.width * GAUGE_ASPECT_RATIO;
+    const { width, height } = this.gaugeSize(rect.width, rect.height, isVertical);
     this.updateGaugeSize(width, height);
   }
 
@@ -364,25 +375,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     const cfg = this.runtime.options();
     if (!cfg) return;
     const isVertical = cfg.gauge?.subType === 'vertical';
-    let width: number;
-    let height: number;
-
-    if (isVertical) {
-      height = evt.contentRect.height;
-      width = height * GAUGE_ASPECT_RATIO;
-      if (width > evt.contentRect.width) {
-        width = evt.contentRect.width;
-        height = width / GAUGE_ASPECT_RATIO;
-      }
-    } else {
-      width = evt.contentRect.width;
-      height = width * GAUGE_ASPECT_RATIO;
-      if (height > evt.contentRect.height) {
-        height = evt.contentRect.height;
-        width = height / GAUGE_ASPECT_RATIO;
-      }
-    }
-
+    const { width, height } = this.gaugeSize(evt.contentRect.width, evt.contentRect.height, isVertical);
     this.updateGaugeSize(width, height - GAUGE_HEIGHT_INSET);
   }
 }
