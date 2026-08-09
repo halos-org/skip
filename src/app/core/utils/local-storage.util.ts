@@ -25,30 +25,23 @@ function localStorageOrNull(): Storage | null {
   }
 }
 
-let usable: boolean | undefined;
-
 /**
  * Whether a write would actually survive. Resolving the Storage object is not enough: a zero-quota
- * store answers every read and silently discards every write, so probe with a round trip. Cached,
- * since the answer cannot change within a page session.
+ * store answers every read and silently discards every write, so probe with a round trip. Not
+ * cached — the callers ask once at boot or when the user attempts a change, and a cache would make
+ * the answer depend on which caller asked first.
  */
 export function isLocalStorageAvailable(): boolean {
-  if (usable !== undefined) { return usable; }
   const store = localStorageOrNull();
-  if (!store) { return (usable = false); }
+  if (!store) { return false; }
   try {
     store.setItem(PROBE_KEY, '1');
-    usable = store.getItem(PROBE_KEY) === '1';
+    const survived = store.getItem(PROBE_KEY) === '1';
     store.removeItem(PROBE_KEY);
+    return survived;
   } catch {
-    usable = false;
+    return false;
   }
-  return usable;
-}
-
-/** Test seam: the probe is cached for the page session, which outlives a spec. */
-export function resetLocalStorageAvailability(): void {
-  usable = undefined;
 }
 
 export function getLocalStorageItem(key: string): string | null {
