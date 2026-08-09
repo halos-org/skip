@@ -18,6 +18,7 @@ import {WidgetStreamsDirective} from '../../core/directives/widget-streams.direc
 import {IPathArray, IWidgetSvcConfig} from '../../core/interfaces/widgets-interface';
 import {ITheme} from '../../core/services/app-service';
 import {SignalkRequestsService} from '../../core/services/signalk-requests.service';
+import {ToastService} from '../../core/services/toast.service';
 import {DashboardService} from '../../core/services/dashboard.service';
 import {CanvasService} from '../../core/services/canvas.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
@@ -25,6 +26,9 @@ import {getColors} from '../../core/utils/themeColors.utils';
 import {FormsModule} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatTooltipModule} from '@angular/material/tooltip';
+
+/** A helm needs to know quickly that a start time did not take. */
+const PENDING_START_TIME_TIMEOUT_MS = 5000;
 
 /**
  * Local wall-clock time as `input[type=time]` requires it. `toLocaleTimeString` gives "05:30:45 PM"
@@ -71,6 +75,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   protected readonly runtime = inject(WidgetRuntimeDirective);
   private readonly streams = inject(WidgetStreamsDirective);
   private readonly signalk = inject(SignalkRequestsService);
+  private readonly toast = inject(ToastService);
   protected readonly dashboard = inject(DashboardService);
   private readonly canvas = inject(CanvasService);
   private readonly destroyRef = inject(DestroyRef);
@@ -94,6 +99,11 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   private valueStateColor = '';
   protected startAtTime = signal<string>('00:00:00');
   protected startAtTimeEdit = model<string>('');
+  /** The setStartTime request we are waiting on, so an unrelated widget's reply cannot resolve it. */
+  private pendingStartTimeRequest: string | null = null;
+  /** Blur fires on every exit from the field, so only a changed value is worth resending. */
+  private lastSubmittedStartTime: string | null = null;
+  private pendingStartTimeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Theme / palette effect
@@ -165,8 +175,12 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
 
     // Request subscription (PUT feedback)
     this.signalk.subscribeRequest().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(result => {
-      if (result.widgetUUID === this.id()) {
-        if (result.statusCode === 200) this.beep(600, 20);
+      if (result.widgetUUID !== this.id()) return;
+      if (result.statusCode === 200) this.beep(600, 20);
+      if (result.requestId === this.pendingStartTimeRequest) {
+        this.settlePendingStartTime(result.statusCode === 200
+          ? null
+          : result.message ?? result.statusCodeDescription ?? `Start time refused (${result.statusCode})`);
       }
     });
   }
@@ -189,6 +203,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.clearPendingStartTimeTimer();
     try { if (this.canvasElement) this.canvas.unregisterCanvas(this.canvasElement); } catch { /* ignore */ }
   }
 
@@ -211,8 +226,15 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
     this.signalk.putRequest('navigation.racing.setStartTime', { command: 'adjust', delta }, this.id());
   }
 
+  /**
+   * Commits on blur or Enter, never on `change`: a time input fires that as soon as the value is
+   * complete, which on Chromium is mid-entry — typing 20 then 4 of "20:40" makes "20:04" complete
+   * and would submit it.
+   */
   public setStartTime(): void {
-    const parts = this.startAtTimeEdit().split(':').map(Number);
+    const entered = this.startAtTimeEdit();
+    if (entered === this.lastSubmittedStartTime) { return; }
+    const parts = entered.split(':').map(Number);
     // A cleared field yields [0] and the placeholder yields NaNs; either would build an Invalid Date
     // whose toISOString() throws out of the change handler. Stay in the edit mode instead.
     if (parts.length < 2 || parts.some(part => !Number.isFinite(part))) { return; }
@@ -220,8 +242,39 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
     const seconds = parts.length >= 3 ? parts[2] : 0;
     const now = new Date();
     const date = new Date(now); date.setHours(hours, minutes, seconds, 0); if (date <= now) date.setDate(date.getDate() + 1);
+    // The widget holds no start time of its own — the readout shows what the race plugin publishes
+    // back. Switching to it before the server answers shows a placeholder that is indistinguishable
+    // from a set timer, so stay on the form until the request is settled.
+    this.lastSubmittedStartTime = entered;
+    this.pendingStartTimeRequest =
+      this.signalk.putRequest('navigation.racing.setStartTime', { command: 'set', startTime: date.toISOString() }, this.id());
+    if (!this.pendingStartTimeRequest) {
+      this.toast.show('Could not send the start time', 4000, false, 'error');
+      return;
+    }
+    this.clearPendingStartTimeTimer();
+    this.pendingStartTimeTimer = setTimeout(
+      () => this.settlePendingStartTime('No reply from the race plugin; start time not set'),
+      PENDING_START_TIME_TIMEOUT_MS);
+  }
+
+  /** Leave the form only once the request landed; otherwise say why and stay put. */
+  private settlePendingStartTime(error: string | null): void {
+    this.clearPendingStartTimeTimer();
+    this.pendingStartTimeRequest = null;
+    if (error) {
+      this.toast.show(error, 5000, false, 'error');
+      return;
+    }
     this.mode.set(0);
-    this.signalk.putRequest('navigation.racing.setStartTime', { command: 'set', startTime: date.toISOString() }, this.id());
+    this.draw();
+  }
+
+  private clearPendingStartTimeTimer(): void {
+    if (this.pendingStartTimeTimer) {
+      clearTimeout(this.pendingStartTimeTimer);
+      this.pendingStartTimeTimer = null;
+    }
   }
 
   // Helpers
@@ -312,12 +365,19 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
 
   private beep(frequency = 440, duration = 100) {
     if (!this.runtime.options()?.playBeeps) return;
-    const AudioCtx = (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
-    const audioCtx = new AudioCtx();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
-    oscillator.type = 'sine'; oscillator.frequency.value = frequency; gainNode.gain.value = 0.1;
-    oscillator.start(); oscillator.stop(audioCtx.currentTime + duration / 1000);
+    // Audio is a courtesy, and it is blocked often enough — autoplay policy, no output device, a
+    // sandboxed embed — that it must not take down the caller. This runs from the PUT-result
+    // handler, where a throw would have swallowed the command's outcome.
+    try {
+      const AudioCtx = (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      const audioCtx = new AudioCtx();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+      oscillator.type = 'sine'; oscillator.frequency.value = frequency; gainNode.gain.value = 0.1;
+      oscillator.start(); oscillator.stop(audioCtx.currentTime + duration / 1000);
+    } catch {
+      /* no audio available */
+    }
   }
 }

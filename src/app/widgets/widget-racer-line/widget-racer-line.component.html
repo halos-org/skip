@@ -3,250 +3,50 @@
     <canvas #canvasMainRef class="line-canvas"></canvas>
   </div>
   <div class="buttons-container">
-    <button mat-flat-button class="button select-button" matTooltip="Select the control mode" (click)="toggleMode()">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 80 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="40" y="9">&vellip;</text>
-        </svg>
-      </mat-icon>
-    </button>
-    @switch(mode()) { @case (0) {
-    <div class="pin-container">
-      <svg
-        width="100%"
-        height="100%"
-        viewBox="0 0 70 18"
-        preserveAspectRatio="xMidYMid meet"
-        class="svg-content pin">
-        <text x="33" y="14">{{ portBiasValue() }}</text>
-      </svg>
-    </div>
-    <div class="len-bias-container">
-      <svg
-        width="100%"
-        height="100%"
-        viewBox="0 0 90 12"
-        preserveAspectRatio="xMidYMid meet"
-        class="svg-content len-bias">
-        <text x="45" y="9">
-          <tspan class="pin">⚑</tspan>
-          {{ lineLengthValue() }}
-          <tspan class="boat">⚑</tspan>
-        </text>
-      </svg>
-    </div>
-    <div class="boat-container">
-      <svg
-        width="100%"
-        height="100%"
-        viewBox="0 0 70 18"
-        preserveAspectRatio="xMidYMid meet"
-        class="svg-content boat">
-        <text x="33" y="14">{{ stbBiasValue() }}</text>
-      </svg>
-    </div>
-    } @case (1) {
-    <button
-      mat-flat-button
-      class="button port-button"
-      matTooltip="Set the port(pin) end of the line to the current position"
-      (click)="setLineEnd('port')">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 100 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="50" y="11">Port End</text>
-        </svg>
-      </mat-icon>
-    </button>
-    <button
-      mat-flat-button
-      class="button starboard-button"
-      matTooltip="Set the starboard(boat) end of the line to the current position"
-      (click)="setLineEnd('stb')">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 100 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="50" y="11">Stbd End</text>
-        </svg>
-      </mat-icon>
-    </button>
-    } @case (2) {
-    <button
-      mat-flat-button
-      class="button port-small-button"
-      matTooltip="Increase the line length by 5m at the port(pin) end"
-      (click)="adjustLineEnd('port', 5, 0)">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">+5m</text>
-        </svg>
-      </mat-icon>
-    </button>
-    <button
-      mat-flat-button
-      class="button port-small-button"
-      matTooltip="Decrease the line length by 5m at the port(pin) end"
-      (click)="adjustLineEnd('port', -5, 0)">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">-5m</text>
-        </svg>
-      </mat-icon>
-    </button>
-    <button
-      mat-flat-button
-      class="button starboard-small-button"
-      matTooltip="Decrease the line length by 5m at the starboard(boat) end"
-      (click)="adjustLineEnd('stb', -5, 0)">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">-5m</text>
-        </svg>
-      </mat-icon>
-    </button>
-    <button
-      mat-flat-button
-      class="button starboard-small-button"
-      matTooltip="Increase the line length by 5m at the starboard(boat) end"
-      (click)="adjustLineEnd('stb', 5, 0)">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">+5m</text>
-        </svg>
-      </mat-icon>
-    </button>
-    } @case (3) {
-    <button
-      mat-flat-button
-      class="button port-small-button"
-      matTooltip="Rotate the line by moving the port(pin) end 1° clockwise"
-      (click)="adjustLineEnd('port', 0, toRadians(1))">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">↑1&deg;</text>
-        </svg>
-      </mat-icon>
-    </button>
-    <button
-      mat-flat-button
-      class="button port-small-button"
-      matTooltip="Rotate the line by moving the port(pin) end 1° counter-clockwise"
-      (click)="adjustLineEnd('port', 0, toRadians(-1))">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">↓1&deg;</text>
-        </svg>
-      </mat-icon>
-    </button>
-    <button
-      mat-flat-button
-      class="button starboard-small-button"
-      matTooltip="Rotate the line by moving the starboard(boat) end 1° counter-clockwise"
-      (click)="adjustLineEnd('stb', 0, toRadians(1))">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">↓1&deg;</text>
-        </svg>
-      </mat-icon>
-    </button>
-    <button
-      mat-flat-button
-      class="button starboard-small-button"
-      matTooltip="Rotate the line by moving the starboard(boat) end 1° clockwise"
-      (click)="adjustLineEnd('stb', 0, toRadians(-1))">
-      <mat-icon class="buttons-svg-icon">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 50 14"
-          preserveAspectRatio="xMidYMid meet"
-          class="svg-content">
-          <text x="25" y="11">↑1&deg;</text>
-        </svg>
-      </mat-icon>
-    </button>
-    } @case (4) {
-      <button
-        mat-flat-button
-        class="button select-button"
-        matTooltip="Display the next named line"
-        (click)="nextDisplayLineName()">
-        <mat-icon class="buttons-svg-icon">
-          <svg
-            width="100%"
-            height="100%"
-            viewBox="0 0 50 14"
-            preserveAspectRatio="xMidYMid meet"
-            class="svg-content">
-            <text x="25" y="11">Line</text>
-          </svg>
-        </mat-icon>
-      </button>
-      <button
-        mat-flat-button
-        class="button {{isDisplayLineCurrent() ? 'line-button-current' : 'line-button'}}"
-        matTooltip="Set the {{ getDisplayLineName()}} line as the current line"
-        (click)="setStartLine(getDisplayLineName())">
-        <mat-icon class="buttons-svg-icon">
-          <svg
-            width="100%"
-            height="100%"
-            viewBox="0 0 150 14"
-            preserveAspectRatio="xMidYMid meet"
-            class="svg-content">
-            <text x="75" y="11">{{ getDisplayLineName() }}</text>
-          </svg>
-        </mat-icon>
-      </button>
-    } }
+    <button mat-flat-button class="button select-button" matTooltip="Select the control mode"
+      aria-label="Select the control mode" (click)="toggleMode()"><span class="label label-glyph">&vellip;</span></button>
+    @switch (mode()) {
+      @case (0) {
+        <div class="pin-container"><span class="label label-bias pin">{{ portBiasValue() }}</span></div>
+        <div class="len-bias-container"><span class="label label-length"><span class="pin">⚑</span> {{ lineLengthValue() }} <span class="boat">⚑</span></span></div>
+        <div class="boat-container"><span class="label label-bias boat">{{ stbBiasValue() }}</span></div>
+      }
+      @case (1) {
+        <button mat-flat-button class="button port-button" matTooltip="Set the port(pin) end of the line to the current position"
+          (click)="setLineEnd('port')"><span class="label label-wide">Port End</span></button>
+        <button mat-flat-button class="button starboard-button" matTooltip="Set the starboard(boat) end of the line to the current position"
+          (click)="setLineEnd('stb')"><span class="label label-wide">Stbd End</span></button>
+      }
+      @case (2) {
+        <!-- Both ends offer the same four adjustments, so a visible label names neither the end it acts
+             on nor, for the rotations, a direction at all — only the colour distinguishes them. -->
+        <button mat-flat-button class="button port-button" matTooltip="Increase the line length by 5m at the port(pin) end"
+          aria-label="Increase the line length by 5m at the port end" (click)="adjustLineEnd('port', 5, 0)"><span class="label">+5m</span></button>
+        <button mat-flat-button class="button port-button" matTooltip="Decrease the line length by 5m at the port(pin) end"
+          aria-label="Decrease the line length by 5m at the port end" (click)="adjustLineEnd('port', -5, 0)"><span class="label">-5m</span></button>
+        <button mat-flat-button class="button starboard-button" matTooltip="Decrease the line length by 5m at the starboard(boat) end"
+          aria-label="Decrease the line length by 5m at the starboard end" (click)="adjustLineEnd('stb', -5, 0)"><span class="label">-5m</span></button>
+        <button mat-flat-button class="button starboard-button" matTooltip="Increase the line length by 5m at the starboard(boat) end"
+          aria-label="Increase the line length by 5m at the starboard end" (click)="adjustLineEnd('stb', 5, 0)"><span class="label">+5m</span></button>
+      }
+      @case (3) {
+        <button mat-flat-button class="button port-button" matTooltip="Rotate the line by moving the port(pin) end 1° clockwise"
+          aria-label="Rotate the line by moving the port end 1 degree clockwise" (click)="adjustLineEnd('port', 0, toRadians(1))"><span class="label">↑1°</span></button>
+        <button mat-flat-button class="button port-button" matTooltip="Rotate the line by moving the port(pin) end 1° counter-clockwise"
+          aria-label="Rotate the line by moving the port end 1 degree counter-clockwise" (click)="adjustLineEnd('port', 0, toRadians(-1))"><span class="label">↓1°</span></button>
+        <button mat-flat-button class="button starboard-button" matTooltip="Rotate the line by moving the starboard(boat) end 1° counter-clockwise"
+          aria-label="Rotate the line by moving the starboard end 1 degree counter-clockwise" (click)="adjustLineEnd('stb', 0, toRadians(1))"><span class="label">↓1°</span></button>
+        <button mat-flat-button class="button starboard-button" matTooltip="Rotate the line by moving the starboard(boat) end 1° clockwise"
+          aria-label="Rotate the line by moving the starboard end 1 degree clockwise" (click)="adjustLineEnd('stb', 0, toRadians(-1))"><span class="label">↑1°</span></button>
+      }
+      @case (4) {
+        <button mat-flat-button class="button select-button" matTooltip="Display the next named line"
+          (click)="nextDisplayLineName()"><span class="label">Line</span></button>
+        <button mat-flat-button class="button {{isDisplayLineCurrent() ? 'line-button-current' : 'line-button'}}"
+          matTooltip="Set the {{ getDisplayLineName() }} line as the current line"
+          (click)="setStartLine(getDisplayLineName())"><span class="label">{{ getDisplayLineName() }}</span></button>
+      }
+    }
   </div>
   @if (!dashboard.isDashboardStatic()) {
     <div class="widgetOverlay"></div>

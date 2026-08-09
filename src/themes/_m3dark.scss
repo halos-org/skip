@@ -140,15 +140,24 @@ $_background: map.get(map.get($_palettes, neutral), 10);
 
 $skip-dark-color: (
   blue: #3298ff, blue-dim: #359affc6, blue-dimmer: #063b7178,
+  // Ink for labels on the accent fills; the surface `contrast` ink does not track these accents' own lightness.
+  on-blue: #000000,
+  // The dim blue composites over the black card to a mid luminance that sits at the worst point of the
+  // contrast curve: white is the best any ink can do against it, and it only just clears AA.
+  on-blue-dim: #ffffff,
   green: #00d000, green-dim: #00d000b6, green-dimmer: #00680078,
   purple: #A020F0, purple-dim: #A020F0b6, purple-dimmer: #4a0f6e78,
   yellow: #ffdf00, yellow-dim: #ffdf00b6, yellow-dimmer: #726e0078,
   pink: #FC0FC0, pink-dim: #FC0FC0b6, pink-dimmer: #6d075378,
   orange: #ff9100, orange-dim: #ff9100b6, orange-dimmer: #714a0078,
+  on-orange: #000000,
   contrast: #FFFFFF, contrast-dim: #ffffffb6, contrast-dimmer: #ffffff29,
   grey: #B5B5B5, grey-dim: #B5B5B5b6, grey-dimmer: #1a1a1a,
+  on-grey: #000000,
   port: #8F0000,
+  on-port: #ffffff,
   starboard: #008700,
+  on-starboard: #ffffff,
   zone-nominal: #0164FA,
   zone-alert: #ffff60,
   zone-warn: #ff8d41,
@@ -172,6 +181,8 @@ $skip-widget-action-delete-button-color: map.get($skip-dark-color, widget-action
 $blue: map.get($skip-dark-color, blue);
 $blueDim: map.get($skip-dark-color, blue-dim);
 $blueDimmer: map.get($skip-dark-color, blue-dimmer);
+$onBlue: map.get($skip-dark-color, on-blue);
+$onBlueDim: map.get($skip-dark-color, on-blue-dim);
 
 $green: map.get($skip-dark-color, green);
 $greenDim: map.get($skip-dark-color, green-dim);
@@ -192,6 +203,7 @@ $pinkDimmer: map.get($skip-dark-color, pink-dimmer);
 $orange: map.get($skip-dark-color, orange);
 $orangeDim: map.get($skip-dark-color, orange-dim);
 $orangeDimmer: map.get($skip-dark-color, orange-dimmer);
+$onOrange: map.get($skip-dark-color, on-orange);
 
 $contrast: map.get($skip-dark-color, contrast);
 $contrastDim: map.get($skip-dark-color, contrast-dim);
@@ -200,9 +212,12 @@ $contrastDimmer: map.get($skip-dark-color, contrast-dimmer);
 $grey: map.get($skip-dark-color, grey);
 $greyDim: map.get($skip-dark-color, grey-dim);
 $greyDimmer: map.get($skip-dark-color, grey-dimmer);
+$onGrey: map.get($skip-dark-color, on-grey);
 
 $port: map.get($skip-dark-color, port);
+$onPort: map.get($skip-dark-color, on-port);
 $starboard: map.get($skip-dark-color, starboard);
+$onStarboard: map.get($skip-dark-color, on-starboard);
 $zone-nominal: map.get($skip-dark-color, zone-nominal);
 $zone-alert: map.get($skip-dark-color, zone-alert);
 $zone-warn: map.get($skip-dark-color, zone-warn);

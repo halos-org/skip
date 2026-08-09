@@ -27,6 +27,8 @@
   --skip-blue-color: #{dark.$blue};
   --skip-blue-dim-color: #{dark.$blueDim};
   --skip-blue-dimmer-color: #{dark.$blueDimmer};
+  --skip-on-blue-color: #{dark.$onBlue};
+  --skip-on-blue-dim-color: #{dark.$onBlueDim};
 
   --skip-green-color: #{dark.$green};
   --skip-green-dim-color: #{dark.$greenDim};
@@ -47,6 +49,7 @@
   --skip-orange-color: #{dark.$orange};
   --skip-orange-dim-color: #{dark.$orangeDim};
   --skip-orange-dimmer-color: #{dark.$orangeDimmer};
+  --skip-on-orange-color: #{dark.$onOrange};
 
   --skip-contrast-color: #{dark.$contrast};
   --skip-contrast-dim-color: #{dark.$contrastDim};
@@ -55,9 +58,12 @@
   --skip-grey-color: #{dark.$grey};
   --skip-grey-dim-color: #{dark.$greyDim};
   --skip-grey-dimmer-color: #{dark.$greyDimmer};
+  --skip-on-grey-color: #{dark.$onGrey};
 
   --skip-port-color: #{dark.$port};
+  --skip-on-port-color: #{dark.$onPort};
   --skip-starboard-color: #{dark.$starboard};
+  --skip-on-starboard-color: #{dark.$onStarboard};
   --skip-zone-nominal-color: #{dark.$zone-nominal};
   --skip-zone-alert-color: #{dark.$zone-alert};
   --skip-zone-warn-color: #{dark.$zone-warn};
@@ -76,9 +82,12 @@ body.light-theme {
   --skip-grey-color: #{light.$grey};
   --skip-grey-dim-color: #{light.$greyDim};
   --skip-grey-dimmer-color: #{light.$greyDimmer};
+  --skip-on-grey-color: #{light.$onGrey};
   --skip-blue-color: #{light.$blue};
   --skip-blue-dim-color: #{light.$blueDim};
   --skip-blue-dimmer-color: #{light.$blueDimmer};
+  --skip-on-blue-color: #{light.$onBlue};
+  --skip-on-blue-dim-color: #{light.$onBlueDim};
   --skip-green-color: #{light.$green};
   --skip-green-dim-color: #{light.$greenDim};
   --skip-green-dimmer-color: #{light.$greenDimmer};
@@ -94,8 +103,11 @@ body.light-theme {
   --skip-orange-color: #{light.$orange};
   --skip-orange-dim-color: #{light.$orangeDim};
   --skip-orange-dimmer-color: #{light.$orangeDimmer};
+  --skip-on-orange-color: #{light.$onOrange};
   --skip-port-color: #{light.$port};
+  --skip-on-port-color: #{light.$onPort};
   --skip-starboard-color: #{light.$starboard};
+  --skip-on-starboard-color: #{light.$onStarboard};
   --skip-zone-nominal-color: #{light.$zone-nominal};
   --skip-zone-alert-color: #{light.$zone-alert};
   --skip-zone-warn-color: #{light.$zone-warn};
@@ -114,9 +126,12 @@ body.night-theme {
   --skip-grey-color: #{night.$grey};
   --skip-grey-dim-color: #{night.$greyDim};
   --skip-grey-dimmer-color: #{night.$greyDimmer};
+  --skip-on-grey-color: #{night.$onGrey};
   --skip-blue-color: #{night.$blue};
   --skip-blue-dim-color: #{night.$blueDim};
   --skip-blue-dimmer-color: #{night.$blueDimmer};
+  --skip-on-blue-color: #{night.$onBlue};
+  --skip-on-blue-dim-color: #{night.$onBlueDim};
   --skip-green-color: #{night.$green};
   --skip-green-dim-color: #{night.$greenDim};
   --skip-green-dimmer-color: #{night.$greenDimmer};
@@ -132,8 +147,11 @@ body.night-theme {
   --skip-orange-color: #{night.$orange};
   --skip-orange-dim-color: #{night.$orangeDim};
   --skip-orange-dimmer-color: #{night.$orangeDimmer};
+  --skip-on-orange-color: #{night.$onOrange};
   --skip-port-color: #{night.$port};
+  --skip-on-port-color: #{night.$onPort};
   --skip-starboard-color: #{night.$starboard};
+  --skip-on-starboard-color: #{night.$onStarboard};
   --skip-zone-nominal-color: #{night.$zone-nominal};
   --skip-zone-alert-color: #{night.$zone-alert};
   --skip-zone-warn-color: #{night.$zone-warn};

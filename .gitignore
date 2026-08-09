@@ -54,3 +54,6 @@ Thumbs.db
 
 # Playwright MCP / e2e scratch output
 .playwright-mcp/
+
+# Agent and git worktrees live inside the clone; they are never part of it.
+.worktrees/

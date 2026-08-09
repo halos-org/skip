@@ -5,7 +5,6 @@ import { TimersService } from '../../core/services/timers.service';
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { CanvasService } from '../../core/services/canvas.service';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ITheme } from '../../core/services/app-service';
@@ -15,7 +14,7 @@ import { ITheme } from '../../core/services/app-service';
   templateUrl: './widget-race-timer.component.html',
   styleUrls: ['./widget-race-timer.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatIconModule]
+  imports: [MatButtonModule]
 })
 export class WidgetRaceTimerComponent implements AfterViewInit, OnDestroy {
   // Functional inputs

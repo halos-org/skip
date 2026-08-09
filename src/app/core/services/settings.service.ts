@@ -16,6 +16,7 @@ import { ReloadService } from './reload.service';
 import { EmbedModeService } from './embed-mode.service';
 import { Dashboard } from './dashboard.service';
 import { LOCAL_CONFIG_KEYS, localConfigKey } from '../constants/config-storage.const';
+import { getLocalStorageItem, isLocalStorageAvailable, removeLocalStorageItem, setLocalStorageItem } from '../utils/local-storage.util';
 import { REMOTE_CONFIG_FILE_VERSION, LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION, SUPPORTED_CONNECTION_CONFIG_VERSIONS } from '../constants/config-versions.const';
 
 
@@ -96,14 +97,14 @@ export class SettingsService {
         }
       ));
 
-    if (!window.localStorage) {
-      // REQUIRED BY APP - localStorage support
-      console.error("[AppSettings Service] LocalStorage NOT SUPPORTED by browser\nThis is a requirement to run Skip. See browser documentation to enable this feature.");
-
-    } else {
-      this.loadConnectionConfig();
-      this.startup();
+    // An unusable store is not fatal: it reads like an empty one, so the connection config falls back
+    // to defaults and the profile config still loads from the server.
+    if (!isLocalStorageAvailable()) {
+      console.warn("[AppSettings Service] Browser storage is unavailable. Per-device connection settings will not persist beyond this session.");
     }
+
+    this.loadConnectionConfig();
+    this.startup();
   }
 
   private async startup(): Promise<void> {
@@ -155,13 +156,13 @@ export class SettingsService {
       for (const key of legacyCredentialKeys) {
         delete rawConfig[key];
       }
-      localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(config));
+      setLocalStorageItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(config));
     }
 
     // Also drop the legacy top-level session/device token blob. Nothing reads it anymore (auth is
     // session-cookie only), so leaving it would strand a still-server-valid bearer credential —
     // often a never-expiring device token — at rest.
-    localStorage.removeItem('authorization_token');
+    removeLocalStorageItem('authorization_token');
 
     // Remote-control identity is per-device: read from connectionConfig, not the profile.
     this._isRemoteControl.set(config.isRemoteControl ?? false);
@@ -169,7 +170,7 @@ export class SettingsService {
   }
 
   public resetConnection() {
-    localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.getDefaultConnectionConfig()));
+    setLocalStorageItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.getDefaultConnectionConfig()));
     void this._reload.reload();
   }
 
@@ -188,7 +189,15 @@ export class SettingsService {
    * @memberof SettingsService
    */
   public loadConfigFromLocalStorage(type: string) {
-    let config = JSON.parse(localStorage.getItem(localConfigKey(type)) ?? 'null');
+    // A corrupt entry must fall through to defaults, not throw: this runs from the constructor, so
+    // a SyntaxError here means the app does not boot and there is no in-app way to clear the value.
+    let config;
+    try {
+      config = JSON.parse(getLocalStorageItem(localConfigKey(type)) ?? 'null');
+    } catch {
+      config = null;
+      console.warn(`[AppSettings Service] Stored ${type} config is not valid JSON; using defaults.`);
+    }
 
     if (config === null) {
       console.log(`[AppSettings Service] Error loading ${type} config. Force loading ${type} defaults`);
@@ -559,7 +568,7 @@ export class SettingsService {
 
   private readStoredConnectionConfig(): Partial<IConnectionConfig> | null {
     try {
-      return JSON.parse(localStorage.getItem(LOCAL_CONFIG_KEYS.connectionConfig) ?? 'null');
+      return JSON.parse(getLocalStorageItem(LOCAL_CONFIG_KEYS.connectionConfig) ?? 'null');
     } catch {
       return null;
     }
@@ -578,7 +587,7 @@ export class SettingsService {
 
   private saveConnectionConfigToLocalStorage() {
     console.log("[AppSettings Service] Saving Connection config to LocalStorage");
-    localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.buildConnectionStorageObject()));
+    setLocalStorageItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(this.buildConnectionStorageObject()));
   }
 
   // Builders returning fresh default configs. Profile config persists to the server, so these
@@ -595,7 +604,7 @@ export class SettingsService {
     const config: IConnectionConfig = cloneDeep(DefaultConnectionConfig);
     config.skipUUID = UUID.create();
     config.signalKUrl = window.location.origin;
-    localStorage.setItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(config));
+    setLocalStorageItem(LOCAL_CONFIG_KEYS.connectionConfig, JSON.stringify(config));
     return config;
   }
 

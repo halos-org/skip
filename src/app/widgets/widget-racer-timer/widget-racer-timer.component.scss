@@ -25,9 +25,10 @@
   position: relative;
   height: 24%;
   width: 100%;
-  // The gap below the controls comes out of the same 24%, so it stays proportional; a fixed one
-  // takes most of the row on a small tile.
-  padding: 0 8px 3% 8px;
+  // Fixed, not a percentage: percentage padding resolves against the containing block's WIDTH
+  // while this row is a percentage of the tile's HEIGHT, so a wide tile would shrink the
+  // controls it is meant to space and eventually leave no row at all.
+  padding: 0 8px 8px 8px;
   z-index: 20;
   pointer-events: auto;
   align-items: center;
@@ -100,39 +101,23 @@ $label-field-width: 13cqw;
   width: 18%;
   @include mat.button-overrides((
     filled-container-color: var(--skip-blue-color),
-    filled-label-text-color: var(--skip-contrast-color)
+    filled-label-text-color: var(--skip-on-blue-color)
   ));
 }
 
-.main-button {
+.primary-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
     filled-container-color: var(--skip-port-color),
-    filled-label-text-color: var(--skip-contrast-color)
+    filled-label-text-color: var(--skip-on-port-color)
   ));
 }
 
-.other-button {
+.secondary-button {
   flex: 1 1 auto;
   @include mat.button-overrides((
     filled-container-color: var(--skip-blue-color),
-    filled-label-text-color: var(--skip-contrast-color)
-  ));
-}
-
-.main-small-button {
-  flex: 1 1 auto;
-  @include mat.button-overrides((
-    filled-container-color: var(--skip-port-color),
-    filled-label-text-color: var(--skip-contrast-color)
-  ));
-}
-
-.other-small-button {
-  flex: 1 1 auto;
-  @include mat.button-overrides((
-    filled-container-color: var(--skip-blue-color),
-    filled-label-text-color: var(--skip-contrast-color)
+    filled-label-text-color: var(--skip-on-blue-color)
   ));
 }
 
