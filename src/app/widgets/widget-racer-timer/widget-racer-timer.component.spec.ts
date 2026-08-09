@@ -1,10 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { EMPTY } from 'rxjs';
+import { Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WidgetRacerTimerComponent } from './widget-racer-timer.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
-import { SignalkRequestsService } from '../../core/services/signalk-requests.service';
+import { SignalkRequestsService, skRequest } from '../../core/services/signalk-requests.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { CanvasService } from '../../core/services/canvas.service';
 
@@ -13,7 +13,11 @@ describe('WidgetRacerTimerComponent', () => {
 
   const runtimeMock = { options: () => WidgetRacerTimerComponent.DEFAULT_CONFIG };
   const streamsMock = { observe: vi.fn() };
-  const requestsMock = { subscribeRequest: () => EMPTY, putRequest: vi.fn() };
+  const requestResults = new Subject<skRequest>();
+  const requestsMock = {
+    subscribeRequest: () => requestResults.asObservable(),
+    putRequest: vi.fn(() => 'req-1')
+  };
   const dashboardMock = { isDashboardStatic: () => true };
   // Typed so a member the widget does not have is a compile error under `npm run snc`. A member it
   // gains later still returns undefined silently — the canvas is not what these tests are about.
@@ -29,6 +33,7 @@ describe('WidgetRacerTimerComponent', () => {
 
   beforeEach(async () => {
     streamsMock.observe.mockClear();
+    requestsMock.putRequest.mockClear();
     await TestBed.configureTestingModule({
       imports: [WidgetRacerTimerComponent],
       providers: [
@@ -126,5 +131,60 @@ describe('WidgetRacerTimerComponent', () => {
     expect(input).not.toBeNull();
     expect(input?.getAttribute('aria-label')).toBeTruthy();
     expect(input?.type).toBe('time');
+  });
+
+  // The widget holds no start time of its own: the readout shows what the race plugin publishes
+  // back, so leaving the form before the request settles shows a placeholder that looks identical
+  // to a timer that is actually set.
+  describe('setting an absolute start time', () => {
+    const enterTime = () => {
+      setMode(4);
+      const input = host().querySelector<HTMLInputElement>('input.set-start-at');
+      input!.value = '23:45:00';
+      input!.dispatchEvent(new Event('input'));
+      input!.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+    };
+
+    it('does not submit an intermediate value while the field is still being typed', () => {
+      // Chromium fires `change` as soon as a time input holds a complete value, so typing 20 then 4
+      // of "20:40" made "20:04" complete and submitted it.
+      setMode(4);
+      const input = host().querySelector<HTMLInputElement>('input.set-start-at');
+      input!.value = '20:04:00';
+      input!.dispatchEvent(new Event('input'));
+      input!.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      expect(requestsMock.putRequest).not.toHaveBeenCalled();
+      expect(host().querySelector('input.set-start-at')).not.toBeNull();
+    });
+
+    it('stays on the form until the server confirms', () => {
+      enterTime();
+      expect(requestsMock.putRequest).toHaveBeenCalled();
+      expect(host().querySelector('input.set-start-at')).not.toBeNull();
+    });
+
+    it('leaves the form once the request succeeds', () => {
+      enterTime();
+      requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 200, widgetUUID: 'racer-timer-test' });
+      fixture.detectChanges();
+      expect(host().querySelector('input.set-start-at')).toBeNull();
+    });
+
+    it('stays on the form and reports a refusal', () => {
+      enterTime();
+      requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 403,
+        statusCodeDescription: 'Permission denied', widgetUUID: 'racer-timer-test' });
+      fixture.detectChanges();
+      expect(host().querySelector('input.set-start-at')).not.toBeNull();
+    });
+
+    it('ignores a reply belonging to another request', () => {
+      enterTime();
+      requestResults.next({ requestId: 'someone-else', state: 'COMPLETED', statusCode: 200, widgetUUID: 'racer-timer-test' });
+      fixture.detectChanges();
+      expect(host().querySelector('input.set-start-at')).not.toBeNull();
+    });
   });
 });

@@ -26,7 +26,8 @@
     @case (4) {
       <div class="start-at-field">
         <input class="set-start-at" type="time" step="1" matTooltip="Set an absolute start time"
-          aria-label="Absolute start time" [(ngModel)]="startAtTimeEdit" (change)="setStartTime()">
+          aria-label="Absolute start time" [(ngModel)]="startAtTimeEdit"
+          (blur)="setStartTime()" (keyup.enter)="setStartTime()">
       </div>
     }
   }
