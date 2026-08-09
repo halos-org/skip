@@ -189,7 +189,15 @@ export class SettingsService {
    * @memberof SettingsService
    */
   public loadConfigFromLocalStorage(type: string) {
-    let config = JSON.parse(getLocalStorageItem(localConfigKey(type)) ?? 'null');
+    // A corrupt entry must fall through to defaults, not throw: this runs from the constructor, so
+    // a SyntaxError here means the app does not boot and there is no in-app way to clear the value.
+    let config;
+    try {
+      config = JSON.parse(getLocalStorageItem(localConfigKey(type)) ?? 'null');
+    } catch {
+      config = null;
+      console.warn(`[AppSettings Service] Stored ${type} config is not valid JSON; using defaults.`);
+    }
 
     if (config === null) {
       console.log(`[AppSettings Service] Error loading ${type} config. Force loading ${type} defaults`);
