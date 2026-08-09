@@ -18,6 +18,7 @@ import { GestureDirective } from './gesture.directive';
       [enableDoubleTap]="enableDoubleTap"
       [enableTap]="enableTap"
       (tap)="tapCount = tapCount + 1">
+      <input class="probe-input" type="time" step="1">
     </div>
   `
 })
@@ -376,5 +377,50 @@ describe('GestureDirective', () => {
 
         expect(pressCount).toBe(0);
         expect(doubleTapCount).toBe(0);
+    });
+
+    // A gesture that starts on a form control must not be recognised: capture is taken on the event
+    // target and pointerdown is preventDefault()ed, which on WebKit stops the control focusing and
+    // stops a date/time picker opening at all.
+    describe('native form controls', () => {
+        const inputEl = () => hostEl.querySelector('input.probe-input') as HTMLInputElement;
+
+        it('does not preventDefault a pointerdown on an input', () => {
+            component.mode = 'press';
+            syncFixture();
+            const event = createPointerEvent('pointerdown', {
+                clientX: 10, clientY: 10, pointerId: POINTER_ID, pointerType: 'touch'
+            });
+            inputEl().dispatchEvent(event);
+            expect(event.defaultPrevented).toBe(false);
+        });
+
+        it('does not capture the pointer on an input', () => {
+            component.mode = 'press';
+            syncFixture();
+            const input = inputEl();
+            let captured = false;
+            input.setPointerCapture = () => { captured = true; };
+            dispatchPointerEvent(input, 'pointerdown', {
+                clientX: 10, clientY: 10, pointerId: POINTER_ID, pointerType: 'touch'
+            });
+            expect(captured).toBe(false);
+        });
+
+        it('fires no long press from a hold that starts on an input', async () => {
+            component.mode = 'press';
+            component.longPressMs = 80;
+            syncFixture();
+            now = 2000;
+            let pressCount = 0;
+            hostEl.addEventListener('press', () => { pressCount += 1; });
+            vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+            dispatchPointerEvent(inputEl(), 'pointerdown', {
+                clientX: 10, clientY: 10, pointerId: POINTER_ID, pointerType: 'touch'
+            });
+            await vi.advanceTimersByTimeAsync(200);
+            vi.useRealTimers();
+            expect(pressCount).toBe(0);
+        });
     });
 });
