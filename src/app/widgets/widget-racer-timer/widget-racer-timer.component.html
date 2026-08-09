@@ -3,29 +3,31 @@
 </div>
 <div class="buttons-container">
   <button mat-flat-button class="button select-button" matTooltip="Select the control mode"
-    aria-label="Select the control mode" (click)="toggleMode()">&vellip;</button>
+    aria-label="Select the control mode" (click)="toggleMode()"><span class="label label-glyph">&vellip;</span></button>
   @switch (mode()) {
     @case (0) {
-      <div class="start-at">&commat; {{ startAtTime() }}</div>
+      <div class="start-at"><span class="label label-readout">&commat; {{ startAtTime() }}</span></div>
     }
     @case (1) {
-      <button mat-flat-button class="button main-button" matTooltip="Start the race timer" (click)="sendStartTimerCommand('start')">Start</button>
-      <button mat-flat-button class="button other-small-button" matTooltip="Remove 1 minute from the timer" (click)="adjustStartTime(-60)">-1m</button>
-      <button mat-flat-button class="button other-small-button" matTooltip="Add 1 minute to the timer" (click)="adjustStartTime(+60)">+1m</button>
+      <button mat-flat-button class="button main-button" matTooltip="Start the race timer" (click)="sendStartTimerCommand('start')"><span class="label">Start</span></button>
+      <button mat-flat-button class="button other-small-button" matTooltip="Remove 1 minute from the timer" (click)="adjustStartTime(-60)"><span class="label">-1m</span></button>
+      <button mat-flat-button class="button other-small-button" matTooltip="Add 1 minute to the timer" (click)="adjustStartTime(+60)"><span class="label">+1m</span></button>
     }
     @case (2) {
-      <button mat-flat-button class="button main-button" matTooltip="Sync the timer to nearest minute" (click)="sendStartTimerCommand('sync')">Sync</button>
-      <button mat-flat-button class="button other-button" matTooltip="Stop and reset the timer" (click)="sendStartTimerCommand('reset')">Reset</button>
+      <button mat-flat-button class="button main-button" matTooltip="Sync the timer to nearest minute" (click)="sendStartTimerCommand('sync')"><span class="label">Sync</span></button>
+      <button mat-flat-button class="button other-button" matTooltip="Stop and reset the timer" (click)="sendStartTimerCommand('reset')"><span class="label">Reset</span></button>
     }
     @case (3) {
-      <button mat-flat-button class="button main-small-button" matTooltip="Reduce the timer by 1 minute" (click)="adjustStartTime(-60)">-1m</button>
-      <button mat-flat-button class="button other-small-button" matTooltip="Reduce the timer by 1 second" (click)="adjustStartTime(-1)">-1s</button>
-      <button mat-flat-button class="button other-small-button" matTooltip="Increase the timer by 1 second" (click)="adjustStartTime(+1)">+1s</button>
-      <button mat-flat-button class="button main-small-button" matTooltip="Increase the timer by 1 minute" (click)="adjustStartTime(+60)">+1m</button>
+      <button mat-flat-button class="button main-small-button" matTooltip="Reduce the timer by 1 minute" (click)="adjustStartTime(-60)"><span class="label">-1m</span></button>
+      <button mat-flat-button class="button other-small-button" matTooltip="Reduce the timer by 1 second" (click)="adjustStartTime(-1)"><span class="label">-1s</span></button>
+      <button mat-flat-button class="button other-small-button" matTooltip="Increase the timer by 1 second" (click)="adjustStartTime(+1)"><span class="label">+1s</span></button>
+      <button mat-flat-button class="button main-small-button" matTooltip="Increase the timer by 1 minute" (click)="adjustStartTime(+60)"><span class="label">+1m</span></button>
     }
     @case (4) {
-      <input class="set-start-at" type="time" step="1" matTooltip="Set an absolute start time"
-        aria-label="Absolute start time" [(ngModel)]="startAtTimeEdit" (change)="setStartTime()">
+      <div class="start-at-field">
+        <input class="set-start-at" type="time" step="1" matTooltip="Set an absolute start time"
+          aria-label="Absolute start time" [(ngModel)]="startAtTimeEdit" (change)="setStartTime()">
+      </div>
     }
   }
 </div>

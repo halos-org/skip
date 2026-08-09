@@ -17,12 +17,7 @@
   height: 76%;
 }
 
-// Size container for the control row: every label and the time field derive their type size from
-// the row's own height, so a control reads the same in every mode and scales with the tile. The
-// bottom gap stays small — it is carved out of the same 24%, and a fixed one swallowed most of the
-// row on a small tile.
 .buttons-container {
-  container-type: size;
   display: flex;
   flex-wrap: nowrap;
   justify-content: space-between;
@@ -30,15 +25,60 @@
   position: relative;
   height: 24%;
   width: 100%;
-  padding: 0px 8px 8px 8px;
+  // The gap below the controls comes out of the same 24%, so it stays proportional; a fixed one
+  // takes most of the row on a small tile.
+  padding: 0 8px 3% 8px;
   z-index: 20;
   pointer-events: auto;
   align-items: center;
 }
 
-// Labels are real text sized off the row height. The floor keeps them legible on a tile too small
-// to give the row much; below that the tile cannot usefully carry these controls at all.
-$control-text-size: max(9px, 45cqh);
+// Each control is a size container so its label can be sized against the control's own box. A tile
+// may be far taller than it is wide, so height alone does not bound the type: the label has to fit
+// the narrow axis too, which is the one thing the SVG this replaced got right.
+.button,
+.start-at,
+.start-at-field {
+  container-type: size;
+}
+
+// The coefficients are the measured fraction of a control's width and height that keeps the widest
+// label of each kind inside its box: `Reset`/`Start` for a button, `@ HH:MM:SS` for the readout,
+// `HH:MM:SS` plus the browser's clock affordance for the field. Short labels are bounded by height
+// on any ordinary tile, so they only shrink where the tile is genuinely too narrow.
+$label-height: 45cqh;
+$label-word-width: 26cqw;
+$label-glyph-width: 90cqw;
+$label-readout-width: 11cqw;
+$label-field-width: 13cqw;
+
+.label {
+  display: block;
+  white-space: nowrap;
+  font-family: Roboto;
+  font-weight: 700;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: min(#{$label-height}, #{$label-word-width});
+}
+
+// Container queries reached Chrome 105 / Safari 16. Skip also runs inside third-party chartplotter
+// browsers through the Freeboard-SK panel, where the engine version is not ours to pick, so an
+// older one gets a fixed size rather than a `cq` unit it would resolve against the viewport.
+@supports not (container-type: size) {
+  .label { font-size: 14px; }
+}
+
+.label-glyph {
+  font-size: min(#{$label-height}, #{$label-glyph-width});
+}
+
+.label-readout {
+  font-weight: 400;
+  font-size: min(#{$label-height}, #{$label-readout-width});
+}
 
 .button {
   min-width: 0px;
@@ -48,13 +88,10 @@ $control-text-size: max(9px, 45cqh);
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  overflow: hidden;
   @include mat.button-overrides((
     filled-container-height: 100%,
     filled-horizontal-padding: 0px,
     filled-icon-spacing: 0px,
-    filled-label-text-size: $control-text-size,
-    filled-label-text-weight: 700,
   ));
 }
 
@@ -99,30 +136,41 @@ $control-text-size: max(9px, 45cqh);
   ));
 }
 
-// A surface background rather than the contrast ink, so the field themes with the app and the
-// browser's own clock affordance stays visible against it.
-.set-start-at {
+.start-at-field {
   flex: 1 1 auto;
   min-width: 0;
   height: 100%;
+}
+
+// The field sits on the widget's own surface and takes the theme's ink, which is the pairing every
+// theme is built around — the night theme is near-monochrome dark red, so any two of its own tokens
+// stacked give about 1.3:1. A border delineates the field instead of a fill.
+.set-start-at {
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
   padding: 0 4px;
-  border: none;
+  border: 1px solid var(--skip-contrast-dimmer-color);
   border-radius: 12px;
-  background-color: var(--mat-sys-surface-container-highest);
-  color: var(--mat-sys-on-surface);
+  background-color: transparent;
+  color: var(--skip-contrast-color);
   font-family: Roboto;
-  font-size: $control-text-size;
   font-weight: 700;
   text-align: center;
+  font-size: min(#{$label-height}, #{$label-field-width});
+}
+
+@supports not (container-type: size) {
+  .set-start-at { font-size: 14px; }
 }
 
 .start-at {
   flex: 1 1 auto;
   min-width: 0;
-  text-align: center;
-  font-family: Roboto;
-  font-size: $control-text-size;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--skip-contrast-dim-color);
 }
 

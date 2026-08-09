@@ -15,15 +15,16 @@ describe('WidgetRacerTimerComponent', () => {
   const streamsMock = { observe: vi.fn() };
   const requestsMock = { subscribeRequest: () => EMPTY, putRequest: vi.fn() };
   const dashboardMock = { isDashboardStatic: () => true };
-  // Every CanvasService member the widget touches; the canvas itself is not under test here.
-  const canvasMock = {
+  // Typed so a member the widget does not have is a compile error under `npm run snc`. A member it
+  // gains later still returns undefined silently — the canvas is not what these tests are about.
+  const canvasMock: Partial<CanvasService> = {
     clearCanvas: vi.fn(),
-    createTitleBitmap: vi.fn(() => null),
+    createTitleBitmap: vi.fn(() => document.createElement('canvas')),
     drawText: vi.fn(),
     drawTextBitmap: vi.fn(),
     registerCanvas: vi.fn(),
     unregisterCanvas: vi.fn(),
-    MIN: 0
+    MIN_LABEL_PX: 16
   };
 
   beforeEach(async () => {
@@ -54,13 +55,22 @@ describe('WidgetRacerTimerComponent', () => {
     fixture.detectChanges();
   };
 
-  /** A name a screen reader can read out: a word, not a bare glyph. */
-  const accessibleName = (btn: HTMLButtonElement) =>
-    (btn.getAttribute('aria-label') ?? btn.textContent ?? '').trim();
+  /**
+   * What a screen reader would announce. `textContent` is not that: it includes subtrees marked
+   * aria-hidden, which is exactly the markup that hid these labels, so a test built on it cannot
+   * see the defect. Drop those subtrees first.
+   */
+  const accessibleName = (btn: HTMLButtonElement) => {
+    const explicit = btn.getAttribute('aria-label');
+    if (explicit) { return explicit.trim(); }
+    const clone = btn.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('[aria-hidden="true"]').forEach(node => node.remove());
+    return (clone.textContent ?? '').trim();
+  };
 
   it('gives every control a pronounceable accessible name in every mode', () => {
-    // The labels used to live inside <mat-icon>, which Angular Material marks aria-hidden unless an
-    // explicit value is given — leaving every button nameless to assistive tech.
+    // Angular Material marks mat-icon aria-hidden unless given an explicit value, so a control's
+    // label must not live inside one or the control has no name at all.
     for (const mode of [0, 1, 2, 3, 4]) {
       setMode(mode);
       const controls = host().querySelectorAll<HTMLButtonElement>('button');
@@ -68,6 +78,8 @@ describe('WidgetRacerTimerComponent', () => {
       for (const btn of controls) {
         expect(accessibleName(btn), `mode ${mode}`).toMatch(/[a-z]/i);
       }
+      expect(host().querySelector('mat-icon'), `mode ${mode}`).toBeNull();
+      expect(host().querySelector('svg text'), `mode ${mode}`).toBeNull();
     }
   });
 
@@ -78,8 +90,34 @@ describe('WidgetRacerTimerComponent', () => {
     expect(labels).toContain('Start');
     expect(labels).toContain('-1m');
     expect(labels).toContain('+1m');
-    expect(host().querySelector('mat-icon')).toBeNull();
-    expect(host().querySelector('svg text')).toBeNull();
+  });
+
+  const clickLabel = (text: string) => {
+    const btn = [...host().querySelectorAll<HTMLButtonElement>('button')]
+      .find(b => b.textContent?.trim() === text);
+    expect(btn, `no button labelled ${text}`).toBeTruthy();
+    btn?.click();
+    fixture.detectChanges();
+  };
+
+  // The rewrite re-authored every button by hand, and the adjust arguments differ only by sign while
+  // two modes reuse the same labels. Pin each label to the request it sends.
+  it.each([
+    [1, 'Start', { command: 'start' }],
+    [2, 'Sync', { command: 'sync' }],
+    [2, 'Reset', { command: 'reset' }],
+    [1, '-1m', { command: 'adjust', delta: -60 }],
+    [1, '+1m', { command: 'adjust', delta: 60 }],
+    [3, '-1m', { command: 'adjust', delta: -60 }],
+    [3, '-1s', { command: 'adjust', delta: -1 }],
+    [3, '+1s', { command: 'adjust', delta: 1 }],
+    [3, '+1m', { command: 'adjust', delta: 60 }]
+  ])('mode %i: %s sends %o', (mode, label, payload) => {
+    requestsMock.putRequest.mockClear();
+    setMode(mode as number);
+    clickLabel(label as string);
+    expect(requestsMock.putRequest).toHaveBeenCalledWith(
+      'navigation.racing.setStartTime', payload, 'racer-timer-test');
   });
 
   it('names the absolute start time field, whose glyph-free input carries no visible label', () => {
