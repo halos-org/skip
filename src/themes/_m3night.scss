@@ -144,6 +144,7 @@ $skip-night-color: (
   // Ink for labels on the accent fills: the dimmest palette tone that clears AA on each fill, since white would
   // cost dark adaptation and no ink darker than these accents clears AA against them at all.
   on-blue: #e56c5b,
+  on-blue-dim: #e56c5b,
   green: #520000, green-dim: #520000b6, green-dimmer: #260000c5,
   purple: #520000, purple-dim: #520000b6, purple-dimmer: #260000c5,
   yellow: #520000, yellow-dim: #520000b6, yellow-dimmer: #260000c5,
@@ -182,6 +183,7 @@ $blue: map.get($skip-night-color, blue);
 $blueDim: map.get($skip-night-color, blue-dim);
 $blueDimmer: map.get($skip-night-color, blue-dimmer);
 $onBlue: map.get($skip-night-color, on-blue);
+$onBlueDim: map.get($skip-night-color, on-blue-dim);
 
 $green: map.get($skip-night-color, green);
 $greenDim: map.get($skip-night-color, green-dim);

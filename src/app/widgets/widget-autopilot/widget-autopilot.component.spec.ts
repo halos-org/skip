@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { EMPTY, of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -139,5 +139,61 @@ describe('WidgetAutopilotComponent', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  /**
+   * What a screen reader would announce. `textContent` is not that: it includes subtrees marked
+   * aria-hidden, which is exactly the markup that hid these labels, so a test built on it cannot
+   * see the defect. Drop those subtrees first.
+   */
+  const accessibleName = (btn: HTMLButtonElement) => {
+    const explicit = btn.getAttribute('aria-label');
+    if (explicit) { return explicit.trim(); }
+    const clone = btn.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('[aria-hidden="true"]').forEach(node => node.remove());
+    return (clone.textContent ?? '').trim();
+  };
+
+  const render = (mode: string): ComponentFixture<WidgetAutopilotComponent> => {
+    const fixture = TestBed.createComponent(WidgetAutopilotComponent);
+    const set = fixture.componentRef.setInput.bind(fixture.componentRef) as (k: string, v: unknown) => void;
+    set('id', 'autopilot-test');
+    set('type', 'widget-autopilot');
+    set('theme', null);
+    const state = fixture.componentInstance as unknown as {
+      apMode: { set: (value: string) => void };
+      apState: { set: (value: string) => void };
+    };
+    state.apMode.set(mode);
+    state.apState.set('engaged');
+    fixture.detectChanges();
+    return fixture;
+  };
+
+  const controls = (fixture: ComponentFixture<WidgetAutopilotComponent>) =>
+    [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.ap-btn')];
+
+  it('gives every control a pronounceable accessible name', () => {
+    // Angular Material marks mat-icon aria-hidden unless given an explicit value, so a control's
+    // label must not live inside one or the control has no name at all.
+    for (const mode of ['auto', 'wind', 'route', 'nav']) {
+      const found = controls(render(mode));
+      // Every control is in the DOM in every mode; visibility is a `display` binding on the wrapper.
+      expect(found.length, mode).toBe(10);
+      for (const btn of found) {
+        expect(accessibleName(btn), `${mode}: ${btn.outerHTML}`).toMatch(/[a-z]/i);
+        expect(btn.querySelector('mat-icon'), mode).toBeNull();
+        expect(btn.querySelector('svg text'), mode).toBeNull();
+      }
+    }
+  });
+
+  it('renders control labels as text rather than markup the accessibility tree drops', () => {
+    const labels = controls(render('auto')).map(btn => btn.textContent?.trim());
+    expect(labels).toContain('Engage');
+    expect(labels).toContain('Tack Port');
+    expect(labels).toContain('Tack Stbd');
+    expect(labels).toContain('Dodge');
+    expect(labels).toContain('Adv Wpt');
   });
 });

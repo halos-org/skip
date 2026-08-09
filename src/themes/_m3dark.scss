@@ -142,6 +142,9 @@ $skip-dark-color: (
   blue: #3298ff, blue-dim: #359affc6, blue-dimmer: #063b7178,
   // Ink for labels on the accent fills; the surface `contrast` ink does not track these accents' own lightness.
   on-blue: #000000,
+  // The dim blue composites over the black card to a mid luminance that sits at the worst point of the
+  // contrast curve: white is the best any ink can do against it, and it only just clears AA.
+  on-blue-dim: #ffffff,
   green: #00d000, green-dim: #00d000b6, green-dimmer: #00680078,
   purple: #A020F0, purple-dim: #A020F0b6, purple-dimmer: #4a0f6e78,
   yellow: #ffdf00, yellow-dim: #ffdf00b6, yellow-dimmer: #726e0078,
@@ -179,6 +182,7 @@ $blue: map.get($skip-dark-color, blue);
 $blueDim: map.get($skip-dark-color, blue-dim);
 $blueDimmer: map.get($skip-dark-color, blue-dimmer);
 $onBlue: map.get($skip-dark-color, on-blue);
+$onBlueDim: map.get($skip-dark-color, on-blue-dim);
 
 $green: map.get($skip-dark-color, green);
 $greenDim: map.get($skip-dark-color, green-dim);

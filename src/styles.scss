@@ -28,6 +28,7 @@
   --skip-blue-dim-color: #{dark.$blueDim};
   --skip-blue-dimmer-color: #{dark.$blueDimmer};
   --skip-on-blue-color: #{dark.$onBlue};
+  --skip-on-blue-dim-color: #{dark.$onBlueDim};
 
   --skip-green-color: #{dark.$green};
   --skip-green-dim-color: #{dark.$greenDim};
@@ -86,6 +87,7 @@ body.light-theme {
   --skip-blue-dim-color: #{light.$blueDim};
   --skip-blue-dimmer-color: #{light.$blueDimmer};
   --skip-on-blue-color: #{light.$onBlue};
+  --skip-on-blue-dim-color: #{light.$onBlueDim};
   --skip-green-color: #{light.$green};
   --skip-green-dim-color: #{light.$greenDim};
   --skip-green-dimmer-color: #{light.$greenDimmer};
@@ -129,6 +131,7 @@ body.night-theme {
   --skip-blue-dim-color: #{night.$blueDim};
   --skip-blue-dimmer-color: #{night.$blueDimmer};
   --skip-on-blue-color: #{night.$onBlue};
+  --skip-on-blue-dim-color: #{night.$onBlueDim};
   --skip-green-color: #{night.$green};
   --skip-green-dim-color: #{night.$greenDim};
   --skip-green-dimmer-color: #{night.$greenDimmer};

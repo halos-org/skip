@@ -11,6 +11,8 @@ $skip-light-color: (
   blue: #005bb5, blue-dim: #005bb5b6, blue-dimmer: #005bb578,
   // Ink for labels on the accent fills; the surface `contrast` ink does not track these accents' own lightness.
   on-blue: #ffffff,
+  // The dim blue composites to a mid-light blue over the card, so it takes the opposite ink to the solid one.
+  on-blue-dim: #000000,
   green: #007a00, green-dim: #007a00b6, green-dimmer: #007a0078,
   purple: #6a00a8, purple-dim: #6a00a8b6, purple-dimmer: #6a00a878,
   yellow: #bfa800, yellow-dim: #bfa800b6, yellow-dimmer: #bfa80078,
@@ -48,6 +50,7 @@ $blue: map.get($skip-light-color, blue);
 $blueDim: map.get($skip-light-color, blue-dim);
 $blueDimmer: map.get($skip-light-color, blue-dimmer);
 $onBlue: map.get($skip-light-color, on-blue);
+$onBlueDim: map.get($skip-light-color, on-blue-dim);
 
 $green: map.get($skip-light-color, green);
 $greenDim: map.get($skip-light-color, green-dim);
