@@ -1,7 +1,7 @@
 <div class="autopilot-grid-container">
   <!-- Modes row -->
   <div class="ap-modes">
-    <button mat-flat-button [disabled]="(apState() === 'off-line') || (apMode() === 'off-line')" class="ap-btn ap-btn-ctrlbar" (click)="toggleMenu()">
+    <button mat-flat-button [disabled]="!apModeKnown()" class="ap-btn ap-btn-ctrlbar" (click)="toggleMenu()">
       <span class="label label-ctrlbar">Mode {{ apMode() | titlecase }}<span aria-hidden="true">&nbsp;&vellip;</span></span>
     </button>
     <button mat-flat-button [disabled]="apEngageBtnDisabled()" [class]="!apEngaged() ? 'ap-btn ap-btn-ctrlbar ap-btn-disengage' : 'ap-btn ap-btn-ctrlbar ap-btn-engage'" (click)="buildAndSendCommand('standby')">

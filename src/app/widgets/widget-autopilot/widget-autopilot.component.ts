@@ -308,17 +308,16 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
 
     return "Disengage";
   });
-  /** True while the error overlay is showing, whether the error is persistent or a command failure. */
-  protected readonly errorActive = computed(() => this.errorOverlayVisibility() === 'visible');
   protected readonly apEngageBtnDisabled = computed(() => {
     const state = this.apState();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const engaged = this.apEngaged();
     const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
 
-    // Under a displayed error the pilot is either unreachable or just refused a command; engaging
-    // it is the last thing the helm should be able to do by accident.
-    if (this.errorActive()) return true;
+    // Same reachability gate as every other control: a pilot whose paths are silent is not one the
+    // helm can command, whatever the REST API would accept. A refused command is not a reason to
+    // disable this one — it is the button that takes a misbehaving pilot off.
+    if (!this.apModeKnown()) return true;
 
     if (!apiVersion) return true;
 
