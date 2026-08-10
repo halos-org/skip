@@ -26,7 +26,8 @@ export class SvgAutopilotComponent implements OnDestroy {
   protected readonly appWindAngle = input.required<number | null>();
   protected readonly rudderAngle = input.required<number | null>();
 
-  protected compassAngle = signal<number>(0);
+  /** null until a heading arrives, so the readout shows '--' rather than a fabricated north. */
+  protected compassAngle = signal<number | null>(null);
   protected awaAngle = signal<number>(0);
   private prevCompassAngle = 0;
   private prevAwaAngle = 0;

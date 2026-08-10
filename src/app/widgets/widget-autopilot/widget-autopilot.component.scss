@@ -53,15 +53,40 @@
   z-index: 50;
   vertical-align: middle;
   text-align: center;
-  background-color: var(--mat-sys-background);
+  // Translucent so the autopilot screen stays readable behind a message: a widget that is only
+  // an opaque panel and a sentence reads as broken rather than as an autopilot with no data.
+  background-color: color-mix(in srgb, var(--mat-sys-background) 72%, transparent);
 }
 
-.ap-error-icon {
-  padding-top: 15px;
+// The message sits on its own plate rather than tinting the whole layer, matching the electrical
+// widgets' empty state: error-coloured text needs a surface behind it to stay legible over the
+// autopilot screen.
+.ap-error-overlay {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  background-color: transparent;
 }
 
-.ap-error-text {
-  color: var(--mat-sys-error-container);
+.ap-error-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--skip-widget-card-border-color);
+  background: color-mix(in srgb, var(--mat-sys-surface-container-high) 88%, transparent);
+  color: var(--mat-sys-error);
+}
+
+.ap-error-msg {
+  font-family: Roboto;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1.25;
 }
 
 // Each control is a size container so its label can be sized against the control's own box. A tile

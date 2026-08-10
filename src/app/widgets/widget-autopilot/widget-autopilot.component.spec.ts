@@ -112,6 +112,41 @@ describe('WidgetAutopilotComponent', () => {
 
   const startV1 = () => (component as unknown as { startV1Subscriptions: () => void }).startV1Subscriptions();
 
+  it('keeps the control rows laid out but disabled while no autopilot mode is known', () => {
+    // A silent or unconfigured autopilot must still look like an autopilot, not collapse to two
+    // buttons over an empty panel.
+    const internals = component as unknown as {
+      apMode: { set: (value: string | null) => void };
+      adjustHdgBtnVisibility: () => boolean;
+      tackBtnVisibility: () => boolean;
+      apBtnDisabled: () => boolean;
+    };
+
+    internals.apMode.set(null);
+    expect(internals.adjustHdgBtnVisibility()).toBe(true);
+    expect(internals.tackBtnVisibility()).toBe(true);
+    expect(internals.apBtnDisabled()).toBe(true);
+
+    internals.apMode.set('off-line');
+    expect(internals.adjustHdgBtnVisibility()).toBe(true);
+    expect(internals.tackBtnVisibility()).toBe(true);
+    expect(internals.apBtnDisabled()).toBe(true);
+  });
+
+  it('enables the control rows once a real mode is reported', () => {
+    const internals = component as unknown as {
+      apMode: { set: (value: string | null) => void };
+      apEngaged: { set: (value: boolean) => void };
+      adjustHdgBtnVisibility: () => boolean;
+      apBtnDisabled: () => boolean;
+    };
+
+    internals.apMode.set('auto');
+    internals.apEngaged.set(true);
+    expect(internals.adjustHdgBtnVisibility()).toBe(true);
+    expect(internals.apBtnDisabled()).toBe(false);
+  });
+
   it('does not throw starting V1 subscriptions when the config has no paths object', () => {
     const spy = vi.spyOn(runtimeMock, 'options').mockReturnValue({ autopilot: runtimeOptions.autopilot } as unknown as typeof runtimeOptions);
     try {
