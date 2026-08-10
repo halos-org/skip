@@ -87,9 +87,16 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
 
   // Reactive state
   protected value = signal<number | null | undefined>(undefined);
-  /** True after first datapoint has been received (including zero). */
-  protected shouldRenderGauge = computed(() => this.value() !== undefined);
-  protected textValue = signal('--');
+  /** True while a non-null datapoint is in hand; needle and progress bar are suppressed when false. */
+  protected dataAvailable = signal(false);
+  /**
+   * Gates the gauge element on the first buildGaugeOptions() run. The library builds its geometry
+   * in the constructor, so mounting it against the empty initial options object throws — the gauge
+   * has to wait for config and theme, but not for data.
+   */
+  protected optionsReady = signal(false);
+  /** '--' with no reading; blank once one arrives, which lets the gauge print its own value. */
+  protected textValue = computed(() => this.dataAvailable() ? '' : '--');
   protected colorStrokeTicks = signal('');
   /** True after first non-animated frame has been rendered. */
   private gaugeBootstrapped = signal(false);
@@ -101,7 +108,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
   private effectiveMeasure = computed<string>(() =>
     this.effectiveUnit() || (this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo ?? 'unitless')
   );
-  private adjustedScale = computed<IScale>(() => {
+  protected adjustedScale = computed<IScale>(() => {
     const cfg = this.runtime.options();
     if (!cfg) return { min: 0, max: 100, majorTicks: [] };
     const fromUnit = cfg.paths?.['gaugePath']?.convertUnitTo ?? 'unitless';
@@ -158,14 +165,12 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
         const upper = this.unitsService.convertBetweenMeasures(fromUnit, toMeasure, cfg.displayScale?.upper ?? 100);
 
         const raw = (path?.data?.value as number) ?? null;
+        this.dataAvailable.set(raw != null);
         if (raw == null) {
           this.value.set(lower);
-          this.textValue.set('--');
         } else {
           // clamp
-          const clamped = Math.min(Math.max(raw, lower), upper);
-          this.value.set(clamped);
-          if (this.textValue() === '--') this.textValue.set('');
+          this.value.set(Math.min(Math.max(raw, lower), upper));
         }
       }));
     });
@@ -205,6 +210,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
         const cfg = this.runtime.options();
         if (!cfg || !theme) return;
         this.buildGaugeOptions(cfg, theme, scale);
+        this.optionsReady.set(true);
         if (this.viewReady()) {
           try {
             this.ngGauge()?.update(this.gaugeOptions);
@@ -213,10 +219,28 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       });
     });
 
-    // Enable animation only after the first rendered frame to avoid startup motion.
+    // Hide the needle and progress bar while no datapoint is in hand, so an unfed gauge reads
+    // as "no data" instead of parking both at the scale minimum as if it were a real reading.
+    effect(() => {
+      const hasData = this.dataAvailable();
+      if (!this.viewReady()) return;
+      untracked(() => {
+        const cfg = this.runtime.options();
+        if (!cfg) return;
+        try {
+          this.ngGauge()?.update({
+            needle: !!cfg.gauge?.enableNeedle && hasData,
+            barProgress: !!cfg.gauge?.enableProgressbar && hasData
+          });
+        } catch { /* ignore */ }
+      });
+    });
+
+    // Enable animation only after the first datapoint has been placed, so the needle never
+    // sweeps up from the scale minimum on the first real reading.
     effect(() => {
       const gauge = this.ngGauge();
-      if (!gauge || this.gaugeBootstrapped()) return;
+      if (!gauge || !this.dataAvailable() || this.gaugeBootstrapped()) return;
       untracked(() => {
         try {
           requestAnimationFrame(() => {
@@ -323,7 +347,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     g.colorBorderShadow = false; g.colorBorderOuter = theme.cardColor; g.colorBorderOuterEnd = ''; g.colorBorderMiddle = theme.cardColor; g.colorBorderMiddleEnd = '';
     g.colorPlate = g.colorPlateEnd = theme.cardColor; g.colorBar = theme.background;
 
-    g.barProgress = cfg.gauge?.enableProgressbar; g.colorBarProgress = getColors(cfg.color ?? 'contrast', theme).color;
+    g.barProgress = !!cfg.gauge?.enableProgressbar && this.dataAvailable(); g.colorBarProgress = getColors(cfg.color ?? 'contrast', theme).color;
     g.colorNeedle = getColors(cfg.color ?? 'contrast', theme).color; g.colorNeedleEnd = getColors(cfg.color ?? 'contrast', theme).color;
     g.needleShadow = true; g.colorNeedleShadowUp = "black"; g.colorNeedleShadowDown = "black";
     g.colorNeedleCircleInner = g.colorPlate; g.colorNeedleCircleInnerEnd = g.colorPlate; g.colorNeedleCircleOuter = g.colorPlate; g.colorNeedleCircleOuterEnd = g.colorPlate;
@@ -339,14 +363,14 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       g.colorMajorTicks = g.colorPlate; g.colorNumbers = g.colorMinorTicks = '' as unknown as string;
 
       g.barWidth = 20; g.colorBarProgress = getColors(cfg.color ?? 'contrast', theme).dim;
-      g.needle = cfg.gauge.enableNeedle; g.needleType = this.LINE; g.needleWidth = 2; g.needleStart = 75; g.needleEnd = 95; g.needleCircleSize = 1; g.needleCircleInner = false; g.needleCircleOuter = false;
+      g.needle = !!cfg.gauge.enableNeedle && this.dataAvailable(); g.needleType = this.LINE; g.needleWidth = 2; g.needleStart = 75; g.needleEnd = 95; g.needleCircleSize = 1; g.needleCircleInner = false; g.needleCircleOuter = false;
       g.ticksAngle = 360; g.startAngle = (cfg.gauge?.scaleStart as number) || 180; g.majorTicks = 0 as unknown as string[]; g.exactTicks = true; g.strokeTicks = false; g.minorTicks = 0; g.numbersMargin = 0; g.fontNumbersSize = 0;
       g.borders = true; g.borderOuterWidth = 2; g.borderMiddleWidth = 1; g.borderInnerWidth = 0; g.borderShadowWidth = 0;
 
     } else { // measuring
       g.fontTitleSize = 24;
       g.barWidth = 15; g.valueBox = true; g.fontValueSize = 60; g.valueBoxWidth = 100; g.valueBoxBorderRadius = 0; g.valueBoxStroke = 0; g.colorValueBoxBackground = '';
-      g.needle = cfg.gauge?.enableNeedle; g.needleType = this.LINE; g.needleWidth = 2; g.needleStart = 0; g.needleEnd = 95; g.needleCircleSize = 10; g.needleCircleInner = false; g.needleCircleOuter = false;
+      g.needle = !!cfg.gauge?.enableNeedle && this.dataAvailable(); g.needleType = this.LINE; g.needleWidth = 2; g.needleStart = 0; g.needleEnd = 95; g.needleCircleSize = 10; g.needleCircleInner = false; g.needleCircleOuter = false;
       g.ticksAngle = 270; g.startAngle = 45; g.barStartPosition = cfg.gauge?.barStartPosition || 'left';
       if (cfg.gauge?.enableTicks) {
         g.strokeTicks = true; g.majorTicks = scale.majorTicks as unknown as string[]; g.minorTicks = 2; g.exactTicks = false; g.numbersMargin = 3; g.fontNumbersSize = 15;

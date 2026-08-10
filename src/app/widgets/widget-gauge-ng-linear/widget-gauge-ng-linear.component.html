@@ -4,14 +4,14 @@
     <span class="gaugeUnit">{{ unitSymbol() }}</span>
   }
 </div>
-@if (shouldRenderGauge()) {
+@if (optionsReady()) {
   <linear-gauge
     class="linearGauge"
     #linearGauge
     skipResizeObserver
     (resizeChange)="onResized($event)"
     [options]="gaugeOptions"
-    [value]="value() ?? 0"
+    [value]="value() ?? adjustedScale().min"
     [attr.value-text]="textValue()"
   ></linear-gauge>
 }

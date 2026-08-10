@@ -39,6 +39,8 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
     adjustedScale: () => IScale;
     value: () => number | null | undefined;
     textValue: () => string;
+    dataAvailable: () => boolean;
+    optionsReady: () => boolean;
   }
 
   // convertUnitTo is the stored authoring unit; a tagged measure that differs is the flip target.
@@ -99,8 +101,8 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
       contrast: '#fff', contrastDim: '#ccc', contrastDimmer: '#999',
       cardColor: '#111', background: '#000'
     });
-    // Runs the data-subscription effect, capturing the stream callback (value still undefined here, so
-    // the @if never renders the gauge and no lib code runs).
+    // Runs the data-subscription and option-building effects, capturing the stream callback. The gauge
+    // element renders as soon as the options exist (the lib is a no-op shim here), before any data.
     fixture.detectChanges();
     internals = fixture.componentInstance as unknown as GaugeInternals;
   });
@@ -120,6 +122,27 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
     // effectiveUnit '' (boot) -> fall back to convertUnitTo ('ratio'), identity conversion.
     internals.effectiveUnit.set('');
     expect(internals.adjustedScale()).toEqual({ min: 10, max: 100, majorTicks: [] });
+  });
+
+  it('renders the gauge before any datapoint arrives, with no needle and a placeholder reading', () => {
+    // The widget must show its dial rather than a blank card while its path is silent.
+    expect(internals.optionsReady()).toBe(true);
+    expect(fixture.nativeElement.querySelector('radial-gauge')).not.toBeNull();
+    expect(internals.dataAvailable()).toBe(false);
+    expect(internals.textValue()).toBe('--');
+  });
+
+  it('marks data available once a non-null value arrives and blanks the placeholder text', () => {
+    capturedNext?.(update(42, 'percent'));
+    expect(internals.dataAvailable()).toBe(true);
+    expect(internals.textValue()).toBe('');
+  });
+
+  it('drops back to the placeholder when a later datapoint is null', () => {
+    capturedNext?.(update(42, 'percent'));
+    capturedNext?.(update(null, 'percent'));
+    expect(internals.dataAvailable()).toBe(false);
+    expect(internals.textValue()).toBe('--');
   });
 
   it('sets the value to the reinterpreted lower bound on a null (first/placeholder) datapoint', () => {
