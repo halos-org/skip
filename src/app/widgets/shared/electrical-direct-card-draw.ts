@@ -53,6 +53,24 @@ interface DirectCard<TEntity> {
   y: number;
 }
 
+const PLACEHOLDER_KEY = '__no-electrical-data__';
+const PLACEHOLDER_OPACITY = 0.6;
+
+/** Dimmed all-'--' card drawn while nothing has reported, so the widget keeps its card shape. */
+const PLACEHOLDER_MODEL: DirectCardDisplayModel = {
+  id: '',
+  titleText: '',
+  modeText: '--',
+  busText: '--',
+  metricsLineOne: '--',
+  metricsLineTwo: '--',
+  stateBarColor: 'var(--skip-contrast-dim-color)',
+  titleTextColor: 'var(--skip-contrast-dim-color)',
+  metaTextColor: 'var(--skip-contrast-dim-color)',
+  primaryMetricsTextColor: 'var(--skip-contrast-dim-color)',
+  secondaryMetricsTextColor: 'var(--skip-contrast-dim-color)'
+};
+
 /**
  * Select the direct-card `<svg>`, seed the shared viewBox/role/aria-label, and
  * append the stacked-card layer group. Reads the layout constants at call time
@@ -89,11 +107,18 @@ export function drawDirectCards<TEntity extends IElectricalTopologySnapshotCore>
 
   const layout = compact ? ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT : ELECTRICAL_DIRECT_CARD_FULL_LAYOUT;
   const cardHeight = compact ? ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT : ELECTRICAL_DIRECT_CARD_HEIGHT;
-  const cards: DirectCard<TEntity>[] = entities.map((entity, index) => ({
-    key: entity.deviceKey ?? entity.id,
-    entity,
-    y: index * (cardHeight + ELECTRICAL_DIRECT_CARD_GAP)
-  }));
+  // With nothing to show, draw one all-'--' card so the widget keeps its shape behind the
+  // empty-state message instead of collapsing to a bare panel and a sentence. The synthetic
+  // entity only ever reaches the id text, which the placeholder model blanks anyway.
+  const isPlaceholder = entities.length === 0;
+  const models = isPlaceholder ? { [PLACEHOLDER_KEY]: PLACEHOLDER_MODEL } : displayModels;
+  const cards: DirectCard<TEntity>[] = isPlaceholder
+    ? [{ key: PLACEHOLDER_KEY, entity: { id: '' } as TEntity, y: 0 }]
+    : entities.map((entity, index) => ({
+        key: entity.deviceKey ?? entity.id,
+        entity,
+        y: index * (cardHeight + ELECTRICAL_DIRECT_CARD_GAP)
+      }));
 
   const contentHeight = cards.length ? cards[cards.length - 1].y + cardHeight : cardHeight;
   svg.attr('viewBox', `0 0 ${ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH} ${contentHeight}`);
@@ -117,6 +142,7 @@ export function drawDirectCards<TEntity extends IElectricalTopologySnapshotCore>
   const merged = enter.merge(selection as Selection<SVGGElement, DirectCard<TEntity>, SVGGElement, unknown>);
 
   merged.attr('transform', item => `translate(0, ${item.y})`);
+  merged.attr('opacity', isPlaceholder ? PLACEHOLDER_OPACITY : null);
 
   if (includeCardBg) {
     merged.select(`rect.${classPrefix}-card-bg`)
@@ -138,15 +164,15 @@ export function drawDirectCards<TEntity extends IElectricalTopologySnapshotCore>
     .attr('ry', layout.stateBarCornerRadius)
     .attr('width', 3)
     .attr('height', cardHeight - 3)
-    .attr('fill', item => displayModels[item.key]?.stateBarColor ?? widgetColors.dim);
+    .attr('fill', item => models[item.key]?.stateBarColor ?? widgetColors.dim);
 
   if (entities.length > 1) {
     merged.select(`text.${classPrefix}-title`)
       .attr('x', layout.titleX)
       .attr('y', layout.titleY)
       .attr('font-size', layout.titleFontSize)
-      .attr('fill', item => displayModels[item.key]?.titleTextColor ?? 'var(--skip-contrast-color)')
-      .text(item => displayModels[item.key]?.titleText ?? titleFallback(item.entity));
+      .attr('fill', item => models[item.key]?.titleTextColor ?? 'var(--skip-contrast-color)')
+      .text(item => models[item.key]?.titleText ?? titleFallback(item.entity));
   } else {
     merged.select(`text.${classPrefix}-title`).text('');
   }
@@ -164,8 +190,8 @@ export function drawDirectCards<TEntity extends IElectricalTopologySnapshotCore>
     .attr('y', layout.metaY)
     .attr('font-size', layout.metaFontSize)
     .attr('opacity', 0.8)
-    .attr('fill', item => displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-    .text(item => displayModels[item.key]?.modeText ?? '');
+    .attr('fill', item => models[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
+    .text(item => models[item.key]?.modeText ?? '');
 
   merged.select(`text.${classPrefix}-bus`)
     .attr('x', layout.metaRightX)
@@ -173,23 +199,23 @@ export function drawDirectCards<TEntity extends IElectricalTopologySnapshotCore>
     .attr('text-anchor', 'end')
     .attr('font-size', layout.metaFontSize)
     .attr('opacity', 0.8)
-    .attr('fill', item => displayModels[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
-    .text(item => displayModels[item.key]?.busText ?? '');
+    .attr('fill', item => models[item.key]?.metaTextColor ?? 'var(--skip-contrast-dim-color)')
+    .text(item => models[item.key]?.busText ?? '');
 
   merged.select(`text.${classPrefix}-metrics-1`)
     .attr('x', layout.lineOneX)
     .attr('y', layout.lineOneY)
     .attr('font-size', layout.lineOneFontSize)
-    .attr('fill', item => displayModels[item.key]?.primaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-    .text(item => displayModels[item.key]?.metricsLineOne ?? '');
+    .attr('fill', item => models[item.key]?.primaryMetricsTextColor ?? 'var(--skip-contrast-color)')
+    .text(item => models[item.key]?.metricsLineOne ?? '');
 
   merged.select(`text.${classPrefix}-metrics-2`)
     .attr('x', layout.lineTwoX)
     .attr('y', layout.lineTwoY)
     .attr('font-size', layout.lineTwoFontSize)
     .attr('opacity', 0.85)
-    .attr('fill', item => displayModels[item.key]?.secondaryMetricsTextColor ?? 'var(--skip-contrast-color)')
-    .text(item => displayModels[item.key]?.metricsLineTwo ?? '');
+    .attr('fill', item => models[item.key]?.secondaryMetricsTextColor ?? 'var(--skip-contrast-color)')
+    .text(item => models[item.key]?.metricsLineTwo ?? '');
 
   selection.exit().remove();
 }

@@ -330,4 +330,19 @@ describe('WidgetAlternatorComponent', () => {
     const normalized = (svg?.outerHTML ?? '').replace(/ _ng(content|host)-[a-z0-9-]+=""/g, '');
     expect(normalized).toMatchSnapshot();
   });
+  it('draws one dimmed all-placeholder card while no alternator has reported', async () => {
+    // The widget must keep its card shape behind the empty-state message rather than collapsing
+    // to a bare panel carrying a sentence.
+    vi.useFakeTimers();
+    await setup([]);
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const cards = host.querySelectorAll('g.alternator-card');
+    expect(cards.length).toBe(1);
+    expect(cards[0].getAttribute('opacity')).toBe('0.6');
+    expect(host.querySelector('text.alternator-metrics-1')?.textContent).toBe('--');
+  });
 });

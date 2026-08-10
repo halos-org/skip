@@ -52,6 +52,22 @@ export class WidgetChargerComponent implements AfterViewInit {
   private static readonly CHARGER_DISPLAY_BASE_WIDTH = 145;
   private static readonly CHARGER_DISPLAY_BASE_HEIGHT = 37;
   private static readonly CHARGER_DISPLAY_HORIZONTAL_MARGIN = 40;
+  private static readonly PLACEHOLDER_KEY = '__no-charger-data__';
+  private static readonly PLACEHOLDER_OPACITY = 0.6;
+
+  /** Dimmed all-'--' card shown while no charger has reported. */
+  private static placeholderDisplayModel(): ChargerDisplayModel {
+    return {
+      id: '',
+      titleText: '',
+      modeText: '--',
+      voltageText: '--',
+      currentText: '--',
+      powerText: '--',
+      temperatureText: '--',
+      temperatureUnit: ''
+    };
+  }
 
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     color: 'contrast',
@@ -479,12 +495,25 @@ export class WidgetChargerComponent implements AfterViewInit {
     const displayY = compact ? 33 : 60;
 
 
-    const cards = snapshot.chargers.map((charger, index) => ({
-      key: charger.deviceKey ?? charger.id,
-      id: charger.id,
-      charger,
-      y: index * (cardHeight + WidgetChargerComponent.CARD_GAP)
-    }));
+    // With nothing to show, draw one all-'--' card so the widget keeps its shape behind the
+    // empty-state message instead of collapsing to a bare panel and a sentence.
+    const isPlaceholder = snapshot.chargers.length === 0;
+    const models = isPlaceholder
+      ? { [WidgetChargerComponent.PLACEHOLDER_KEY]: WidgetChargerComponent.placeholderDisplayModel() }
+      : snapshot.displayModels;
+    const cards = isPlaceholder
+      ? [{
+          key: WidgetChargerComponent.PLACEHOLDER_KEY,
+          id: '',
+          charger: { id: '' } as ChargerSnapshot,
+          y: 0
+        }]
+      : snapshot.chargers.map((charger, index) => ({
+          key: charger.deviceKey ?? charger.id,
+          id: charger.id,
+          charger,
+          y: index * (cardHeight + WidgetChargerComponent.CARD_GAP)
+        }));
     const contentHeight = cards.length
       ? cards[cards.length - 1].y + cardHeight
       : cardHeight;
@@ -575,6 +604,7 @@ export class WidgetChargerComponent implements AfterViewInit {
     const merged = enter.merge(selection as Selection<SVGGElement, { key: string; id: string; charger: ChargerSnapshot; y: number }, SVGGElement, unknown>);
 
     merged.attr('transform', item => `translate(0, ${item.y})`);
+    merged.attr('opacity', isPlaceholder ? WidgetChargerComponent.PLACEHOLDER_OPACITY : null);
     merged.select('g.charger-display-group')
       .attr('transform', `translate(${displayX}, ${displayY}) scale(${displayScale})`)
       .each((item, _index, nodes) => {
@@ -612,7 +642,7 @@ export class WidgetChargerComponent implements AfterViewInit {
         .attr('y', titleY)
         .attr('font-size', layout.titleFontSize)
         .attr('fill', 'var(--skip-contrast-dim-color)')
-        .text(item => snapshot.displayModels[item.key]?.titleText ?? this.resolveTitleText(item.charger));
+        .text(item => models[item.key]?.titleText ?? this.resolveTitleText(item.charger));
     } else {
       merged.select('text.charger-title').text('');
     }
@@ -626,7 +656,7 @@ export class WidgetChargerComponent implements AfterViewInit {
       .attr('fill', 'var(--skip-contrast-color)');
 
     merged.select('tspan.voltage-metric-value')
-      .text(item => snapshot.displayModels[item.key]?.voltageText ?? '');
+      .text(item => models[item.key]?.voltageText ?? '');
 
     merged.select('tspan.voltage-metric-unit')
       .attr('dx', 1)
@@ -643,7 +673,7 @@ export class WidgetChargerComponent implements AfterViewInit {
       .attr('fill', 'var(--skip-contrast-color)');
 
     merged.select('tspan.current-metric-value')
-      .text(item => snapshot.displayModels[item.key]?.currentText ?? '');
+      .text(item => models[item.key]?.currentText ?? '');
 
     merged.select('tspan.current-metric-unit')
       .attr('dx', 1)
@@ -658,7 +688,7 @@ export class WidgetChargerComponent implements AfterViewInit {
       .attr('font-size', 10);
 
     merged.select('tspan.power-metric-value')
-      .text(item => snapshot.displayModels[item.key]?.powerText ?? '');
+      .text(item => models[item.key]?.powerText ?? '');
 
     merged.select('tspan.power-metric-unit')
       .attr('dx', 1)
@@ -673,20 +703,20 @@ export class WidgetChargerComponent implements AfterViewInit {
       .attr('font-size', 10);
 
     merged.select('tspan.temperature-metric-value')
-      .text(item => snapshot.displayModels[item.key]?.temperatureText ?? '');
+      .text(item => models[item.key]?.temperatureText ?? '');
 
     merged.select('tspan.temperature-metric-unit')
       .attr('dx', 1)
       .attr('font-size', 6)
       .attr('fill', 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.temperatureUnit ?? '');
+      .text(item => models[item.key]?.temperatureUnit ?? '');
 
     merged.select('text.charger-mode')
       .attr('x', 5)
       .attr('y', 46)
       .attr('font-size', 10)
       .attr('fill', 'var(--skip-contrast-dim-color)')
-      .text(item => snapshot.displayModels[item.key]?.modeText ?? '');
+      .text(item => models[item.key]?.modeText ?? '');
 
     selection.exit().remove();
   }
