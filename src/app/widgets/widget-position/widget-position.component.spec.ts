@@ -101,7 +101,7 @@ describe('WidgetPositionComponent', () => {
       expect(drawn).toContain('longitudeMin:22.5');
     });
 
-    it('renders blank coordinates when no position value is present', async () => {
+    it('renders a placeholder for both coordinates when no position value is present', async () => {
       await setup();
       const callback = streamsMock.observe.mock.calls[0][1] as (u: IPathUpdate) => void;
       drawText.mockReset();
@@ -109,7 +109,8 @@ describe('WidgetPositionComponent', () => {
       callback({ data: { value: null } } as unknown as IPathUpdate);
 
       const drawn = drawText.mock.calls.map(c => c[1]);
-      expect(drawn).toContain('');
+      // Both coordinates read '--' so the widget still shows its label and two value rows.
+      expect(drawn.filter(s => s === '--')).toHaveLength(2);
       expect(drawn.some(s => typeof s === 'string' && s.includes(':'))).toBe(false);
     });
 
@@ -122,12 +123,12 @@ describe('WidgetPositionComponent', () => {
 
       const drawn = drawText.mock.calls.map(c => c[1]);
       expect(drawn).toContain('latitudeMin:59.5');
-      // The absent longitude must blank, never render 'undefined'/'NaN' text.
-      expect(drawn).toContain('');
+      // The absent longitude reads '--', never 'undefined'/'NaN' text.
+      expect(drawn).toContain('--');
       expect(drawn.some(s => typeof s === 'string' && s.startsWith('longitudeMin'))).toBe(false);
     });
 
-    it('blanks a non-finite coordinate rather than formatting NaN', async () => {
+    it('shows a placeholder for a non-finite coordinate rather than formatting NaN', async () => {
       await setup();
       const callback = streamsMock.observe.mock.calls[0][1] as (u: IPathUpdate) => void;
       drawText.mockReset();
@@ -136,10 +137,11 @@ describe('WidgetPositionComponent', () => {
 
       const drawn = drawText.mock.calls.map(c => c[1]);
       expect(drawn).toContain('longitudeMin:22.5');
+      expect(drawn).toContain('--');
       expect(drawn.some(s => typeof s === 'string' && s.startsWith('latitudeMin'))).toBe(false);
     });
 
-    it('blanks both coordinates for a non-object scalar value (guards against +value coercion)', async () => {
+    it('shows a placeholder for both coordinates on a non-object scalar value (guards against +value coercion)', async () => {
       await setup();
       const callback = streamsMock.observe.mock.calls[0][1] as (u: IPathUpdate) => void;
       drawText.mockReset();
