@@ -258,6 +258,12 @@ body {
   touch-action: none;
 }
 
+// The generated M3 light surface is near-white, so white widget cards vanish
+// into it. Use the theme's own backdrop tone instead.
+body.light-theme {
+  background: var(--mat-sys-background);
+}
+
 #app-filter-wrapper {
   filter: brightness(var(--skip-nightModeBrightness)) var(--skip-nightModeFilters);
   backdrop-filter: brightness(var(--skip-nightModeBrightness));
