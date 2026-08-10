@@ -424,6 +424,51 @@ describe('WidgetSolarChargerComponent', () => {
     expect(tspans.length).toBe(2);
   });
 
+  it('draws one dimmed all-placeholder card while no charger has reported', () => {
+    // The widget must keep the shape of a charger card behind its empty-state message rather than
+    // collapsing to a bare panel carrying a sentence.
+    dataServiceMock.subscribePathTreeWithInitial.mockReturnValue({
+      initial: [],
+      live$: liveSubject.asObservable()
+    });
+
+    // The scheduler subscribes when the component is constructed, so the empty tree has to be in
+    // place before createComponent.
+    fixture = TestBed.createComponent(WidgetSolarChargerComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('id', 'w-solar-empty');
+    fixture.componentRef.setInput('type', 'widget-solar-charger');
+    fixture.componentRef.setInput('theme', themeMock);
+    fixture.detectChanges();
+
+    const testApi = component as unknown as {
+      buildRenderSnapshot: () => unknown;
+      render: (snapshot: unknown) => void;
+    };
+    testApi.render(testApi.buildRenderSnapshot());
+
+    const host = fixture.nativeElement as HTMLElement;
+    const cards = host.querySelectorAll('g.solar-card');
+    expect(cards.length).toBe(1);
+    expect(cards[0].getAttribute('opacity')).toBe('0.6');
+    expect(host.querySelector('tspan.current-metric-value')?.textContent).toBe('--');
+    expect(host.querySelector('text.solar-yield-today')?.textContent).toBe('--');
+  });
+
+  it('leaves live cards at full opacity', () => {
+    fixture.detectChanges();
+
+    const testApi = component as unknown as {
+      buildRenderSnapshot: () => unknown;
+      render: (snapshot: unknown) => void;
+    };
+    testApi.render(testApi.buildRenderSnapshot());
+
+    const cards = (fixture.nativeElement as HTMLElement).querySelectorAll('g.solar-card');
+    expect(cards.length).toBe(2);
+    expect(cards[0].getAttribute('opacity')).toBeNull();
+  });
+
   it('normalizes compact card mode from widget config', () => {
     runtimeOptions.solarCharger = {
       trackedDevices: [{ id: 'sc1', source: 'default', key: 'sc1||default' }],

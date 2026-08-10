@@ -1,10 +1,10 @@
-@if (hasBanks()) {
 <widget-title [text]="displayLabel()" [color]="labelColor()"></widget-title>
-}
-<svg #bmsSvg class="bms-svg" [class.bms-svg--full]="!hasBanks()" aria-hidden="false"></svg>
+<svg #bmsSvg class="bms-svg" aria-hidden="false"></svg>
 @if (!hasBatteries()) {
   <div class="bms-empty">
-    <div class="bms-empty-title">No batteries detected</div>
-    <div class="bms-empty-sub">Check Signal K battery paths or select batteries in widget settings.</div>
+    <div class="bms-empty-panel">
+      <div class="bms-empty-title">No batteries detected</div>
+      <div class="bms-empty-sub">Check Signal K battery paths or select batteries in widget settings.</div>
+    </div>
   </div>
 }

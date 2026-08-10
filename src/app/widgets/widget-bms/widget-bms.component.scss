@@ -16,12 +16,6 @@
   width: 100%;
   overflow: hidden;
   padding: 0 10px 10px 10px;
-
-  &.bms-svg--full {
-    top: 0;
-    height: 100%;
-    padding-top: 10px;
-  }
 }
 
 .bms-card-metric {
@@ -73,13 +67,23 @@
   inset: 0;
   margin: 10px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   text-align: center;
   color: var(--mat-sys-on-surface);
-  background: color-mix(in srgb, var(--skip-widget-card-background-color) 92%, transparent);
+  pointer-events: none;
+}
+
+// The message gets its own translucent panel rather than a full-bleed scrim, so it stays legible
+// while the placeholder bank behind it still reads as a battery monitor with no data.
+.bms-empty-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--skip-widget-card-border-color);
+  background: color-mix(in srgb, var(--mat-sys-surface-container-high) 88%, transparent);
 }
 
 .bms-empty-title {
