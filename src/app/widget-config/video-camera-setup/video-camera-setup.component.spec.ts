@@ -128,8 +128,7 @@ describe('VideoCameraSetupComponent — camera mode', () => {
           provide: SignalKConnectionService,
           useValue: {
             serverServiceEndpoint$: of({
-              httpServiceUrl: 'http://h:3000/signalk/v1/api/',
-              httpServiceUrlV2: 'http://h:3000/signalk/v2/api'
+              httpServiceUrl: 'http://h:3000/signalk/v1/api/'
             }),
             signalKURL: { url: null }
           }

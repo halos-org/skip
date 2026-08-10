@@ -67,7 +67,13 @@ export class VideoCameraSetupComponent implements OnInit, OnDestroy {
   private readonly pluginBaseUrl = computed(() =>
     resolveSignalKPluginBaseUrl('sk-video', this.endpoint()?.httpServiceUrl ?? null, this.connection.signalKURL?.url ?? null)
   );
-  private readonly v2BaseUrl = computed(() => this.endpoint()?.httpServiceUrlV2 ?? null);
+  private readonly v2BaseUrl = computed(() =>
+    this.endpoint()?.httpServiceUrlV2
+    ?? this.endpoint()?.httpServiceUrl?.replace(/\/signalk\/v1\/api\/?$/, '/signalk/v2/api')
+    ?? (this.connection.signalKURL?.url
+      ? `${this.connection.signalKURL.url.replace(/\/$/, '')}/signalk/v2/api`
+      : null)
+  );
 
   protected readonly cameras = signal<ISavedCamera[]>([]);
   protected readonly candidates = signal<ICameraCandidate[]>([]);
