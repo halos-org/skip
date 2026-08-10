@@ -227,10 +227,9 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
         const theme = this.theme();
         if (!cfg || !theme) return;
         const enableNeedle = !!cfg.gauge?.enableNeedle;
-        const opt: LinearGaugeOptions = { needle: enableNeedle && hasData } as LinearGaugeOptions;
+        const opt: LinearGaugeOptions = { needle: enableNeedle && hasData };
         if (!enableNeedle) {
-          const palette = getColors(cfg.color ?? 'contrast', theme);
-          opt.colorBarProgress = this.progressBarColor(this.zoneColor(theme, palette.color, this.currentState()));
+          opt.colorBarProgress = this.barColor(cfg, theme, this.currentState());
         }
         try {
           this.ngGauge()?.update(opt);
@@ -265,11 +264,11 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
         const enableNeedle = cfg.gauge?.enableNeedle;
         const palette = getColors(cfg.color ?? 'contrast', theme);
         const stateColor = this.zoneColor(theme, palette.color, state);
-        const opt: LinearGaugeOptions = { colorValueText: stateColor } as LinearGaugeOptions;
+        const opt: LinearGaugeOptions = { colorValueText: stateColor };
         if (enableNeedle) {
           opt.colorNeedle = stateColor;
         } else {
-          opt.colorBarProgress = this.progressBarColor(stateColor);
+          opt.colorBarProgress = this.barColor(cfg, theme, state);
         }
         try {
           this.ngGauge()?.update(opt);
@@ -278,9 +277,18 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     });
   }
 
-  /** The bar's colour, or fully transparent while no datapoint is in hand. */
-  private progressBarColor(color: string): string {
-    return this.dataAvailable() ? color : 'rgba(0,0,0,0)';
+  /**
+   * The single decision about what colour the bar is painted, shared by the no-data effect, the
+   * zone-state effect and the option builder so they cannot disagree. Transparent stands in for
+   * "hidden": switching barProgress off makes the library skip the pass that computes
+   * barDimensions, which every later draw step reads, so it throws on construction.
+   */
+  private barColor(cfg: IWidgetSvcConfig, theme: ITheme, state: string): string {
+    if (!this.dataAvailable()) return 'rgba(0,0,0,0)';
+    const palette = getColors(cfg.color ?? 'contrast', theme);
+    // The zone-state effect returns early under ignoreZones, so a zone colour written anywhere
+    // else would stick with nothing to correct it.
+    return cfg.ignoreZones ? palette.color : this.zoneColor(theme, palette.color, state);
   }
 
   /** Zone colour for the indicator and value text, falling back to the widget's own palette. */
@@ -306,9 +314,9 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     // Bar geometry (match legacy defaults)
     opt.barLength = isVertical ? 80 : 90;
     opt.barWidth = ticks ? (enableNeedle ? 0 : 30) : 60;
-    // barProgress stays on even with no data: the library computes the bar geometry every other
-    // draw step reads (barDimensions) inside the progress-bar pass, so switching it off throws.
-    // The bar is hidden by painting it transparent instead — see progressBarColor().
+    // barProgress stays on even with no data. The library computes barDimensions inside the
+    // progress-bar pass, and every later draw step reads it, so switching barProgress off throws
+    // on construction. The bar is hidden by painting it transparent instead — see barColor().
     opt.barProgress = true; opt.barBeginCircle = 0; opt.barStrokeWidth = 0; opt.barShadow = 0;
     // Needle geometry
     opt.needle = !!enableNeedle && this.dataAvailable(); opt.needleType = enableNeedle ? 'arrow' : 'line';
@@ -329,7 +337,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       opt.colorNeedle = palette.color; opt.colorNeedleEnd = palette.color; opt.needleWidth = 45;
       opt.colorNeedleShadowUp = palette.color; opt.colorNeedleShadowDown = palette.color;
     } else {
-      opt.colorBarProgress = this.progressBarColor(palette.color); opt.colorBarProgressEnd = ''; opt.needleWidth = 0;
+      opt.colorBarProgress = this.barColor(cfg, theme, this.currentState()); opt.colorBarProgressEnd = ''; opt.needleWidth = 0;
     }
     opt.colorPlate = theme.cardColor; opt.colorBar = theme.background; opt.colorBarEnd = ''; opt.colorBarStroke = '0';
     opt.colorMajorTicks = getColors('contrast', theme).dim; opt.colorMinorTicks = getColors('contrast', theme).dim; opt.colorNumbers = getColors('contrast', theme).dim;

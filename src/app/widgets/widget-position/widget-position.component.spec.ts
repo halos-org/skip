@@ -149,6 +149,7 @@ describe('WidgetPositionComponent', () => {
       callback({ data: { value: 42 } } as unknown as IPathUpdate);
 
       const drawn = drawText.mock.calls.map(c => c[1]);
+      expect(drawn.filter(s => s === '--')).toHaveLength(2);
       expect(drawn.some(s => typeof s === 'string' && s.includes(':'))).toBe(false);
     });
   });
