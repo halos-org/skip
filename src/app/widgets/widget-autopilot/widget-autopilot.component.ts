@@ -308,11 +308,17 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
 
     return "Disengage";
   });
+  /** True while the error overlay is showing, whether the error is persistent or a command failure. */
+  protected readonly errorActive = computed(() => this.errorOverlayVisibility() === 'visible');
   protected readonly apEngageBtnDisabled = computed(() => {
     const state = this.apState();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const engaged = this.apEngaged();
     const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
+
+    // Under a displayed error the pilot is either unreachable or just refused a command; engaging
+    // it is the last thing the helm should be able to do by accident.
+    if (this.errorActive()) return true;
 
     if (!apiVersion) return true;
 

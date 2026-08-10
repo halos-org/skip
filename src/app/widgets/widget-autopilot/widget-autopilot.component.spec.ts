@@ -112,6 +112,21 @@ describe('WidgetAutopilotComponent', () => {
 
   const startV1 = () => (component as unknown as { startV1Subscriptions: () => void }).startV1Subscriptions();
 
+  it('disables the engage toggle while an error is on screen', () => {
+    const internals = component as unknown as {
+      apEngaged: { set: (value: boolean) => void };
+      errorOverlayVisibility: { set: (value: string) => void };
+      apEngageBtnDisabled: () => boolean;
+    };
+
+    internals.apEngaged.set(false);
+    internals.errorOverlayVisibility.set('hidden');
+    expect(internals.apEngageBtnDisabled()).toBe(false);
+
+    internals.errorOverlayVisibility.set('visible');
+    expect(internals.apEngageBtnDisabled()).toBe(true);
+  });
+
   it('keeps the control rows laid out but disabled while no autopilot mode is known', () => {
     // A silent or unconfigured autopilot must still look like an autopilot, not collapse to two
     // buttons over an empty panel.
