@@ -299,8 +299,6 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   // Request management
   private currentRequests = new Set<Observable<unknown>>();
 
-  // Keypad buttons & layout
-  protected apGrid = computed(() => this.apMode() ? 'grid' : 'none');
   protected readonly standbyButtonLabel = computed(() => {
     const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
 
@@ -315,6 +313,11 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const engaged = this.apEngaged();
     const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
+
+    // Same reachability gate as every other control: a pilot whose paths are silent is not one the
+    // helm can command, whatever the REST API would accept. A refused command is not a reason to
+    // disable this one — it is the button that takes a misbehaving pilot off.
+    if (!this.apModeKnown()) return true;
 
     if (!apiVersion) return true;
 
@@ -331,6 +334,8 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     const engaged = this.apEngaged();
     const apiVersion = this.runtime.options()?.autopilot?.apiVersion;
 
+    if (!this.apModeKnown()) return true;
+
     if (apiVersion === "v1") {
       return this.apMode() === 'standby' ? true : false;
     }
@@ -339,8 +344,16 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
     }
     return true;
   });
+  /** False while no mode has been reported (never subscribed, or reported off-line). */
+  protected readonly apModeKnown = computed(() => {
+    const mode = this.apMode();
+    return mode !== null && mode !== 'off-line';
+  });
   protected readonly adjustHdgBtnVisibility = computed(() => {
     const mode = this.apMode();
+    // With no known mode the rows stay laid out but disabled, so the widget keeps its shape
+    // instead of collapsing to two buttons and an empty panel.
+    if (!this.apModeKnown()) return true;
     if ( mode !== null && ['auto', 'compass', 'gps', 'wind', 'true wind', 'standby'].includes(mode)) {
       return true;
     }
@@ -348,6 +361,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
   });
   protected readonly tackBtnVisibility = computed(() => {
     const mode = this.apMode();
+    if (!this.apModeKnown()) return true;
     if ( mode !== null && ['auto', 'compass', 'gps', 'wind', 'true wind', 'standby'].includes(mode)) {
       return true;
     }
@@ -723,8 +737,8 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
         console.warn('[Autopilot Widget] Autopilot V1 mode state is null or not available');
       }
     });
-    this.streams.observe('autopilotTargetHeading', newValue => this.autopilotTargetHeading.set(newValue.data.value != null ? newValue.data.value : 0));
-    this.streams.observe('autopilotTargetWindHeading', newValue => this.autopilotTargetWindHeading.set(newValue.data.value != null ? newValue.data.value : 0));
+    this.streams.observe('autopilotTargetHeading', newValue => this.autopilotTargetHeading.set(newValue.data.value));
+    this.streams.observe('autopilotTargetWindHeading', newValue => this.autopilotTargetWindHeading.set(newValue.data.value));
 
     this.startDataSubscription();
 
@@ -747,13 +761,15 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       }
     );
 
+    // A missing heading or wind angle stays null so the AP screen shows '--' instead of a
+    // fabricated north / dead-ahead reading.
     if (this.runtime.options()?.autopilot?.headingDirectionTrue ?? false) {
-      this.streams.observe('headingTrue', newValue => this.heading.set(newValue.data.value != null ? newValue.data.value : 0));
+      this.streams.observe('headingTrue', newValue => this.heading.set(newValue.data.value));
     } else {
-      this.streams.observe('headingMag', newValue => this.heading.set(newValue.data.value != null ? newValue.data.value : 0));
+      this.streams.observe('headingMag', newValue => this.heading.set(newValue.data.value));
     }
 
-    this.streams.observe('windAngleApparent', newValue => this.windAngleApparent.set(newValue.data.value != null ? newValue.data.value : 0));
+    this.streams.observe('windAngleApparent', newValue => this.windAngleApparent.set(newValue.data.value));
   }
 
   private subscribePutResponse(): void {

@@ -1,7 +1,7 @@
-<div [style.display]="apGrid()" class="autopilot-grid-container">
+<div class="autopilot-grid-container">
   <!-- Modes row -->
   <div class="ap-modes">
-    <button mat-flat-button [disabled]="(apState() === 'off-line') || (apMode() === 'off-line')" class="ap-btn ap-btn-ctrlbar" (click)="toggleMenu()">
+    <button mat-flat-button [disabled]="!apModeKnown()" class="ap-btn ap-btn-ctrlbar" (click)="toggleMenu()">
       <span class="label label-ctrlbar">Mode {{ apMode() | titlecase }}<span aria-hidden="true">&nbsp;&vellip;</span></span>
     </button>
     <button mat-flat-button [disabled]="apEngageBtnDisabled()" [class]="!apEngaged() ? 'ap-btn ap-btn-ctrlbar ap-btn-disengage' : 'ap-btn ap-btn-ctrlbar ap-btn-engage'" (click)="buildAndSendCommand('standby')">
@@ -27,11 +27,11 @@
         <text x="50%" dy="75" [style.visibility]="countDownValue >= 0 ? 'visible' : 'hidden'" style="font-size: 3em" [innerHTML]="countDownValue + 1" class="svg-element-msg" />
       </svg>
     </div>
-    <div class="ap-screen-overlay ap-error-text" [style.visibility]="errorOverlayVisibility()">
-      <span class="material-icons ap-error-icon">warning</span>
-      <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
-        <text x="50%" y="25" [innerHTML]="errorOverlayText()" class="svg-element-msg svg-element-error-txt" />
-      </svg>
+    <div class="ap-screen-overlay ap-error-overlay" [style.visibility]="errorOverlayVisibility()">
+      <div class="ap-error-panel">
+        <span class="material-icons">warning</span>
+        <span class="ap-error-msg">{{ errorOverlayText() }}</span>
+      </div>
     </div>
   </div>
   <!-- -1 / +1 buttons row -->

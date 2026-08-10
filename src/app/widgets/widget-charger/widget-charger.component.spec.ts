@@ -620,4 +620,20 @@ describe('WidgetChargerComponent', () => {
       vi.useRealTimers();
     }
   });
+  it('draws one dimmed all-placeholder card while no charger has reported', async () => {
+    // The widget must keep its card shape behind the empty-state message rather than collapsing
+    // to a bare panel carrying a sentence.
+    vi.useFakeTimers();
+    await setup([]);
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const cards = host.querySelectorAll('g.charger-card');
+    expect(cards.length).toBe(1);
+    expect(cards[0].getAttribute('opacity')).toBe('0.6');
+    expect(host.querySelector('tspan.voltage-metric-value')?.textContent).toBe('--');
+    expect(host.querySelector('tspan.current-metric-value')?.textContent).toBe('--');
+  });
 });

@@ -104,8 +104,14 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
   // Data/state
   protected textValue = signal('--');
   protected value = signal<number | null | undefined>(undefined);
-  /** True after first datapoint has been received (including zero). */
-  protected shouldRenderGauge = computed(() => this.value() !== undefined);
+  /** True while a non-null datapoint is in hand; the needle is suppressed when false. */
+  protected dataAvailable = signal(false);
+  /**
+   * Gates the gauge element on the first buildGaugeOptions() run. The library builds its geometry
+   * in the constructor and throws on the empty initial options object, so the gauge has to wait for
+   * config and theme — but not for data.
+   */
+  protected optionsReady = signal(false);
   /** True after first non-animated frame has been rendered. */
   private gaugeBootstrapped = signal(false);
   /** Enables smooth transitions only after the first static frame. */
@@ -143,6 +149,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       if (!pCfg?.path) return;
       untracked(() => this.streams.observe('gaugePath', pkt => {
         let raw = (pkt?.data?.value as number) ?? null;
+        this.dataAvailable.set(raw != null);
         if (raw == null) {
           this.value.set(0);
           this.textValue.set('--');
@@ -164,18 +171,29 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       if (!cfg || !theme) return;
       untracked(() => {
         this.buildGaugeOptions(cfg, theme);
+        this.optionsReady.set(true);
         if (this.viewReady()) {
           try { this.ngGauge()?.update(this.gaugeOptions); } catch { /* ignore */ }
         }
       });
     });
 
-    // Enable the needle animation only after the gauge canvas is first mounted, so
-    // the initial @if render places the needle at the real value without a sweep.
+    // Hide the needle while no datapoint is in hand, so an unfed compass shows its rose and
+    // a '--' readout instead of a needle parked on north as if it were a real heading.
+    effect(() => {
+      const hasData = this.dataAvailable();
+      if (!this.viewReady()) return;
+      untracked(() => {
+        try { this.ngGauge()?.update({ needle: hasData }); } catch { /* ignore */ }
+      });
+    });
+
+    // Enable the needle animation only after the first datapoint has been placed, so the
+    // needle lands on the real value without a sweep from north.
     // The value box tween (animatedValue) stays off on every path — see #222.
     effect(() => {
       const gauge = this.ngGauge();
-      if (!gauge || this.gaugeBootstrapped()) return;
+      if (!gauge || !this.dataAvailable() || this.gaugeBootstrapped()) return;
       untracked(() => {
         try {
           requestAnimationFrame(() => {
@@ -220,7 +238,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
     g.ticksAngle = 360; g.startAngle = 180; g.exactTicks = false; g.strokeTicks = '' as unknown as string;
     g.majorTicks = cfg.gauge?.compassUseNumbers ? ['N','30','60','E','120','150','S','210','240','W','300','330','N'] : ['N','NE','E','SE','S','SW','W','NW','N'];
     g.majorTicksDec = 0; g.majorTicksInt = 1; g.numbersMargin = 5; g.fontNumbersSize = 25; g.minorTicks = cfg.gauge?.compassUseNumbers ? 3 : 2;
-    g.needle = true; g.needleType = this.LINE; g.needleStart = this.NEEDLE_START; g.needleEnd = this.NEEDLE_END; g.needleCircleSize = this.NEEDLE_CIRCLE_SIZE; g.needleWidth = 4; g.needleShadow = false; g.needleCircleInner = false; g.needleCircleOuter = false;
+    g.needle = this.dataAvailable(); g.needleType = this.LINE; g.needleStart = this.NEEDLE_START; g.needleEnd = this.NEEDLE_END; g.needleCircleSize = this.NEEDLE_CIRCLE_SIZE; g.needleWidth = 4; g.needleShadow = false; g.needleCircleInner = false; g.needleCircleOuter = false;
     g.borders = true; g.borderOuterWidth = 0; g.borderMiddleWidth = this.BORDER_MIDDLE_WIDTH; g.borderInnerWidth = this.BORDER_INNER_WIDTH; g.borderShadowWidth = 0;
     g.highlights = []; g.highlightsWidth = 0;
     g.fontTitle = 'Roboto'; g.fontTitleWeight = 'normal'; g.fontTitleSize = 25; g.fontUnits = 'Roboto'; g.fontUnitsSize = 25; g.fontUnitsWeight = 'normal';

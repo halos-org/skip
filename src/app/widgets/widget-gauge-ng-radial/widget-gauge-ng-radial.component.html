@@ -1,9 +1,9 @@
-@if (shouldRenderGauge()) {
+@if (optionsReady()) {
   <radial-gauge
     #radialGauge
     skipResizeObserver
     [options]="gaugeOptions"
-    [value]="value() ?? 0"
+    [value]="value() ?? adjustedScale().min"
     [attr.value-text]="textValue()"
     (resizeChange)="onResized($event)"
   ></radial-gauge>

@@ -57,3 +57,9 @@ export const ELECTRICAL_DIRECT_CARD_FULL_LAYOUT: IElectricalDirectCardLayout = {
 export const ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT: IElectricalDirectCardLayout = {
   ...ELECTRICAL_DIRECT_CARD_FULL_LAYOUT
 };
+
+/**
+ * Opacity of the all-'--' card the electrical widgets draw while nothing has reported. One value
+ * so the family's empty state cannot render at two intensities.
+ */
+export const ELECTRICAL_NO_DATA_OPACITY = 0.6;

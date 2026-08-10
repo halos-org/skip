@@ -112,6 +112,79 @@ describe('WidgetAutopilotComponent', () => {
 
   const startV1 = () => (component as unknown as { startV1Subscriptions: () => void }).startV1Subscriptions();
 
+  it('disables the engage toggle while the pilot has no known mode', () => {
+    // A pilot whose paths are silent cannot be commanded, whatever the REST API would accept.
+    const internals = component as unknown as {
+      apMode: { set: (value: string | null) => void };
+      apEngaged: { set: (value: boolean) => void };
+      apEngageBtnDisabled: () => boolean;
+    };
+
+    internals.apEngaged.set(false);
+    internals.apMode.set(null);
+    expect(internals.apEngageBtnDisabled()).toBe(true);
+
+    internals.apMode.set('off-line');
+    expect(internals.apEngageBtnDisabled()).toBe(true);
+
+    internals.apMode.set('auto');
+    expect(internals.apEngageBtnDisabled()).toBe(false);
+  });
+
+  it('leaves the engage toggle live after a refused command', () => {
+    // The toggle reads Disengage on an engaged pilot; a rejected command must not lock the helm
+    // out of taking a misbehaving pilot off.
+    const internals = component as unknown as {
+      apMode: { set: (value: string | null) => void };
+      apEngaged: { set: (value: boolean) => void };
+      errorOverlayVisibility: { set: (value: string) => void };
+      apEngageBtnDisabled: () => boolean;
+      standbyButtonLabel: () => string;
+    };
+
+    internals.apMode.set('auto');
+    internals.apEngaged.set(true);
+    internals.errorOverlayVisibility.set('visible');
+
+    expect(internals.standbyButtonLabel()).toBe('Disengage');
+    expect(internals.apEngageBtnDisabled()).toBe(false);
+  });
+
+  it('keeps the control rows laid out but disabled while no autopilot mode is known', () => {
+    // A silent or unconfigured autopilot must still look like an autopilot, not collapse to two
+    // buttons over an empty panel.
+    const internals = component as unknown as {
+      apMode: { set: (value: string | null) => void };
+      adjustHdgBtnVisibility: () => boolean;
+      tackBtnVisibility: () => boolean;
+      apBtnDisabled: () => boolean;
+    };
+
+    internals.apMode.set(null);
+    expect(internals.adjustHdgBtnVisibility()).toBe(true);
+    expect(internals.tackBtnVisibility()).toBe(true);
+    expect(internals.apBtnDisabled()).toBe(true);
+
+    internals.apMode.set('off-line');
+    expect(internals.adjustHdgBtnVisibility()).toBe(true);
+    expect(internals.tackBtnVisibility()).toBe(true);
+    expect(internals.apBtnDisabled()).toBe(true);
+  });
+
+  it('enables the control rows once a real mode is reported', () => {
+    const internals = component as unknown as {
+      apMode: { set: (value: string | null) => void };
+      apEngaged: { set: (value: boolean) => void };
+      adjustHdgBtnVisibility: () => boolean;
+      apBtnDisabled: () => boolean;
+    };
+
+    internals.apMode.set('auto');
+    internals.apEngaged.set(true);
+    expect(internals.adjustHdgBtnVisibility()).toBe(true);
+    expect(internals.apBtnDisabled()).toBe(false);
+  });
+
   it('does not throw starting V1 subscriptions when the config has no paths object', () => {
     const spy = vi.spyOn(runtimeMock, 'options').mockReturnValue({ autopilot: runtimeOptions.autopilot } as unknown as typeof runtimeOptions);
     try {
@@ -154,14 +227,14 @@ describe('WidgetAutopilotComponent', () => {
     return (clone.textContent ?? '').trim();
   };
 
-  const render = (mode: string): ComponentFixture<WidgetAutopilotComponent> => {
+  const render = (mode: string | null): ComponentFixture<WidgetAutopilotComponent> => {
     const fixture = TestBed.createComponent(WidgetAutopilotComponent);
     const set = fixture.componentRef.setInput.bind(fixture.componentRef) as (k: string, v: unknown) => void;
     set('id', 'autopilot-test');
     set('type', 'widget-autopilot');
     set('theme', null);
     const state = fixture.componentInstance as unknown as {
-      apMode: { set: (value: string) => void };
+      apMode: { set: (value: string | null) => void };
       apState: { set: (value: string) => void };
     };
     state.apMode.set(mode);
@@ -197,5 +270,19 @@ describe('WidgetAutopilotComponent', () => {
     expect(labels).toContain('Tack Stbd');
     expect(labels).toContain('Dodge');
     expect(labels).toContain('Adv Wpt');
+  });
+  it('keeps the grid and its controls on screen when no mode is known', () => {
+    // The widget went blank because [style.display]="apGrid()" collapsed this container. Assert the
+    // rendered result, not the row-visibility signals — those never fed that binding.
+    const fixture = render(null);
+    const host = fixture.nativeElement as HTMLElement;
+
+    const grid = host.querySelector<HTMLElement>('.autopilot-grid-container');
+    expect(grid).not.toBeNull();
+    expect(grid?.style.display).not.toBe('none');
+
+    const buttons = controls(fixture);
+    expect(buttons.length).toBeGreaterThan(0);
+    expect(buttons.every(b => b.disabled)).toBe(true);
   });
 });

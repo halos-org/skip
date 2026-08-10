@@ -304,4 +304,35 @@ describe('WidgetBmsComponent', () => {
             vi.useRealTimers();
         }
     });
+    it('draws one dimmed all-placeholder bank while no battery has reported', () => {
+        // The widget must keep the shape of a bank behind its empty-state message rather than
+        // collapsing to a bare panel carrying a sentence.
+        dataServiceMock.subscribePathTreeWithInitial.mockReturnValue({
+            initial: [],
+            live$: liveSubject.asObservable()
+        });
+
+        // The scheduler subscribes when the component is constructed, so the empty tree has to be
+        // in place before createComponent.
+        fixture = TestBed.createComponent(WidgetBmsComponent);
+        component = fixture.componentInstance;
+        fixture.componentRef.setInput('id', 'w-bms-empty');
+        fixture.componentRef.setInput('type', 'widget-bms');
+        fixture.componentRef.setInput('theme', themeMock);
+        fixture.detectChanges();
+
+        const internals = component as unknown as {
+            buildRenderSnapshot: () => unknown;
+            render: (snapshot: unknown) => void;
+        };
+        internals.render(internals.buildRenderSnapshot());
+
+        const host = fixture.nativeElement as HTMLElement;
+        expect(host.querySelectorAll('g.bank-card').length).toBe(1);
+        expect(host.querySelector('svg.bms-svg > g')?.getAttribute('opacity')).toBe('0.6');
+        expect(host.querySelector('tspan.bank-card-current-value')?.textContent).toBe('--');
+        expect(host.querySelector('tspan.bank-gauge-soc-value')?.textContent).toBe('--');
+        // The title stays on so the card is still identifiable as the battery widget.
+        expect(host.querySelector('widget-title')).not.toBeNull();
+    });
 });

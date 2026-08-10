@@ -8,6 +8,7 @@ import { WidgetStreamsDirective } from '../../core/directives/widget-streams.dir
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
 import { UnitsService } from '../../core/services/units.service';
 import { IWidgetSvcConfig, IPathArray } from '../../core/interfaces/widgets-interface';
+import { States } from '../../core/interfaces/signalk-interfaces';
 
 /**
  * The label and the unit are rendered by the component as one header row on the card, so the gauge
@@ -28,6 +29,11 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
 
   interface LinearInternals {
     effectiveUnit: WritableSignal<string>;
+    dataAvailable: WritableSignal<boolean>;
+    currentState: WritableSignal<string>;
+    barColor: (cfg: IWidgetSvcConfig, theme: unknown, state: string) => string;
+    optionsReady: () => boolean;
+    textValue: () => string;
     gaugeOptions: LinearGaugeOptions;
     unitSymbol: () => string;
     buildGaugeOptions: (cfg: IWidgetSvcConfig, theme: unknown, scale: unknown) => void;
@@ -151,5 +157,63 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
     component.onResized(resizeEntry(0, 0));
 
     expect(sizeUpdates).toEqual([]);
+  });
+  describe('no-data state', () => {
+    it('mounts the gauge before any datapoint, with a placeholder reading', () => {
+      // The whole template used to sit behind a data-dependent @if, so a silent path drew nothing.
+      expect(internals.optionsReady()).toBe(true);
+      expect(fixture.nativeElement.querySelector('linear-gauge')).not.toBeNull();
+      expect(internals.textValue()).toBe('--');
+    });
+
+    it('keeps barProgress on and hides the bar by colour instead', () => {
+      // Switching barProgress off makes the library skip the pass that computes barDimensions,
+      // which every later draw step reads — it throws on construction and kills the canvas.
+      const cfg = makeConfig();
+      internals.dataAvailable.set(false);
+      internals.buildGaugeOptions(cfg, theme, internals.adjustedScale());
+      expect(internals.gaugeOptions.barProgress).toBe(true);
+      expect(internals.gaugeOptions.colorBarProgress).toBe('rgba(0,0,0,0)');
+
+      internals.dataAvailable.set(true);
+      internals.buildGaugeOptions(cfg, theme, internals.adjustedScale());
+      expect(internals.gaugeOptions.barProgress).toBe(true);
+      expect(internals.gaugeOptions.colorBarProgress).not.toBe('rgba(0,0,0,0)');
+    });
+
+    it('suppresses the needle only while no reading is in hand', () => {
+      const cfg = makeConfig();
+      cfg.gauge = { ...cfg.gauge, type: 'ngLinear', enableNeedle: true };
+
+      internals.dataAvailable.set(false);
+      internals.buildGaugeOptions(cfg, theme, internals.adjustedScale());
+      expect(internals.gaugeOptions.needle).toBe(false);
+
+      internals.dataAvailable.set(true);
+      internals.buildGaugeOptions(cfg, theme, internals.adjustedScale());
+      expect(internals.gaugeOptions.needle).toBe(true);
+    });
+
+    it('leaves the bar in the widget palette when zones are ignored', () => {
+      // The zone-state effect returns early under ignoreZones, so a zone colour applied anywhere
+      // else would stick with nothing to correct it.
+      const themed = { ...theme, zoneAlarm: '#f00' };
+      const cfg = makeConfig();
+      internals.dataAvailable.set(true);
+
+      cfg.ignoreZones = true;
+      expect(internals.barColor(cfg, themed, States.Alarm)).not.toBe('#f00');
+
+      cfg.ignoreZones = false;
+      expect(internals.barColor(cfg, themed, States.Alarm)).toBe('#f00');
+    });
+
+    it('paints the bar transparent with no reading, whatever the zone state', () => {
+      const themed = { ...theme, zoneAlarm: '#f00' };
+      const cfg = makeConfig();
+      cfg.ignoreZones = false;
+      internals.dataAvailable.set(false);
+      expect(internals.barColor(cfg, themed, States.Alarm)).toBe('rgba(0,0,0,0)');
+    });
   });
 });

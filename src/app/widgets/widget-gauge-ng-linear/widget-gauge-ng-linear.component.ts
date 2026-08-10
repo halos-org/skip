@@ -86,8 +86,14 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
   // Reactive presentation
   protected textValue = signal('--');
   protected value = signal<number | null | undefined>(undefined);
-  /** True after first datapoint has been received (including zero). */
-  protected shouldRenderGauge = computed(() => this.value() !== undefined);
+  /** True while a non-null datapoint is in hand; needle and progress bar are suppressed when false. */
+  protected dataAvailable = signal(false);
+  /**
+   * Gates the gauge element on the first buildGaugeOptions() run. The library builds its geometry
+   * in the constructor and throws on the empty initial options object, so the gauge has to wait for
+   * config and theme — but not for data.
+   */
+  protected optionsReady = signal(false);
   protected gaugeOptions: LinearGaugeOptions = {} as LinearGaugeOptions;
   private viewReady = signal(false);
   /** True after first non-animated frame has been rendered. */
@@ -98,7 +104,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
   /** Measure the incoming value was converted to (server-resolved for this display path). '' = boot placeholder. */
   private effectiveUnit = signal<string>('');
 
-  private adjustedScale = computed<IScale>(() => {
+  protected adjustedScale = computed<IScale>(() => {
     const cfg = this.runtime.options();
     if (!cfg) return { min: 0, max: 100, majorTicks: [] };
     // displayScale bounds are stored in the user-picked convertUnitTo; re-express them in the
@@ -151,6 +157,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
           const stored = cfg.paths?.['gaugePath']?.convertUnitTo ?? 'unitless';
           const lower = this.unitsService.convertBetweenMeasures(stored, measure, cfg.displayScale?.lower ?? 0);
           const upper = this.unitsService.convertBetweenMeasures(stored, measure, cfg.displayScale?.upper ?? 100);
+          this.dataAvailable.set(raw != null);
           if (raw == null) {
             this.value.set(lower);
             this.textValue.set('--');
@@ -200,6 +207,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
         const cfg = this.runtime.options();
         if (!cfg || !theme) return;
         this.buildGaugeOptions(cfg, theme, scale);
+        this.optionsReady.set(true);
         if (this.viewReady()) {
           try {
             this.ngGauge()?.update(this.gaugeOptions);
@@ -209,10 +217,31 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       });
     });
 
-    // Enable animation only after the first rendered frame to avoid startup motion.
+    // Hide the needle and progress bar while no datapoint is in hand, so an unfed gauge reads
+    // as "no data" instead of parking both at the scale minimum as if it were a real reading.
+    effect(() => {
+      const hasData = this.dataAvailable();
+      if (!this.viewReady()) return;
+      untracked(() => {
+        const cfg = this.runtime.options();
+        const theme = this.theme();
+        if (!cfg || !theme) return;
+        const enableNeedle = !!cfg.gauge?.enableNeedle;
+        const opt: LinearGaugeOptions = { needle: enableNeedle && hasData };
+        if (!enableNeedle) {
+          opt.colorBarProgress = this.barColor(cfg, theme, this.currentState());
+        }
+        try {
+          this.ngGauge()?.update(opt);
+        } catch { /* ignore */ }
+      });
+    });
+
+    // Enable animation only after the first datapoint has been placed, so the bar never
+    // sweeps up from the scale minimum on the first real reading.
     effect(() => {
       const gauge = this.ngGauge();
-      if (!gauge || this.gaugeBootstrapped()) return;
+      if (!gauge || !this.dataAvailable() || this.gaugeBootstrapped()) return;
       untracked(() => {
         try {
           requestAnimationFrame(() => {
@@ -232,51 +261,44 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
         const theme = this.theme();
         if (!cfg || !theme || cfg.ignoreZones) return;
 
-        const opt: LinearGaugeOptions = {};
         const enableNeedle = cfg.gauge?.enableNeedle;
         const palette = getColors(cfg.color ?? 'contrast', theme);
-        switch (state) {
-          case States.Alarm:
-            if (enableNeedle) {
-              opt.colorNeedle = theme.zoneAlarm;
-              opt.colorValueText = theme.zoneAlarm;
-            } else {
-              opt.colorBarProgress = theme.zoneAlarm;
-              opt.colorValueText = theme.zoneAlarm;
-            }
-            break;
-          case States.Warn:
-            if (enableNeedle) {
-              opt.colorNeedle = theme.zoneWarn;
-              opt.colorValueText = theme.zoneWarn;
-            } else {
-              opt.colorBarProgress = theme.zoneWarn;
-              opt.colorValueText = theme.zoneWarn;
-            }
-            break;
-          case States.Alert:
-            if (enableNeedle) {
-              opt.colorNeedle = theme.zoneAlert;
-              opt.colorValueText = theme.zoneAlert;
-            } else {
-              opt.colorBarProgress = theme.zoneAlert;
-              opt.colorValueText = theme.zoneAlert;
-            }
-            break;
-          default:
-            if (enableNeedle) {
-              opt.colorNeedle = palette.color;
-              opt.colorValueText = palette.color;
-            } else {
-              opt.colorBarProgress = palette.color;
-              opt.colorValueText = palette.color;
-            }
+        const stateColor = this.zoneColor(theme, palette.color, state);
+        const opt: LinearGaugeOptions = { colorValueText: stateColor };
+        if (enableNeedle) {
+          opt.colorNeedle = stateColor;
+        } else {
+          opt.colorBarProgress = this.barColor(cfg, theme, state);
         }
         try {
           this.ngGauge()?.update(opt);
         } catch { /* ignore */ }
       });
     });
+  }
+
+  /**
+   * The single decision about what colour the bar is painted, shared by the no-data effect, the
+   * zone-state effect and the option builder so they cannot disagree. Transparent stands in for
+   * "hidden": switching barProgress off makes the library skip the pass that computes
+   * barDimensions, which every later draw step reads, so it throws on construction.
+   */
+  private barColor(cfg: IWidgetSvcConfig, theme: ITheme, state: string): string {
+    if (!this.dataAvailable()) return 'rgba(0,0,0,0)';
+    const palette = getColors(cfg.color ?? 'contrast', theme);
+    // The zone-state effect returns early under ignoreZones, so a zone colour written anywhere
+    // else would stick with nothing to correct it.
+    return cfg.ignoreZones ? palette.color : this.zoneColor(theme, palette.color, state);
+  }
+
+  /** Zone colour for the indicator and value text, falling back to the widget's own palette. */
+  private zoneColor(theme: ITheme, paletteColor: string, state: string): string {
+    switch (state) {
+      case States.Alarm: return theme.zoneAlarm;
+      case States.Warn: return theme.zoneWarn;
+      case States.Alert: return theme.zoneAlert;
+      default: return paletteColor;
+    }
   }
 
   private buildGaugeOptions(cfg: IWidgetSvcConfig, theme: ITheme, scale: IScale) {
@@ -292,9 +314,12 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
     // Bar geometry (match legacy defaults)
     opt.barLength = isVertical ? 80 : 90;
     opt.barWidth = ticks ? (enableNeedle ? 0 : 30) : 60;
+    // barProgress stays on even with no data. The library computes barDimensions inside the
+    // progress-bar pass, and every later draw step reads it, so switching barProgress off throws
+    // on construction. The bar is hidden by painting it transparent instead — see barColor().
     opt.barProgress = true; opt.barBeginCircle = 0; opt.barStrokeWidth = 0; opt.barShadow = 0;
     // Needle geometry
-    opt.needle = !!enableNeedle; opt.needleType = enableNeedle ? 'arrow' : 'line';
+    opt.needle = !!enableNeedle && this.dataAvailable(); opt.needleType = enableNeedle ? 'arrow' : 'line';
     opt.needleStart = enableNeedle ? (isVertical ? 200 : 155) : -45;
     opt.needleEnd = enableNeedle ? (isVertical ? 175 : 180) : 55;
     opt.needleShadow = true; opt.needleSide = 'both';
@@ -312,7 +337,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       opt.colorNeedle = palette.color; opt.colorNeedleEnd = palette.color; opt.needleWidth = 45;
       opt.colorNeedleShadowUp = palette.color; opt.colorNeedleShadowDown = palette.color;
     } else {
-      opt.colorBarProgress = palette.color; opt.colorBarProgressEnd = ''; opt.needleWidth = 0;
+      opt.colorBarProgress = this.barColor(cfg, theme, this.currentState()); opt.colorBarProgressEnd = ''; opt.needleWidth = 0;
     }
     opt.colorPlate = theme.cardColor; opt.colorBar = theme.background; opt.colorBarEnd = ''; opt.colorBarStroke = '0';
     opt.colorMajorTicks = getColors('contrast', theme).dim; opt.colorMinorTicks = getColors('contrast', theme).dim; opt.colorNumbers = getColors('contrast', theme).dim;

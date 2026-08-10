@@ -44,9 +44,18 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
   private center = 0;
   private fontSizeOffset = 0;
 
+  /** Shown for either coordinate until a finite value arrives, matching widget-numeric. */
+  private static readonly NO_VALUE = '--';
+  /**
+   * A formatted coordinate of typical length. drawText sizes text to fill its box, so a bare '--'
+   * would render several times larger than the real reading it stands in for; this bounds the
+   * placeholder to the size an actual coordinate gets.
+   */
+  private static readonly REFERENCE_COORDINATE = "60° 10.12' N";
+
   // Value state
-  private latPos = '';
-  private longPos = '';
+  private latPos = WidgetPositionComponent.NO_VALUE;
+  private longPos = WidgetPositionComponent.NO_VALUE;
   protected labelColor = signal<string>('');
   private valueColor = '';
 
@@ -104,10 +113,10 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
   }
 
   private formatCoordinate(measure: 'latitudeMin' | 'longitudeMin', value: number | null | undefined): string {
-    if (value === null || value === undefined || !Number.isFinite(value)) return '';
+    if (value === null || value === undefined || !Number.isFinite(value)) return WidgetPositionComponent.NO_VALUE;
     // The latitudeMin/longitudeMin conversions return a preformatted DMS string despite convertToUnit's
     // number|null signature, so the String() coercion is load-bearing — do not drop it or reformat here.
-    return String(this.units.convertToUnit(measure, value) ?? '');
+    return String(this.units.convertToUnit(measure, value) ?? WidgetPositionComponent.NO_VALUE);
   }
 
   // Canvas lifecycle
@@ -142,6 +151,20 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private valueTextHeight(text: string): number {
+    if (text !== WidgetPositionComponent.NO_VALUE || !this.ctx) return this.maxTextHeight;
+    return Math.min(
+      this.maxTextHeight,
+      this.canvas.calculateOptimalFontSize(
+        this.ctx,
+        WidgetPositionComponent.REFERENCE_COORDINATE,
+        this.maxTextWidth,
+        this.maxTextHeight,
+        'bold'
+      )
+    );
+  }
+
   private draw(): void {
     if (!this.ctx || !this.canvasElement) return;
     const cfg = this.runtime.options();
@@ -168,7 +191,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
       this.center,
       this.middle - this.fontSizeOffset,
       this.maxTextWidth,
-      this.maxTextHeight,
+      this.valueTextHeight(this.latPos),
       'bold',
       this.valueColor,
       'center',
@@ -181,7 +204,7 @@ export class WidgetPositionComponent implements AfterViewInit, OnDestroy {
       this.center,
       this.middle + this.fontSizeOffset,
       this.maxTextWidth,
-      this.maxTextHeight,
+      this.valueTextHeight(this.longPos),
       'bold',
       this.valueColor,
       'center',

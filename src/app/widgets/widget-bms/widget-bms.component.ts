@@ -13,7 +13,7 @@ import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electr
 import type { BmsBankDisplayModel, BmsBankSummary, BmsBatteryDisplayModel, BmsBatterySnapshot } from './widget.bms.types';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import type { ITheme } from '../../core/services/app-service';
-import { ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH } from '../shared/electrical-card-layout.constants';
+import { ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_NO_DATA_OPACITY } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
 import { toFiniteNumber } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
@@ -99,6 +99,7 @@ export class WidgetBmsComponent implements AfterViewInit {
   private static readonly BANK_GAUGE_VALUE_STROKE = 10;
   private static readonly COMPACT_UNASSIGNED_BATTERY_SCALE = 0.82;
   private static readonly PATH_BATCH_WINDOW_MS = 500;
+  private static readonly PLACEHOLDER_KEY = '__no-battery-data__';
 
   private readonly runtime = inject(WidgetRuntimeDirective);
   private readonly data = inject(DataService);
@@ -291,6 +292,12 @@ export class WidgetBmsComponent implements AfterViewInit {
 
   protected readonly hasBatteries = computed(() => this.visibleBatteries().length > 0);
   protected readonly hasBanks = computed(() => this.bankSummaries().length > 0);
+  /**
+   * Drives both the empty-state message and the placeholder card, so the plate can never end up
+   * over live bank cards. A configured bank yields a summary before any battery reports, so
+   * hasBatteries() alone is not the same question.
+   */
+  protected readonly nothingToShow = computed(() => !this.hasBanks() && !this.hasBatteries());
 
   constructor() {
     effect(() => {
@@ -660,9 +667,65 @@ export class WidgetBmsComponent implements AfterViewInit {
     };
   }
 
+  /**
+   * One all-'--' bank holding one all-'--' battery, drawn while nothing has reported so the
+   * widget keeps its shape behind the empty-state message. Text comes from the same formatters
+   * the live path uses, so the placeholders read exactly like a real card with missing values.
+   */
+  private placeholderRenderInput(widgetColors: ReturnType<typeof getColors> | null): Omit<BmsRenderSnapshot, 'widgetColors'> {
+    const id = WidgetBmsComponent.PLACEHOLDER_KEY;
+    const dim = 'var(--skip-contrast-dim-color)';
+    const dimmer = 'var(--skip-contrast-dimmer-color)';
+    return {
+      banks: [{
+        id, name: 'Bank', batteryIds: [id],
+        totalCurrent: null, totalPower: null, avgSoc: null, remainingCapacity: null, timeRemaining: null
+      }],
+      batteries: [{ id, name: 'Battery', voltage: null, current: null, power: null }],
+      bankDisplayModels: {
+        [id]: {
+          id,
+          titleText: 'Bank',
+          currentText: this.formatCurrent(null),
+          powerText: this.formatPower(null),
+          socText: this.formatSoc(null),
+          remainingTimeText: '',
+          remainingCapacityText: '',
+          gaugeValuePath: this.buildSemiGaugeArcPath(WidgetBmsComponent.BANK_GAUGE_RADIUS, null),
+          gaugeValueColor: widgetColors?.color ?? 'var(--skip-contrast-color)',
+          zoneState: null,
+          zoneColor: null
+        }
+      },
+      batteryDisplayModels: {
+        [id]: {
+          id,
+          titleText: 'Battery',
+          chargeWidth: 0,
+          chargeBarColorCompact: dimmer,
+          chargeBarColorRegular: dim,
+          currentTextColorCompact: dim,
+          currentTextColorRegular: dim,
+          currentText: this.formatCurrent(null),
+          detailLineCompact: this.formatVoltage(null),
+          detailLineRegular: this.formatVoltage(null),
+          socText: this.formatSoc(null),
+          socGlowEnabled: false,
+          remainingCapacityText: '',
+          remainingTimeText: '',
+          iconKey: 'power_available'
+        }
+      }
+    };
+  }
+
   private render(snapshot: BmsRenderSnapshot): void {
     if (!this.bankLayer || !this.batteryLayer) return;
-    const { banks, batteries, bankDisplayModels, batteryDisplayModels, widgetColors } = snapshot;
+    const isPlaceholder = this.nothingToShow();
+    const { banks, batteries, bankDisplayModels, batteryDisplayModels } = isPlaceholder
+      ? this.placeholderRenderInput(snapshot.widgetColors)
+      : snapshot;
+    const widgetColors = snapshot.widgetColors;
 
     const renderLayout = this.buildRenderLayout(
       banks,
@@ -679,6 +742,7 @@ export class WidgetBmsComponent implements AfterViewInit {
     const viewBoxHeight = Math.max(WidgetBmsComponent.MIN_VIEWBOX_HEIGHT, renderLayout.contentHeight);
     this.svg?.attr('viewBox', `0 0 ${WidgetBmsComponent.VIEWBOX_WIDTH} ${viewBoxHeight}`);
     this.root?.attr('transform', null);
+    this.root?.attr('opacity', isPlaceholder ? ELECTRICAL_NO_DATA_OPACITY : null);
 
     const bankSelection = this.bankLayer
       .selectAll<SVGGElement, BmsRenderBank>('g.bank-card')

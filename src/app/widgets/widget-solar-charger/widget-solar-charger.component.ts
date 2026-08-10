@@ -10,7 +10,7 @@ import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import type { ElectricalCardModeConfig, ElectricalTrackedDevice, SolarChargerDisplayModel, SolarChargerSnapshot, SolarOptionConfig, SolarWidgetConfig } from './widget.solar-charger.types';
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
-import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT } from '../shared/electrical-card-layout.constants';
+import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_NO_DATA_OPACITY } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
 import { setValue, toNumber, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
@@ -56,6 +56,35 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
       optionsById: {},
     }
   };
+
+  private static readonly PLACEHOLDER_KEY = '__no-solar-data__';
+
+  /** Dimmed all-'--' card shown while no charger has reported. */
+  private static placeholderDisplayModel(): SolarChargerDisplayModel {
+    const dim = 'var(--skip-contrast-dim-color)';
+    return {
+      id: '',
+      titleText: '',
+      panelPowerText: '--',
+      panelPowerUnitText: 'W',
+      panelPowerColor: 'var(--skip-contrast-dimmer-color)',
+      panelPowerGlowEnabled: false,
+      chargerCurrentTextColor: dim,
+      chargerMetaTextColor: dim,
+      panelValuesTextColor: dim,
+      panelValuesGlowEnabled: false,
+      gaugeProgress: 0,
+      gaugeSectionText: '--',
+      yieldTodayText: '--',
+      yieldYesterdayText: '--',
+      chargerMode: '--',
+      chargerSectionCurrent: '--',
+      chargerSectionMetadata: '--',
+      relaySectionVisible: true,
+      relaySectionText: '--',
+      relayValuesTextColor: dim
+    };
+  }
 
   // Getters, not fields: read the shared layout constants at access time. A
   // class-def-time capture reads undefined in combined test bundles (#360).
@@ -667,11 +696,20 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     const compact = this.isCompactCardMode();
     // Compact mode is wired, but solar intentionally reuses the full-card geometry until a dedicated layout exists.
     const layout = compact ? ELECTRICAL_DIRECT_CARD_FULL_LAYOUT : ELECTRICAL_DIRECT_CARD_FULL_LAYOUT;
-    const cards = snapshot.solarUnits.map((solar, index) => ({
-      key: solar.deviceKey ?? solar.id,
-      model: snapshot.displayModels[solar.deviceKey ?? solar.id],
-      y: index * (WidgetSolarChargerComponent.CARD_HEIGHT + WidgetSolarChargerComponent.CARD_GAP)
-    }));
+    // With nothing to show, draw one all-'--' card so the widget keeps its shape behind the
+    // empty-state message instead of collapsing to a bare panel and a sentence.
+    const isPlaceholder = snapshot.solarUnits.length === 0;
+    const cards = isPlaceholder
+      ? [{
+          key: WidgetSolarChargerComponent.PLACEHOLDER_KEY,
+          model: WidgetSolarChargerComponent.placeholderDisplayModel(),
+          y: 0
+        }]
+      : snapshot.solarUnits.map((solar, index) => ({
+          key: solar.deviceKey ?? solar.id,
+          model: snapshot.displayModels[solar.deviceKey ?? solar.id],
+          y: index * (WidgetSolarChargerComponent.CARD_HEIGHT + WidgetSolarChargerComponent.CARD_GAP)
+        }));
 
     const contentHeight = cards.length
       ? cards[cards.length - 1].y + WidgetSolarChargerComponent.CARD_HEIGHT
@@ -739,6 +777,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     const merged = enter.merge(selection as Selection<SVGGElement, { key: string; model: SolarChargerDisplayModel; y: number }, SVGGElement, unknown>);
 
     merged.attr('transform', item => `translate(0, ${item.y})`);
+    merged.attr('opacity', isPlaceholder ? ELECTRICAL_NO_DATA_OPACITY : null);
 
     if (snapshot.solarUnits.length > 1) {
       merged.select('text.solar-charger-title')
