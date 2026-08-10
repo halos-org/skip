@@ -13,7 +13,7 @@ import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electr
 import type { BmsBankDisplayModel, BmsBankSummary, BmsBatteryDisplayModel, BmsBatterySnapshot } from './widget.bms.types';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
 import type { ITheme } from '../../core/services/app-service';
-import { ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH } from '../shared/electrical-card-layout.constants';
+import { ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_NO_DATA_OPACITY } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
 import { toFiniteNumber } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
@@ -100,7 +100,6 @@ export class WidgetBmsComponent implements AfterViewInit {
   private static readonly COMPACT_UNASSIGNED_BATTERY_SCALE = 0.82;
   private static readonly PATH_BATCH_WINDOW_MS = 500;
   private static readonly PLACEHOLDER_KEY = '__no-battery-data__';
-  private static readonly PLACEHOLDER_OPACITY = 0.6;
 
   private readonly runtime = inject(WidgetRuntimeDirective);
   private readonly data = inject(DataService);
@@ -293,6 +292,12 @@ export class WidgetBmsComponent implements AfterViewInit {
 
   protected readonly hasBatteries = computed(() => this.visibleBatteries().length > 0);
   protected readonly hasBanks = computed(() => this.bankSummaries().length > 0);
+  /**
+   * Drives both the empty-state message and the placeholder card, so the plate can never end up
+   * over live bank cards. A configured bank yields a summary before any battery reports, so
+   * hasBatteries() alone is not the same question.
+   */
+  protected readonly nothingToShow = computed(() => !this.hasBanks() && !this.hasBatteries());
 
   constructor() {
     effect(() => {
@@ -716,7 +721,7 @@ export class WidgetBmsComponent implements AfterViewInit {
 
   private render(snapshot: BmsRenderSnapshot): void {
     if (!this.bankLayer || !this.batteryLayer) return;
-    const isPlaceholder = snapshot.banks.length === 0 && snapshot.batteries.length === 0;
+    const isPlaceholder = this.nothingToShow();
     const { banks, batteries, bankDisplayModels, batteryDisplayModels } = isPlaceholder
       ? this.placeholderRenderInput(snapshot.widgetColors)
       : snapshot;
@@ -737,7 +742,7 @@ export class WidgetBmsComponent implements AfterViewInit {
     const viewBoxHeight = Math.max(WidgetBmsComponent.MIN_VIEWBOX_HEIGHT, renderLayout.contentHeight);
     this.svg?.attr('viewBox', `0 0 ${WidgetBmsComponent.VIEWBOX_WIDTH} ${viewBoxHeight}`);
     this.root?.attr('transform', null);
-    this.root?.attr('opacity', isPlaceholder ? WidgetBmsComponent.PLACEHOLDER_OPACITY : null);
+    this.root?.attr('opacity', isPlaceholder ? ELECTRICAL_NO_DATA_OPACITY : null);
 
     const bankSelection = this.bankLayer
       .selectAll<SVGGElement, BmsRenderBank>('g.bank-card')

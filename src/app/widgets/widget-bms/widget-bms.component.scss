@@ -16,6 +16,14 @@
   width: 100%;
   overflow: hidden;
   padding: 0 10px 10px 10px;
+
+  // Batteries reported without a bank have no bank header to sit under, so the cards take the
+  // full box. The empty state keeps the inset layout: its placeholder card needs the title row.
+  &.bms-svg--full {
+    top: 0;
+    height: 100%;
+    padding-top: 10px;
+  }
 }
 
 .bms-card-metric {

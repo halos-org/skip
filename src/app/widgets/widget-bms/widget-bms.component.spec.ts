@@ -288,6 +288,22 @@ describe('WidgetBmsComponent', () => {
     // Guards #360: the layout-constant getters must yield well-formed geometry. The
     // NaN only appears when >=2 electrical specs share a test bundle, so this bites
     // in the full suite, not when this spec runs alone.
+    it('renders well-formed geometry (no NaN/undefined viewBox)', async () => {
+        vi.useFakeTimers();
+        try {
+            fixture.detectChanges();
+            await vi.runAllTimersAsync();
+            fixture.detectChanges();
+            await vi.runAllTimersAsync();
+            const svg = fixture.nativeElement.querySelector('svg') as SVGSVGElement | null;
+            const viewBox = svg?.getAttribute('viewBox') ?? '';
+            expect(viewBox).not.toBe('');
+            expect(viewBox).not.toContain('NaN');
+            expect(viewBox).not.toContain('undefined');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
     it('draws one dimmed all-placeholder bank while no battery has reported', () => {
         // The widget must keep the shape of a bank behind its empty-state message rather than
         // collapsing to a bare panel carrying a sentence.
@@ -318,22 +334,5 @@ describe('WidgetBmsComponent', () => {
         expect(host.querySelector('tspan.bank-gauge-soc-value')?.textContent).toBe('--');
         // The title stays on so the card is still identifiable as the battery widget.
         expect(host.querySelector('widget-title')).not.toBeNull();
-    });
-
-    it('renders well-formed geometry (no NaN/undefined viewBox)', async () => {
-        vi.useFakeTimers();
-        try {
-            fixture.detectChanges();
-            await vi.runAllTimersAsync();
-            fixture.detectChanges();
-            await vi.runAllTimersAsync();
-            const svg = fixture.nativeElement.querySelector('svg') as SVGSVGElement | null;
-            const viewBox = svg?.getAttribute('viewBox') ?? '';
-            expect(viewBox).not.toBe('');
-            expect(viewBox).not.toContain('NaN');
-            expect(viewBox).not.toContain('undefined');
-        } finally {
-            vi.useRealTimers();
-        }
     });
 });

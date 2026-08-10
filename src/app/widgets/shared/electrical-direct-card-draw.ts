@@ -6,8 +6,7 @@ import {
   ELECTRICAL_DIRECT_CARD_GAP,
   ELECTRICAL_DIRECT_CARD_HEIGHT,
   ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH,
-  ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT
-} from './electrical-card-layout.constants';
+  ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT, ELECTRICAL_NO_DATA_OPACITY } from './electrical-card-layout.constants';
 
 /**
  * The per-card display fields the shared direct-card draw reads. The trio's own
@@ -54,7 +53,6 @@ interface DirectCard<TEntity> {
 }
 
 const PLACEHOLDER_KEY = '__no-electrical-data__';
-const PLACEHOLDER_OPACITY = 0.6;
 
 /** Dimmed all-'--' card drawn while nothing has reported, so the widget keeps its card shape. */
 const PLACEHOLDER_MODEL: DirectCardDisplayModel = {
@@ -142,7 +140,7 @@ export function drawDirectCards<TEntity extends IElectricalTopologySnapshotCore>
   const merged = enter.merge(selection as Selection<SVGGElement, DirectCard<TEntity>, SVGGElement, unknown>);
 
   merged.attr('transform', item => `translate(0, ${item.y})`);
-  merged.attr('opacity', isPlaceholder ? PLACEHOLDER_OPACITY : null);
+  merged.attr('opacity', isPlaceholder ? ELECTRICAL_NO_DATA_OPACITY : null);
 
   if (includeCardBg) {
     merged.select(`rect.${classPrefix}-card-bg`)

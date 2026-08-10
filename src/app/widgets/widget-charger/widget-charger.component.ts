@@ -10,7 +10,7 @@ import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-
 import type { ElectricalTrackedDevice, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import type { ITheme } from '../../core/services/app-service';
 import type { ChargerDisplayModel, ChargerSnapshot } from './widget-charger.types';
-import { ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT } from '../shared/electrical-card-layout.constants';
+import { ELECTRICAL_DIRECT_CARD_COMPACT_LAYOUT, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_COMPACT_CARD_HEIGHT, ELECTRICAL_NO_DATA_OPACITY } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeTrackedDevices, buildIdToDeviceKeysMap } from '../shared/electrical-config.util';
 import { setValue, setMetricValue, toStringValue, toBoolean, toNumber, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
@@ -53,7 +53,6 @@ export class WidgetChargerComponent implements AfterViewInit {
   private static readonly CHARGER_DISPLAY_BASE_HEIGHT = 37;
   private static readonly CHARGER_DISPLAY_HORIZONTAL_MARGIN = 40;
   private static readonly PLACEHOLDER_KEY = '__no-charger-data__';
-  private static readonly PLACEHOLDER_OPACITY = 0.6;
 
   /** Dimmed all-'--' card shown while no charger has reported. */
   private static placeholderDisplayModel(): ChargerDisplayModel {
@@ -505,7 +504,7 @@ export class WidgetChargerComponent implements AfterViewInit {
       ? [{
           key: WidgetChargerComponent.PLACEHOLDER_KEY,
           id: '',
-          charger: { id: '' } as ChargerSnapshot,
+          charger: { id: '' },
           y: 0
         }]
       : snapshot.chargers.map((charger, index) => ({
@@ -604,7 +603,7 @@ export class WidgetChargerComponent implements AfterViewInit {
     const merged = enter.merge(selection as Selection<SVGGElement, { key: string; id: string; charger: ChargerSnapshot; y: number }, SVGGElement, unknown>);
 
     merged.attr('transform', item => `translate(0, ${item.y})`);
-    merged.attr('opacity', isPlaceholder ? WidgetChargerComponent.PLACEHOLDER_OPACITY : null);
+    merged.attr('opacity', isPlaceholder ? ELECTRICAL_NO_DATA_OPACITY : null);
     merged.select('g.charger-display-group')
       .attr('transform', `translate(${displayX}, ${displayY}) scale(${displayScale})`)
       .each((item, _index, nodes) => {

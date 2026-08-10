@@ -28,6 +28,8 @@
   justify-content: center;
   text-align: center;
   color: var(--mat-sys-on-surface);
+  // Above the card SVG, which carries z-index 20.
+  z-index: 30;
   pointer-events: none;
 }
 

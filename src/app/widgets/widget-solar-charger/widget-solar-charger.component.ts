@@ -10,7 +10,7 @@ import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import type { ElectricalCardModeConfig, ElectricalTrackedDevice, SolarChargerDisplayModel, SolarChargerSnapshot, SolarOptionConfig, SolarWidgetConfig } from './widget.solar-charger.types';
 import { getElectricalWidgetFamilyDescriptor } from '../../core/contracts/electrical-widget-family.contract';
 import type { ElectricalCardDisplayMode } from '../../core/contracts/electrical-topology-card.contract';
-import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT } from '../shared/electrical-card-layout.constants';
+import { ELECTRICAL_DIRECT_CARD_GAP, ELECTRICAL_DIRECT_CARD_HEIGHT, ELECTRICAL_DIRECT_CARD_VIEWBOX_WIDTH, ELECTRICAL_DIRECT_CARD_FULL_LAYOUT, ELECTRICAL_NO_DATA_OPACITY } from '../shared/electrical-card-layout.constants';
 import { normalizeOptionalString, normalizeStringList, normalizeTrackedDevices } from '../shared/electrical-config.util';
 import { setValue, toNumber, resolveMostSevereState } from '../shared/electrical-apply.util';
 import { ElectricalIngestScheduler } from '../shared/electrical-ingest-scheduler';
@@ -58,7 +58,6 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
   };
 
   private static readonly PLACEHOLDER_KEY = '__no-solar-data__';
-  private static readonly PLACEHOLDER_OPACITY = 0.6;
 
   /** Dimmed all-'--' card shown while no charger has reported. */
   private static placeholderDisplayModel(): SolarChargerDisplayModel {
@@ -778,7 +777,7 @@ export class WidgetSolarChargerComponent implements AfterViewInit {
     const merged = enter.merge(selection as Selection<SVGGElement, { key: string; model: SolarChargerDisplayModel; y: number }, SVGGElement, unknown>);
 
     merged.attr('transform', item => `translate(0, ${item.y})`);
-    merged.attr('opacity', isPlaceholder ? WidgetSolarChargerComponent.PLACEHOLDER_OPACITY : null);
+    merged.attr('opacity', isPlaceholder ? ELECTRICAL_NO_DATA_OPACITY : null);
 
     if (snapshot.solarUnits.length > 1) {
       merged.select('text.solar-charger-title')
