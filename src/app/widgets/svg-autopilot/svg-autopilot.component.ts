@@ -94,7 +94,16 @@ export class SvgAutopilotComponent implements OnDestroy {
   constructor() {
     effect(() => {
       const heading = this.compassHeading();
-      if (heading == null || !Number.isFinite(heading)) return;
+      // A heading that stops arriving must read as absent, not hold its last value: a frozen dial
+      // is indistinguishable from a live one. Clearing `compassInitialized` also places the next
+      // real heading without sweeping to it from a stale angle.
+      if (heading == null || !Number.isFinite(heading)) {
+        untracked(() => {
+          this.compassAngle.set(null);
+          this.compassInitialized = false;
+        });
+        return;
+      }
       const next = this.roundDeg(heading);
       untracked(() => {
         const prev = this.prevCompassAngle;
@@ -156,7 +165,7 @@ export class SvgAutopilotComponent implements OnDestroy {
     effect(() => {
       const state = this.apMode();
       const awaRaw = this.appWindAngle();
-      const awa = (awaRaw != null && Number.isFinite(awaRaw)) ? this.roundDeg(awaRaw) : 0;
+      const awa = (awaRaw != null && Number.isFinite(awaRaw)) ? this.roundDeg(awaRaw) : null;
       let xteValue = this.courseXte();
 
       untracked(() => {
@@ -195,8 +204,9 @@ export class SvgAutopilotComponent implements OnDestroy {
             this.apModeValueDirection.set('');
             break;
           case "wind":
+            // A dead vane reads '--', not a dead-ahead 0 the helm would take for a real target.
             this.apModeValueAnnotation.set(awa ? awa > 0 ? 'S' : 'P' : '');
-            this.apModeValue.set(Math.abs(awa) + '°');
+            this.apModeValue.set(awa === null ? '--' : Math.abs(awa) + '°');
             this.apModeValueDirection.set('');
             break;
           default:

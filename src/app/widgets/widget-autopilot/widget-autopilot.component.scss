@@ -53,9 +53,9 @@
   z-index: 50;
   vertical-align: middle;
   text-align: center;
-  // Translucent so the autopilot screen stays readable behind a message: a widget that is only
-  // an opaque panel and a sentence reads as broken rather than as an autopilot with no data.
-  background-color: color-mix(in srgb, var(--mat-sys-background) 72%, transparent);
+  // Opaque by default: the countdown overlay is a confirmation prompt and must not compete with
+  // the rotating dial behind it. The error overlay opts out and carries its own plate instead.
+  background-color: var(--mat-sys-background);
 }
 
 // The message sits on its own plate rather than tinting the whole layer, matching the electrical
