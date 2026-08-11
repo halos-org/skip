@@ -28,9 +28,13 @@ const PAGE_SLIDE_PHASE_MS = 150;
 const PAGE_SLIDE_EXIT_EASING = 'ease-in';
 const PAGE_SLIDE_ENTER_EASING = 'ease-out';
 /**
- * How far a page travels, as a fraction of the wrapper's own width. Short on purpose: the page is
- * transparent well before it gets far, so the swap hides behind opacity rather than behind the
- * viewport edge, and no full-width empty sweep is ever exposed between the two phases.
+ * How far a page travels, as a fraction of the wrapper's own width. Short on purpose: what hides the
+ * grid swap is the exit phase ending at opacity 0, not the page clearing the viewport, so the travel
+ * only has to suggest a direction. A short hop also keeps a full-width empty sweep off screen.
+ *
+ * The fade does not lead the motion — `animatePhase` passes one effect easing, so opacity and
+ * transform ride the same curve and opacity only reaches 0 at the end of the phase. Extending the
+ * travel on the assumption that the page is already invisible partway would expose the swap.
  */
 const PAGE_SLIDE_TRAVEL_PCT = 15;
 
@@ -312,17 +316,23 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const exitTo = direction === 'next' ? -PAGE_SLIDE_TRAVEL_PCT : PAGE_SLIDE_TRAVEL_PCT;
-    const enterFrom = -exitTo;
+    const exitPose: SlidePose = { pct: direction === 'next' ? -PAGE_SLIDE_TRAVEL_PCT : PAGE_SLIDE_TRAVEL_PCT, opacity: 0 };
+    // Seeded inline and then declared as the enter phase's start: one binding so the two cannot
+    // disagree, which would start the enter with a visible jump.
+    const enterPose: SlidePose = { pct: -exitPose.pct, opacity: 0 };
     this._slideInFlight = true;
+    // A transparent page is still hit-testable, and at this travel it stays inside the host's clip
+    // box — without this a tap mid-transition reaches a control the user cannot see, on the page
+    // they have not seen yet. Widgets do not consult the transition flag themselves.
+    slide.style.pointerEvents = 'none';
     this.dashboard.beginPageTransition();
     try {
-      await this.animatePhase(slide, PAGE_SLIDE_RESTING, { pct: exitTo, opacity: 0 }, PAGE_SLIDE_EXIT_EASING);
+      await this.animatePhase(slide, PAGE_SLIDE_RESTING, exitPose, PAGE_SLIDE_EXIT_EASING);
       if (this._destroyed) return;
       let target = this.dashboard.activeDashboard();
       this.loadDashboard(target);
-      this.setSlidePose(slide, { pct: enterFrom, opacity: 0 }); // jump to the opposite side, still invisible
-      await this.animatePhase(slide, { pct: enterFrom, opacity: 0 }, PAGE_SLIDE_RESTING, PAGE_SLIDE_ENTER_EASING);
+      this.setSlidePose(slide, enterPose); // jump to the opposite side, still invisible
+      await this.animatePhase(slide, enterPose, PAGE_SLIDE_RESTING, PAGE_SLIDE_ENTER_EASING);
       if (this._destroyed) return;
       // A change that landed during the slide bypassed the guard; settle on it now.
       if (this.dashboard.activeDashboard() !== target) {
@@ -330,9 +340,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         this.loadDashboard(target);
       }
     } finally {
-      // Restores opacity as well as position: an aborted transition must never leave the page
-      // displaced or invisible.
+      // Restores opacity and input as well as position: an aborted transition must never leave the
+      // page displaced, invisible, or deaf to taps.
       this.setSlidePose(slide, PAGE_SLIDE_RESTING);
+      slide.style.pointerEvents = '';
       this._slideInFlight = false;
       this.dashboard.endPageTransition();
     }

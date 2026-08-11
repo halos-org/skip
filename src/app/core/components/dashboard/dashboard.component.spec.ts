@@ -482,13 +482,14 @@ describe('DashboardComponent', () => {
         interface RunPageChangeApi {
             runPageChange: () => Promise<void>;
             animatePhase: (el: HTMLElement, from: SlidePose, to: SlidePose, easing: string) => Promise<void>;
+            ngOnDestroy?: () => void;
             loadDashboard: (dashboardId: number) => void;
             prefersReducedMotion: () => boolean;
         }
 
         // Drive the sequence without real Web Animations: record phase/load ordering
         // (load carries the index) and stub loadDashboard so it does not touch the grid.
-        function instrument(): { api: RunPageChangeApi; order: string[]; animate: Mock } {
+        function instrument(): { api: RunPageChangeApi; order: string[]; animate: Mock; slide: HTMLElement } {
             const api = component as unknown as RunPageChangeApi;
             const order: string[] = [];
             const slide = document.createElement('div');
@@ -499,7 +500,7 @@ describe('DashboardComponent', () => {
                 return Promise.resolve();
             }) as unknown as Mock;
             vi.spyOn(api, 'loadDashboard').mockImplementation((id) => { order.push(`load:${id}`); });
-            return { api, order, animate };
+            return { api, order, animate, slide };
         }
 
         function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -508,17 +509,30 @@ describe('DashboardComponent', () => {
             return { promise, resolve };
         }
 
-        it('slides out then in, loading the current page off-screen at the midpoint, for next', async () => {
+        it('slides out then in, loading the current page while transparent at the midpoint, for next', async () => {
             mockDashboardService.activeDashboard.set(1);
             (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
-            const { api, order } = instrument();
+            const { api, order, slide } = instrument();
+            let pointerEventsDuringExit: string | undefined;
+            (api.animatePhase as unknown as Mock).mockImplementationOnce((el, from, to) => {
+                order.push(`animate:${from.pct}@${from.opacity}->${to.pct}@${to.opacity}`);
+                pointerEventsDuringExit = (el as HTMLElement).style.pointerEvents;
+                return Promise.resolve();
+            });
 
             await api.runPageChange();
 
+            // A transparent page is still hit-testable and, at this travel, still inside the host's
+            // clip box: input must be off for the whole transition or a tap reaches an unseen control.
+            expect(pointerEventsDuringExit).toBe('none');
             // The exit must end fully transparent: opacity, not distance, is what hides the swap.
             expect(order).toEqual(['animate:0@1->-15@0', 'load:1', 'animate:15@0->0@1']);
             expect(mockDashboardService.beginPageTransition).toHaveBeenCalledTimes(1);
             expect(mockDashboardService.endPageTransition).toHaveBeenCalledTimes(1);
+            // A missed restore now leaves the dashboard invisible and deaf to taps, not just displaced.
+            expect(slide.style.opacity).toBe('');
+            expect(slide.style.transform).toBe('');
+            expect(slide.style.pointerEvents).toBe('');
         });
 
         it('mirrors the slide direction for a previous navigation', async () => {
@@ -528,6 +542,82 @@ describe('DashboardComponent', () => {
             await api.runPageChange();
 
             expect(order).toEqual(['animate:0@1->15@0', 'load:0', 'animate:-15@0->0@1']);
+        });
+
+        it('animates transform and opacity together, and persists the end pose before dropping the fill', async () => {
+            // jsdom has no Element.animate, so every other test in this block stubs animatePhase and
+            // its body never runs. Dropping the opacity keyframes, or persisting the end pose after
+            // the cancel instead of before it, would leave the wrapper opaque while the grid swaps —
+            // the half-loaded flash this transition exists to prevent — with the rest of the suite green.
+            const api = component as unknown as RunPageChangeApi;
+            let opacityAtCancel: string | undefined;
+            let keyframes: Keyframe[] | undefined;
+            let options: KeyframeAnimationOptions | undefined;
+            const el = { style: {} as CSSStyleDeclaration } as HTMLElement;
+            (el as unknown as { animate: Mock }).animate = vi.fn((kf: Keyframe[], opt: KeyframeAnimationOptions) => {
+                keyframes = kf;
+                options = opt;
+                return {
+                    finished: Promise.resolve(),
+                    cancel: () => { opacityAtCancel = el.style.opacity; }
+                };
+            }) as unknown as Mock;
+
+            await api.animatePhase(el, { pct: 0, opacity: 1 }, { pct: -15, opacity: 0 }, 'ease-in');
+
+            expect(keyframes).toEqual([
+                { transform: 'translateX(0%)', opacity: 1 },
+                { transform: 'translateX(-15%)', opacity: 0 }
+            ]);
+            expect(options).toMatchObject({ easing: 'ease-in', fill: 'forwards' });
+            expect(options?.duration).toBeGreaterThan(0);
+            expect(opacityAtCancel).toBe('0');
+            expect(el.style.transform).toBe('translateX(-15%)');
+        });
+
+        it('restores the wrapper when the component is destroyed mid-transition', async () => {
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api, order, slide } = instrument();
+            const exit = deferred();
+            (api.animatePhase as unknown as Mock).mockImplementationOnce(() => exit.promise);
+
+            // ngOnDestroy is stubbed for the rest of the suite; this test needs the real teardown.
+            (vi.mocked(component.ngOnDestroy) as unknown as { mockRestore: () => void }).mockRestore();
+
+            const run = api.runPageChange();
+            component.ngOnDestroy();
+            exit.resolve();
+            await run;
+
+            // The teardown guard must not skip the restore: a slide abandoned at opacity 0 leaves a
+            // blank dashboard behind, and loadDashboard re-queues itself forever against a dead grid.
+            expect(order).not.toContain('load:0');
+            expect(slide.style.opacity).toBe('');
+            expect(slide.style.pointerEvents).toBe('');
+            // Once from the teardown, once from the finally — the flag must not be left set either way.
+            expect(mockDashboardService.endPageTransition).toHaveBeenCalledTimes(2);
+        });
+
+        it('reads the reduced-motion preference from the real media query', async () => {
+            // The other reduced-motion test stubs the predicate, so the query string itself is never
+            // evaluated; a typo there would animate for users who asked not to be.
+            (mockDashboardService.consumePendingPageDirection as Mock).mockReturnValue('next');
+            const { api, order } = instrument();
+            // src/test.ts defines matchMedia without a setter, so it is replaced through its
+            // descriptor. Restored immediately: this spec has no afterEach, and a leak would send
+            // every later test down the reduced-motion path.
+            const spy = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+                matches: query === '(prefers-reduced-motion: reduce)'
+            }) as unknown as MediaQueryList);
+
+            try {
+                await api.runPageChange();
+            } finally {
+                spy.mockRestore();
+            }
+
+            expect(order).toEqual(['load:0']);
+            expect(api.animatePhase).not.toHaveBeenCalled();
         });
 
         it('swaps instantly without animating when no travel direction is pending', async () => {
