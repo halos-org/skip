@@ -16,10 +16,14 @@ describe('StorageService', () => {
 
   beforeEach(() => {
     ensureLocalStorage();
-    // Provide StorageService in the module so its deps resolve to the global test stubs
-    // (AuthenticationService / SignalKConnectionService) instead of the real root services.
-    TestBed.configureTestingModule({ providers: [StorageService] });
+    // Provide StorageService in the module so its deps resolve to the local stubs instead of the
+    // real root services. The auth stub reports a write-capable session: these cases are about the
+    // write-safety guards, not about who is signed in.
+    TestBed.configureTestingModule({
+      providers: [StorageService, { provide: AuthenticationService, useValue: new AuthStub() }]
+    });
     service = TestBed.inject(StorageService);
+    (TestBed.inject(AuthenticationService) as unknown as AuthStub).isLoggedIn$.next(true);
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -274,6 +278,9 @@ interface StoragePrivate { serverEndpoint: string }
 
 class AuthStub {
   isLoggedIn$ = new BehaviorSubject<boolean>(false);
+  // Mirrors the real service closely enough for storage's purposes: only a signed-in session with a
+  // write-capable userLevel may persist. Specs override it to model a signed-in read-only user.
+  canWriteUserData = vi.fn(() => this.isLoggedIn$.getValue());
 }
 class ConnStub {
   serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({ state: EndpointStatus.Disconnected } as IEndpointStatus);
@@ -327,6 +334,63 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   });
   it('reports isAppDataSupported for a clearly newer server', () => {
     expect(setup({ version: '2.5.0' }).service.isAppDataSupported).toBe(true);
+  });
+
+  // An anonymous readonly principal may READ applicationData (SK admin-gates only the write verbs),
+  // so readiness gates on the connection, not on a session; writes get their own guard (#551, #552).
+  describe('session-less access', () => {
+    it('is ready without a session, so an anonymous visitor can read a config', async () => {
+      const { service } = setup({ loggedIn: false });
+
+      expect(service.storageServiceReady$.getValue()).toBe(true);
+
+      const read = service.getConfig('global', 'default');
+      http.expectOne(`${ENDPOINT}global/skip/11/default`).flush(blankConfig());
+      await expect(read).resolves.toBeTruthy();
+    });
+
+    it('drops a routine patch instead of firing a write that can only 401', () => {
+      const { service } = setup({ loggedIn: false });
+      const failures: IPatchFailure[] = [];
+      service.patchFailure$.subscribe(f => failures.push(f));
+
+      service.patchConfig('Dashboards', [{ id: 'd1' }]);
+
+      http.expectNone(() => true);
+      expect(failures).toEqual([]);
+    });
+
+    it('rejects an explicit full-file write rather than pretending it landed', async () => {
+      const { service } = setup({ loggedIn: false });
+
+      await expect(service.setConfig('user', 'cockpit', blankConfig())).rejects.toThrow(/read-only/i);
+      http.expectNone(() => true);
+    });
+
+    // removeItem refuses synchronously, like its sibling slot-name guard.
+    it('rejects a delete for the same reason', () => {
+      const { service } = setup({ loggedIn: false });
+
+      expect(() => service.removeItem('user', 'cockpit')).toThrow(/read-only/i);
+      http.expectNone(() => true);
+    });
+
+    it('drops a routine patch for a signed-in user the server marks read-only', () => {
+      const { service, auth } = setup({ loggedIn: true });
+      auth.canWriteUserData.mockReturnValue(false);
+
+      service.patchConfig('Dashboards', [{ id: 'd1' }]);
+
+      http.expectNone(() => true);
+    });
+
+    it('still writes for a signed-in user with write access', () => {
+      const { service } = setup({ loggedIn: true });
+
+      service.patchConfig('Dashboards', [{ id: 'd1' }]);
+
+      http.expectOne((r) => r.method === 'POST').flush(null);
+    });
   });
 
   it('listConfigs GETs the global then the user scoped keys URLs', async () => {
@@ -412,7 +476,7 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   });
 
   it('refuses reads and writes when the storage service is not ready', async () => {
-    const { service } = setup();
+    const { service } = setup({ loggedIn: true });
     service.storageServiceReady$.next(false);
     await expect(service.getConfig('user', 'default')).rejects.toThrow(/not ready/i);
     expect(() => service.patchConfig('IAppConfig', {})).toThrow(/not ready/i);

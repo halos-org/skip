@@ -68,9 +68,15 @@ export class AuthenticationService {
    * read-only session does not present controls that silently fail server-side.
    */
   public canWriteUserData$ = this._loginStatus$.pipe(
-    map(status => status?.status === 'loggedIn' && this.isWriteUserLevel(status.userLevel)),
+    map(() => this.canWriteUserData()),
     distinctUntilChanged()
   );
+
+  /** {@link canWriteUserData$} read synchronously, for callers that must decide at call time. */
+  public canWriteUserData(): boolean {
+    const status = this.loginStatusValue;
+    return status?.status === 'loggedIn' && this.isWriteUserLevel(status.userLevel);
+  }
 
   /**
    * Query `GET /skServer/loginStatus` with credentials so the httpOnly session cookie authenticates

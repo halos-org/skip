@@ -153,7 +153,10 @@ export class StorageService {
       this.serverEndpoint = this._networkStatus.httpServiceUrl.substring(0, this._networkStatus.httpServiceUrl.length - 4) + "applicationData/"; // this removes 'api/' from the end;
     }
 
-    if (this._networkStatus?.state === EndpointStatus.Connected && this._isLoggedIn && this.serverEndpoint) {
+    // Readiness is about reachability, not identity: Signal K admin-gates only the write verbs on
+    // applicationData, so a session-less visitor on a server with allow_readonly can read it. Writes
+    // are refused separately in assertWritable().
+    if (this._networkStatus?.state === EndpointStatus.Connected && this.serverEndpoint) {
       this.storageServiceReady$.next(true);
       console.log(`[Remote Storage Service] Authenticated ${this._isLoggedIn}, AppData API: ${this.serverEndpoint}`);
     } else {
@@ -209,6 +212,25 @@ export class StorageService {
   private ensureReady(): void {
     if (!this.storageServiceReady$.getValue()) {
       throw new Error('[StorageService] Not ready: storageServiceReady is false');
+    }
+  }
+
+  /**
+   * Whether this session may persist configuration: a signed-in identity whose server-side userLevel
+   * can write. An anonymous read-only visitor and a signed-in `readonly` user both fail it.
+   */
+  public canPersist(): boolean {
+    return this._auth.canWriteUserData();
+  }
+
+  /**
+   * Boundary guard for the write verbs. A session that cannot write must not reach the server at
+   * all: the request could only come back 401, and the failure would surface as a save-lost report
+   * for a save the user was never offered.
+   */
+  private assertWritable(op: string): void {
+    if (!this.canPersist()) {
+      throw new Error(`[StorageService] Refusing ${op}: read-only session cannot write configuration.`);
     }
   }
 
@@ -367,6 +389,7 @@ export class StorageService {
    */
   public async setConfig(scope: string, configName: string, config: IConfig, forceConfigFileVersion?: number | string): Promise<null> {
     this.ensureReady();
+    this.assertWritable('setConfig');
     this.assertSlotName(configName, 'setConfig');
 
     const base = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/";
@@ -403,6 +426,11 @@ export class StorageService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public patchConfig(ObjType: TConfigObjectType, value: any, forceConfigFileVersion?: number) {
     this.ensureReady();
+    if (!this.canPersist()) {
+      // Routine autosave in a session that cannot write. Drop it silently: patchFailure$ exists to
+      // tell a user their save was lost, and a read-only visitor was never offered one.
+      return;
+    }
     if (!this.sharedConfigName) {
       const error = new Error('[StorageService] Refusing patchConfig: active config slot name is unset.');
       console.error(error.message);
@@ -493,6 +521,7 @@ export class StorageService {
    */
   public removeItem(scope: string, name: string, forceConfigFileVersion?: number): Promise<void> {
     this.ensureReady();
+    this.assertWritable('removeItem');
     this.assertSlotName(name, 'removeItem');
     let url = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/" + this.configFileVersion;
     if (forceConfigFileVersion) {
