@@ -763,10 +763,14 @@ describe('DefaultDashboard seed constant', () => {
     widgets.forEach(w => expect(w.id).toBe(w.input!.widgetProperties.uuid));
   });
 
-  it('pins no vessel-specific $source — every source resolves to the server default', () => {
-    // The seed is extracted from a live boat; a stray non-'default' source or a
-    // pinned trackedDevices entry would bind to one vessel's hardware and blank
-    // the widget on every other install (and leak a device id into the package).
+  it('pins nothing to the vessel it was exported from', () => {
+    // The seed is extracted from a live boat. Anything naming that boat's hardware
+    // binds to it and blanks (or worse, misreports) on every other install, and it
+    // leaks a device id into the published package. Each key below has shipped a
+    // leak at least once: a non-'default' source, a pinned trackedDevices entry,
+    // per-device optionsById calibration, and an autopilot instanceId — the last
+    // being the one that makes the widget build v2 endpoints that 404 elsewhere
+    // instead of taking its explicit not-configured branch.
     const offenders: string[] = [];
     const scan = (node: unknown, path: string): void => {
       if (Array.isArray(node)) {
@@ -777,13 +781,27 @@ describe('DefaultDashboard seed constant', () => {
             offenders.push(`${path}/${k}=${v}`);
           } else if (k === 'trackedDevices' && Array.isArray(v) && v.length > 0) {
             offenders.push(`${path}/${k} pins ${v.length} device(s)`);
+          } else if (k === 'optionsById' && v && typeof v === 'object' && Object.keys(v).length > 0) {
+            offenders.push(`${path}/${k} calibrates ${Object.keys(v).join(', ')}`);
+          } else if (k === 'instanceId' && v !== null && v !== undefined && v !== '') {
+            offenders.push(`${path}/${k}=${String(v)}`);
           } else {
             scan(v, `${path}/${k}`);
           }
         }
       }
     };
-    DefaultDashboard.forEach((d, i) => scan(d.configuration, `page${i}`));
+    // Scan the whole page, not just its widgets — a page-level auto-switch trigger
+    // is vessel state too, and it sits outside `configuration`.
+    DefaultDashboard.forEach((d, i) => scan(d, `page${i}`));
     expect(offenders).toEqual([]);
+  });
+
+  it('ships no page auto-switch trigger', () => {
+    // A seeded trigger opts every new profile into PageSwitchService moving the view
+    // on its own: a moored boat would boot straight past page one, and the view would
+    // jump on each nav/engine state change. Auto-switching stays something a user
+    // turns on per page.
+    expect(DefaultDashboard.filter(d => d.trigger != null)).toEqual([]);
   });
 });
