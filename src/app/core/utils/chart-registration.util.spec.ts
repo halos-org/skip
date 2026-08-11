@@ -1,51 +1,37 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Chart.js cannot instantiate under jsdom; the behaviour under test is the module-level
-// register-once guard and the exact minimal component union it registers. The suite shares module
-// state, so other chart specs may have already imported (and tripped) the util — reset the module
-// registry inside the test and re-import fresh so the guard starts clean regardless of run order.
-// Each mocked component is a distinct sentinel string so the assertion can name the exact set.
-vi.mock('chart.js', () => ({
-  // defaults.elements.line: registerChartComponents() writes the round join default onto it.
-  Chart: { register: vi.fn(), defaults: { elements: { line: {} } } },
-  LineController: 'LineController',
-  LineElement: 'LineElement',
-  PointElement: 'PointElement',
-  LinearScale: 'LinearScale',
-  TimeScale: 'TimeScale',
-  Filler: 'Filler',
-  Legend: 'Legend',
-  Tooltip: 'Tooltip',
-  Title: 'Title',
-  SubTitle: 'SubTitle'
-}));
-vi.mock('chartjs-plugin-annotation', () => ({ default: 'annotationPlugin' }));
-vi.mock('@aziham/chartjs-plugin-streaming', () => ({ default: 'ChartStreaming' }));
-
+// chart.js and its plugins are aliased to test shims (vitest.config.ts), so the util under test
+// registers the shims' tokens rather than the real building blocks. The behaviour under test is the
+// module-level register-once guard and the exact minimal union it registers. Module state is shared
+// across the suite, so another chart spec may already have imported (and tripped) the util — the
+// registry is reset inside each test and everything re-imported fresh, which also keeps the token
+// identities consistent with the freshly-loaded util.
 describe('registerChartComponents', () => {
   it('registers the minimal line/time chart component union exactly once', async () => {
     vi.resetModules();
-    const { Chart } = await import('chart.js');
+    const chart = await import('chart.js');
+    const annotationPlugin = (await import('chartjs-plugin-annotation')).default;
+    const chartStreaming = (await import('@aziham/chartjs-plugin-streaming')).default;
+    const register = vi.spyOn(chart.Chart, 'register');
     const { registerChartComponents } = await import('./chart-registration.util');
 
     registerChartComponents();
     registerChartComponents();
 
-    const register = vi.mocked(Chart.register);
     expect(register).toHaveBeenCalledTimes(1);
     expect(register).toHaveBeenCalledWith(
-      'LineController',
-      'LineElement',
-      'PointElement',
-      'LinearScale',
-      'TimeScale',
-      'Filler',
-      'Legend',
-      'Tooltip',
-      'Title',
-      'SubTitle',
-      'annotationPlugin',
-      'ChartStreaming'
+      chart.LineController,
+      chart.LineElement,
+      chart.PointElement,
+      chart.LinearScale,
+      chart.TimeScale,
+      chart.Filler,
+      chart.Legend,
+      chart.Tooltip,
+      chart.Title,
+      chart.SubTitle,
+      annotationPlugin,
+      chartStreaming
     );
   });
 
