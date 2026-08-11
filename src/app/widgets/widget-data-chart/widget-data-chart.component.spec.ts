@@ -29,6 +29,7 @@ vi.mock('chartjs-plugin-annotation', () => ({ default: {} }));
 vi.mock('chartjs-adapter-date-fns', () => ({}));
 vi.mock('@aziham/chartjs-plugin-streaming', () => ({ default: {} }));
 
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EMPTY, Subject } from 'rxjs';
 import { WidgetDataChartComponent } from './widget-data-chart.component';
@@ -53,13 +54,17 @@ const makeConfig = (overrides: Partial<IWidgetSvcConfig> = {}): IWidgetSvcConfig
 describe('WidgetDataChartComponent', () => {
   let fixture: ComponentFixture<WidgetDataChartComponent>;
 
-  const runtimeMock = { options: vi.fn() };
+  // A real signal, not a vi.fn: the component tracks runtime.options() inside computed/effect, so a
+  // config edit only reaches the rebuild path when the source is reactive — which is what the live
+  // WidgetRuntimeDirective provides.
+  const options = signal<IWidgetSvcConfig | undefined>(undefined);
+  const runtimeMock = { options };
   const historyMock = { getBackfillThenLive: vi.fn() };
   const unitsMock = { convertToUnit: (_unit: string, value: number) => value, getUnitDisplaySymbol: (measure: string) => measure, resolvePathMeasure: () => 'knots' };
   const canvasMock = { releaseCanvas: vi.fn() };
 
   const setup = async (config: IWidgetSvcConfig): Promise<void> => {
-    runtimeMock.options.mockReturnValue(config);
+    options.set(config);
 
     await TestBed.configureTestingModule({
       imports: [WidgetDataChartComponent],
@@ -83,7 +88,7 @@ describe('WidgetDataChartComponent', () => {
   beforeEach(() => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockReturnValue({} as unknown as CanvasRenderingContext2D);
-    runtimeMock.options.mockReset();
+    options.set(undefined);
     historyMock.getBackfillThenLive.mockReset().mockReturnValue(EMPTY);
   });
 
@@ -192,6 +197,7 @@ describe('WidgetDataChartComponent', () => {
     }).subtitle;
 
   interface AxisState {
+    type?: string;
     ticks?: { mirror?: boolean; padding?: number; textStrokeColor?: string; textStrokeWidth?: number; color?: string };
     grid?: { display?: boolean; drawTicks?: boolean };
     title?: { display?: boolean };
@@ -243,6 +249,29 @@ describe('WidgetDataChartComponent', () => {
       expect(axis?.grid?.display).toBe(true);
       expect(axis?.grid?.drawTicks).toBe(false);
     }
+  });
+
+  it('rebuilds the chart when the orientation is toggled', async () => {
+    const emissions$ = new Subject<IDatasetServiceDatapoint>();
+    historyMock.getBackfillThenLive.mockReturnValue(emissions$);
+
+    await setup(makeConfig({ verticalChart: false, showTimeScale: true, showYScale: true }));
+    emissions$.next({ timestamp: 1000, data: { value: 5 } });
+
+    expect(readAxis('x')?.type).toBe('realtime');
+    expect(fixture.componentInstance.lineChartData.datasets[0].data.length).toBeGreaterThan(0);
+    const streamsBefore = historyMock.getBackfillThenLive.mock.calls.length;
+
+    options.set(makeConfig({ verticalChart: true, showTimeScale: true, showYScale: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Swapping the orientation swaps which axis carries time. transformDatasetRows only transposes
+    // rows as they arrive, so anything already buffered plots as garbage — up to a 365-day window —
+    // unless the toggle goes through the full rebuild rather than an in-place options update.
+    expect(readAxis('y')?.type).toBe('realtime');
+    expect(fixture.componentInstance.lineChartData.datasets[0].data.length).toBe(0);
+    expect(historyMock.getBackfillThenLive.mock.calls.length).toBeGreaterThan(streamsBefore);
   });
 
   it('keeps the per-axis tick colour when the shared inside-tick options are applied', async () => {
