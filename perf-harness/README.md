@@ -107,7 +107,21 @@ the machine step boot-asserts only the tile count; **symbol correctness is a hum
 eyeball of the screenshot** (each tile is labelled by its measure key). The symbol
 resolution itself is unit-tested in `units.service.spec.ts`.
 
-Both invoke as `CHROME_BIN=/usr/bin/chromium node <probe> --public ../public` after a
+`shot-default-seed.mjs` boots an empty-dashboards profile so `DashboardService`
+seeds the bundled `DefaultDashboard` exactly as on a fresh install, then shoots every
+seeded page plus the New-profile dialog to `results/shots/<label>-*.png`. Run it after
+any re-export of `src/default-config/config.blank.dashboard.ts`. It streams a realistic
+SI value for every path the seed subscribes to — a dataless run cannot show a display
+scale calibrated for one boat or a slot left on the wrong unit, which is the class of
+defect a re-export actually ships. Page and expected widget counts are read from the
+seed source, and a mismatch exits non-zero. `--dashboards <file.json>` serves a given
+dashboards array instead of the bundled seed, which is how the previous seed gets
+rendered by the current bundle for an A/B. `--settle <ms>` (default 5000) is the per-page
+wait before the shot; dense pages need it. Data-chart widgets label their axis `unitless`
+here because they resolve the measure from server path metadata that the mock does not
+publish — that is the harness, not the seed.
+
+All invoke as `CHROME_BIN=/usr/bin/chromium node <probe> --public ../public` after a
 `../public` build.
 
 ## Interpreting the numbers
