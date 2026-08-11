@@ -48,6 +48,15 @@ interface IDataSetRow { x: number | null, y: number | null }
 // below a pixel from the vertices, so the rendered line is indistinguishable from straight segments.
 const NON_FAST_PATH_TENSION = 1e-6;
 
+// Compact plot-window suffix for the widget label ("SOG (30 s)"). The legacy TimeScaleFormat members
+// have no abbreviation, so a config still carrying one gets the bare label.
+const TIME_SCALE_SUFFIX: Partial<Record<TimeScaleFormat, string>> = {
+  day: 'd',
+  hour: 'h',
+  minute: 'min',
+  second: 's'
+};
+
 @Component({
   selector: 'widget-data-chart',
   templateUrl: './widget-data-chart.component.html',
@@ -110,7 +119,6 @@ export class WidgetDataChartComponent implements OnDestroy {
   private streamSub: Subscription | null = null;
   private datasetConfig: IDatasetServiceDatasetConfig | null = null;
   private dataSourceInfo: IDatasetServiceDataSourceInfo | null = null;
-  private lastVerticalChart: boolean | null | undefined = null;
   // Latest finite annotation values; NaN until real data arrives, which keeps the
   // min/max/average lines and their labels hidden instead of drawing at a placeholder 0.
   private lastAverageValue = NaN;
@@ -142,7 +150,11 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (!cfg?.datachartPath) {
       return undefined;
     }
-    return [cfg.datachartPath, this.pathMeasure(), cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
+    // verticalChart belongs here rather than in the display effect: swapping the orientation swaps
+    // which axis carries time, so every buffered point is transposed and the realtime scale changes
+    // type. Only a full rebuild re-maps the data and destroys the outgoing scale — an in-place
+    // options update leaves the old scale's refresh interval running against the live chart.
+    return [cfg.datachartPath, this.pathMeasure(), cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange, cfg.verticalChart].join('|');
   });
   private previousPathSignature: string | undefined = undefined;
 
@@ -169,21 +181,16 @@ export class WidgetDataChartComponent implements OnDestroy {
       const theme = this.theme();
       if (!cfg || !theme) return;
       untracked(() => {
-        const verticalChanged = this.lastVerticalChart !== null && this.lastVerticalChart !== cfg.verticalChart;
-        if (verticalChanged) {
-          this.lastVerticalChart = cfg.verticalChart;
-          this.rebuildForDataset(cfg);
-        } else if (this.chart) {
-          // Styling / axis / annotation toggles / showAverageData. setChartOptions rebuilds the
-          // annotation plugin wholesale, so annotation visibility is re-applied after it — otherwise
-          // an already-enabled avg/min/max line is reset to hidden until the next stream emission.
-          this.ensureAverageDatasetPresence();
-          this.applyDynamicTrackAverageStyling();
-          this.setChartOptions(cfg);
-          this.updateAnnotationVisibility();
-          this.setDatasetsColors();
-          this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
-        }
+        if (!this.chart) return;
+        // Styling / axis / annotation toggles / showAverageData. setChartOptions rebuilds the
+        // annotation plugin wholesale, so annotation visibility is re-applied after it — otherwise
+        // an already-enabled avg/min/max line is reset to hidden until the next stream emission.
+        this.ensureAverageDatasetPresence();
+        this.applyDynamicTrackAverageStyling();
+        this.setChartOptions(cfg);
+        this.updateAnnotationVisibility();
+        this.setDatasetsColors();
+        this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
       });
     });
 
@@ -250,20 +257,32 @@ export class WidgetDataChartComponent implements OnDestroy {
     this.lineChartOptions.animation = false;
     this.lineChartOptions.indexAxis = cfg.verticalChart ? 'y' : 'x';
 
+    // Ticks drawn inside the plot area: an enabled axis then costs the plot the padding alone
+    // instead of a label gutter. Chart.js draws tick labels above the grid but below the datasets,
+    // so the card-coloured outline — the Numeric widget's halo — keeps a label legible over the
+    // grid lines behind it while the value line still crosses in front.
+    const insideTicks = {
+      mirror: true,
+      padding: 4,
+      textStrokeColor: theme.cardColor,
+      textStrokeWidth: 3
+    };
+    const insideGrid = { display: true, drawTicks: false, color: theme.contrastDimmer };
+    // The plot window rides on the widget label instead of a time-axis title, which would cost the
+    // plot a whole row to say what the label can say in four characters. The axis title rendered
+    // independently of the label toggle, so the subtitle carries the window on its own when the
+    // label is off rather than taking it down with the name.
+    const suffix = TIME_SCALE_SUFFIX[datasetConfig.timeScaleFormat];
+    const windowSuffix = suffix ? ` (${datasetConfig.period} ${suffix})` : '';
+
     if (cfg.verticalChart) {
       this.lineChartOptions.scales = {
         y: {
           type: "realtime",
           display: cfg.showTimeScale,
-          position: cfg.verticalChart ? "right" : "left",
+          position: "right",
           suggestedMin: "",
           suggestedMax: "",
-          title: {
-            display: true,
-            text: `Last ${datasetConfig.period} ${datasetConfig.timeScaleFormat}`,
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           time: {
             unit: datasetConfig.timeScaleFormat as TimeUnit,
             minUnit: "second",
@@ -278,34 +297,27 @@ export class WidgetDataChartComponent implements OnDestroy {
             },
           },
           ticks: {
+            ...insideTicks,
             autoSkip: true,
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true
             }
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer
-          }
+          grid: { ...insideGrid }
         },
         x: {
           type: "linear",
           display: cfg.showYScale,
-          position: cfg.verticalChart ? "top" : "bottom",
+          position: "top",
           suggestedMin: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMin,
           suggestedMax: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMax,
           min: cfg.enableMinMaxScaleLimit ? cfg.yScaleMin : undefined,
           max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : undefined,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
-          title: {
-            display: false,
-            text: "Value Axis",
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           ticks: {
+            ...insideTicks,
             maxTicksLimit: 8,
             precision: cfg.numDecimal,
             color: this.getThemeColors().averageChartLine,
@@ -313,10 +325,7 @@ export class WidgetDataChartComponent implements OnDestroy {
               enabled: true,
             }
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer,
-          }
+          grid: { ...insideGrid }
         }
       }
     } else {
@@ -324,12 +333,6 @@ export class WidgetDataChartComponent implements OnDestroy {
         x: {
           type: "realtime",
           display: cfg.showTimeScale,
-          title: {
-            display: true,
-            text: `Last ${datasetConfig.period} ${datasetConfig.timeScaleFormat}`,
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           time: {
             unit: datasetConfig.timeScaleFormat as TimeUnit,
             minUnit: "second",
@@ -344,16 +347,14 @@ export class WidgetDataChartComponent implements OnDestroy {
             },
           },
           ticks: {
+            ...insideTicks,
             autoSkip: true,
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true
             }
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer
-          }
+          grid: { ...insideGrid }
         },
         y: {
           display: cfg.showYScale,
@@ -364,13 +365,8 @@ export class WidgetDataChartComponent implements OnDestroy {
           max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : undefined,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
-          title: {
-            display: false,
-            text: "Value Axis",
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           ticks: {
+            ...insideTicks,
             maxTicksLimit: 8,
             precision: cfg.numDecimal,
             color: this.getThemeColors().averageChartLine,
@@ -378,10 +374,7 @@ export class WidgetDataChartComponent implements OnDestroy {
               enabled: true,
             }
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer,
-          }
+          grid: { ...insideGrid }
         }
       }
     }
@@ -401,13 +394,13 @@ export class WidgetDataChartComponent implements OnDestroy {
         color: this.getThemeColors().chartValue
       },
       subtitle: {
-        display: cfg.showLabel,
+        display: cfg.showLabel || !!windowSuffix,
         align: "start",
         padding: {
           top: -35,
           bottom: 20
         },
-        text: `  ${cfg.displayName}`,
+        text: `  ${cfg.showLabel ? `${cfg.displayName}${windowSuffix}` : windowSuffix.trimStart()}`,
         font: {
           size: 22,
         },
