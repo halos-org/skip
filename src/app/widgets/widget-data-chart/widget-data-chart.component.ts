@@ -48,6 +48,15 @@ interface IDataSetRow { x: number | null, y: number | null }
 // below a pixel from the vertices, so the rendered line is indistinguishable from straight segments.
 const NON_FAST_PATH_TENSION = 1e-6;
 
+// Compact plot-window suffix for the widget label ("SOG (30 s)"). The legacy TimeScaleFormat members
+// have no abbreviation, so a config still carrying one gets the bare label.
+const TIME_SCALE_SUFFIX: Partial<Record<TimeScaleFormat, string>> = {
+  day: 'd',
+  hour: 'h',
+  minute: 'min',
+  second: 's'
+};
+
 @Component({
   selector: 'widget-data-chart',
   templateUrl: './widget-data-chart.component.html',
@@ -250,6 +259,22 @@ export class WidgetDataChartComponent implements OnDestroy {
     this.lineChartOptions.animation = false;
     this.lineChartOptions.indexAxis = cfg.verticalChart ? 'y' : 'x';
 
+    // Ticks drawn inside the plot area: an enabled axis then costs the plot the padding alone
+    // instead of a label gutter. Chart.js draws tick labels above the grid but below the datasets,
+    // so the card-coloured outline — the Numeric widget's halo — keeps a label legible over the
+    // grid lines behind it while the value line still crosses in front.
+    const insideTicks = {
+      mirror: true,
+      padding: 4,
+      textStrokeColor: theme.cardColor,
+      textStrokeWidth: 3
+    };
+    const insideGrid = { display: true, drawTicks: false, color: theme.contrastDimmer };
+    // The plot window rides on the widget label instead of a time-axis title, which would cost the
+    // plot a whole row to say what the label can say in four characters.
+    const suffix = TIME_SCALE_SUFFIX[datasetConfig.timeScaleFormat];
+    const windowSuffix = suffix ? ` (${datasetConfig.period} ${suffix})` : '';
+
     if (cfg.verticalChart) {
       this.lineChartOptions.scales = {
         y: {
@@ -258,12 +283,6 @@ export class WidgetDataChartComponent implements OnDestroy {
           position: cfg.verticalChart ? "right" : "left",
           suggestedMin: "",
           suggestedMax: "",
-          title: {
-            display: true,
-            text: `Last ${datasetConfig.period} ${datasetConfig.timeScaleFormat}`,
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           time: {
             unit: datasetConfig.timeScaleFormat as TimeUnit,
             minUnit: "second",
@@ -282,12 +301,10 @@ export class WidgetDataChartComponent implements OnDestroy {
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true
-            }
+            },
+            ...insideTicks
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer
-          }
+          grid: insideGrid
         },
         x: {
           type: "linear",
@@ -311,12 +328,10 @@ export class WidgetDataChartComponent implements OnDestroy {
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true,
-            }
+            },
+            ...insideTicks
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer,
-          }
+          grid: insideGrid
         }
       }
     } else {
@@ -324,12 +339,6 @@ export class WidgetDataChartComponent implements OnDestroy {
         x: {
           type: "realtime",
           display: cfg.showTimeScale,
-          title: {
-            display: true,
-            text: `Last ${datasetConfig.period} ${datasetConfig.timeScaleFormat}`,
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           time: {
             unit: datasetConfig.timeScaleFormat as TimeUnit,
             minUnit: "second",
@@ -348,12 +357,10 @@ export class WidgetDataChartComponent implements OnDestroy {
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true
-            }
+            },
+            ...insideTicks
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer
-          }
+          grid: insideGrid
         },
         y: {
           display: cfg.showYScale,
@@ -376,12 +383,10 @@ export class WidgetDataChartComponent implements OnDestroy {
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true,
-            }
+            },
+            ...insideTicks
           },
-          grid: {
-            display: true,
-            color: theme.contrastDimmer,
-          }
+          grid: insideGrid
         }
       }
     }
@@ -407,7 +412,7 @@ export class WidgetDataChartComponent implements OnDestroy {
           top: -35,
           bottom: 20
         },
-        text: `  ${cfg.displayName}`,
+        text: `  ${cfg.displayName}${windowSuffix}`,
         font: {
           size: 22,
         },
