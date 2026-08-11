@@ -271,7 +271,9 @@ export class WidgetDataChartComponent implements OnDestroy {
     };
     const insideGrid = { display: true, drawTicks: false, color: theme.contrastDimmer };
     // The plot window rides on the widget label instead of a time-axis title, which would cost the
-    // plot a whole row to say what the label can say in four characters.
+    // plot a whole row to say what the label can say in four characters. The axis title rendered
+    // independently of the label toggle, so the subtitle carries the window on its own when the
+    // label is off rather than taking it down with the name.
     const suffix = TIME_SCALE_SUFFIX[datasetConfig.timeScaleFormat];
     const windowSuffix = suffix ? ` (${datasetConfig.period} ${suffix})` : '';
 
@@ -280,7 +282,7 @@ export class WidgetDataChartComponent implements OnDestroy {
         y: {
           type: "realtime",
           display: cfg.showTimeScale,
-          position: cfg.verticalChart ? "right" : "left",
+          position: "right",
           suggestedMin: "",
           suggestedMax: "",
           time: {
@@ -297,41 +299,35 @@ export class WidgetDataChartComponent implements OnDestroy {
             },
           },
           ticks: {
+            ...insideTicks,
             autoSkip: true,
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true
-            },
-            ...insideTicks
+            }
           },
-          grid: insideGrid
+          grid: { ...insideGrid }
         },
         x: {
           type: "linear",
           display: cfg.showYScale,
-          position: cfg.verticalChart ? "top" : "bottom",
+          position: "top",
           suggestedMin: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMin,
           suggestedMax: cfg.enableMinMaxScaleLimit ? undefined : cfg.yScaleSuggestedMax,
           min: cfg.enableMinMaxScaleLimit ? cfg.yScaleMin : undefined,
           max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : undefined,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
-          title: {
-            display: false,
-            text: "Value Axis",
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           ticks: {
+            ...insideTicks,
             maxTicksLimit: 8,
             precision: cfg.numDecimal,
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true,
-            },
-            ...insideTicks
+            }
           },
-          grid: insideGrid
+          grid: { ...insideGrid }
         }
       }
     } else {
@@ -353,14 +349,14 @@ export class WidgetDataChartComponent implements OnDestroy {
             },
           },
           ticks: {
+            ...insideTicks,
             autoSkip: true,
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true
-            },
-            ...insideTicks
+            }
           },
-          grid: insideGrid
+          grid: { ...insideGrid }
         },
         y: {
           display: cfg.showYScale,
@@ -371,22 +367,16 @@ export class WidgetDataChartComponent implements OnDestroy {
           max: cfg.enableMinMaxScaleLimit ? cfg.yScaleMax : undefined,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
-          title: {
-            display: false,
-            text: "Value Axis",
-            align: "center",
-            color: this.getThemeColors().averageChartLine
-          },
           ticks: {
+            ...insideTicks,
             maxTicksLimit: 8,
             precision: cfg.numDecimal,
             color: this.getThemeColors().averageChartLine,
             major: {
               enabled: true,
-            },
-            ...insideTicks
+            }
           },
-          grid: insideGrid
+          grid: { ...insideGrid }
         }
       }
     }
@@ -406,13 +396,13 @@ export class WidgetDataChartComponent implements OnDestroy {
         color: this.getThemeColors().chartValue
       },
       subtitle: {
-        display: cfg.showLabel,
+        display: cfg.showLabel || !!windowSuffix,
         align: "start",
         padding: {
           top: -35,
           bottom: 20
         },
-        text: `  ${cfg.displayName}${windowSuffix}`,
+        text: `  ${cfg.showLabel ? `${cfg.displayName}${windowSuffix}` : windowSuffix.trimStart()}`,
         font: {
           size: 22,
         },
