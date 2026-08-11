@@ -21,6 +21,7 @@ export interface DialogComponentData {
 export interface DialogNameData {
   title: string;
   name: string;
+  description?: string;
   confirmBtnText?: string;
   cancelBtnText: string;
 }

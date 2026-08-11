@@ -132,6 +132,20 @@ describe('SettingsConfigComponent', () => {
     expect(profileMock.createProfile).toHaveBeenCalledWith('cockpit');
   });
 
+  // New seeds from the configuration shipped with the running version; saying so is the
+  // whole point of the description, and nothing else pins that the dialog gets one.
+  it('tells the user a new profile starts from the shipped pages', () => {
+    component['createProfile']();
+    const [data] = dialogMock.openNameDialog.mock.calls.at(-1) as [{ description?: string }];
+    expect(data.description).toMatch(/shipped with this version/i);
+  });
+
+  it('offers no such description when renaming, which starts from nothing', () => {
+    component['renameProfile']('cockpit');
+    const [data] = dialogMock.openNameDialog.mock.calls.at(-1) as [{ description?: string }];
+    expect(data.description).toBeUndefined();
+  });
+
   it('deleteProfile confirms then delegates', async () => {
     await component['deleteProfile']('old');
     expect(profileMock.deleteProfile).toHaveBeenCalledWith('old');
