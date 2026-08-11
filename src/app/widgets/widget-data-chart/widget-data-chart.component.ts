@@ -119,7 +119,6 @@ export class WidgetDataChartComponent implements OnDestroy {
   private streamSub: Subscription | null = null;
   private datasetConfig: IDatasetServiceDatasetConfig | null = null;
   private dataSourceInfo: IDatasetServiceDataSourceInfo | null = null;
-  private lastVerticalChart: boolean | null | undefined = null;
   // Latest finite annotation values; NaN until real data arrives, which keeps the
   // min/max/average lines and their labels hidden instead of drawing at a placeholder 0.
   private lastAverageValue = NaN;
@@ -151,7 +150,11 @@ export class WidgetDataChartComponent implements OnDestroy {
     if (!cfg?.datachartPath) {
       return undefined;
     }
-    return [cfg.datachartPath, this.pathMeasure(), cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange].join('|');
+    // verticalChart belongs here rather than in the display effect: swapping the orientation swaps
+    // which axis carries time, so every buffered point is transposed and the realtime scale changes
+    // type. Only a full rebuild re-maps the data and destroys the outgoing scale — an in-place
+    // options update leaves the old scale's refresh interval running against the live chart.
+    return [cfg.datachartPath, this.pathMeasure(), cfg.datachartSource, cfg.timeScale, cfg.period, cfg.datachartAngleRange, cfg.verticalChart].join('|');
   });
   private previousPathSignature: string | undefined = undefined;
 
@@ -178,21 +181,16 @@ export class WidgetDataChartComponent implements OnDestroy {
       const theme = this.theme();
       if (!cfg || !theme) return;
       untracked(() => {
-        const verticalChanged = this.lastVerticalChart !== null && this.lastVerticalChart !== cfg.verticalChart;
-        if (verticalChanged) {
-          this.lastVerticalChart = cfg.verticalChart;
-          this.rebuildForDataset(cfg);
-        } else if (this.chart) {
-          // Styling / axis / annotation toggles / showAverageData. setChartOptions rebuilds the
-          // annotation plugin wholesale, so annotation visibility is re-applied after it — otherwise
-          // an already-enabled avg/min/max line is reset to hidden until the next stream emission.
-          this.ensureAverageDatasetPresence();
-          this.applyDynamicTrackAverageStyling();
-          this.setChartOptions(cfg);
-          this.updateAnnotationVisibility();
-          this.setDatasetsColors();
-          this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
-        }
+        if (!this.chart) return;
+        // Styling / axis / annotation toggles / showAverageData. setChartOptions rebuilds the
+        // annotation plugin wholesale, so annotation visibility is re-applied after it — otherwise
+        // an already-enabled avg/min/max line is reset to hidden until the next stream emission.
+        this.ensureAverageDatasetPresence();
+        this.applyDynamicTrackAverageStyling();
+        this.setChartOptions(cfg);
+        this.updateAnnotationVisibility();
+        this.setDatasetsColors();
+        this.ngZone.runOutsideAngular(() => this.chart?.update('none'));
       });
     });
 
