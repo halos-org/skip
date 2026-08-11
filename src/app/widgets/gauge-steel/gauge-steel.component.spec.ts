@@ -204,4 +204,67 @@ describe('GaugeSteelComponent', () => {
 
     expect(seeded).toEqual([]);
   });
+  // A rebuild replaces the gauge object, but the library cannot cancel a tween: the discarded
+  // instance keeps repainting the same canvas with its stale scale and wins the last frame. So a
+  // batch that both changes the value and forces a rebuild must not animate the outgoing gauge --
+  // the rebuild's seed paints the value instead. This is the ordinary boot batch, where the
+  // server-resolved measure lands together with the value it re-converted.
+  it('does not animate a gauge that a rebuild in the same batch is about to discard', () => {
+    const seeded: number[] = [];
+    const animated: number[] = [];
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = (v: number) => { seeded.push(v); };
+      this.setValueAnimated = (v: number) => { animated.push(v); };
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-batch');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 3600);
+    fixture.componentRef.setInput('value', 900);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    seeded.length = 0;
+
+    fixture.componentRef.setInput('value', 1800);
+    fixture.componentRef.setInput('maxValue', 4000);
+    internals.ngOnChanges({
+      value: new SimpleChange(900, 1800, false),
+      maxValue: new SimpleChange(3600, 4000, false),
+    });
+
+    expect(animated).toEqual([]);
+    expect(seeded).toEqual([1800]);
+  });
+
+  it('still animates a value change that stands alone', () => {
+    const animated: number[] = [];
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = (v: number) => { animated.push(v); };
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-solo');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 3600);
+    fixture.componentRef.setInput('value', 900);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+
+    fixture.componentRef.setInput('value', 1800);
+    internals.ngOnChanges({ value: new SimpleChange(900, 1800, false) });
+
+    expect(animated).toEqual([1800]);
+  });
 });

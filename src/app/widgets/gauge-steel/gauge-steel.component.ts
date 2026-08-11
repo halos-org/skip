@@ -84,7 +84,9 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
   readonly zones = input<ISkZone[]>();
   readonly title = input<string>();
   readonly units = input<string>();
-  readonly value = input<number>();
+  // null until the first packet, so a gauge built before any data keeps the library's
+  // start-at-minimum face instead of being seeded with a fabricated zero.
+  readonly value = input<number | null>();
   // eslint-disable-next-line @angular-eslint/no-input-rename
   readonly theme = input<ITheme | null>(null, { alias: "themeColors" });
 
@@ -296,7 +298,14 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges) {
     if (!this.gaugeStarted) { return; }
-    if (changes.value && !changes.value.firstChange) {
+    // A structural change replaces the gauge object further down, and the replacement is seeded
+    // with the current value. Animating the outgoing one first is not merely wasted: the library
+    // offers no way to cancel a tween, so the discarded gauge keeps repainting the same canvas —
+    // with its own now-stale scale, sections and size — and wins the last frame. Under a steady
+    // reading nothing repaints afterwards, leaving the old face on screen for good. The server's
+    // measure resolving after the first value delivers exactly this batch on an ordinary boot.
+    const rebuilding = !!(changes.zones || changes.radialSize || changes.units || changes.minValue || changes.maxValue);
+    if (changes.value && !changes.value.firstChange && !rebuilding) {
         this.gauge.setValueAnimated(changes.value.currentValue);
     }
     if (changes.zones) {
@@ -334,11 +343,14 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
       this.resizeTimer = null;
     }
 
-    // Stop any running animations before cleanup
+    // Park the needle on its current reading. This does NOT stop a running setValueAnimated tween —
+    // the library exposes no cancel, and only a later setValueAnimated on the same instance stops the
+    // previous one — so an animation in flight keeps repainting until it finishes on its own.
     if (this.gauge && this.gauge.setValue) {
-      // Call setValue to stop any running setValueAnimated animations
       const currentValue = this.gauge.getValue ? this.gauge.getValue() : this.value();
-      this.gauge.setValue(currentValue);
+      if (currentValue != null) {
+        this.gauge.setValue(currentValue);
+      }
     }
 
     // Steelseries draws into the canvas with id widgetUUID(). Release it to free GPU memory.
