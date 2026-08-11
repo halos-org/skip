@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { AppNetworkInitService, IBootstrapIssue } from './app-initNetwork.service';
+import { AppNetworkInitService, IBootstrapIssue, TCookieAuthOutcome } from './app-initNetwork.service';
 import { IConfig, IConnectionConfig } from '../interfaces/app-settings.interfaces';
 import { SignalKConnectionService } from './signalk-connection.service';
 import { AuthenticationService, ILoginStatus } from './authentication.service';
@@ -111,8 +111,8 @@ describe('AppNetworkInitService', () => {
         service = TestBed.inject(AppNetworkInitService);
     });
 
-    function handleCookieAuth(status: ILoginStatus | null): 'redirecting' | 'proceed' | 'auth-blocked' {
-        return (service as unknown as { handleCookieAuth: (s: ILoginStatus | null) => 'redirecting' | 'proceed' | 'auth-blocked' }).handleCookieAuth(status);
+    function handleCookieAuth(status: ILoginStatus | null): TCookieAuthOutcome {
+        return (service as unknown as { handleCookieAuth: (s: ILoginStatus | null) => TCookieAuthOutcome }).handleCookieAuth(status);
     }
 
     function routeToReauth(): void {
@@ -375,6 +375,53 @@ describe('AppNetworkInitService', () => {
 
             expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
             expect(latestIssue().reason).not.toBe('auth-blocked');
+        });
+    });
+
+    // The server hardcodes authenticationRequired:true whenever security is enabled, whatever
+    // allow_readonly says; readOnlyAccess is the field that reports anonymous read. Auto-login still
+    // outranks it, so a device configured to sign its users in keeps doing that (#550).
+    describe('anonymous read-only access (#550)', () => {
+        const readOnly = (extra: Partial<ILoginStatus> = {}): ILoginStatus =>
+            ({ status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: true, ...extra });
+
+        it('readOnlyAccess without OIDC: read-only anonymous session, no redirect', () => {
+            expect(handleCookieAuth(readOnly())).toBe('anonymous');
+
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+            expect(latestIssue().reason).not.toBe('auth-blocked');
+        });
+
+        it('readOnlyAccess with oidcAutoLogin: still redirects (HaLOS keeps its SSO bounce)', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('redirected');
+
+            expect(handleCookieAuth(readOnly({ oidcEnabled: true, oidcAutoLogin: true }))).toBe('redirecting');
+        });
+
+        it('readOnlyAccess with oidcAutoLogin:false: read-only rather than auth-blocked', () => {
+            expect(handleCookieAuth(readOnly({ oidcEnabled: true, oidcAutoLogin: false }))).toBe('anonymous');
+
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+            expect(latestIssue().reason).not.toBe('auth-blocked');
+        });
+
+        it('readOnlyAccess:false: unchanged, the visitor is still sent to sign in', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('redirected');
+
+            expect(handleCookieAuth({ status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: false })).toBe('redirecting');
+        });
+
+        it('readOnlyAccess absent: fails closed to the sign-in path', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('redirected');
+
+            expect(handleCookieAuth({ status: 'notLoggedIn', authenticationRequired: true })).toBe('redirecting');
+        });
+
+        it('an anonymous session spends no redirect budget', () => {
+            handleCookieAuth(readOnly());
+
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+            expect(mockSsoRedirect.resetBudget).not.toHaveBeenCalled();
         });
     });
 

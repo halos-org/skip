@@ -27,6 +27,8 @@ import { getLocalStorageItem, setLocalStorageItem } from '../utils/local-storage
 
 const CONNECTION_CONFIG_KEY = LOCAL_CONFIG_KEYS.connectionConfig;
 export type TBootstrapStatus = 'starting' | 'ready' | 'degraded';
+/** Bootstrap auth verdict. 'anonymous' is a session-less read-only visit that must not be redirected. */
+export type TCookieAuthOutcome = 'redirecting' | 'proceed' | 'anonymous' | 'auth-blocked';
 export type TBootstrapIssueReason = 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked';
 export type TAuthBlockedCause = 'budget-exhausted' | 'sign-in-required';
 
@@ -67,11 +69,14 @@ export class AppNetworkInitService implements OnDestroy {
    * Bootstrap auth decision from loginStatus. Returns 'redirecting' when the browser is being
    * sent to the SK/SSO login (caller should stop), or 'proceed' otherwise:
    * - loggedIn   → reset the redirect budget; the storage bootstrap then runs (isLoggedIn is true).
+   * - notLoggedIn + authRequired + readOnlyAccess → the server serves this visitor without a session,
+   *   so read anonymously rather than demanding a sign-in — unless the server asked for auto-login,
+   *   which is a deployment saying its users are expected to arrive signed in.
    * - notLoggedIn + authRequired → auto-redirect when allowed by oidcAutoLogin and the budget; else
    *   surface the auth-blocked recovery state (budget exhausted, or a manual sign-in is required).
    * - auth not required → anonymous read; proceed with no redirect.
    */
-  private handleCookieAuth(status: ILoginStatus | null): 'redirecting' | 'proceed' | 'auth-blocked' {
+  private handleCookieAuth(status: ILoginStatus | null): TCookieAuthOutcome {
     if (status?.status === 'loggedIn') {
       // The budget reset is deferred to a genuinely completed bootstrap (see initNetworkServices'
       // finally), so a loggedIn -> applicationData-401 -> reauth path cannot reset-then-loop.
@@ -83,6 +88,9 @@ export class AppNetworkInitService implements OnDestroy {
       return 'auth-blocked';
     }
     if (status.authenticationRequired) {
+      if (status.oidcAutoLogin !== true && status.readOnlyAccess) {
+        return 'anonymous';
+      }
       return this.attemptCookieRedirect(status) === 'redirecting' ? 'redirecting' : 'auth-blocked';
     }
     // authentication explicitly not required: anonymous read access, no redirect.

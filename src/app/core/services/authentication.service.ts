@@ -11,7 +11,12 @@ import { distinctUntilChanged, map } from "rxjs/operators";
  */
 export interface ILoginStatus {
   status?: string;
+  // The server hardcodes this to true whenever its security strategy is active, whatever
+  // allow_readonly says; it is false only when security is switched off entirely.
   authenticationRequired?: boolean;
+  // The server's allow_readonly: an anonymous request is granted a readonly principal. This, not
+  // authenticationRequired, is what says a visitor can read without signing in.
+  readOnlyAccess?: boolean;
   userLevel?: string;
   username?: string;
   oidcEnabled?: boolean;
