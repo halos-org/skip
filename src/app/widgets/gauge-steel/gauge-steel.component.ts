@@ -257,6 +257,18 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
         this.gauge = new steelseries.Linear(id, this.gaugeOptions);
       }
     }
+
+    // A steelseries gauge is born at its own default, and ngOnChanges is the only thing
+    // that ever feeds it a value — yet it drops every change that lands before the canvas
+    // exists, and the first change always. So seed the fresh gauge from the value we
+    // already hold. Without this the needle sticks at zero whenever no further change
+    // arrives: a path a previously-visited page already subscribed emits on subscribe,
+    // before this runs, and a constant reading never changes again (#556). Rebuilds from
+    // resize and zone changes land in the same hole.
+    const current = this.value();
+    if (current != null && this.gauge?.setValue) {
+      this.gauge.setValue(current);
+    }
   }
 
   onResized(event: ResizeObserverEntry):void {
