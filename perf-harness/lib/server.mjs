@@ -23,7 +23,13 @@ const TYPES = {
 
 const iso = (t) => new Date(t).toISOString();
 
-function genSelfValue(path, t) {
+function genSelfValue(path, t, overrides) {
+  // A fixed SI value per path, when the caller cares that the number is realistic
+  // (a scale calibrated for one boat only shows up against a plausible reading).
+  if (overrides && path in overrides) {
+    const v = overrides[path];
+    return typeof v === 'function' ? v(t) : v;
+  }
   switch (path) {
     case 'navigation.speedOverGround': return 5 + 2 * Math.sin(t / 1000);
     case 'navigation.headingTrue':
@@ -36,8 +42,8 @@ function genSelfValue(path, t) {
   }
 }
 
-function selfDelta(paths, t) {
-  return JSON.stringify({ context: SELF_URN, updates: [{ $source: 'mock.0', timestamp: iso(t), values: paths.map((p) => ({ path: p, value: genSelfValue(p, t) })) }] });
+function selfDelta(paths, t, overrides) {
+  return JSON.stringify({ context: SELF_URN, updates: [{ $source: 'mock.0', timestamp: iso(t), values: paths.map((p) => ({ path: p, value: genSelfValue(p, t, overrides) })) }] });
 }
 
 function aisDelta(mmsi, i, t) {
@@ -107,10 +113,10 @@ function historyResponse(paths, rows, stepSec) {
 /**
  * @param {object} o { publicDir, base, port }
  * Returns { origin, appUrl, setControl(c), blast(n), streamCount(), stop() }.
- * control: { streaming:bool, rateHz, selfPaths:[], ais:{count, churnPerSec} }
+ * control: { streaming:bool, rateHz, selfPaths:[], selfValues:{path:value|fn}, ais:{count, churnPerSec} }
  */
 export async function startServer({ publicDir, base, port }) {
-  const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], ais: { count: 0, churnPerSec: 0 } };
+  const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], selfValues: null, ais: { count: 0, churnPerSec: 0 } };
   let history = { rows: 0, stepSec: 1, paths: ['navigation.speedOverGround'] };
   let configDoc = null; // IConfig served from applicationData (set per scenario by the runner)
   let sent = 0;
@@ -194,7 +200,7 @@ export async function startServer({ publicDir, base, port }) {
         for (const tg of control.staticScene.targets) { ws.send(targetSceneDelta(tg, t)); sent++; }
         return;
       }
-      ws.send(selfDelta(control.selfPaths, t)); sent++;
+      ws.send(selfDelta(control.selfPaths, t, control.selfValues)); sent++;
       const n = control.ais.count | 0;
       for (let i = 0; i < n; i++) { ws.send(aisDelta(mmsiBase + i, i, t)); sent++; }
       // churn: introduce brand-new MMSIs over time (unbounded-growth scenario)
@@ -213,7 +219,7 @@ export async function startServer({ publicDir, base, port }) {
     timerRestarts.add(startTimer);
     ws.on('close', () => { clearInterval(timer); timerRestarts.delete(startTimer); });
     // Many separate frames (sustained flood) — each is its own onmessage task.
-    ws._blast = (count) => { const t = Date.now(); for (let i = 0; i < count; i++) { ws.send(selfDelta(control.selfPaths, t + i)); sent++; } };
+    ws._blast = (count) => { const t = Date.now(); for (let i = 0; i < count; i++) { ws.send(selfDelta(control.selfPaths, t + i, control.selfValues)); sent++; } };
     // ONE frame carrying many values (reconnect snapshot) — a single synchronous
     // parse + fan-out, i.e. the worst-case long task that coalescing must bound.
     ws._blastBig = (nValues) => {
