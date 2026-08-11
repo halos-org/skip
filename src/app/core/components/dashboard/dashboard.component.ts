@@ -23,12 +23,23 @@ import { PluginConfigClientService } from '../../services/plugin-config-client.s
 import { EmbedModeService } from '../../services/embed-mode.service';
 
 /** Per-phase duration (ms) of the page-transition slide; two phases run back to back. */
-const PAGE_SLIDE_PHASE_MS = 180;
+const PAGE_SLIDE_PHASE_MS = 150;
 /** Exit accelerates out, enter decelerates in, so the two phases read as one motion. */
 const PAGE_SLIDE_EXIT_EASING = 'ease-in';
 const PAGE_SLIDE_ENTER_EASING = 'ease-out';
-/** Distance a page travels to fully clear the viewport (100% of the wrapper's own width). */
-const PAGE_SLIDE_OFFSCREEN_PCT = 100;
+/**
+ * How far a page travels, as a fraction of the wrapper's own width. Short on purpose: the page is
+ * transparent well before it gets far, so the swap hides behind opacity rather than behind the
+ * viewport edge, and no full-width empty sweep is ever exposed between the two phases.
+ */
+const PAGE_SLIDE_TRAVEL_PCT = 15;
+
+/** Where a page sits mid-transition: displaced by {@link SlidePose.pct} and faded to its opacity. */
+interface SlidePose {
+  pct: number;
+  opacity: number;
+}
+const PAGE_SLIDE_RESTING: SlidePose = { pct: 0, opacity: 1 };
 
 interface PressGestureDetail { x?: number; y?: number; center?: { x: number; y: number }; }
 interface GridApi {
@@ -278,10 +289,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Applies an active-dashboard change: a horizontal slide when the change was
-   * initiated by a navigate* call (a travel direction is pending) and motion is
-   * allowed, otherwise an instant swap. The incoming page loads while the wrapper
-   * is off-screen, so no partially-loaded page is ever visible mid-slide.
+   * Applies an active-dashboard change: a short horizontal slide with a fade when the change was
+   * initiated by a navigate* call (a travel direction is pending) and motion is allowed, otherwise
+   * an instant swap. The incoming page loads while the wrapper is fully transparent, so no
+   * partially-loaded page is ever visible mid-transition — opacity is what hides the swap here, not
+   * distance, so the exit phase must always end at opacity 0.
    *
    * Always loads the *current* activeDashboard rather than a captured index, and
    * ignores re-entrant calls (a router-driven change — browser back/forward —
@@ -300,17 +312,17 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const exitTo = direction === 'next' ? -PAGE_SLIDE_OFFSCREEN_PCT : PAGE_SLIDE_OFFSCREEN_PCT;
+    const exitTo = direction === 'next' ? -PAGE_SLIDE_TRAVEL_PCT : PAGE_SLIDE_TRAVEL_PCT;
     const enterFrom = -exitTo;
     this._slideInFlight = true;
     this.dashboard.beginPageTransition();
     try {
-      await this.animatePhase(slide, 0, exitTo, PAGE_SLIDE_EXIT_EASING);
+      await this.animatePhase(slide, PAGE_SLIDE_RESTING, { pct: exitTo, opacity: 0 }, PAGE_SLIDE_EXIT_EASING);
       if (this._destroyed) return;
       let target = this.dashboard.activeDashboard();
       this.loadDashboard(target);
-      this.setSlideOffset(slide, enterFrom); // jump to the opposite edge, still off-screen
-      await this.animatePhase(slide, enterFrom, 0, PAGE_SLIDE_ENTER_EASING);
+      this.setSlidePose(slide, { pct: enterFrom, opacity: 0 }); // jump to the opposite side, still invisible
+      await this.animatePhase(slide, { pct: enterFrom, opacity: 0 }, PAGE_SLIDE_RESTING, PAGE_SLIDE_ENTER_EASING);
       if (this._destroyed) return;
       // A change that landed during the slide bypassed the guard; settle on it now.
       if (this.dashboard.activeDashboard() !== target) {
@@ -318,30 +330,36 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         this.loadDashboard(target);
       }
     } finally {
-      this.setSlideOffset(slide, 0);
+      // Restores opacity as well as position: an aborted transition must never leave the page
+      // displaced or invisible.
+      this.setSlidePose(slide, PAGE_SLIDE_RESTING);
       this._slideInFlight = false;
       this.dashboard.endPageTransition();
     }
   }
 
-  /** Runs one transform-only slide phase. Overridable so specs can drive the sequence without real Web Animations. */
-  protected animatePhase(el: HTMLElement, fromPct: number, toPct: number, easing: string): Promise<void> {
+  /** Runs one slide-and-fade phase. Overridable so specs can drive the sequence without real Web Animations. */
+  protected animatePhase(el: HTMLElement, from: SlidePose, to: SlidePose, easing: string): Promise<void> {
     const animation = el.animate(
-      [{ transform: `translateX(${fromPct}%)` }, { transform: `translateX(${toPct}%)` }],
+      [
+        { transform: `translateX(${from.pct}%)`, opacity: from.opacity },
+        { transform: `translateX(${to.pct}%)`, opacity: to.opacity }
+      ],
       { duration: PAGE_SLIDE_PHASE_MS, easing, fill: 'forwards' }
     );
     this._currentAnimation = animation;
     return animation.finished
       .catch(() => undefined)
       .then(() => {
-        this.setSlideOffset(el, toPct); // persist the end position as the inline base
+        this.setSlidePose(el, to); // persist the end pose as the inline base
         animation.cancel(); // drop the forwards fill so the inline style wins
         if (this._currentAnimation === animation) this._currentAnimation = null;
       });
   }
 
-  private setSlideOffset(el: HTMLElement, pct: number): void {
-    el.style.transform = pct === 0 ? '' : `translateX(${pct}%)`;
+  private setSlidePose(el: HTMLElement, pose: SlidePose): void {
+    el.style.transform = pose.pct === 0 ? '' : `translateX(${pose.pct}%)`;
+    el.style.opacity = pose.opacity === 1 ? '' : String(pose.opacity);
   }
 
   private prefersReducedMotion(): boolean {

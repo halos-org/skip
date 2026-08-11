@@ -478,9 +478,10 @@ describe('DashboardComponent', () => {
     });
 
     describe('runPageChange (page transition)', () => {
+        interface SlidePose { pct: number; opacity: number }
         interface RunPageChangeApi {
             runPageChange: () => Promise<void>;
-            animatePhase: (el: HTMLElement, from: number, to: number, easing: string) => Promise<void>;
+            animatePhase: (el: HTMLElement, from: SlidePose, to: SlidePose, easing: string) => Promise<void>;
             loadDashboard: (dashboardId: number) => void;
             prefersReducedMotion: () => boolean;
         }
@@ -494,7 +495,7 @@ describe('DashboardComponent', () => {
             vi.spyOn(component as unknown as { _pageSlide: () => unknown }, '_pageSlide')
                 .mockReturnValue({ nativeElement: slide });
             const animate = vi.spyOn(api, 'animatePhase').mockImplementation((_el, from, to) => {
-                order.push(`animate:${from}->${to}`);
+                order.push(`animate:${from.pct}@${from.opacity}->${to.pct}@${to.opacity}`);
                 return Promise.resolve();
             }) as unknown as Mock;
             vi.spyOn(api, 'loadDashboard').mockImplementation((id) => { order.push(`load:${id}`); });
@@ -514,7 +515,8 @@ describe('DashboardComponent', () => {
 
             await api.runPageChange();
 
-            expect(order).toEqual(['animate:0->-100', 'load:1', 'animate:100->0']);
+            // The exit must end fully transparent: opacity, not distance, is what hides the swap.
+            expect(order).toEqual(['animate:0@1->-15@0', 'load:1', 'animate:15@0->0@1']);
             expect(mockDashboardService.beginPageTransition).toHaveBeenCalledTimes(1);
             expect(mockDashboardService.endPageTransition).toHaveBeenCalledTimes(1);
         });
@@ -525,7 +527,7 @@ describe('DashboardComponent', () => {
 
             await api.runPageChange();
 
-            expect(order).toEqual(['animate:0->100', 'load:0', 'animate:-100->0']);
+            expect(order).toEqual(['animate:0@1->15@0', 'load:0', 'animate:-15@0->0@1']);
         });
 
         it('swaps instantly without animating when no travel direction is pending', async () => {
