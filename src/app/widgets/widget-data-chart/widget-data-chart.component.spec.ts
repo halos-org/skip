@@ -1,33 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Chart.js (and its plugins) cannot instantiate under jsdom. Mock them self-contained — no
-// importOriginal, and mock the plugin modules too — so the factory has no outer references that
-// would trip the vi.mock hoisting TDZ and break the rest of the suite. Kept above every other
-// import so the source order matches the hoisted execution order.
-vi.mock('chart.js', () => {
-  class MockChart {
-    public static register(): void { /* noop */ }
-    // registerChartComponents() sets a line-element default join style on this.
-    public static defaults = { elements: { line: {} } };
-    public data: unknown;
-    public options: unknown;
-    constructor(_ctx: unknown, config: { data: unknown; options: unknown }) {
-      this.data = config.data;
-      this.options = config.options;
-    }
-    public update(): void { /* noop */ }
-    public destroy(): void { /* noop */ }
-  }
-  return {
-    Chart: MockChart,
-    registerables: [],
-    TimeScale: {}, LinearScale: {}, LineController: {}, PointElement: {},
-    LineElement: {}, Filler: {}, Legend: {}, Tooltip: {}, Title: {}, SubTitle: {}
-  };
-});
-vi.mock('chartjs-plugin-annotation', () => ({ default: {} }));
-vi.mock('chartjs-adapter-date-fns', () => ({}));
-vi.mock('@aziham/chartjs-plugin-streaming', () => ({ default: {} }));
+// chart.js and its plugins are aliased to test shims (vitest.config.ts): the real library
+// cannot instantiate under jsdom, and a per-spec vi.mock only wins when this file is the
+// first in its worker to load the module, which is what made #544 look like a flake.
 
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
