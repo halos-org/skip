@@ -1,3 +1,11 @@
+// The chart.js test shims (aliased in vitest.config.ts) are source files, so the builder splits
+// them into their own chunks. A spec that reaches them only through a lazily-loaded chunk can ask
+// for one after its worker's environment has already been torn down, which fails the whole suite
+// file. Importing them here pulls them in during setup, while the environment is alive.
+import './test-shims/chartjs-shim';
+import './test-shims/chartjs-annotation-shim';
+import './test-shims/chartjs-streaming-shim';
+import './test-shims/chartjs-plugin-shim';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cwd } from 'node:process';
