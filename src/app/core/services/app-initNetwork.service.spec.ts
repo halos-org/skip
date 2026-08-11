@@ -425,6 +425,59 @@ describe('AppNetworkInitService', () => {
         });
     });
 
+    // A session-less visitor has no user-scope slot to load, so the dashboards come from the shared
+    // global scope, falling back to the dashboards shipped in this release (#551).
+    describe('anonymous bootstrap config source (#551)', () => {
+        beforeEach(() => {
+            setConnConfig({ signalKUrl: 'http://localhost', sharedConfigName: 'default' });
+            mockAuth.refreshLoginStatus.mockResolvedValue({
+                status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: true
+            });
+        });
+
+        it('reads the published dashboard from the global scope', async () => {
+            const published = { app: { configVersion: 11 }, theme: null, dashboards: [{ id: 'published' }] } as unknown as IConfig;
+            mockStorage.getConfig.mockResolvedValue(published);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.getConfig).toHaveBeenCalledWith('global', 'default', REMOTE_CONFIG_FILE_VERSION);
+            expect(mockStorage.bootstrapRemoteContext).toHaveBeenCalledWith(
+                expect.objectContaining({ initConfig: published, readOnly: true })
+            );
+            expect(latestStatus()).toBe('ready');
+        });
+
+        it('falls back to the shipped dashboards when the server publishes none', async () => {
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            const context = mockStorage.bootstrapRemoteContext.mock.calls[0][0];
+            expect(context.initConfig.dashboards.length).toBeGreaterThan(0);
+            expect(context.readOnly).toBe(true);
+            expect(latestStatus()).toBe('ready');
+        });
+
+        it('treats an appless 200 {} global slot as nothing published', async () => {
+            mockStorage.getConfig.mockResolvedValue({} as IConfig);
+
+            await service.initNetworkServices();
+
+            const context = mockStorage.bootstrapRemoteContext.mock.calls[0][0];
+            expect(context.initConfig.app).toBeTruthy();
+            expect(latestStatus()).toBe('ready');
+        });
+
+        it('never offers the missing-shared-config recovery to a visitor who has no profile', async () => {
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            expect(latestIssue().reason).toBe('none');
+        });
+    });
+
     it('should be created', () => {
         expect(service).toBeTruthy();
     });

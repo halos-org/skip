@@ -4,9 +4,7 @@ import { IConfig } from '../interfaces/app-settings.interfaces';
 import { StorageService } from './storage.service';
 import { SettingsService } from './settings.service';
 import { ConfigurationUpgradeService } from './configuration-upgrade.service';
-import { defaultConfig } from '../../../default-config/config.blank.const';
-import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
-import { UUID } from '../utils/uuid.util';
+import { buildDefaultConfig } from '../../../default-config/config.default.factory';
 
 export interface IProfileSummary {
   name: string;
@@ -198,12 +196,7 @@ export class ProfileService {
   }
 
   private buildBlankConfig(): IConfig {
-    const config = cloneDeep(defaultConfig);
-    config.dashboards = cloneDeep(DefaultDashboard).map(dashboard => ({
-      ...dashboard,
-      id: UUID.create()
-    }));
-    return config;
+    return buildDefaultConfig();
   }
 
   private validateNewName(name: string): string {

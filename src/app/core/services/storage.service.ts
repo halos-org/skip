@@ -30,6 +30,8 @@ export interface IStorageRemoteBootstrapContext {
   sharedConfigName: string;
   configFileVersion: number;
   initConfig: IConfig;
+  /** The config was loaded for a session that cannot own it — a shared, read-only view. */
+  readOnly?: boolean;
 }
 
 interface IPatchAction {
@@ -57,6 +59,7 @@ export class StorageService {
   public sharedConfigName: string;
   private InitConfig: IConfig | null = null;
   private _isRemoteContextBootstrapped = false;
+  private _isReadOnlyContext = false;
   public storageServiceReady$ = new BehaviorSubject<boolean>(false);
   private _isLoggedIn = false;
   private _networkStatus: IEndpointStatus | undefined = undefined;
@@ -582,6 +585,7 @@ export class StorageService {
     this.sharedConfigName = context.sharedConfigName;
     this.configFileVersion = context.configFileVersion;
     this.InitConfig = cloneDeep(context.initConfig);
+    this._isReadOnlyContext = !!context.readOnly;
     this._isRemoteContextBootstrapped = true;
     console.log(`[Storage Service] Bootstrap handoff applied (sharedConfig=${this.sharedConfigName}, fileVersion=${this.configFileVersion})`);
   }
@@ -598,6 +602,15 @@ export class StorageService {
    */
   public isRemoteContextBootstrapped(): boolean {
     return this._isRemoteContextBootstrapped;
+  }
+
+  /**
+   * Whether the bootstrapped config is a shared, read-only view rather than this device's own
+   * profile. Per-device state derived from the loaded dashboards must not be persisted from one:
+   * the visitor is looking at someone else's configuration.
+   */
+  public isReadOnlyContext(): boolean {
+    return this._isReadOnlyContext;
   }
 
   private logError(error: HttpErrorResponse) {

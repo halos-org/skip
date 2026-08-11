@@ -122,10 +122,11 @@ export class DashboardService {
         // Recompute the remote (AIS/DSC) context subscribe demand and persist it per-device (#386),
         // so the next boot's pre-auth subscribe-scope decision reflects the widgets configured.
         // Derive it ONLY from the device's own authoritative profile: skip an ephemeral ?profile
-        // viewer (embed already returned above) and any pre-load/degraded seed (DefaultDashboard
-        // before the real profile bootstrapped). Otherwise a transient viewer or a failed boot would
-        // clobber the device flag and silently under-subscribe the real profile — hiding AIS.
-        if (!this._embedMode.profile() && this._storage.isRemoteContextBootstrapped()) {
+        // viewer (embed already returned above), a read-only view of a shared config, and any
+        // pre-load/degraded seed (DefaultDashboard before the real profile bootstrapped). Otherwise
+        // a transient viewer or a failed boot would clobber the device flag and silently
+        // under-subscribe the real profile — hiding AIS.
+        if (!this._embedMode.profile() && this._storage.isRemoteContextBootstrapped() && !this._storage.isReadOnlyContext()) {
           this._settings.setRemoteContextDemand(dashboardsRequireRemoteContexts(dashboards));
         }
       });
@@ -189,7 +190,8 @@ export class DashboardService {
    */
   public toggleStaticDashboard(): void {
     // Embed mode is strictly read-only: this single choke point stays locked, so never unlock.
-    if (this._embedMode.embed()) return;
+    // An anonymous read-only session is too — its edits could never be saved.
+    if (this.isReadOnlySession()) return;
     this.isDashboardStatic.set(!this.isDashboardStatic());
   }
 
@@ -536,9 +538,14 @@ export class DashboardService {
    */
   public setStaticDashboard(isStatic: boolean): void {
     // Embed mode is strictly read-only: ignore unlock requests so this single choke point stays
-    // locked. A redundant lock (isStatic=true) still applies.
-    if (this._embedMode.embed() && !isStatic) return;
+    // locked. A redundant lock (isStatic=true) still applies. Same for a read-only session.
+    if (this.isReadOnlySession() && !isStatic) return;
     this.isDashboardStatic.set(isStatic);
+  }
+
+  /** Sessions whose layout edits could never be persisted: the chromeless embed, and a read-only view. */
+  private isReadOnlySession(): boolean {
+    return this._embedMode.embed() || this._storage.isReadOnlyContext();
   }
 
   public notifyLayoutEditSaved(): void {

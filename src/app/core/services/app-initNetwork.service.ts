@@ -12,6 +12,7 @@ import { SignalKConnectionService } from "./signalk-connection.service";
 import { AuthenticationService, ILoginStatus } from './authentication.service';
 import { SsoRedirectService } from './sso-redirect.service';
 import { DefaultConnectionConfig } from '../../../default-config/config.blank.const';
+import { buildDefaultConfig } from '../../../default-config/config.default.factory';
 import { cloneDeep } from 'lodash-es';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { DataService } from './data.service';
@@ -26,6 +27,11 @@ import { REMOTE_CONFIG_FILE_VERSION, CONNECTION_CONFIG_VERSION } from '../consta
 import { getLocalStorageItem, setLocalStorageItem } from '../utils/local-storage.util';
 
 const CONNECTION_CONFIG_KEY = LOCAL_CONFIG_KEYS.connectionConfig;
+// Where an operator publishes the dashboard anonymous visitors land on. The global applicationData
+// scope is the only one they can read: Signal K admin-gates its writes but not its reads, while the
+// user scope belongs to a signed-in identity an anonymous visitor does not have.
+const ANONYMOUS_CONFIG_SCOPE = 'global';
+const ANONYMOUS_CONFIG_NAME = 'default';
 export type TBootstrapStatus = 'starting' | 'ready' | 'degraded';
 /** Bootstrap auth verdict. 'anonymous' is a session-less read-only visit that must not be redirected. */
 export type TCookieAuthOutcome = 'redirecting' | 'proceed' | 'anonymous' | 'auth-blocked';
@@ -170,6 +176,10 @@ export class AppNetworkInitService implements OnDestroy {
         return;
       }
 
+      if (outcome === 'anonymous') {
+        await this.bootstrapAnonymousConfig();
+      }
+
       let remoteConfig: IConfig | null = null;
       // True when an ephemeral URL `?profile` override was honored (a valid, existing, different
       // slot). The remote-control migration must then ignore the loaded (ephemeral) config and take
@@ -279,6 +289,43 @@ export class AppNetworkInitService implements OnDestroy {
         this.connectionStateMachine.startWebSocketConnection();
       }
     }
+  }
+
+  /**
+   * Loads the configuration an anonymous visitor sees and hands it to storage as a read-only
+   * context. There is no user scope to read — the anonymous principal is not a user — so the source
+   * is the shared global slot an operator publishes, and the dashboards shipped in this release when
+   * none is published. Either way the visitor gets a working app instead of the missing-shared-config
+   * recovery state, which offers to fix a profile they do not have.
+   */
+  private async bootstrapAnonymousConfig(): Promise<void> {
+    const storageReady = await this.storage.waitUntilReady();
+    if (!storageReady) {
+      throw new Error('[AppInit Network Service] StorageService did not become ready in time. Cannot bootstrap anonymous configuration.');
+    }
+    this.storage.bootstrapRemoteContext({
+      sharedConfigName: ANONYMOUS_CONFIG_NAME,
+      configFileVersion: REMOTE_CONFIG_FILE_VERSION,
+      initConfig: await this.loadAnonymousConfig(),
+      readOnly: true
+    });
+  }
+
+  /**
+   * The published global config, or the shipped defaults. SK answers a never-created slot with
+   * 200 {} rather than a 404, so an appless body means "nothing published" just as a 404 does.
+   */
+  private async loadAnonymousConfig(): Promise<IConfig> {
+    try {
+      const published = await this.storage.getConfig(ANONYMOUS_CONFIG_SCOPE, ANONYMOUS_CONFIG_NAME, REMOTE_CONFIG_FILE_VERSION);
+      if (published?.app) {
+        return published;
+      }
+      console.log('[AppInit Network Service] No shared configuration published; using the dashboards shipped with this version.');
+    } catch (error) {
+      console.warn('[AppInit Network Service] Shared configuration unavailable; using the dashboards shipped with this version. Error:', error);
+    }
+    return buildDefaultConfig();
   }
 
   /**

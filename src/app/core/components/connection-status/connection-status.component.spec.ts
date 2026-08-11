@@ -4,6 +4,7 @@ import { ConnectionStatusComponent } from './connection-status.component';
 import { EndpointStatus, SignalKConnectionService } from '../../services/signalk-connection.service';
 import { SignalKDeltaService, StreamStatus } from '../../services/signalk-delta.service';
 import { SsoRedirectService } from '../../services/sso-redirect.service';
+import { AuthenticationService, ILoginStatus } from '../../services/authentication.service';
 
 describe('ConnectionStatusComponent', () => {
   let component: ConnectionStatusComponent;
@@ -11,6 +12,15 @@ describe('ConnectionStatusComponent', () => {
 
   const statusText = (): string =>
     (fixture.nativeElement as HTMLElement).querySelector('pre')?.textContent ?? '';
+
+  const identityText = (): string =>
+    (fixture.nativeElement as HTMLElement).querySelector('.sso-identity')?.textContent ?? '';
+
+  const emitLoginStatus = (status: ILoginStatus): void => {
+    const auth = TestBed.inject(AuthenticationService);
+    (auth as unknown as { applyLoginStatus: (raw: unknown) => void }).applyLoginStatus(status);
+    fixture.detectChanges();
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -35,6 +45,22 @@ describe('ConnectionStatusComponent', () => {
     const spy = vi.spyOn(sso, 'manualSignIn').mockImplementation(() => undefined);
     (component as unknown as { signIn: () => void }).signIn();
     expect(spy).toHaveBeenCalled();
+  });
+
+  // A session-less visitor on a server that grants anonymous read is connected and useful, not
+  // locked out — the identity line must say so rather than read as a bare failure to sign in (#552).
+  it('tells an anonymous visitor they are reading shared data, and still offers Sign in', () => {
+    emitLoginStatus({ status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: true });
+
+    expect(identityText()).toContain('reading shared data');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.sso-identity button')).toBeTruthy();
+  });
+
+  it('keeps the bare not-signed-in wording when the server grants no anonymous read', () => {
+    emitLoginStatus({ status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: false });
+
+    expect(identityText()).toContain('Not signed in.');
+    expect(identityText()).not.toContain('reading shared data');
   });
 
   // The connection and delta services both re-emit the SAME mutated status object on each update.

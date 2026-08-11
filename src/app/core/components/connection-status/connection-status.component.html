@@ -9,6 +9,9 @@
   } @else if (loginStatus(); as status) {
     @if (status.authenticationRequired === false) {
       <span>Connected (no sign-in required).</span>
+    } @else if (status.readOnlyAccess) {
+      <span>Not signed in — reading shared data. Configuration changes need a sign-in. </span>
+      <button mat-flat-button type="button" (click)="signIn()">Sign in</button>
     } @else {
       <span>Not signed in. </span>
       <button mat-flat-button type="button" (click)="signIn()">Sign in</button>
