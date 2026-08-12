@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SimpleChange } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GaugeSteelComponent } from './gauge-steel.component';
+import { GaugeSteelComponent, SteelBackgroundColors, SteelFrameColors } from './gauge-steel.component';
 import { UnitsService } from '../../core/services/units.service';
 import { States } from '../../core/interfaces/signalk-interfaces';
 
@@ -367,6 +367,117 @@ describe('GaugeSteelComponent', () => {
 
     expect(internals.gaugeOptions.titleString).toBe('New');
     expect(titleSetter).not.toHaveBeenCalled();
+  });
+
+  // The batch runs ONE rebuild: buildOptions re-reads every input, so a second would repeat the work
+  // on inputs the first already carried -- and the library cannot cancel the discarded gauge's tween,
+  // so it keeps repainting the canvas with its stale scale and wins the last frame.
+  it('rebuilds once for a batch carrying several structural changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Section = vi.fn((lower: number, upper: number, color: string) => ({ lower, upper, color }));
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-one-rebuild');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('units', 'V');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+    fixture.componentRef.setInput('decimals', 2);
+    fixture.componentRef.setInput('zones', []);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Linear).toHaveBeenCalledTimes(1);
+
+    fixture.componentRef.setInput('maxValue', 200);
+    fixture.componentRef.setInput('decimals', 0);
+    fixture.componentRef.setInput('zones', [{ upper: 50, state: States.Alarm }]);
+    internals.ngOnChanges({
+      maxValue: new SimpleChange(100, 200, false),
+      decimals: new SimpleChange(2, 0, false),
+      zones: new SimpleChange([], [{ upper: 50, state: States.Alarm }], false),
+    });
+
+    expect(steel.Linear).toHaveBeenCalledTimes(2);
+  });
+
+  // The setters run only on a batch with no structural change; buildOptions carries these inputs
+  // through a rebuild. Both halves need pinning -- deleting the setters is otherwise invisible.
+  it('applies a standalone title, background and frame change through the live setters', () => {
+    const calls: string[] = [];
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge & Record<string, unknown>) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+      this.setTitleString = () => { calls.push('title'); };
+      this.setBackgroundColor = () => { calls.push('background'); };
+      this.setFrameDesign = () => { calls.push('frame'); };
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-live-setters');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+
+    internals.ngOnChanges({ title: new SimpleChange('Old', 'New', false) });
+    internals.ngOnChanges({ backgroundColor: new SimpleChange('carbon', 'white', false) });
+    internals.ngOnChanges({ frameColor: new SimpleChange('anthracite', 'brass', false) });
+
+    expect(calls).toEqual(['title', 'background', 'frame']);
+    // No rebuild: none of these is structural.
+    expect(steel.Radial).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries the background and frame through a rebuild, without calling their setters', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    const bgSetter = vi.fn();
+    const frameSetter = vi.fn();
+    steel.Linear = vi.fn(function (this: FakeGauge & Record<string, unknown>) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+      this.setBackgroundColor = bgSetter;
+      this.setFrameDesign = frameSetter;
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-carry-colors');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('backgroundColor', 'carbon');
+    fixture.componentRef.setInput('frameColor', 'anthracite');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      gaugeOptions: { backgroundColor?: string; frameDesign?: string };
+    };
+    internals.startGauge(true);
+
+    fixture.componentRef.setInput('backgroundColor', 'white');
+    fixture.componentRef.setInput('frameColor', 'brass');
+    fixture.componentRef.setInput('maxValue', 200);
+    internals.ngOnChanges({
+      backgroundColor: new SimpleChange('carbon', 'white', false),
+      frameColor: new SimpleChange('anthracite', 'brass', false),
+      maxValue: new SimpleChange(100, 200, false),
+    });
+
+    expect(internals.gaugeOptions.backgroundColor).toBe(SteelBackgroundColors['white']);
+    expect(internals.gaugeOptions.frameDesign).toBe(SteelFrameColors['brass']);
+    expect(bgSetter).not.toHaveBeenCalled();
+    expect(frameSetter).not.toHaveBeenCalled();
   });
 
   it('still animates a value change that stands alone', () => {
