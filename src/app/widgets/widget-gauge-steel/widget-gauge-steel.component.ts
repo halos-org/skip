@@ -62,7 +62,9 @@ export class WidgetSteelGaugeComponent {
   };
 
   // Reactive state
-  protected readonly dataValue = signal<number>(0);
+  /** null until the first packet: a gauge built before any data arrives must not be seeded with a
+   *  zero that reads as a live measurement on a scale whose minimum is negative. */
+  protected readonly dataValue = signal<number | null>(null);
   protected readonly zones = signal<ISkZone[]>([]);
   protected readonly displayName = computed(() => this.runtime.options()?.displayName || 'Gauge Label');
 
