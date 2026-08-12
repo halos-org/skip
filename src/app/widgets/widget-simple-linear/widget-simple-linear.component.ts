@@ -34,11 +34,11 @@ export class WidgetSimpleLinearComponent {
         pathType: 'number',
         isPathConfigurable: true,
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: 'V',
-        convertUnitTo: 'V'
+        pathSkUnitsFilter: null,
+        convertUnitTo: 'unitless'
       }
     },
-    displayScale: { lower: 0, upper: 15, type: 'linear' },
+    displayScale: { lower: 0, upper: 100, type: 'linear' },
     gauge: { type: 'simpleLinear', unitLabelFormat: 'full' },
     numInt: 1,
     numDecimal: 2,
@@ -84,7 +84,7 @@ export class WidgetSimpleLinearComponent {
   protected readonly displayLower = computed<number>(() =>
     this.reinterpretScaleBound(this.runtime.options()?.displayScale?.lower ?? 0));
   protected readonly displayUpper = computed<number>(() =>
-    this.reinterpretScaleBound(this.runtime.options()?.displayScale?.upper ?? 15));
+    this.reinterpretScaleBound(this.runtime.options()?.displayScale?.upper ?? 100));
 
   // Computed signal for highlights (zones)
   protected highlights = computed<IDataHighlight[]>(() => {

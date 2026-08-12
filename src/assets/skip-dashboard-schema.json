@@ -2596,7 +2596,7 @@
         "displayScale": {
           "lower": 0,
           "type": "linear",
-          "upper": 15
+          "upper": 100
         },
         "enableTimeout": false,
         "filterSelfPaths": true,
@@ -2609,11 +2609,11 @@
         "numInt": 1,
         "paths": {
           "gaugePath": {
-            "convertUnitTo": "V",
+            "convertUnitTo": "unitless",
             "description": "Numeric Data",
             "isPathConfigurable": true,
             "path": null,
-            "pathSkUnitsFilter": "V",
+            "pathSkUnitsFilter": null,
             "pathType": "number",
             "showPathSkUnitsFilter": true,
             "source": null
@@ -2631,10 +2631,10 @@
       "name": "Compact Linear",
       "pathSlots": [
         {
-          "defaultConvertUnitTo": "V",
+          "defaultConvertUnitTo": "unitless",
           "defaultPath": null,
           "description": "Numeric Data",
-          "expectedSkUnit": "V",
+          "expectedSkUnit": null,
           "hideFromConfig": false,
           "isPathConfigurable": true,
           "pathOptions": null,
