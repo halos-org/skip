@@ -93,19 +93,30 @@ type UnitConverter = (v: any) => any;
 
 /**
  * Maps a Signal K unit-preferences `displayUnits.targetUnit` string onto Skip's internal conversion
- * measure key, for the cases where the two differ. Keys are the strings the plugin actually EMITS in
- * `meta.displayUnits.targetUnit` (verified from live path meta — e.g. temperature emits the bare `C`,
- * time emits `hour`), NOT the plugin's internal preset/definition keys. Server targets that already
- * equal a Skip measure (A, V, W, J, mbar, liter, percent, rpm, Ah, deg/s, ...) need no entry — an
- * unmapped target is used as-is and, when it is not a resolvable conversion for the path's group,
- * the caller degrades gracefully to 'unitless'. Extend as other presets/units are adopted.
+ * measure key, for the cases where the two differ. Keys are the strings the server actually EMITS in
+ * `meta.displayUnits.targetUnit` — the `targetUnit` values of its six built-in presets
+ * (`unitpreferences/presets/*.json`), NOT the internal definition keys. Server targets that already
+ * equal a Skip measure (A, V, W, J, mbar, psi, inHg, liter, gallon, percent, rpm, Ah, deg/s, mph,
+ * ...) need no entry.
+ *
+ * An unmapped target is used as-is and, when it is not a member of the path's conversion group, the
+ * caller degrades to 'unitless' — silently, and taking the label with it, which is how #536 surfaced:
+ * fuel rate resolved to nothing because the metric presets emit `L/h` where Skip's measure is `l/h`.
+ * A units.service.spec case pins this table against the full preset vocabulary; extend both together.
  */
 const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
   kn: 'knots',
+  'km/h': 'kph',
   'naut-mile': 'nm',
+  kilometer: 'km',
+  mile: 'mi',
+  foot: 'feet',
   degree: 'deg',
   hour: 'Hours',
   C: 'celsius',
+  F: 'fahrenheit',
+  'L/h': 'l/h',
+  'gal/h': 'g/h',
 };
 
 @Injectable()
@@ -121,8 +132,8 @@ export class UnitsService {
    */
   private readonly _conversionList: IUnitGroup[] = [
     { group: 'Unitless', units: [
-      { measure: 'unitless', description: "As-Is numeric value" },
-      { measure: ' ', description: "No unit label - As-Is numeric value" }
+      { measure: 'unitless', symbol: '', description: "As-Is numeric value" },
+      { measure: ' ', symbol: '', description: "No unit label - As-Is numeric value" }
     ] },
     { group: 'Speed', units: [
       { measure: 'knots', symbol: 'kn', description: "Knots - Nautical miles per hour"},
@@ -135,7 +146,8 @@ export class UnitsService {
       { measure: 'l/min', description: "Liters per minute"},
       { measure: 'l/h', description: "Liters per hour"},
       { measure: 'g/min', symbol: 'gal/min', description: "Gallons per minute"},
-      { measure: 'g/h', symbol: 'gal/h', description: "Gallons per hour"}
+      { measure: 'g/h', symbol: 'gal/h', description: "Gallons per hour"},
+      { measure: 'gal-imp/h', symbol: 'imp gal/h', description: "Imperial gallons per hour"}
     ] },
     { group: 'Fuel Distance', units: [
       { measure: 'm/m3', symbol: 'm/m³', description: "Meters per cubic meter (base)"},
@@ -170,6 +182,7 @@ export class UnitsService {
       { measure: 'liter', symbol: 'L', description: "Liters (base)"},
       { measure: 'm3', symbol: 'm³', description: "Cubic Meters"},
       { measure: 'gallon', symbol: 'gal', description: "Gallons"},
+      { measure: 'gallon-imp', symbol: 'imp gal', description: "Imperial Gallons"},
      ] },
     { group: 'Current', units: [
       { measure: 'A', description: "Amperes (base)"},
@@ -190,6 +203,7 @@ export class UnitsService {
     { group: 'Energy', units: [
       { measure: 'J', description: "Joules (base)"},
       { measure: 'kWh', description: "Kilowatt*Hours"},
+      { measure: 'btu', symbol: 'BTU', description: "British Thermal Units"},
     ] },
     { group: 'Resistance', units: [
       { measure: 'ohm', symbol: "\u2126", description: "\u2126 (base)"},
@@ -470,6 +484,7 @@ export class UnitsService {
 // volume
     "liter": Qty.swiftConverter('m^3', 'liter'),
     "gallon": Qty.swiftConverter('m^3', 'gallon'),
+    "gallon-imp": Qty.swiftConverter('m^3', 'gallon-imp'),
     "m3": function(v) { return v; },
 //  flow
     'm3/s': function(v) { return v; },
@@ -477,6 +492,7 @@ export class UnitsService {
     'l/h': Qty.swiftConverter("m^3/s", "liter/hour"),
     'g/min': Qty.swiftConverter("m^3/s", "gallon/minute"),
     'g/h': Qty.swiftConverter("m^3/s", "gallon/hour"),
+    'gal-imp/h': Qty.swiftConverter("m^3/s", "gallon-imp/hour"),
 //  fuel consumption
     'm/m3': function(v) { return v; },
     'nm/l': Qty.swiftConverter('m/m^3', 'naut-mile/liter'),
@@ -517,6 +533,7 @@ export class UnitsService {
 // Energy
     "J": function(v) { return v; },
     "kWh": Qty.swiftConverter('J', 'kWh'),
+    "btu": Qty.swiftConverter('J', 'btu'),
 // Resistance
     "ohm": function(v) { return v; },
     "kiloohm": function(v) { return v / 1000; },

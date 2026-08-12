@@ -37,6 +37,15 @@ describe('UnitsService', () => {
       expect(service.getUnitDisplaySymbol(undefined)).toBe('');
       expect(service.getUnitDisplaySymbol('')).toBe('');
     });
+
+    it('renders no symbol for the Unitless measures, so no gauge prints the word "unitless"', () => {
+      // The steel gauge, the linear and radial gauges, the data chart title and the history dialog's
+      // axis all label themselves from this seam with a resolved measure, which is 'unitless' whenever
+      // the server states no preference for the path (#536).
+      const service = setup();
+      expect(service.getUnitDisplaySymbol('unitless')).toBe('');
+      expect(service.getUnitDisplaySymbol(' ')).toBe('');
+    });
   });
 
   describe('getRenderableUnitSymbol', () => {
@@ -167,6 +176,78 @@ describe('UnitsService', () => {
       expect(setupWithData('s', { targetUnit: 'hour' }).getConversionsForPath('self.navigation.trip.timeElapsed').base).toBe('Hours');
     });
 
+    // Every (baseUnit, targetUnit) pair the Signal K server's six built-in unit-preference presets can
+    // emit, read from signalk-server `unitpreferences/presets/*.json` (verified at master 2495b860,
+    // server 2.30.0). A pair Skip cannot map degrades the path to 'unitless' — silently, since the resolver
+    // logs nothing for an unmappable target — which is what #536 reported for fuel rate: the metric
+    // presets emit volumeRate 'L/h' and Skip's Flow measure is 'l/h'.
+    //
+    // Categories deliberately absent: mass (kg) and area (m2) have no Skip conversion group at all, so
+    // even their identity target fails (tracked separately); dataSize, dateTime and boolean are not
+    // Signal K numeric units.
+    const PRESET_TARGET_VOCABULARY: { category: string; unit: string; target: string; measure: string }[] = [
+      { category: 'angle', unit: 'rad', target: 'degree', measure: 'deg' },
+      { category: 'angleDegrees', unit: 'deg', target: 'deg', measure: 'deg' },
+      { category: 'angularVelocity', unit: 'rad/s', target: 'deg/s', measure: 'deg/s' },
+      { category: 'charge', unit: 'C', target: 'Ah', measure: 'Ah' },
+      { category: 'current', unit: 'A', target: 'A', measure: 'A' },
+      { category: 'depth', unit: 'm', target: 'm', measure: 'm' },
+      { category: 'depth', unit: 'm', target: 'foot', measure: 'feet' },
+      { category: 'distance', unit: 'm', target: 'kilometer', measure: 'km' },
+      { category: 'distance', unit: 'm', target: 'mile', measure: 'mi' },
+      { category: 'distance', unit: 'm', target: 'naut-mile', measure: 'nm' },
+      { category: 'energy', unit: 'J', target: 'J', measure: 'J' },
+      { category: 'energy', unit: 'J', target: 'btu', measure: 'btu' },
+      { category: 'frequency', unit: 'Hz', target: 'rpm', measure: 'rpm' },
+      { category: 'length', unit: 'm', target: 'm', measure: 'm' },
+      { category: 'length', unit: 'm', target: 'foot', measure: 'feet' },
+      { category: 'percentage', unit: 'ratio', target: 'percent', measure: 'percent' },
+      { category: 'power', unit: 'W', target: 'W', measure: 'W' },
+      { category: 'pressure', unit: 'Pa', target: 'mbar', measure: 'mbar' },
+      { category: 'pressure', unit: 'Pa', target: 'psi', measure: 'psi' },
+      { category: 'pressure', unit: 'Pa', target: 'inHg', measure: 'inHg' },
+      { category: 'speed', unit: 'm/s', target: 'kn', measure: 'knots' },
+      { category: 'speed', unit: 'm/s', target: 'km/h', measure: 'kph' },
+      { category: 'speed', unit: 'm/s', target: 'mph', measure: 'mph' },
+      { category: 'temperature', unit: 'K', target: 'C', measure: 'celsius' },
+      { category: 'temperature', unit: 'K', target: 'F', measure: 'fahrenheit' },
+      { category: 'time', unit: 's', target: 'hour', measure: 'Hours' },
+      { category: 'voltage', unit: 'V', target: 'V', measure: 'V' },
+      { category: 'volume', unit: 'm3', target: 'liter', measure: 'liter' },
+      { category: 'volume', unit: 'm3', target: 'gallon', measure: 'gallon' },
+      { category: 'volume', unit: 'm3', target: 'gallon-imp', measure: 'gallon-imp' },
+      { category: 'volumeRate', unit: 'm3/s', target: 'L/h', measure: 'l/h' },
+      { category: 'volumeRate', unit: 'm3/s', target: 'gal/h', measure: 'g/h' },
+      { category: 'volumeRate', unit: 'm3/s', target: 'gal-imp/h', measure: 'gal-imp/h' },
+    ];
+
+    it('honours every target unit the built-in server presets emit (#536)', () => {
+      for (const c of PRESET_TARGET_VOCABULARY) {
+        const service = setupWithData(c.unit, { targetUnit: c.target });
+        const base = service.getConversionsForPath('self.some.path').base;
+        expect(base, `${c.category} ${c.unit} -> ${c.target}`).toBe(c.measure);
+        expect(service.getUnitDisplaySymbol(base), `symbol for ${base}`).not.toBe('');
+        expect(Number.isFinite(service.convertToUnit(base, 1) as number), `conversion for ${base}`).toBe(true);
+      }
+    });
+
+    it('converts fuel rate to the metric preset target (m3/s -> L/h)', () => {
+      const service = setupWithData('m3/s', { targetUnit: 'L/h' });
+      const path = 'self.propulsion.0.fuel.rate';
+      expect(service.resolvePathMeasure(path)).toBe('l/h');
+      // 1 m³/s is 3 600 000 L/h; a fuel rate of 2 L/h is what the gauge must read.
+      expect(service.convertToUnit('l/h', 2 / 3_600_000) as number).toBeCloseTo(2, 6);
+      expect(service.getUnitDisplaySymbol('l/h')).toBe('l/h');
+    });
+
+    it('converts the imperial volume and flow targets Skip previously had no measure for', () => {
+      const service = setup();
+      expect(service.convertToUnit('g/h', 1) as number).toBeCloseTo(951019.3845, 3);
+      expect(service.convertToUnit('gal-imp/h', 1) as number).toBeCloseTo(791889.2939, 3);
+      expect(service.convertToUnit('gallon-imp', 1) as number).toBeCloseTo(219.9692483, 6);
+      expect(service.convertToUnit('btu', 1) as number).toBeCloseTo(0.000947817, 9);
+    });
+
     it('keeps the label-matches-conversion invariant for every aliased category (symbol + working conversion)', () => {
       // The server value is the SOLE base source — proves the invariant holds across the alias set,
       // not just for one measure.
@@ -195,6 +276,9 @@ describe('UnitsService', () => {
       // conversion function or a resolvable symbol.
       const service = setup();
       for (const group of service.getConversions()) {
+        // The Unitless group is the one exception, and deliberately so: its members exist to carry the
+        // as-is value with nothing rendered beside it, so their symbol is empty by design.
+        if (group.group === 'Unitless') { continue; }
         for (const unit of group.units) {
           expect(service.convertToUnit(unit.measure, 1), `conversion ${unit.measure}`).not.toBeNull();
           expect(service.getUnitDisplaySymbol(unit.measure), `symbol ${unit.measure}`).not.toBe('');
