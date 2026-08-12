@@ -182,8 +182,9 @@ OIDC-aware" — Skip needs no OIDC code, only cookie + loginStatus + redirect.
   `oidcLoginUrl:"/signalk/v1/auth/oidc/login"`, `oidcProviderName:"HaLOS SSO"`. Probed **without**
   credentials — re-verify behavior with `withCredentials` (deferred).
 - `GET /signalk/v1/auth/oidc/login` → 302 to Authelia auth-code + PKCE; OIDC `redirect_uri` is the
-  path form (`/signalk-server/.../callback`). SK's OIDC login accepts a `returnTo` param; local login
-  is reachable at `/admin/#/login?noAutoLogin=true`.
+  path form (`/signalk-server/.../callback`). SK's OIDC login accepts a `redirect` param (`req.query
+  .redirect`, since v2.20.0); local login is reachable at `/admin/#/login?noAutoLogin=true`, and its
+  page reads `redirect` out of the hash query (since v2.27.0).
 - `POST /signalk/v1/auth/validate` → **404**. No token-refresh endpoint.
 - OIDC-provisioned users have **no** SK-local password (user-confirmed).
 - `connectionConfig` version is 12 on `master`; `named_configs` bumps to 13. `named_configs`'s
@@ -196,7 +197,9 @@ OIDC-aware" — Skip needs no OIDC code, only cookie + loginStatus + redirect.
 - SK security / login + loginStatus + cookies: https://signalk.org/specification/1.7.0/doc/security.html
 - `loginRedirect.ts` (validation: relative-only, reject `//`, control chars, self-route loop — **no
   budget**): https://github.com/SignalK/signalk-server/blob/master/packages/server-admin-ui/src/views/security/loginRedirect.ts
-- SK OIDC (`returnTo`, `noAutoLogin`): https://raw.githubusercontent.com/SignalK/signalk-server/master/docs/oidc.md
+- SK OIDC (`redirect`, `noAutoLogin`): https://raw.githubusercontent.com/SignalK/signalk-server/master/docs/oidc.md
+  — its "Login Endpoint" section names the param `returnTo`, which no server version reads. The
+  webapps guide (`docs/develop/webapps.md`) has it right; prefer that page.
 - Token-theft advisory: GHSA-fq56-hvg6-wvm5
 - KIP README (same-origin / bundled-with-SK is the primary distribution): https://github.com/mxtommy/Kip
 
@@ -237,7 +240,7 @@ OIDC-aware" — Skip needs no OIDC code, only cookie + loginStatus + redirect.
   session is actually obtainable.
 - **Redirect safety is normative.** Validate the redirect-back target relative-only (single leading
   `/`, reject `//`, backslashes, control chars < 32, scheme, host, self-route login paths). Param is
-  SK's `returnTo` (verify on v2.27.0). A reload-surviving sessionStorage budget caps attempts (kiosk
+  SK's `redirect`. A reload-surviving sessionStorage budget caps attempts (kiosk
   + `oidcAutoLogin` defeats a single-shot guard), **resets on a confirmed `loginStatus==='loggedIn'`**,
   and is **bypassed by an explicit user Sign-in click**. The recovery screen's manual Sign in uses
   `noAutoLogin=true` so SK does not auto-bounce it.
@@ -266,7 +269,7 @@ Detection is origin-first; the manual flags do not gate cookie mode. `useDeviceT
 |---|---|---|---|
 | same origin | authRequired, logged-in, write | **cookie (write)** | cookie auth (REST + WS + origin-correct iframe); server-side shared config; profiles + writes |
 | same origin | authRequired, logged-in, read-only | **cookie (read-only)** | cookie auth; `canWriteUserData` false → write controls disabled with explanation |
-| same origin | authRequired, not logged in | **cookie → redirect** | loginStatus-driven redirect (`returnTo`, budget-guarded, `noAutoLogin` on recovery) |
+| same origin | authRequired, not logged in | **cookie → redirect** | loginStatus-driven redirect (`redirect`, budget-guarded, `noAutoLogin` on recovery) |
 | same origin | auth not required | anonymous read (Unit 6 owns) | no auth; no redirect; "Connected (no sign-in required)"; profiles unavailable |
 | cross origin, useSharedConfig true | — | user-token | form → JWT (header + `&token=`) — unchanged, minus plaintext password |
 | cross origin, useSharedConfig false | — | device-token / local-only | stored device JWT if present, else local-only — unchanged |
@@ -289,7 +292,7 @@ sequenceDiagram
   else notLoggedIn AND authenticationRequired
     SK-->>Skip: {notLoggedIn, oidcEnabled, oidcAutoLogin, oidcLoginUrl}
     Skip->>Skip: "Signing in via SSO…"; check budget
-    Skip->>SK: redirect to oidcLoginUrl?returnTo=<relative-validated> (budget-guarded)
+    Skip->>SK: redirect to oidcLoginUrl?redirect=<relative-validated> (budget-guarded)
     SK->>IdP: auth-code + PKCE
     IdP-->>SK: callback -> sets JAUTHENTICATION cookie
     SK-->>Skip: redirect back; loginStatus -> loggedIn (budget reset)
@@ -326,8 +329,9 @@ sequenceDiagram
 - **withCredentials on discovery/loginStatus** — re-verify the already-probed GETs behave the same
   with `withCredentials`; for `proxyEnabled` + cross-origin `signalKUrl`, the discovery GET is cross
   -origin-with-credentials and depends on SK CORS allow-credentials.
-- **OIDC redirect round-trip** — confirm the `returnTo` param name on v2.27.0 and that the callback
-  returns to Skip at `:4430` without a loop.
+- **OIDC redirect round-trip** — the param name is settled: `redirect`, read by both endpoints (#554).
+  Still confirm the callback returns to Skip at `:4430` without a loop, and that the inner `#` of a
+  hash-routed target survives the round trip.
 - **CSRF / SameSite** — record the JAUTHENTICATION SameSite attribute, confirm a cross-site forged
   write is blocked, and that Skip's writes succeed (R10 gating check).
 - **`userLevel`/`readOnlyAccess` values** — confirm the exact value set on v2.27.0 that maps to read
@@ -644,7 +648,7 @@ profiles (post-rebase) read/write user scope.
   `signalk-delta.service.ts`, `signalk-connection.service.ts`, `storage.service.ts`,
   `settings.service.ts`, `widget-login.component.ts`, `widget-freeboardsk.component.ts`,
   `options/signalk/signalk.component.ts`, `options/configuration/config.component.ts` (profiles)
-- SK docs: webapps auth, security spec, `loginRedirect.ts`, OIDC docs (`returnTo`/`noAutoLogin`)
+- SK docs: webapps auth, security spec, `loginRedirect.ts`, OIDC docs (`redirect`/`noAutoLogin`)
 - Advisory: GHSA-fq56-hvg6-wvm5
 
 ## Review follow-ups (deferred from PR #1)
