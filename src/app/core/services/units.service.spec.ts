@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { UnitsService } from './units.service';
 import { DataService } from './data.service';
 
@@ -163,10 +163,52 @@ describe('UnitsService', () => {
       expect(service.getConversionsForPath('self.environment.water.temperature').base).toBe('celsius');
     });
 
-    it('does not mis-apply the C->celsius alias on a Charge path (celsius not in group -> unitless)', () => {
-      // A charge path's SI unit is 'C' (Coulomb); a stray targetUnit 'C' must not become celsius.
+    it('resolves C to Coulomb on a Charge path — a target that is itself a measure beats the alias', () => {
+      // A charge path's SI unit is 'C' (Coulomb), and 'C' is the identity target the server offers
+      // for it under the `base` category. Matching the group before the alias table is what keeps
+      // that from being rewritten to Celsius and dropped.
       const service = setupWithData('C', { targetUnit: 'C' });
-      expect(service.getConversionsForPath('self.electrical.batteries.house.capacity').base).toBe('unitless');
+      expect(service.getConversionsForPath('self.electrical.batteries.house.capacity').base).toBe('C');
+    });
+
+    it('resolves the identity target of every group Skip supports (the server`s `base` category)', () => {
+      // `base` is always-valid on the server and emits targetUnit === the path's own SI unit, so it
+      // reaches Skip for any path — a second route into the resolver that no preset exercises.
+      for (const unit of ['m/s', 'K', 'Pa', 'm', 'rad', 'rad/s', 'm3', 'V', 'A', 'W', 'ratio', 'Hz', 's', 'C', 'm3/s', 'J']) {
+        const service = setupWithData(unit, { targetUnit: unit });
+        expect(service.getConversionsForPath('self.some.path').base, `base target ${unit}`).toBe(unit);
+      }
+    });
+
+    it('honours the spelled-out and case-variant targets a per-path override can select', () => {
+      // Only the six built-in presets' targets are pinned below; an override or custom preset can
+      // select any conversion key the server defines. These are the ones naming a unit Skip has.
+      const cases: [string, string, string][] = [
+        ['m3/s', 'L/min', 'l/min'], ['m', 'meter', 'm'], ['rad', 'radian', 'rad'],
+        ['rad', 'gradian', 'grad'], ['Hz', 'hertz', 'Hz'], ['W', 'watt', 'W'],
+        ['s', 'second', 's'], ['s', 'minute', 'Minutes'], ['s', 'day', 'Days'],
+      ];
+      for (const [unit, target, measure] of cases) {
+        const service = setupWithData(unit, { targetUnit: target });
+        expect(service.getConversionsForPath('self.some.path').base, `${unit} -> ${target}`).toBe(measure);
+      }
+    });
+
+    it('names the target it could not honour instead of degrading silently', () => {
+      // The silent degrade is what made #536 present as "the gauge reads 0.00" with nothing to go on.
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        const service = setupWithData('W', { targetUnit: 'horsepower' });
+        expect(service.getConversionsForPath('self.electrical.solar.panelPower').base).toBe('unitless');
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toContain('horsepower');
+        expect(warn.mock.calls[0][0]).toContain('self.electrical.solar.panelPower');
+        // Once per target: the resolver runs on every meta emission.
+        service.getConversionsForPath('self.electrical.solar.panelPower');
+        expect(warn).toHaveBeenCalledTimes(1);
+      } finally {
+        warn.mockRestore();
+      }
     });
 
     it('maps every non-identity server target through to a valid group measure', () => {
@@ -183,11 +225,11 @@ describe('UnitsService', () => {
     // presets emit volumeRate 'L/h' and Skip's Flow measure is 'l/h'.
     //
     // Categories deliberately absent: mass (kg) and area (m2) have no Skip conversion group at all, so
-    // even their identity target fails (tracked separately); dataSize, dateTime and boolean are not
-    // Signal K numeric units.
+    // even their identity target fails (#570); dataSize, dateTime and boolean are not Signal K numeric
+    // units; and angleDegrees (baseUnit 'deg') is left out because Skip's only 'deg' measure converts
+    // FROM radians, so honouring it would scale an already-degrees value by 57.3 (#574).
     const PRESET_TARGET_VOCABULARY: { category: string; unit: string; target: string; measure: string }[] = [
       { category: 'angle', unit: 'rad', target: 'degree', measure: 'deg' },
-      { category: 'angleDegrees', unit: 'deg', target: 'deg', measure: 'deg' },
       { category: 'angularVelocity', unit: 'rad/s', target: 'deg/s', measure: 'deg/s' },
       { category: 'charge', unit: 'C', target: 'Ah', measure: 'Ah' },
       { category: 'current', unit: 'A', target: 'A', measure: 'A' },
@@ -240,12 +282,17 @@ describe('UnitsService', () => {
       expect(service.getUnitDisplaySymbol('l/h')).toBe('l/h');
     });
 
-    it('converts the imperial volume and flow targets Skip previously had no measure for', () => {
+    it('converts and labels the imperial gallon, imperial gallons per hour and BTU targets', () => {
       const service = setup();
-      expect(service.convertToUnit('g/h', 1) as number).toBeCloseTo(951019.3845, 3);
-      expect(service.convertToUnit('gal-imp/h', 1) as number).toBeCloseTo(791889.2939, 3);
-      expect(service.convertToUnit('gallon-imp', 1) as number).toBeCloseTo(219.9692483, 6);
+      // Tolerances are physical, not library-exact: they catch a wrong unit (the nearest neighbour
+      // is a factor of 60 away) without pinning js-quantities' rounding of the US gallon.
+      expect(service.convertToUnit('g/h', 1) as number).toBeCloseTo(951019.39, 0);
+      expect(service.convertToUnit('gal-imp/h', 1) as number).toBeCloseTo(791889.29, 0);
+      expect(service.convertToUnit('gallon-imp', 1) as number).toBeCloseTo(219.96925, 4);
       expect(service.convertToUnit('btu', 1) as number).toBeCloseTo(0.000947817, 9);
+      expect(service.getUnitDisplaySymbol('gal-imp/h')).toBe('imp gal/h');
+      expect(service.getUnitDisplaySymbol('gallon-imp')).toBe('imp gal');
+      expect(service.getUnitDisplaySymbol('btu')).toBe('BTU');
     });
 
     it('keeps the label-matches-conversion invariant for every aliased category (symbol + working conversion)', () => {
@@ -276,12 +323,17 @@ describe('UnitsService', () => {
       // conversion function or a resolvable symbol.
       const service = setup();
       for (const group of service.getConversions()) {
-        // The Unitless group is the one exception, and deliberately so: its members exist to carry the
-        // as-is value with nothing rendered beside it, so their symbol is empty by design.
-        if (group.group === 'Unitless') { continue; }
         for (const unit of group.units) {
           expect(service.convertToUnit(unit.measure, 1), `conversion ${unit.measure}`).not.toBeNull();
-          expect(service.getUnitDisplaySymbol(unit.measure), `symbol ${unit.measure}`).not.toBe('');
+          // The Unitless group is the one exception on the symbol half, and deliberately so: its
+          // members carry the as-is value with nothing rendered beside it. Pinned positively rather
+          // than skipped, so a member added there without an empty symbol still fails.
+          const symbol = service.getUnitDisplaySymbol(unit.measure);
+          if (group.group === 'Unitless') {
+            expect(symbol, `symbol ${unit.measure}`).toBe('');
+          } else {
+            expect(symbol, `symbol ${unit.measure}`).not.toBe('');
+          }
         }
       }
     });
