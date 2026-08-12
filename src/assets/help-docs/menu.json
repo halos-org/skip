@@ -52,6 +52,10 @@
     "title": "Advanced Features",
     "items": [
       { "title": "Kiosk Mode", "file": "kiosk.md" },
+      {
+        "title": "Read-Only Access Without Signing In",
+        "file": "anonymous-default.md"
+      },
       { "title": "Contributing Widgets", "file": "contributing-widgets.md" }
     ]
   },
