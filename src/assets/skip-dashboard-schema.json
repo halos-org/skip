@@ -415,6 +415,32 @@
         ]
       },
       {
+        "group": "Mass",
+        "measures": [
+          {
+            "description": "Kilograms (base)",
+            "measure": "kg"
+          },
+          {
+            "description": "Pounds",
+            "measure": "lbs"
+          }
+        ]
+      },
+      {
+        "group": "Area",
+        "measures": [
+          {
+            "description": "Square Meters (base)",
+            "measure": "m2"
+          },
+          {
+            "description": "Square Feet",
+            "measure": "sqft"
+          }
+        ]
+      },
+      {
         "group": "Density",
         "measures": [
           {
