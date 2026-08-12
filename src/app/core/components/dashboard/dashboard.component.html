@@ -25,7 +25,7 @@
         <mat-icon class="touch-icon">touch_app</mat-icon>
       } @else {
         <p class="empty-state-text">This empty page is ready to be customized.</p>
-        @if (!embed()) {
+        @if (!readOnly()) {
           <button class="empty-state-button" mat-flat-button (click)="editDashboard()">
             <mat-icon>lock_open</mat-icon>
             Unlock and Customize

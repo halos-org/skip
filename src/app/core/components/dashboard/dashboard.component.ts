@@ -20,7 +20,6 @@ import { GroupWidgetComponent } from '../group-widget/group-widget.component';
 import { ActionMenuComponent } from '../action-menu/action-menu.component';
 import { ActionMenuItem } from '../action-menu/action-menu-item';
 import { PluginConfigClientService } from '../../services/plugin-config-client.service';
-import { EmbedModeService } from '../../services/embed-mode.service';
 
 /** Per-phase duration (ms) of the page-transition slide; two phases run back to back. */
 const PAGE_SLIDE_PHASE_MS = 150;
@@ -77,9 +76,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     return actions;
   });
   protected readonly dashboard = inject(DashboardService);
-  private readonly _embedMode = inject(EmbedModeService);
-  /** True in the chromeless embed render mode; gates the empty-state "Unlock and Customize" button. */
-  protected readonly embed = this._embedMode.embed;
+  /** Any session whose edits could never be saved — the chromeless embed, an anonymous read-only
+   *  visitor, a signed-in `readonly` user. Gates the empty-state "Unlock and Customize" button,
+   *  which calls into a lock the same predicate refuses to open. */
+  protected readonly readOnly = this.dashboard.isReadOnlySession;
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _uiEvent = inject(uiEventService);
   private readonly _pluginConfig = inject(PluginConfigClientService);

@@ -54,6 +54,7 @@ describe('AppComponent', () => {
     navigateToNextDashboard: ReturnType<typeof vi.fn>;
     navigateToPreviousDashboard: ReturnType<typeof vi.fn>;
     setStaticDashboard: ReturnType<typeof vi.fn>;
+    isReadOnlySession: ReturnType<typeof signal<boolean>>;
     widgetAction$: Subject<unknown>;
   };
   let uiEvent: {
@@ -83,6 +84,7 @@ describe('AppComponent', () => {
       navigateToNextDashboard: vi.fn(),
       navigateToPreviousDashboard: vi.fn(),
       setStaticDashboard: vi.fn(),
+      isReadOnlySession: signal(false),
       widgetAction$: new Subject(),
     };
     uiEvent = {
@@ -488,6 +490,7 @@ describe('AppComponent — embed mode chrome', () => {
       navigateToNextDashboard: vi.fn(),
       navigateToPreviousDashboard: vi.fn(),
       setStaticDashboard: vi.fn(),
+      isReadOnlySession: signal(false),
       widgetAction$: new Subject(),
     };
     const uiEvent = {
@@ -552,6 +555,7 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
       navigateToNextDashboard: vi.fn(),
       navigateToPreviousDashboard: vi.fn(),
       setStaticDashboard: vi.fn(),
+      isReadOnlySession: signal(false),
       widgetAction$: new Subject(),
     };
     const uiEvent = {
