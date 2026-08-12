@@ -87,7 +87,13 @@ function deploy-halos {
   "${runner[@]}" "$sysdir" <<'PREP'
 set -o errexit -o nounset -o pipefail
 sysdir="$1"
-mkdir -p "$sysdir"
+# system-plugins/ belongs to the container-app framework, which creates it as root on a
+# device that ships plugins there (signalk-halpi). Fall back to sudo, then hand the
+# directory to the invoking user so the rsync that follows needs no privilege.
+if ! mkdir -p "$sysdir" 2>/dev/null; then
+  sudo mkdir -p "$sysdir"
+  sudo chown "$(id -u):$(id -g)" "$sysdir"
+fi
 if [ -n "$(ls -A "$sysdir" 2>/dev/null)" ]; then
   tar -czf "$HOME/$(basename "$sysdir")-predeploy-$(date +%F-%H%M%S).tar.gz" \
     -C "$(dirname "$sysdir")" "$(basename "$sysdir")"
@@ -101,10 +107,21 @@ PREP
   rsync -rlpt --delete public/ "${dest}${sysdir}/public/"
   rsync -lpt package.json "${dest}${sysdir}/package.json"
 
+  # The hashed entry bundle names this exact build. It is what the device has to serve
+  # for the deploy to have landed; the package being registered and the URL answering
+  # 200 are both true of the build it replaced.
+  local entry
+  entry=$(grep -o 'main-[A-Za-z0-9]*\.js' public/index.html | head -1)
+  if [[ -z "$entry" ]]; then
+    echo "Could not find the entry bundle in public/index.html; is the build complete?" >&2
+    return 1
+  fi
+
   echo "==> Linking, registering the dependency, and (re)starting Signal K if needed..."
-  "${runner[@]}" "$pkg" "$slug" "$data" <<'REMOTE'
+  local rc=0
+  "${runner[@]}" "$pkg" "$slug" "$data" "$entry" <<'REMOTE' || rc=$?
 set -o errexit -o nounset -o pipefail
-pkg="$1"; slug="$2"; data="$3"
+pkg="$1"; slug="$2"; data="$3"; entry="$4"
 
 # Traefik base URL + device CA (HTTPS, port 4430). Never the container's :3000 --
 # host networking only exposes that incidentally; all access goes via Traefik.
@@ -113,14 +130,12 @@ domain=$(hostname -d 2>/dev/null || true)
 [ -z "$domain" ] && domain=$(awk '/^search/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
 base="https://$(hostname)${domain:+.$domain}:4430"
 
-# Is the webapp already mounted? Signal K registers a webapp mount only at server
-# start (node_modules keyword scan). For an already-served package a content-only
-# update needs no restart -- express.static serves the new public/ from disk per
-# request. Only a first install (not yet mounted) needs a restart to register it.
-was_mounted=no
-if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "\"$pkg\""; then
-  was_mounted=yes
-fi
+# Does the device serve THIS build? Every weaker check passes for the build being
+# replaced: the package stays registered, /skServer/webapps keeps listing it, and the
+# URL keeps answering 200. Only the hashed entry bundle distinguishes them.
+serves_this_build() {
+  curl -s --max-time 10 --cacert "$ca" "${base}/${pkg}/" 2>/dev/null | grep -qF "$entry"
+}
 
 # Link into node_modules exactly as npm does for a file: dependency (scope-aware).
 # Remove any existing entry first: when the package is already present as a real
@@ -158,30 +173,44 @@ PY
 # Remove a stale bundled plugin/ tree from a prior (pre-webapp-only) deploy.
 rm -rf "${data}/system-plugins/${slug}/plugin"
 
-if [ "$was_mounted" = yes ]; then
-  echo "  ${pkg} already mounted; skipping restart (express.static serves the new build on next request)"
+# A content-only update often needs no restart: the webapp mount is registered once at
+# server start, but express.static reads public/ from disk per request. Often is not a
+# check, so ask the device rather than assuming. Restart through systemd, never docker
+# directly -- the unit owns the provision/prestart step and the dependency ordering.
+if serves_this_build; then
+  echo "  ${pkg} is already serving this build (${entry})"
 else
-  echo "  ${pkg} not yet mounted; restarting Signal K to register the webapp mount..."
-  sudo docker restart signalk-server
+  echo "  ${pkg} is not serving ${entry}; restarting Signal K..."
+  sudo systemctl restart marine-signalk-server-container.service
   echo "  waiting for Signal K at ${base} ..."
   for _ in $(seq 1 25); do
     if curl -sf --max-time 10 --cacert "$ca" "${base}/skServer/webapps" >/dev/null 2>&1; then break; fi
     sleep 3
   done
+  if ! serves_this_build; then
+    echo "  FAIL: ${base}/${pkg}/ still does not reference ${entry} after a restart." >&2
+    echo "        The device is serving a different build than the one just synced." >&2
+    exit 1
+  fi
 fi
 
-# Verify through Traefik.
-if curl -s --max-time 10 --cacert "$ca" "${base}/skServer/webapps" 2>/dev/null | grep -qF "\"$pkg\""; then
-  echo "  OK: ${pkg} is served by Signal K (listed in /skServer/webapps)"
-else
-  echo "  WARN: ${pkg} not listed at ${base}/skServer/webapps"
+# The index naming the bundle is not the same as the bundle being fetchable.
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --cacert "$ca" "${base}/${pkg}/${entry}" || true)
+if [ "$code" != 200 ]; then
+  echo "  FAIL: ${base}/${pkg}/${entry} -> HTTP ${code}" >&2
+  exit 1
 fi
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --cacert "$ca" "${base}/${pkg}/" || true)
-echo "  ${base}/${pkg}/ -> HTTP ${code}"
+echo "  OK: ${base}/${pkg}/ serves ${entry}"
 REMOTE
 
+  if [[ $rc -ne 0 ]]; then
+    echo "" >&2
+    echo "Deploy FAILED: ${target} is not serving the build just synced (see above)." >&2
+    return "$rc"
+  fi
+
   echo ""
-  echo "Deployed ${pkg} to ${target}; see the Traefik verify result above."
+  echo "Deployed ${pkg} to ${target}, verified serving ${entry}."
   echo "Note: this ships the webapp only. The Freeboard-SK panel is the separate"
   echo "@halos-org/skip-freeboard-panel package -- deploy it too if this device needs"
   echo "the Freeboard toolbar button."
