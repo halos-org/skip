@@ -84,15 +84,24 @@ function deploy-halos {
   build
 
   echo "==> Preparing ${dest}${sysdir} (backing up any existing install)..."
-  "${runner[@]}" "$sysdir" <<'PREP'
+  "${runner[@]}" "$sysdir" "$data" <<'PREP'
 set -o errexit -o nounset -o pipefail
-sysdir="$1"
-# system-plugins/ belongs to the container-app framework, which creates it as root on a
-# device that ships plugins there (signalk-halpi). Fall back to sudo, then hand the
-# directory to the invoking user so the rsync that follows needs no privilege.
-if ! mkdir -p "$sysdir" 2>/dev/null; then
+sysdir="$1"; data="$2"
+# Refuse a host that has no Signal K container app rather than creating the hierarchy under it.
+# The sudo below would otherwise turn a mistyped hostname into a root-owned tree holding a full
+# copy of the build, failing only later when the remote step cannot write node_modules.
+if [ ! -d "$data" ]; then
+  echo "No Signal K container-app data directory at $data." >&2
+  echo "Is this a HaLOS device with the Signal K app installed?" >&2
+  exit 1
+fi
+# system-plugins/ belongs to the container-app framework, which creates it as root on a device
+# that ships plugins there (signalk-halpi), and the skip/ leaf under it may be root-owned too.
+# mkdir -p returns 0 for a directory that already exists whatever its ownership, so writability
+# is the thing to test. Hand it to the invoking user so the rsync that follows needs no privilege.
+if ! mkdir -p "$sysdir" 2>/dev/null || [ ! -w "$sysdir" ]; then
   sudo mkdir -p "$sysdir"
-  sudo chown "$(id -u):$(id -g)" "$sysdir"
+  sudo chown -R "$(id -u):$(id -g)" "$sysdir"
 fi
 if [ -n "$(ls -A "$sysdir" 2>/dev/null)" ]; then
   tar -czf "$HOME/$(basename "$sysdir")-predeploy-$(date +%F-%H%M%S).tar.gz" \
@@ -110,10 +119,11 @@ PREP
   # The hashed entry bundle names this exact build. It is what the device has to serve
   # for the deploy to have landed; the package being registered and the URL answering
   # 200 are both true of the build it replaced.
+  # The assignment has to be the `if` condition: as a bare statement, errexit exits the script on a
+  # grep that matches nothing, and the diagnostic below never prints.
   local entry
-  entry=$(grep -o 'main-[A-Za-z0-9]*\.js' public/index.html | head -1)
-  if [[ -z "$entry" ]]; then
-    echo "Could not find the entry bundle in public/index.html; is the build complete?" >&2
+  if ! entry=$(grep -o 'main-[A-Za-z0-9]*\.js' public/index.html | head -1) || [[ -z "$entry" ]]; then
+    echo "No main-<hash>.js in public/index.html; is the build complete?" >&2
     return 1
   fi
 
@@ -133,8 +143,12 @@ base="https://$(hostname)${domain:+.$domain}:4430"
 # Does the device serve THIS build? Every weaker check passes for the build being
 # replaced: the package stays registered, /skServer/webapps keeps listing it, and the
 # URL keeps answering 200. Only the hashed entry bundle distinguishes them.
+# Returns 2 when the check itself could not run, so an unreachable app is never reported as a
+# stale one. Capturing the body rather than piping into grep also keeps pipefail out of it.
 serves_this_build() {
-  curl -s --max-time 10 --cacert "$ca" "${base}/${pkg}/" 2>/dev/null | grep -qF "$entry"
+  local body
+  body=$(curl -sf --max-time 10 --cacert "$ca" "${base}/${pkg}/" 2>/dev/null) || return 2
+  printf '%s' "$body" | grep -qF "$entry"
 }
 
 # Link into node_modules exactly as npm does for a file: dependency (scope-aware).
@@ -187,8 +201,13 @@ else
     if curl -sf --max-time 10 --cacert "$ca" "${base}/skServer/webapps" >/dev/null 2>&1; then break; fi
     sleep 3
   done
-  if ! serves_this_build; then
-    echo "  FAIL: ${base}/${pkg}/ still does not reference ${entry} after a restart." >&2
+  verdict=0
+  serves_this_build || verdict=$?
+  if [ "$verdict" -eq 2 ]; then
+    echo "  FAIL: ${base}/${pkg}/ could not be fetched after a restart; the deploy is unverified." >&2
+    exit 1
+  elif [ "$verdict" -ne 0 ]; then
+    echo "  FAIL: ${base}/${pkg}/ does not reference ${entry} after a restart." >&2
     echo "        The device is serving a different build than the one just synced." >&2
     exit 1
   fi
@@ -205,7 +224,7 @@ REMOTE
 
   if [[ $rc -ne 0 ]]; then
     echo "" >&2
-    echo "Deploy FAILED: ${target} is not serving the build just synced (see above)." >&2
+    echo "Deploy FAILED on ${target} (see the error above)." >&2
     return "$rc"
   fi
 
