@@ -8,6 +8,38 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 /** Fixed stale-data TTL (ms) applied to every widget whose enableTimeout is on; not user-configurable. */
 const FIXED_DATA_TIMEOUT_MS = 5000;
 
+/** The subset of a path config that decides which reading a subscription delivers. */
+interface IPathIdentity {
+  path: string | null;
+  pathType?: string | null;
+  convertUnitTo?: string | null;
+  source?: string | null;
+  suppressBootstrapNull?: boolean;
+}
+
+/** Trim a configured path to its canonical form; undefined when it is not a usable path. */
+export function normalizeWidgetPath(path: unknown): string | undefined {
+  const trimmed = typeof path === 'string' ? path.trim() : '';
+  return trimmed.length ? trimmed : undefined;
+}
+
+/**
+ * Identity of a configured path as the subscription diff computes it. Two configs that share a
+ * signature reuse one subscription; a different signature means the widget is now watching another
+ * reading. A widget that holds presentation state derived from the stream — a needle position, a
+ * last value, an alarm colour — needs this to tell a re-point apart from an unrelated reconfigure
+ * such as a theme change, because a rebuilt subscription may replay nothing at all and leave that
+ * state showing the previous path.
+ *
+ * Returns null for a config with no usable path, which has no identity to compare.
+ */
+export function widgetPathSignature(pathCfg: IPathIdentity | undefined | null): string | null {
+  const normalizedPath = normalizeWidgetPath(pathCfg?.path);
+  if (!pathCfg || !normalizedPath) return null;
+  const src = (pathCfg.source?.trim() || 'default');
+  return [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0'].join('|');
+}
+
 @Directive({
   selector: '[widget-streams]',
   exportAs: 'widgetStreams'
@@ -63,9 +95,7 @@ export class WidgetStreamsDirective implements OnDestroy {
   }
 
   private computePathSignature(pathCfg: { path: string; pathType: string; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }): string {
-    const normalizedPath = this.normalizePath(pathCfg.path) ?? '';
-    const src = (pathCfg.source?.trim() || 'default');
-    return [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0'].join('|');
+    return widgetPathSignature(pathCfg) ?? '';
   }
 
   private computeBaseKey(path: string, source?: string): string {
@@ -75,9 +105,7 @@ export class WidgetStreamsDirective implements OnDestroy {
   }
 
   private normalizePath(path: unknown): string | undefined {
-    if (typeof path !== 'string') return undefined;
-    const trimmed = path.trim();
-    return trimmed.length ? trimmed : undefined;
+    return normalizeWidgetPath(path);
   }
 
   private computeRootSignature(cfg: IWidgetSvcConfig | undefined): string {

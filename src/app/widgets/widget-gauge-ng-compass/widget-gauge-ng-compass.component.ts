@@ -15,7 +15,7 @@ import { States } from '../../core/interfaces/signalk-interfaces';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature } from '../../core/directives/widget-streams.directive';
 import { ITheme } from '../../core/services/app-service';
 import { UnitsService } from '../../core/services/units.service';
 
@@ -124,6 +124,28 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
   protected colorStrokeTicks = '';
   private currentState = signal<States>(States.Normal);
   private lastAppliedState: States | null = null;
+  /** Identity of the path the reading state describes; null until the first subscription. */
+  private lastPathSignature: string | null = null;
+
+  /**
+   * Drop the reading when the widget is re-pointed at another path.
+   *
+   * The subscription is rebuilt on every run of the data effect, a theme change included, and
+   * `suppressBootstrapNull` gives each rebuild a fresh suppression closure. Against a path that
+   * reports nothing the replayed leading null is therefore filtered and the stream callback never
+   * runs — leaving the previous path's needle and value on screen, presented as a live reading of
+   * the new one. Clearing unconditionally here is wrong for the same reason: this effect re-runs on
+   * theme changes, which would blink the needle off and back on at every switch.
+   */
+  private clearReadingOnRepoint(signature: string | null): void {
+    if (this.lastPathSignature !== null && this.lastPathSignature !== signature) {
+      this.dataAvailable.set(false);
+      this.value.set(undefined);
+      this.textValue.set('--');
+      this.currentState.set(States.Normal);
+    }
+    this.lastPathSignature = signature;
+  }
 
   private readonly negToPortPaths = [
     "self.environment.wind.angleApparent",
@@ -147,7 +169,10 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       if (!cfg || !theme) return;
       const pCfg = cfg.paths?.['gaugePath'];
       if (!pCfg?.path) return;
-      untracked(() => this.streams.observe('gaugePath', pkt => {
+      const signature = widgetPathSignature(pCfg);
+      untracked(() => {
+        this.clearReadingOnRepoint(signature);
+        this.streams.observe('gaugePath', pkt => {
         let raw = (pkt?.data?.value as number) ?? null;
         this.dataAvailable.set(raw != null);
         if (raw == null) {
@@ -161,7 +186,8 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
         }
         const newState = (pkt?.state ?? States.Normal) as States;
         if (newState !== this.currentState()) this.currentState.set(newState);
-      }));
+        });
+      });
     });
 
     // Build options when config/theme changes

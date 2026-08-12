@@ -16,7 +16,7 @@ import { getHighlights } from '../../core/utils/zones-highlight.utils';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature } from '../../core/directives/widget-streams.directive';
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
 import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
@@ -143,6 +143,28 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
   private pathDataState = signal<States | null>(null);
   private viewReady = signal(false);
   protected gaugeOptions: RadialGaugeOptions = {} as RadialGaugeOptions;
+  /** Identity of the path the state below describes; null until the first subscription. */
+  private lastPathSignature: string | null = null;
+
+  /**
+   * Drop the reading when the widget is re-pointed at another path.
+   *
+   * The subscription is rebuilt on every run of the data effect, a theme change included, and
+   * `suppressBootstrapNull` gives each rebuild a fresh suppression closure. Against a path that
+   * reports nothing the replayed leading null is therefore filtered and the stream callback never
+   * runs — leaving the previous path's needle and value on screen, presented as a live reading of
+   * the new one. Clearing unconditionally here is wrong for the same reason: this effect re-runs on
+   * theme changes, which would blink the needle off and back on at every switch.
+   */
+  private clearReadingOnRepoint(signature: string | null): void {
+    if (this.lastPathSignature !== null && this.lastPathSignature !== signature) {
+      this.dataAvailable.set(false);
+      this.value.set(undefined);
+      this.effectiveUnit.set('');
+      this.pathDataState.set(null);
+    }
+    this.lastPathSignature = signature;
+  }
 
   constructor() {
     // Data subscription effect
@@ -151,8 +173,11 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       const theme = this.theme();
       if (!cfg || !theme) return;
       if (!cfg.paths?.['gaugePath'].path) return;
+      const signature = widgetPathSignature(cfg.paths['gaugePath']);
 
-      untracked(() => this.streams.observe('gaugePath', path => {
+      untracked(() => {
+        this.clearReadingOnRepoint(signature);
+        this.streams.observe('gaugePath', path => {
         if (path.state !== this.pathDataState()) {
           this.pathDataState.set((path.state as States) || null);
         }
@@ -172,7 +197,8 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
           // clamp
           this.value.set(Math.min(Math.max(raw, lower), upper));
         }
-      }));
+        });
+      });
     });
 
     // Metadata observation (idempotent) – only when zones not ignored

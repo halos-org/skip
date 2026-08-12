@@ -9,6 +9,7 @@ import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.d
 import { UnitsService } from '../../core/services/units.service';
 import { IWidgetSvcConfig, IPathArray } from '../../core/interfaces/widgets-interface';
 import { States } from '../../core/interfaces/signalk-interfaces';
+import { IPathUpdate } from '../../core/services/data.service';
 
 /**
  * The label and the unit are rendered by the component as one header row on the card, so the gauge
@@ -26,11 +27,13 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
   let internals: LinearInternals;
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
   let sizeUpdates: LinearGaugeOptions[];
+  let capturedNext: ((u: IPathUpdate) => void) | undefined;
 
   interface LinearInternals {
     effectiveUnit: WritableSignal<string>;
     dataAvailable: WritableSignal<boolean>;
     currentState: WritableSignal<string>;
+    value: () => number | null | undefined;
     barColor: (cfg: IWidgetSvcConfig, theme: unknown, state: string) => string;
     optionsReady: () => boolean;
     textValue: () => string;
@@ -45,16 +48,19 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
     cardColor: '#111', background: '#000'
   };
 
-  const makeConfig = (subType = 'vertical'): IWidgetSvcConfig => {
+  const makeConfig = (subType = 'vertical', path = 'self.navigation.speedOverGround'): IWidgetSvcConfig => {
     const dflt = WidgetGaugeNgLinearComponent.DEFAULT_CONFIG;
     const gaugePath = (dflt.paths as IPathArray)['gaugePath'];
     return {
       ...dflt,
       ignoreZones: true,
       gauge: { ...dflt.gauge, type: 'ngLinear', subType },
-      paths: { gaugePath: { ...gaugePath, path: 'self.navigation.speedOverGround', convertUnitTo: 'knots' } }
+      paths: { gaugePath: { ...gaugePath, path, convertUnitTo: 'knots' } }
     };
   };
+
+  const update = (value: unknown, measure?: string): IPathUpdate =>
+    ({ data: { value, timestamp: null, measure }, state: States.Normal }) as unknown as IPathUpdate;
 
   const unitsFake = {
     convertBetweenMeasures: (from: string, to: string, value: number): number => from === to ? value : value,
@@ -70,12 +76,13 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
   beforeEach(async () => {
     options = signal<IWidgetSvcConfig | undefined>(makeConfig());
     sizeUpdates = [];
+    capturedNext = undefined;
 
     await TestBed.configureTestingModule({
       imports: [WidgetGaugeNgLinearComponent],
       providers: [
         { provide: WidgetRuntimeDirective, useValue: { options } },
-        { provide: WidgetStreamsDirective, useValue: { observe: () => undefined } },
+        { provide: WidgetStreamsDirective, useValue: { observe: (_p: string, next: (u: IPathUpdate) => void) => { capturedNext = next; } } },
         { provide: WidgetMetadataDirective, useValue: { zones: () => [], observe: () => undefined } },
         { provide: UnitsService, useValue: unitsFake }
       ]
@@ -214,6 +221,38 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
       cfg.ignoreZones = false;
       internals.dataAvailable.set(false);
       expect(internals.barColor(cfg, themed, States.Alarm)).toBe('rgba(0,0,0,0)');
+    });
+  });
+
+  // #534: a rebuilt subscription against a silent path replays nothing (the leading null is
+  // suppressed), so the callback never runs and the previous path's reading stayed on the bar.
+  describe('re-point', () => {
+    it('clears the reading when re-pointed at a path that reports nothing', () => {
+      capturedNext?.(update(6.5, 'knots'));
+      expect(internals.dataAvailable()).toBe(true);
+      expect(internals.value()).toBe(6.5);
+
+      options.set(makeConfig('vertical', 'self.environment.depth.belowTransducer'));
+      fixture.detectChanges();
+
+      expect(internals.dataAvailable()).toBe(false);
+      expect(internals.value()).toBeUndefined();
+      expect(internals.textValue()).toBe('--');
+      expect(internals.effectiveUnit()).toBe('');
+    });
+
+    // The same effect re-runs on a theme change, so an unconditional clear would blink the bar off
+    // and back on at every switch.
+    it('keeps the reading when the config changes without changing the path', () => {
+      capturedNext?.(update(6.5, 'knots'));
+      expect(internals.dataAvailable()).toBe(true);
+
+      fixture.componentRef.setInput('theme', { ...theme, cardColor: '#eee', background: '#fff' });
+      fixture.detectChanges();
+
+      expect(internals.dataAvailable()).toBe(true);
+      expect(internals.value()).toBe(6.5);
+      expect(internals.effectiveUnit()).toBe('knots');
     });
   });
 });

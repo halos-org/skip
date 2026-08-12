@@ -1,4 +1,4 @@
-import { signal } from '@angular/core';
+import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WidgetGaugeNgCompassComponent } from './widget-gauge-ng-compass.component';
@@ -20,6 +20,7 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
   let fixture: ComponentFixture<WidgetGaugeNgCompassComponent>;
   let internals: CompassInternals;
   let capturedNext: ((u: IPathUpdate) => void) | undefined;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
 
   interface CompassInternals {
     value: () => number | null | undefined;
@@ -29,12 +30,12 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
     gaugeOptions: { needle?: boolean };
   }
 
-  const makeConfig = (): IWidgetSvcConfig => {
+  const makeConfig = (path = 'self.navigation.headingTrue'): IWidgetSvcConfig => {
     const dflt = WidgetGaugeNgCompassComponent.DEFAULT_CONFIG;
     const gaugePath = (dflt.paths as IPathArray)['gaugePath'];
     return {
       ...dflt,
-      paths: { gaugePath: { ...gaugePath, path: 'self.navigation.headingTrue' } }
+      paths: { gaugePath: { ...gaugePath, path } }
     };
   };
 
@@ -43,7 +44,7 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
 
   beforeEach(async () => {
     capturedNext = undefined;
-    const options = signal<IWidgetSvcConfig | undefined>(makeConfig());
+    options = signal<IWidgetSvcConfig | undefined>(makeConfig());
     const streamsFake = {
       observe(_pathName: string, next: (u: IPathUpdate) => void) { capturedNext = next; }
     };
@@ -95,5 +96,38 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
     capturedNext?.(update(null));
     expect(internals.dataAvailable()).toBe(false);
     expect(internals.textValue()).toBe('--');
+  });
+
+  // #534: a rebuilt subscription against a silent path replays nothing (the leading null is
+  // suppressed), so the callback never runs and the previous heading stayed on the rose.
+  it('clears the heading when re-pointed at a path that reports nothing', () => {
+    capturedNext?.(update(142));
+    expect(internals.dataAvailable()).toBe(true);
+
+    options.set(makeConfig('self.navigation.headingMagnetic'));
+    fixture.detectChanges();
+
+    expect(internals.dataAvailable()).toBe(false);
+    expect(internals.value()).toBeUndefined();
+    expect(internals.textValue()).toBe('--');
+  });
+
+  // The same effect re-runs on a theme change, so an unconditional clear would blink the needle
+  // off and back on at every switch.
+  it('keeps the heading when the config changes without changing the path', () => {
+    capturedNext?.(update(142));
+
+    fixture.componentRef.setInput('theme', {
+      contrast: 'rgba(0,0,0,1)', contrastDim: 'rgba(60,60,60,1)',
+      contrastDimmer: 'rgba(120,120,120,1)', cardColor: 'rgba(238,238,238,1)',
+      background: 'rgba(255,255,255,1)', zoneAlarm: 'rgba(255,0,0,1)',
+      zoneWarn: 'rgba(255,170,0,1)', zoneAlert: 'rgba(255,0,255,1)',
+      zoneEmergency: 'rgba(255,0,0,1)'
+    });
+    fixture.detectChanges();
+
+    expect(internals.dataAvailable()).toBe(true);
+    expect(internals.value()).toBe(142);
+    expect(internals.textValue()).toBe('142');
   });
 });

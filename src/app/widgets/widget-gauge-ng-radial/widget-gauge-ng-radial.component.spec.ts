@@ -44,7 +44,7 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
   }
 
   // convertUnitTo is the stored authoring unit; a tagged measure that differs is the flip target.
-  const makeConfig = (): IWidgetSvcConfig => {
+  const makeConfig = (path = 'self.test.soc'): IWidgetSvcConfig => {
     const dflt = WidgetGaugeNgRadialComponent.DEFAULT_CONFIG;
     const gaugePath = (dflt.paths as IPathArray)['gaugePath'];
     return {
@@ -53,7 +53,7 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
       displayScale: { lower: 10, upper: 100, type: 'linear' },
       gauge: { ...dflt.gauge, type: 'ngRadial', subType: 'capacity' },
       paths: {
-        gaugePath: { ...gaugePath, path: 'self.test.soc', convertUnitTo: 'ratio' }
+        gaugePath: { ...gaugePath, path, convertUnitTo: 'ratio' }
       }
     };
   };
@@ -174,5 +174,42 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
     expect(internals.effectiveUnit()).toBe('');
     // With the tag cleared, the scale falls back to the stored convertUnitTo bounds again.
     expect(internals.adjustedScale()).toEqual({ min: 10, max: 100, majorTicks: [] });
+  });
+
+  // #534: a rebuilt subscription against a silent path replays nothing (the leading null is
+  // suppressed), so the stream callback never runs and the previous path's reading stayed on the
+  // dial, presented as a live reading of the new path.
+  it('clears the reading when re-pointed at a path that reports nothing', () => {
+    capturedNext?.(update(42, 'percent'));
+    expect(internals.dataAvailable()).toBe(true);
+    expect(internals.value()).toBe(42); // within the reinterpreted 20..200 scale, so unclamped
+
+    options.set(makeConfig('self.test.silent'));
+    fixture.detectChanges();
+
+    // The new subscription delivers nothing at all — exactly the case that used to leave the old
+    // needle in place.
+    expect(internals.dataAvailable()).toBe(false);
+    expect(internals.value()).toBeUndefined();
+    expect(internals.textValue()).toBe('--');
+    expect(internals.effectiveUnit()).toBe('');
+  });
+
+  // The same effect re-runs on a theme change, so an unconditional clear would blink the needle off
+  // and back on at every switch.
+  it('keeps the reading when the config changes without changing the path', () => {
+    capturedNext?.(update(42, 'percent'));
+    expect(internals.dataAvailable()).toBe(true);
+
+    fixture.componentRef.setInput('theme', {
+      contrast: '#000', contrastDim: '#333', contrastDimmer: '#666',
+      cardColor: '#eee', background: '#fff'
+    });
+    fixture.detectChanges();
+
+    expect(internals.dataAvailable()).toBe(true);
+    expect(internals.value()).toBe(42);
+    expect(internals.textValue()).toBe('');
+    expect(internals.effectiveUnit()).toBe('percent');
   });
 });

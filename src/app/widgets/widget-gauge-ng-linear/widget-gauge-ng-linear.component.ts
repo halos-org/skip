@@ -16,7 +16,7 @@ import { getColors } from '../../core/utils/themeColors.utils';
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature } from '../../core/directives/widget-streams.directive';
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
 import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
@@ -103,6 +103,29 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
   private currentState = signal<string>(States.Normal);
   /** Measure the incoming value was converted to (server-resolved for this display path). '' = boot placeholder. */
   private effectiveUnit = signal<string>('');
+  /** Identity of the path the state above describes; null until the first subscription. */
+  private lastPathSignature: string | null = null;
+
+  /**
+   * Drop the reading when the widget is re-pointed at another path.
+   *
+   * The subscription is rebuilt on every run of the data effect, a theme change included, and
+   * `suppressBootstrapNull` gives each rebuild a fresh suppression closure. Against a path that
+   * reports nothing the replayed leading null is therefore filtered and the stream callback never
+   * runs — leaving the previous path's bar, value and unit on screen, presented as a live reading
+   * of the new one. Clearing unconditionally here is wrong for the same reason: this effect re-runs
+   * on theme changes, which would blink the bar off and back on at every switch.
+   */
+  private clearReadingOnRepoint(signature: string | null): void {
+    if (this.lastPathSignature !== null && this.lastPathSignature !== signature) {
+      this.dataAvailable.set(false);
+      this.value.set(undefined);
+      this.textValue.set('--');
+      this.effectiveUnit.set('');
+      this.currentState.set(States.Normal);
+    }
+    this.lastPathSignature = signature;
+  }
 
   protected adjustedScale = computed<IScale>(() => {
     const cfg = this.runtime.options();
@@ -144,10 +167,10 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       const theme = this.theme();
       if (!cfg || !theme) return;
       if (!cfg.paths?.['gaugePath'].path) return;
+      const signature = widgetPathSignature(cfg.paths['gaugePath']);
 
       untracked(() => {
-        // Reset the tagged measure so a stale unit never paints the new subscription's value.
-        this.effectiveUnit.set('');
+        this.clearReadingOnRepoint(signature);
         this.streams.observe('gaugePath', path => {
           const raw = (path?.data?.value as number) ?? null;
           const measure = path.data.measure ?? '';
