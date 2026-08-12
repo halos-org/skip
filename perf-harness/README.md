@@ -107,6 +107,16 @@ the machine step boot-asserts only the tile count; **symbol correctness is a hum
 eyeball of the screenshot** (each tile is labelled by its measure key). The symbol
 resolution itself is unit-tested in `units.service.spec.ts`.
 
+`shot-fuel-rate.mjs` is the #536 probe: a steel gauge, a linear gauge and a numeric tile
+on `propulsion.0.fuel.rate`, shot twice to `results/shots/fuel-rate/` — once with the
+`displayUnits` meta the server's metric preset publishes for the `volumeRate` category
+(`targetUnit: 'L/h'`), once with the same path carrying units but no preference. It is the
+only probe that drives `control.selfMeta`, so it is the one that exercises server-resolved
+measures end to end rather than a stored `convertUnitTo`. The machine step boot-asserts
+the tile count only; **the reading and its label are canvas-drawn and need a human
+eyeball**: `preference.png` must read ~7.2 with an `l/h` label on all three tiles, and
+`si-only.png` must show the raw SI value with no label at all — never the word "unitless".
+
 `shot-default-seed.mjs` boots an empty-dashboards profile so `DashboardService`
 seeds the bundled `DefaultDashboard` exactly as on a fresh install, then shoots every
 seeded page plus the New-profile dialog to `results/shots/<label>-*.png`. Run it after

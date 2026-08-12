@@ -16,7 +16,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
-import { buildDashboards, localStorageBundle, serverConfigDocument, initScriptContent } from './lib/skip-config.mjs';
+import { buildDashboards, localStorageBundle, serverConfigDocument, initScriptContent, numericWidget, steelGaugeWidget, simpleLinearWidget } from './lib/skip-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -31,47 +31,13 @@ const SELF_PATH = `self.${PATH}`;
 // 2 µm³/s is 7.2 L/h — a plausible diesel burn, and unmistakable against the raw SI 0.000002.
 const RATE_SI = 2e-6;
 
-const path = (extra = {}) => ({
-  description: 'Numeric Data', path: SELF_PATH, source: 'default', pathType: 'number',
-  isPathConfigurable: true, convertUnitTo: 'unitless', ...extra,
-});
-let seq = 0;
-const node = (w, h, x, y, widgetProperties) => ({ x, y, w, h, id: widgetProperties.uuid, selector: 'widget-host2', input: { widgetProperties } });
-
-const steelGauge = () => (x, y) => node(4, 8, x, y, {
-  type: 'widget-gauge-steel', uuid: `steel-${++seq}`,
-  config: {
-    displayName: 'Fuel rate', filterSelfPaths: true, updateInterval: 500,
-    paths: { gaugePath: path() },
-    displayScale: { type: 'linear', lower: 0, upper: 20 },
-    gauge: { type: 'steel', subType: 'radial', backgroundColor: 'carbon', faceColor: 'anthracite', radialSize: 'full', rotateFace: false, digitalMeter: false },
-    numDecimal: 2, enableTimeout: false, dataTimeout: 5, ignoreZones: true,
-  },
-});
-
-const linearGauge = () => (x, y) => node(4, 8, x, y, {
-  type: 'widget-simple-linear', uuid: `linear-${++seq}`,
-  config: {
-    displayName: 'Fuel rate', filterSelfPaths: true, updateInterval: 500,
-    paths: { gaugePath: path() },
-    displayScale: { type: 'linear', lower: 0, upper: 20 },
-    gauge: { type: 'simpleLinear', unitLabelFormat: 'full' },
-    numDecimal: 1, color: 'blue', enableTimeout: false, dataTimeout: 5, ignoreZones: true,
-  },
-});
-
-const numericTile = () => (x, y) => node(4, 8, x, y, {
-  type: 'widget-numeric', uuid: `num-${++seq}`,
-  config: {
-    displayName: 'Fuel rate', filterSelfPaths: true, updateInterval: 500,
-    paths: { numericPath: path() },
-    numDecimal: 1, showMiniChart: false, color: 'blue', enableTimeout: false, dataTimeout: 5, ignoreZones: true,
-  },
-});
+// Every tile carries the stored unit a widget gets when it is configured before any unit meta has
+// resolved, so the probe also proves the server preference wins over it.
+const tile = { path: SELF_PATH, displayName: 'Fuel rate', unit: 'unitless', scale: { lower: 0, upper: 20 } };
+const tiles = () => [steelGaugeWidget(tile), simpleLinearWidget(tile), numericWidget({ ...tile, h: 8, unit: 'unitless', ignoreZones: true })];
 
 const server = await startServer({ publicDir, base: '/@halos-org/skip/', port });
-const pages = buildDashboards([steelGauge(), linearGauge(), numericTile()])
-  .concat(buildDashboards([steelGauge(), linearGauge(), numericTile()]));
+const pages = buildDashboards(tiles()).concat(buildDashboards(tiles()));
 pages[0].name = 'Preference';
 pages[1].name = 'SI only';
 server.setConfigDocument(serverConfigDocument({ dashboards: pages }));

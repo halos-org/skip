@@ -121,8 +121,9 @@ function historyResponse(paths, rows, stepSec) {
 
 /**
  * @param {object} o { publicDir, base, port }
- * Returns { origin, appUrl, setControl(c), blast(n), streamCount(), stop() }.
- * control: { streaming:bool, rateHz, selfPaths:[], selfValues:{path:value|fn}, ais:{count, churnPerSec} }
+ * Returns { origin, appUrl, setControl(c), setConfigDocument(doc), blast(n), streamCount(), stop() }.
+ * control: { streaming:bool, rateHz, selfPaths:[], selfValues:{path:value|fn}, selfMeta:{path:meta},
+ *            staticScene:{ownShip, targets:[]}, ais:{count, churnPerSec} }
  */
 export async function startServer({ publicDir, base, port }) {
   const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], selfValues: null, selfMeta: null, ais: { count: 0, churnPerSec: 0 } };
@@ -200,12 +201,15 @@ export async function startServer({ publicDir, base, port }) {
   const timerRestarts = new Set();
   wss.on('connection', (ws) => {
     ws.send(helloMsg());
-    let metaSent = false;
+    // Keyed on the object identity a scenario hands to setControl, not a boolean, so swapping
+    // selfMeta mid-run re-sends. A once-per-connection latch would leave a preference-switch
+    // scenario measuring the previous units on a page it never reloaded.
+    let sentMeta = null;
     const sendTick = () => {
       if (!control.streaming || ws.readyState !== ws.OPEN) return;
       const t = Date.now();
       // Meta leads the first values, as the real server's sendMeta=all does.
-      if (control.selfMeta && !metaSent) { ws.send(selfMetaDelta(control.selfMeta, t)); metaSent = true; sent++; }
+      if (control.selfMeta && control.selfMeta !== sentMeta) { ws.send(selfMetaDelta(control.selfMeta, t)); sentMeta = control.selfMeta; sent++; }
       // Deterministic scene: fixed own-ship + fixed targets (reproducible screenshots).
       if (control.staticScene) {
         ws.send(selfSceneDelta(control.staticScene.ownShip, t)); sent++;
