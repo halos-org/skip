@@ -1,8 +1,10 @@
 import { DestroyRef, inject, Injectable, OnDestroy } from '@angular/core';
-import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, interval, filter, Subscription } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, BehaviorSubject, ReplaySubject, Subject, map, combineLatest, interval, filter, timeout, finalize, Subscription } from 'rxjs';
 import { ISkPathData, IPathValueData, IPathMetaData, IMeta, IPathUpdateEvent } from "../interfaces/app-interfaces";
 import { ISignalKDataValueUpdate, ISkMetadata, ISkDisplayUnits, ISignalKNotification, States, TState } from '../interfaces/signalk-interfaces'
 import { SignalKDeltaService } from './signalk-delta.service';
+import { SignalKConnectionService } from './signalk-connection.service';
 import { cloneDeep, merge } from 'lodash-es';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -130,6 +132,8 @@ export interface IPathTreeSubscription {
 })
 export class DataService implements OnDestroy {
   private delta = inject(SignalKDeltaService);
+  private readonly _connection = inject(SignalKConnectionService);
+  private readonly _http = inject(HttpClient);
   private readonly _destroyRef = inject(DestroyRef);
 
   // Performance stats
@@ -182,8 +186,41 @@ export class DataService implements OnDestroy {
    * {@link removePathsForContext} so it stays bounded under AIS context churn.
    */
   private _lastObservedByPath = new Map<string, number>();
+  /**
+   * v1 REST API root, normalized to a trailing slash; null while no endpoint is known. The server
+   * publishes this verbatim from its discovery document, which does not guarantee the slash.
+   */
+  private _httpApiUrl: string | null = null;
+  /**
+   * REST meta attempts per self path, counted on completion so the budget measures answers rather
+   * than deltas. Reset whenever endpoint discovery re-runs: a reconnect or a server restart is a
+   * fresh chance at the metadata, and it is also the moment the stream most often loses it.
+   * Holds only `self.`-prefixed keys, which is why {@link removePathsForContext} does not prune it.
+   */
+  private _metaBackfillAttemptsByPath = new Map<string, number>();
+  /** Self paths with a REST meta request outstanding, so a delta burst cannot duplicate one. */
+  private _metaBackfillInFlight = new Set<string>();
+  /**
+   * Cache keys written from a self context. `setPathContext` cannot be inverted safely — a foreign
+   * context literally named `self.<something>` produces a key indistinguishable from a self path —
+   * so self-ness is recorded where the delta states it rather than re-derived from the key.
+   */
+  private _selfPathKeys = new Set<string>();
+  /** Attempts per path before giving up, bounding the request count for a path with no metadata. */
+  private readonly META_BACKFILL_MAX_ATTEMPTS = 3;
+  private readonly META_BACKFILL_TIMEOUT_MS = 5000;
+  /** Keys that make a REST response recognisable as Signal K metadata rather than any JSON object. */
+  private readonly META_SHAPE_KEYS = ['units', 'displayUnits', 'description', 'displayName', 'zones', 'properties'];
 
   constructor() {
+    this._connection.serverServiceEndpoint$
+      .pipe(takeUntilDestroyed(this._destroyRef))
+      .subscribe(endpoint => {
+        const url = endpoint.httpServiceUrl;
+        this._httpApiUrl = url ? (url.endsWith('/') ? url : `${url}/`) : null;
+        this._metaBackfillAttemptsByPath.clear();
+      });
+
     // Emit Delta message update counter every second (RxJS based)
     interval(1000).pipe(takeUntilDestroyed(this._destroyRef)).subscribe(() => {
       const update: IDeltaUpdate = { timestamp: Date.now(), value: this._deltaUpdatesCounter };
@@ -252,6 +289,10 @@ export class DataService implements OnDestroy {
     this._pendingPathStates.clear();
     this._skDataArrayCache = [];
     this._skDataIndexByPath.clear();
+    // Paired with _skData above: the cached meta and the record of having gone looking for it have
+    // to be dropped together, or a path that loses its meta here could never fetch it back.
+    this._metaBackfillAttemptsByPath.clear();
+    this._selfPathKeys.clear();
     this._selfUrn = 'self';
     this._isReset.next(true);
   }
@@ -322,6 +363,13 @@ export class DataService implements OnDestroy {
       registrations.push(newPathSubject);
     } else {
       this._pathRegisterByPath.set(path, [newPathSubject]);
+    }
+
+    // A widget placed on a path that already holds a cached value renders it straight away, and a
+    // delta-time fetch would then wait for a delta that a change-driven or now-idle path may never
+    // send. Registration is the other moment a path becomes worth asking about.
+    if (dataPath && this._selfPathKeys.has(path)) {
+      this.backfillMetaOverRest(path, path.slice(SELFROOTDEF.length + 1), dataPath);
     }
     return newPathSubject.pathDataUpdate$;
   }
@@ -585,6 +633,13 @@ export class DataService implements OnDestroy {
     // time, matching how the widget-side timeout operator measures its window.
     this._lastObservedByPath.set(updatePath, Date.now());
 
+    // The endpoint resolves against `vessels/self`, so only a self context has an answer to fetch.
+    // Recorded from what the delta states, because the cache key cannot be inverted back to it.
+    const isSelfContext = !dataPath.context || dataPath.context === this._selfUrn;
+    if (isSelfContext) {
+      this._selfPathKeys.add(updatePath);
+    }
+
     // Update path register Subjects with new data
     const pathRegisterItems = this._pathRegisterByPath.get(updatePath) ?? [];
     if (pathRegisterItems.length) {
@@ -613,6 +668,12 @@ export class DataService implements OnDestroy {
       kind: 'data',
       update: dataPath
     });
+
+    // Last, so nothing it does can cost a subscriber this delta's value. It builds a URL from path
+    // segments the server chose, and encodeURIComponent throws on a lone surrogate.
+    if (isSelfContext) {
+      this.backfillMetaOverRest(updatePath, dataPath.path, pathItem);
+    }
   }
 
   private setMeta(meta: IMeta): void {
@@ -758,6 +819,75 @@ export class DataService implements OnDestroy {
     } else {
       console.error('[Signal K Data Service] Invalid self URN: ' + value);
     }
+  }
+
+  /**
+   * Fetch a displayed path's metadata over REST when the stream has not delivered it.
+   *
+   * The server can drop a path's meta for a whole connection. Its WebSocket hook resolves meta from
+   * a registry that gains entries at runtime (`addMetaData`, called as meta deltas are received),
+   * but marks a path as sent *before* checking whether the lookup found anything. So a value that
+   * arrives before the path's metadata is registered — the course calculations, which materialise
+   * when a course is activated — costs that connection its one chance, and the widget renders the
+   * raw SI value until the page is reloaded. REST re-reads the same registry per request and is
+   * therefore still able to answer.
+   *
+   * The request is subject to the same race, so it is retried rather than spent once: a 404 means
+   * "not yet" as often as "never". Retries are driven by later deltas and registrations, but the
+   * budget is counted on completion and only one request per path is ever outstanding, so three
+   * attempts mean three answers rather than three simultaneous guesses.
+   */
+  private backfillMetaOverRest(cacheKey: string, skPath: string, pathItem: ISkPathData): void {
+    if (pathItem.meta || !this._httpApiUrl) return;
+    // Something is displaying the path. A value registration is the common case; the tree API and
+    // the electrical widgets take meta without one, so an observed meta subject counts too.
+    if (!this._pathRegisterByPath.has(cacheKey) && !this._pathMetaByPath.has(cacheKey)) return;
+    const attempts = this._metaBackfillAttemptsByPath.get(cacheKey) ?? 0;
+    if (attempts >= this.META_BACKFILL_MAX_ATTEMPTS) return;
+    // Without this, the budget is spent at delta rate rather than by answers: a 10 Hz path issues
+    // all three requests inside 300 ms, concurrently, each racing the same registry state the first
+    // one already lost — and a stalled server then kills all three on one shared deadline.
+    if (this._metaBackfillInFlight.has(cacheKey)) return;
+    this._metaBackfillInFlight.add(cacheKey);
+
+    // Signal K path segments are dotted identifiers, but nothing on the wire enforces that, and an
+    // unencoded segment can carry the request out of `vessels/self/` and onto another same-origin
+    // endpoint — with the session cookie attached. The server does not decode either, so a segment
+    // that needs encoding is a path this endpoint cannot answer for at all.
+    const url = `${this._httpApiUrl}vessels/self/${skPath.split('.').map(encodeURIComponent).join('/')}/meta`;
+
+    this._http.get<ISkMetadata>(url).pipe(
+      timeout(this.META_BACKFILL_TIMEOUT_MS),
+      finalize(() => {
+        this._metaBackfillInFlight.delete(cacheKey);
+        this._metaBackfillAttemptsByPath.set(cacheKey, (this._metaBackfillAttemptsByPath.get(cacheKey) ?? 0) + 1);
+      })
+    ).subscribe({
+      next: meta => {
+        // A meta delta can land while this is in flight. The stream is the authority for a path it
+        // does deliver, so drop the response rather than merging it over what the delta established.
+        if (this._skData.get(cacheKey)?.meta) return;
+        if (!this.looksLikeMetadata(meta)) return;
+        // Context is left undefined rather than passed through: `setPathContext` resolves that to
+        // the self form directly, so the write lands on `cacheKey` even if the self URN changed
+        // while this request was in flight.
+        this.setMeta({ context: undefined, path: skPath, meta });
+      },
+      error: (err: unknown) => {
+        const status = err instanceof HttpErrorResponse ? err.status : 'no response';
+        console.debug(`[Signal K Data Service] Meta backfill attempt ${attempts + 1} for ${cacheKey} failed (${status})`);
+      }
+    });
+  }
+
+  /**
+   * A 200 is not proof the body is metadata. A same-origin gateway or auth portal answering with its
+   * own JSON envelope would otherwise be cached as the path's meta — and because the cache is then
+   * non-empty, the path never asks again for the life of the page.
+   */
+  private looksLikeMetadata(meta: ISkMetadata | null | undefined): boolean {
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return false;
+    return this.META_SHAPE_KEYS.some(key => key in meta);
   }
 
   private setPathContext(context: string | undefined, path: string): string {
