@@ -31,7 +31,7 @@ With Skip, you get the **clarity of a purpose-built marine instrument panel** co
 - [Where Skip Runs](#where-skip-runs)
 - [Design Goals](#design-goals)
 - [User Experience](#user-experience)
-- [Dashboards and Configuration](#dashboards-and-configuration), [Widget Library](#widget-library) & [Historical Data](#historical-data)
+- [Dashboards and Configuration](#dashboards-and-configuration), [Display Units](#display-units), [Widget Library](#widget-library) & [Historical Data](#historical-data)
 - [Night Modes](#night-modes)
 - [Remote Control](#remote-control-other-skip-displays)
 - [Kiosk Mode](#dedicated-fullscreen-instrument-display-kiosk-mode)
@@ -87,9 +87,32 @@ Intuitive widget configuration.
 See what Signal K has to offer that you can leverage with widgets. Select it and tweak the display options to suit your purpose.
 ![Paths Configuration Image](./images/SkipWidgetConfig-paths-1024x488.png)
 
-Skip displays every value in the units set by your Signal K server's unit preferences, converting automatically — there are no separate unit settings to manage in Skip.
-
 Organize your pages from the toolbar's **Manage pages** panel — add, reorder, rename, duplicate, and delete.
+
+### Display Units
+
+Skip displays every value in the units set by your Signal K server's **unit preferences**, converting automatically — there are no unit settings in Skip to keep in sync. Set your units once on the server and every unit-preferences-aware app, Skip included, follows. Requires Signal K server 2.23.0 or later; on an older server Skip shows values in Signal K's own units (SI: metres, m/s, Kelvin, Pascal, m³/s).
+
+**Where to set them.** In the Signal K server admin UI, go to **Server → Configuration → Settings** and scroll to **Unit Preferences**. Preferences are stored per user, so they follow your login across devices; an anonymous visitor gets the server's default preset.
+
+**Presets** are the quick way in — one choice covers every category:
+
+| Preset | Speed | Distance | Depth | Temperature | Volume |
+| --- | --- | --- | --- | --- | --- |
+| Metric | km/h | kilometres | metres | Celsius | litres |
+| Nautical (Metric) | knots | nautical miles | metres | Celsius | litres |
+| Imperial (US) | mph | miles | feet | Fahrenheit | US gallons |
+| Imperial (UK) | mph | miles | feet | Celsius | imperial gallons |
+| Nautical Imperial (US) | knots | nautical miles | feet | Fahrenheit | US gallons |
+| Nautical Imperial (UK) | knots | nautical miles | feet | Celsius | imperial gallons |
+
+**Categories** are how one preset reaches hundreds of paths. Every numeric path belongs to a category — `speed`, `distance`, `depth`, `temperature`, `pressure`, `angle`, `volume`, `volumeRate`, `frequency`, `time`, `percentage`, the electrical group, and the rest — and the preset picks one unit per category. Set `speed` to knots and boat speed, wind speed, and every other speed path follow at once.
+
+**Per-path overrides** handle the exceptions: boat speed in knots but wind speed in m/s, or fuel rate in litres per minute rather than litres per hour. Override a single path in the admin UI's Data Browser — open the path's meta editor and pick a unit under the `custom` category, or select `base` to see the raw Signal K value. Overrides win over the preset.
+
+**Custom presets and units** cover the rest. The server accepts uploaded presets and custom unit definitions through its `/signalk/v1/unitpreferences/*` API, so a unit combination that no built-in preset offers can still drive every client. Signal K's own [Unit Preferences guide](https://github.com/SignalK/signalk-server/blob/master/docs/guides/unitpreferences.md) documents the full API and the standard category list.
+
+**What Skip does with it.** Skip reads each path's preference from the server's metadata, applies the conversion, and labels the value with that unit — the label always matches the conversion applied. When the server states no preference for a path, Skip shows the Signal K value as-is with no unit label rather than guessing. Where the server asks for a unit Skip has no conversion for, it does the same and names the unit in the browser console (`[Units Service] Server display unit '<unit>' …`), which is worth quoting in a bug report.
 
 ## Widget Library
 All Skip widgets are visual presentation controls that are very versatile, with multiple advanced configuration options available to suit your needs:

@@ -52,14 +52,42 @@ function node(w, h, x, y, widgetProperties) {
   return { x, y, w, h, id, selector: 'widget-host2', input: { widgetProperties } };
 }
 
-export function numericWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', updateInterval = 500, miniChart = false, displayName = 'N' } = {}) {
+export function numericWidget({ path = 'self.navigation.speedOverGround', unit = 'knots', updateInterval = 500, miniChart = false, displayName = 'N', w = 4, h = 6, numDecimal = 1, ignoreZones = false } = {}) {
   const uuid = uid('num');
-  return (x, y) => node(4, 6, x, y, {
+  return (x, y) => node(w, h, x, y, {
     type: 'widget-numeric', uuid,
     config: {
       displayName, filterSelfPaths: true, updateInterval,
       paths: { numericPath: { description: 'Numeric Data', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit } },
-      numDecimal: 1, showMiniChart: miniChart, color: 'blue', enableTimeout: false, dataTimeout: 5, ignoreZones: false,
+      numDecimal, showMiniChart: miniChart, color: 'blue', enableTimeout: false, dataTimeout: 5, ignoreZones,
+    },
+  });
+}
+
+export function steelGaugeWidget({ path = 'self.navigation.speedOverGround', unit = 'unitless', updateInterval = 500, displayName = 'Gauge', scale = { lower: 0, upper: 100 }, w = 4, h = 8, ignoreZones = true } = {}) {
+  const uuid = uid('steel');
+  return (x, y) => node(w, h, x, y, {
+    type: 'widget-gauge-steel', uuid,
+    config: {
+      displayName, filterSelfPaths: true, updateInterval,
+      paths: { gaugePath: { description: 'Numeric Data', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit } },
+      displayScale: { type: 'linear', ...scale },
+      gauge: { type: 'steel', subType: 'radial', backgroundColor: 'carbon', faceColor: 'anthracite', radialSize: 'full', rotateFace: false, digitalMeter: false },
+      numDecimal: 2, enableTimeout: false, dataTimeout: 5, ignoreZones,
+    },
+  });
+}
+
+export function simpleLinearWidget({ path = 'self.navigation.speedOverGround', unit = 'unitless', updateInterval = 500, displayName = 'Linear', scale = { lower: 0, upper: 100 }, w = 4, h = 8, ignoreZones = true } = {}) {
+  const uuid = uid('linear');
+  return (x, y) => node(w, h, x, y, {
+    type: 'widget-simple-linear', uuid,
+    config: {
+      displayName, filterSelfPaths: true, updateInterval,
+      paths: { gaugePath: { description: 'Numeric Data', path, source: 'default', pathType: 'number', isPathConfigurable: true, convertUnitTo: unit } },
+      displayScale: { type: 'linear', ...scale },
+      gauge: { type: 'simpleLinear', unitLabelFormat: 'full' },
+      numDecimal: 1, color: 'blue', enableTimeout: false, dataTimeout: 5, ignoreZones,
     },
   });
 }

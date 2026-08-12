@@ -46,6 +46,15 @@ function selfDelta(paths, t, overrides) {
   return JSON.stringify({ context: SELF_URN, updates: [{ $source: 'mock.0', timestamp: iso(t), values: paths.map((p) => ({ path: p, value: genSelfValue(p, t, overrides) })) }] });
 }
 
+// A `sendMeta=all` meta frame: `{path: {units, displayUnits: {...}}}` in, one SK meta update out.
+// Skip takes a path's unit AND its display preference from here alone, so anything unit-dependent
+// (the resolved measure, the rendered symbol, the conversion applied to the value) is unexercised
+// until a scenario sets control.selfMeta.
+function selfMetaDelta(metaByPath, t) {
+  return JSON.stringify({ context: SELF_URN, updates: [{ $source: 'mock.0', timestamp: iso(t),
+    meta: Object.entries(metaByPath).map(([path, value]) => ({ path, value })) }] });
+}
+
 function aisDelta(mmsi, i, t) {
   return JSON.stringify({
     context: `vessels.urn:mrn:imo:mmsi:${mmsi}`,
@@ -112,11 +121,12 @@ function historyResponse(paths, rows, stepSec) {
 
 /**
  * @param {object} o { publicDir, base, port }
- * Returns { origin, appUrl, setControl(c), blast(n), streamCount(), stop() }.
- * control: { streaming:bool, rateHz, selfPaths:[], selfValues:{path:value|fn}, ais:{count, churnPerSec} }
+ * Returns { origin, appUrl, setControl(c), setConfigDocument(doc), blast(n), streamCount(), stop() }.
+ * control: { streaming:bool, rateHz, selfPaths:[], selfValues:{path:value|fn}, selfMeta:{path:meta},
+ *            staticScene:{ownShip, targets:[]}, ais:{count, churnPerSec} }
  */
 export async function startServer({ publicDir, base, port }) {
-  const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], selfValues: null, ais: { count: 0, churnPerSec: 0 } };
+  const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], selfValues: null, selfMeta: null, ais: { count: 0, churnPerSec: 0 } };
   let history = { rows: 0, stepSec: 1, paths: ['navigation.speedOverGround'] };
   let configDoc = null; // IConfig served from applicationData (set per scenario by the runner)
   let sent = 0;
@@ -191,9 +201,15 @@ export async function startServer({ publicDir, base, port }) {
   const timerRestarts = new Set();
   wss.on('connection', (ws) => {
     ws.send(helloMsg());
+    // Keyed on the object identity a scenario hands to setControl, not a boolean, so swapping
+    // selfMeta mid-run re-sends. A once-per-connection latch would leave a preference-switch
+    // scenario measuring the previous units on a page it never reloaded.
+    let sentMeta = null;
     const sendTick = () => {
       if (!control.streaming || ws.readyState !== ws.OPEN) return;
       const t = Date.now();
+      // Meta leads the first values, as the real server's sendMeta=all does.
+      if (control.selfMeta && control.selfMeta !== sentMeta) { ws.send(selfMetaDelta(control.selfMeta, t)); sentMeta = control.selfMeta; sent++; }
       // Deterministic scene: fixed own-ship + fixed targets (reproducible screenshots).
       if (control.staticScene) {
         ws.send(selfSceneDelta(control.staticScene.ownShip, t)); sent++;

@@ -65,7 +65,10 @@ export interface IUnitGroup {
 export interface IUnit {
   measure: string;
   description: string;
-  /** Display-only label rendered next to values; falls back to `measure` when absent. */
+  /**
+   * Display-only label rendered next to values; falls back to `measure` when absent. An empty string
+   * is a value, not an absence: it means render nothing beside the number (the Unitless measures).
+   */
   symbol?: string;
 }
 
@@ -93,19 +96,42 @@ type UnitConverter = (v: any) => any;
 
 /**
  * Maps a Signal K unit-preferences `displayUnits.targetUnit` string onto Skip's internal conversion
- * measure key, for the cases where the two differ. Keys are the strings the plugin actually EMITS in
- * `meta.displayUnits.targetUnit` (verified from live path meta — e.g. temperature emits the bare `C`,
- * time emits `hour`), NOT the plugin's internal preset/definition keys. Server targets that already
- * equal a Skip measure (A, V, W, J, mbar, liter, percent, rpm, Ah, deg/s, ...) need no entry — an
- * unmapped target is used as-is and, when it is not a resolvable conversion for the path's group,
- * the caller degrades gracefully to 'unitless'. Extend as other presets/units are adopted.
+ * measure key, for the cases where the two differ. Keys are the strings the server EMITS in
+ * `meta.displayUnits.targetUnit`: the conversion keys of `unitpreferences/standard-units-definitions.json`,
+ * of which the six built-in presets use a subset — a per-path override or a custom preset can select
+ * any of the rest, so the reachable vocabulary is the definitions file, not the presets. Targets that
+ * already equal a Skip measure (A, V, W, J, mbar, psi, inHg, liter, gallon, percent, rpm, Ah, deg/s,
+ * mph, m3/s, ...) need no entry — those match ahead of this table.
+ *
+ * A target with no entry that is not a measure of the path's own group degrades to 'unitless': the
+ * raw SI value with no label. That is how #536 surfaced — the metric presets emit `L/h` where Skip's
+ * measure is `l/h`. Targets Skip genuinely has no conversion for (kW, horsepower, Wh, mAh, atm, torr,
+ * Bf, fps, the duration formats, and every mass/area/dataSize target — halos-org/skip#570) belong in
+ * that fallback and are deliberately absent here. A units.service.spec case pins this table against
+ * the full built-in preset vocabulary; extend both together.
  */
 const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
   kn: 'knots',
+  'km/h': 'kph',
   'naut-mile': 'nm',
+  kilometer: 'km',
+  meter: 'm',
+  mile: 'mi',
+  foot: 'feet',
   degree: 'deg',
+  radian: 'rad',
+  gradian: 'grad',
   hour: 'Hours',
+  minute: 'Minutes',
+  second: 's',
+  day: 'Days',
+  hertz: 'Hz',
+  watt: 'W',
   C: 'celsius',
+  F: 'fahrenheit',
+  'L/h': 'l/h',
+  'L/min': 'l/min',
+  'gal/h': 'g/h',
 };
 
 @Injectable()
@@ -121,8 +147,8 @@ export class UnitsService {
    */
   private readonly _conversionList: IUnitGroup[] = [
     { group: 'Unitless', units: [
-      { measure: 'unitless', description: "As-Is numeric value" },
-      { measure: ' ', description: "No unit label - As-Is numeric value" }
+      { measure: 'unitless', symbol: '', description: "As-Is numeric value" },
+      { measure: ' ', symbol: '', description: "No unit label - As-Is numeric value" }
     ] },
     { group: 'Speed', units: [
       { measure: 'knots', symbol: 'kn', description: "Knots - Nautical miles per hour"},
@@ -135,7 +161,8 @@ export class UnitsService {
       { measure: 'l/min', description: "Liters per minute"},
       { measure: 'l/h', description: "Liters per hour"},
       { measure: 'g/min', symbol: 'gal/min', description: "Gallons per minute"},
-      { measure: 'g/h', symbol: 'gal/h', description: "Gallons per hour"}
+      { measure: 'g/h', symbol: 'gal/h', description: "Gallons per hour"},
+      { measure: 'gal-imp/h', symbol: 'imp gal/h', description: "Imperial gallons per hour"}
     ] },
     { group: 'Fuel Distance', units: [
       { measure: 'm/m3', symbol: 'm/m³', description: "Meters per cubic meter (base)"},
@@ -170,6 +197,7 @@ export class UnitsService {
       { measure: 'liter', symbol: 'L', description: "Liters (base)"},
       { measure: 'm3', symbol: 'm³', description: "Cubic Meters"},
       { measure: 'gallon', symbol: 'gal', description: "Gallons"},
+      { measure: 'gallon-imp', symbol: 'imp gal', description: "Imperial Gallons"},
      ] },
     { group: 'Current', units: [
       { measure: 'A', description: "Amperes (base)"},
@@ -190,6 +218,7 @@ export class UnitsService {
     { group: 'Energy', units: [
       { measure: 'J', description: "Joules (base)"},
       { measure: 'kWh', description: "Kilowatt*Hours"},
+      { measure: 'btu', symbol: 'BTU', description: "British Thermal Units"},
     ] },
     { group: 'Resistance', units: [
       { measure: 'ohm', symbol: "\u2126", description: "\u2126 (base)"},
@@ -470,13 +499,19 @@ export class UnitsService {
 // volume
     "liter": Qty.swiftConverter('m^3', 'liter'),
     "gallon": Qty.swiftConverter('m^3', 'gallon'),
+    "gallon-imp": Qty.swiftConverter('m^3', 'gallon-imp'),
     "m3": function(v) { return v; },
 //  flow
     'm3/s': function(v) { return v; },
     'l/min': Qty.swiftConverter("m^3/s", "liter/minute"),
     'l/h': Qty.swiftConverter("m^3/s", "liter/hour"),
     'g/min': Qty.swiftConverter("m^3/s", "gallon/minute"),
+    // The server's own formulas for these two convert to gallons per SECOND — 3600x short, reported
+    // as SignalK/signalk-server#2951. These factors are the correct ones (1 m³/s = 951019.39 US gal/h),
+    // so Skip and the Signal K admin UI disagree on an imperial fuel rate until that lands. Do not
+    // "reconcile" them with the server's numbers.
     'g/h': Qty.swiftConverter("m^3/s", "gallon/hour"),
+    'gal-imp/h': Qty.swiftConverter("m^3/s", "gallon-imp/hour"),
 //  fuel consumption
     'm/m3': function(v) { return v; },
     'nm/l': Qty.swiftConverter('m/m^3', 'naut-mile/liter'),
@@ -517,6 +552,7 @@ export class UnitsService {
 // Energy
     "J": function(v) { return v; },
     "kWh": Qty.swiftConverter('J', 'kWh'),
+    "btu": Qty.swiftConverter('J', 'btu'),
 // Resistance
     "ohm": function(v) { return v; },
     "kiloohm": function(v) { return v / 1000; },
@@ -689,10 +725,11 @@ export class UnitsService {
   }
 
   /**
-   * The symbol to render beside a value, or '' where there is nothing to render: the boot
-   * placeholder, 'unitless', and the whitespace 'No unit label' measure. A render site that lays
-   * out around the symbol must use this rather than {@link getUnitDisplaySymbol}, whose fallback
-   * returns the measure key itself — reserving room for a blank or for the word "unitless".
+   * The symbol to render beside a value, or '' where there is nothing to render. Equivalent to
+   * {@link getUnitDisplaySymbol} for every measure in the conversion table — the Unitless measures
+   * carry an empty symbol there — and differs only for an unknown measure key, which this one
+   * trims and blanks when it is whitespace or the bare word 'unitless'. Prefer it at a render site
+   * that lays out around the symbol.
    */
   public getRenderableUnitSymbol(measure: string | null | undefined): string {
     if (!measure || measure === 'unitless') {
@@ -765,11 +802,6 @@ export class UnitsService {
     return this.getConversionsForPath(path).base;
   }
 
-  /** Map a server displayUnits.targetUnit onto a Skip conversion measure key (identity when no alias). */
-  private mapServerTargetToMeasure(targetUnit: string): string {
-    return SERVER_TARGET_UNIT_ALIASES[targetUnit] ?? targetUnit;
-  }
-
   /**
    * The server's preferred display measure for a path (Signal K unit-preferences plugin), used as the
    * default conversion target when present. Returns a measure only when the server's targetUnit maps
@@ -778,16 +810,37 @@ export class UnitsService {
    * invariant). Undefined when there is no server preference or it is not honourable (unit-less path,
    * or an unmapped/unsupported target), in which case the caller falls back to 'unitless'.
    * Per-widget overrides are unaffected: this only supplies the default a fresh path selection seeds.
+   *
+   * The target is matched against the path's own group BEFORE the alias table, so a target that is
+   * already a measure keeps its own meaning: a charge path asking for `C` (Coulomb, the identity
+   * target the server offers under the `base` category) must not be rewritten to Celsius by an alias
+   * whose key it happens to share.
    */
   private resolveServerDefaultMeasure(path: string, groupList: IUnitGroup[]): string | undefined {
     const targetUnit = this.data.getPathDisplayUnits(path)?.targetUnit;
     if (!targetUnit) return undefined;
-    const measure = this.mapServerTargetToMeasure(targetUnit);
-    // Honour the server preference only when the mapped measure is a member of the path's group.
-    // Every conversion-list measure has a conversion function (pinned by a table-integrity test), so a
-    // group-valid measure is guaranteed to drive both a real conversion and a matching symbol — the
-    // label-matches-conversion invariant. Anything else degrades gracefully to 'unitless'.
-    return groupList.some(group => group.units.some(unit => unit.measure === measure)) ? measure : undefined;
+    // A group-valid measure is guaranteed to drive both a real conversion and a matching symbol —
+    // every conversion-list measure has both, pinned by the table-integrity test.
+    const inGroup = (measure: string) => groupList.some(group => group.units.some(unit => unit.measure === measure));
+    if (inGroup(targetUnit)) { return targetUnit; }
+    const aliased = SERVER_TARGET_UNIT_ALIASES[targetUnit];
+    if (aliased && inGroup(aliased)) { return aliased; }
+    this.warnUnmappableTarget(path, targetUnit);
+    return undefined;
   }
+
+  /**
+   * Server targets Skip cannot honour degrade to 'unitless' — a raw SI value with no label, which is
+   * indistinguishable on screen from a path the server states no preference for. #536 took a user's
+   * bug report to find for exactly that reason, so name the target that was dropped. Once per target
+   * per session: the resolver runs on every meta emission, and a repeating console line is noise the
+   * next reader learns to scroll past.
+   */
+  private warnUnmappableTarget(path: string, targetUnit: string): void {
+    if (this.unmappedTargets.has(targetUnit)) { return; }
+    this.unmappedTargets.add(targetUnit);
+    console.warn(`[Units Service] Server display unit '${targetUnit}' (path: ${path}) has no Skip conversion for this path's unit type. Showing the value in Signal K's own units instead.`);
+  }
+  private readonly unmappedTargets = new Set<string>();
 
 }

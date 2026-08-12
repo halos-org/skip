@@ -163,6 +163,10 @@
           {
             "description": "Gallons per hour",
             "measure": "g/h"
+          },
+          {
+            "description": "Imperial gallons per hour",
+            "measure": "gal-imp/h"
           }
         ]
       },
@@ -284,6 +288,10 @@
           {
             "description": "Gallons",
             "measure": "gallon"
+          },
+          {
+            "description": "Imperial Gallons",
+            "measure": "gallon-imp"
           }
         ]
       },
@@ -349,6 +357,10 @@
           {
             "description": "Kilowatt*Hours",
             "measure": "kWh"
+          },
+          {
+            "description": "British Thermal Units",
+            "measure": "btu"
           }
         ]
       },
