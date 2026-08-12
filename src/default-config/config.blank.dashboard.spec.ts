@@ -5,6 +5,8 @@ import { WidgetWindComponent } from '../app/widgets/widget-windsteer/widget-wind
 import { WidgetRacesteerComponent } from '../app/widgets/widget-racesteer/widget-racesteer.component';
 import { WidgetWindTrendsChartComponent } from '../app/widgets/widget-windtrends-chart/widget-windtrends-chart.component';
 import { WidgetAutopilotComponent } from '../app/widgets/widget-autopilot/widget-autopilot.component';
+import { WidgetHorizonComponent } from '../app/widgets/widget-horizon/widget-horizon.component';
+import { WidgetHeelGaugeComponent } from '../app/widgets/widget-heel-gauge/widget-heel-gauge.component';
 
 // The shipped seed is stamped at LATEST_APP_CONFIG_VERSION, so config migrations never run on a
 // fresh install/profile. A widget whose path shape drifts from its DEFAULT_CONFIG therefore ships
@@ -34,7 +36,9 @@ describe('DefaultDashboard seed', () => {
   // (isPathConfigurable:false) — else the settings show a dead 'number' picker on an object leaf and
   // no Paths tab is suppressed (#416) — and their data timeout defaults on. Each type is asserted
   // separately so dropping one on a future re-export can't hide behind the other's presence.
-  for (const type of ['widget-heel-gauge', 'widget-horizon']) {
+  // The seed carries heel gauges and no horizon; the horizon shape is guarded against its
+  // DEFAULT_CONFIG below instead, so dropping a type from the seed can never drop its guard.
+  for (const type of ['widget-heel-gauge']) {
     it(`seeds ${type} with a hidden fixed attitude path and the timeout enabled`, () => {
       const widgets = seededWidgetsOfType(type);
       expect(widgets.length).toBeGreaterThan(0);
@@ -89,6 +93,62 @@ describe('DefaultDashboard seed', () => {
         expect(seedPath.path, `seed autopilot ${slot}.path`).toBe(defaults[slot]?.path);
       }
     }
+  });
+});
+
+// The seed carries no horizon widget, so the seed-level attitude guard above cannot cover it.
+// The #416 invariant is a property of the widget, not of the seed, so assert it where it lives —
+// a future re-export that places a horizon widget then inherits a shape that is already guarded.
+// widget-heel-gauge is included so both attitude widgets are checked from one place.
+describe('attitude widget path config shape', () => {
+  const ATTITUDE = [
+    { type: 'widget-horizon', config: WidgetHorizonComponent.DEFAULT_CONFIG },
+    { type: 'widget-heel-gauge', config: WidgetHeelGaugeComponent.DEFAULT_CONFIG },
+  ];
+
+  for (const { type, config } of ATTITUDE) {
+    it(`${type}: reads a hidden fixed navigation.attitude path with the timeout enabled`, () => {
+      const paths = Object.values(config.paths ?? {}) as { path?: string; isPathConfigurable?: boolean }[];
+      expect(paths.length).toBeGreaterThan(0);
+      for (const pathConfig of paths) {
+        expect(pathConfig.path).toBe('self.navigation.attitude');
+        expect(pathConfig.isPathConfigurable).toBe(false);
+      }
+      expect(config.enableTimeout).toBe(true);
+      expect(config.dataTimeout).toBe(5);
+    });
+  }
+});
+
+// A re-export captures one boat's per-widget choices, and two widgets reading one path can come
+// back disagreeing — a bearing left at 'unitless' renders raw radians beside the same bearing in
+// degrees, and neither page tells the user which is lying.
+describe('seed self-consistency', () => {
+  interface SeedWidget { input?: { widgetProperties?: { type?: string; config?: { displayName?: string; paths?: Record<string, { path?: string; convertUnitTo?: string }> } } } }
+  const seedWidgets = (): SeedWidget[] => DefaultDashboard.flatMap(dash => (dash.configuration ?? []) as SeedWidget[]);
+
+  it('uses one unit per Signal K path across every page', () => {
+    const unitsByPath = new Map<string, Set<string>>();
+    for (const widget of seedWidgets()) {
+      for (const pathConfig of Object.values(widget.input?.widgetProperties?.config?.paths ?? {})) {
+        if (!pathConfig?.path || !pathConfig.convertUnitTo) continue;
+        const units = unitsByPath.get(pathConfig.path) ?? new Set<string>();
+        units.add(pathConfig.convertUnitTo);
+        unitsByPath.set(pathConfig.path, units);
+      }
+    }
+    const disagreements = [...unitsByPath.entries()]
+      .filter(([, units]) => units.size > 1)
+      .map(([path, units]) => `${path}: ${[...units].join(' vs ')}`);
+    expect(disagreements).toEqual([]);
+  });
+
+  it('carries no stray whitespace in page or widget names', () => {
+    const untrimmed = [
+      ...DefaultDashboard.map(dash => dash.name),
+      ...seedWidgets().map(widget => widget.input?.widgetProperties?.config?.displayName),
+    ].filter((name): name is string => typeof name === 'string' && name !== name.trim());
+    expect(untrimmed).toEqual([]);
   });
 });
 

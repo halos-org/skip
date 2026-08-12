@@ -75,6 +75,7 @@ export class SettingsConfigComponent {
       .openNameDialog({
         title: 'New profile',
         name: '',
+        description: 'The profile starts from the pages shipped with this version of Skip. You can change everything in it afterwards.',
         confirmBtnText: 'Create',
         cancelBtnText: 'Cancel'
       })

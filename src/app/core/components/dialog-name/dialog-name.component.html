@@ -6,6 +6,9 @@
     </button>
   </div>
   <mat-dialog-content>
+    @if (data.description) {
+      <p class="dialog-description">{{data.description}}</p>
+    }
     <mat-form-field class="field-margin">
       <mat-label>Name</mat-label>
       <input matInput type="text" id="name" placeholder="Name" name="name" [(ngModel)]="data.name" required cdkFocusInitial/>
