@@ -1,7 +1,15 @@
 // The parameter name both Signal K login endpoints read: the OIDC login endpoint takes
 // req.query.redirect, and the admin login page reads `redirect` out of its hash query. Skip calls
 // the value a returnTo internally; `redirect` is the server's wire name for it.
+//
+// The server's own docs disagree with each other: docs/develop/webapps.md documents `redirect` for
+// both endpoints, while the OIDC reference (docs/oidc.md, "Login Endpoint") still says `returnTo`,
+// which no server version has ever read. The implementations above are the contract.
 const LOGIN_REDIRECT_PARAM = 'redirect';
+
+// Read only by the admin login page. The OIDC login endpoint ignores it and bounces to the identity
+// provider regardless, so on an OIDC server the recovery sign-in is bounded by Skip's own budget.
+const NO_AUTO_LOGIN_PARAM = 'noAutoLogin';
 
 // Skip routes that must never be a returnTo target — redirecting back to them would loop the
 // SSO bounce instead of returning the user to real content.
@@ -75,7 +83,7 @@ export function buildLoginRedirectUrl(opts: {
     params.push([LOGIN_REDIRECT_PARAM, opts.returnTo]);
   }
   if (opts.noAutoLogin) {
-    params.push(['noAutoLogin', 'true']);
+    params.push([NO_AUTO_LOGIN_PARAM, 'true']);
   }
   if (params.length === 0) {
     return opts.loginUrl;
