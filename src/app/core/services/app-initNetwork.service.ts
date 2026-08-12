@@ -225,8 +225,8 @@ export class AppNetworkInitService implements OnDestroy {
             throw error;
           }
           if (!remoteConfig?.app) {
-            // SK answers a never-created slot with 200 {} rather than a 404, so an appless config is
-            // the real "no shared configuration yet" signal.
+            // A slot that was never written 404s, handled above; an appless 200 is the other shape
+            // "no shared configuration yet" arrives in, so it lands in the same degraded state.
             startupDegraded = true;
             this._bootstrapIssue$.next({
               reason: 'missing-shared-config',
@@ -335,8 +335,8 @@ export class AppNetworkInitService implements OnDestroy {
   }
 
   /**
-   * The published global config, or the shipped defaults. SK answers a never-created slot with
-   * 200 {} rather than a 404, so an appless body means "nothing published" just as a 404 does —
+   * The published global config, or the shipped defaults. A slot that was never written 404s, and
+   * an appless 200 body means "nothing published" just as that 404 does —
    * but nothing else does: a 5xx or a timeout means the operator's dashboard exists and could not
    * be fetched, and silently showing a different one as if it were the boat's is worse than the
    * recovery state, so it is rethrown to the bootstrap's handler.

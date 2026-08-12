@@ -16,7 +16,9 @@ Open **Menu > Connection**:
 - If your account has read-only access, Skip shows a **Read-only access** notice and configuration changes are disabled.
 - If your Signal K server does not require authentication, Skip connects without signing in.
 
-Application configuration is stored on the server under a Signal K user account. Without a signed-in user account, profile management and server-stored configuration are unavailable, and Skip runs with connection settings only.
+Application configuration is stored on the server under a Signal K user account, so profiles and saved changes need a signed-in session.
+
+Without one, Skip does not necessarily stop there. A server that allows read-only access can show you a dashboard its administrator published for visitors — you can watch the instruments, but nothing you change is kept. See [Read-Only Access Without Signing In](#/help/anonymous-default.md).
 
 ## Creating a Signal K User
 
