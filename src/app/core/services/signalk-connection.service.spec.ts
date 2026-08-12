@@ -51,4 +51,35 @@ describe('SignalKConnectionService', () => {
       expect(() => parseEndpoint(noWs)).toThrow();
     });
   });
+
+  describe('setSubscribeAll', () => {
+    it('re-emits the current endpoint with the new scope', () => {
+      const seen: (boolean | undefined)[] = [];
+      const sub = service.serverServiceEndpoint$.subscribe(e => seen.push(e.subscribeAll));
+
+      service.setSubscribeAll(true);
+
+      expect(seen).toEqual([undefined, true]);
+      expect(service.serverServiceEndpoint$.getValue().state).toBe(EndpointStatus.Disconnected);
+      sub.unsubscribe();
+    });
+
+    it('does not re-emit when the scope already matches', () => {
+      service.setSubscribeAll(true);
+      const seen: boolean[] = [];
+      const sub = service.serverServiceEndpoint$.subscribe(e => seen.push(!!e.subscribeAll));
+
+      service.setSubscribeAll(true);
+
+      expect(seen).toEqual([true]); // the BehaviorSubject's current value only
+      sub.unsubscribe();
+    });
+
+    // An HTTP retry rebuilds the endpoint from currentSubscribeAll, so a scope set here has to
+    // survive it — otherwise a retry silently reverts to the pre-auth scope.
+    it('is the scope an HTTP retry rebuilds from', () => {
+      service.setSubscribeAll(true);
+      expect((service as unknown as { currentSubscribeAll?: boolean }).currentSubscribeAll).toBe(true);
+    });
+  });
 });
