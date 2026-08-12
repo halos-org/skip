@@ -2,11 +2,19 @@ import { inject, Injectable } from '@angular/core';
 import { AuthenticationService, ILoginStatus } from './authentication.service';
 import { buildLoginRedirectUrl, isSafeReturnTo } from '../utils/login-redirect.util';
 import { isEmbeddedInIframe } from '../utils/iframe.util';
+import { EMBED_QUERY_PARAM } from './embed-mode.service';
 import { SSO_REDIRECT_BUDGET_KEY } from '../constants/config-storage.const';
 
 const REDIRECT_BUDGET_KEY = SSO_REDIRECT_BUDGET_KEY;
 const MAX_REDIRECT_ATTEMPTS = 3;
 const ADMIN_LOGIN_URL = '/admin/#/login'; // non-OIDC same-origin fallback login
+
+function withoutEmbedFlag(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete(EMBED_QUERY_PARAM);
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
 
 export type TAutoRedirectOutcome = 'redirected' | 'budget-exhausted' | 'framed';
 
@@ -76,8 +84,16 @@ export class SsoRedirectService {
     return ADMIN_LOGIN_URL;
   }
 
+  /**
+   * Where the browser should come back to after signing in. A framed sign-in navigates the TOP
+   * window (see `navigate`), so its target must not carry the iframe's `embed` flag: embed mode
+   * hides the toolbar and locks the dashboard, which full-window is a page with no way out of it.
+   * Dropping the flag also sends an embed-only route through `embedRequiredGuard`, which resolves
+   * it to a normal page.
+   */
   private currentReturnTo(): string | undefined {
-    const relative = window.location.pathname + window.location.search + window.location.hash;
+    const search = this.isFramed() ? withoutEmbedFlag(window.location.search) : window.location.search;
+    const relative = window.location.pathname + search + window.location.hash;
     return isSafeReturnTo(relative) ? relative : undefined;
   }
 

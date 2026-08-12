@@ -14,6 +14,9 @@ import { Injectable, signal } from '@angular/core';
  * pre-hash query — the flags therefore survive every navigation for free, with no reliance on
  * ActivatedRoute/queryParams. The values never change after construction.
  */
+/** The pre-hash query parameter that turns on embed mode. */
+export const EMBED_QUERY_PARAM = 'embed';
+
 @Injectable({ providedIn: 'root' })
 export class EmbedModeService {
   private readonly _embed = signal(false);
@@ -28,8 +31,8 @@ export class EmbedModeService {
     const params = new URLSearchParams(window.location.search);
 
     // Presence-based: any `embed` param turns it on, except the explicit off values.
-    const rawEmbed = params.get('embed');
-    this._embed.set(params.has('embed') && rawEmbed !== 'false' && rawEmbed !== '0');
+    const rawEmbed = params.get(EMBED_QUERY_PARAM);
+    this._embed.set(params.has(EMBED_QUERY_PARAM) && rawEmbed !== 'false' && rawEmbed !== '0');
 
     const rawProfile = (params.get('profile') ?? '').trim();
     this._profile.set(rawProfile.length > 0 ? rawProfile : null);

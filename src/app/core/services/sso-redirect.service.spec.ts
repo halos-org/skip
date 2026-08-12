@@ -16,6 +16,36 @@ const OIDC_STATUS: ILoginStatus = {
   oidcLoginUrl: '/signalk/v1/auth/oidc/login'
 };
 
+function currentUrl(): string {
+  return window.location.pathname + window.location.search + window.location.hash;
+}
+
+/**
+ * `src/test.ts` replaces window.location with a static snapshot, so history.replaceState does not
+ * move it. Swap in a snapshot of our own for the duration of the call instead.
+ */
+function withLocation(url: string, fn: () => void): void {
+  const original = Object.getOwnPropertyDescriptor(window, 'location');
+  const parsed = new URL(url, window.location.origin);
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: {
+      ...window.location,
+      origin: parsed.origin,
+      pathname: parsed.pathname,
+      search: parsed.search,
+      hash: parsed.hash
+    }
+  });
+  try {
+    fn();
+  } finally {
+    if (original) {
+      Object.defineProperty(window, 'location', original);
+    }
+  }
+}
+
 function setup(authStub: AuthStub = new AuthStub()) {
   ensureLocalStorage();
   ensureSessionStorage();
@@ -41,6 +71,9 @@ describe('SsoRedirectService', () => {
 
     expect(navSpy).toHaveBeenCalledTimes(1);
     expect(navSpy.mock.calls[0][0]).toContain('/signalk/v1/auth/oidc/login');
+    // The return address, under the name the server reads. #554 shipped because this seam — the
+    // one place the real window.location is composed and handed to the builder — was unasserted.
+    expect(navSpy.mock.calls[0][0]).toContain(`redirect=${encodeURIComponent(currentUrl())}`);
     expect(service.attempts()).toBe(1);
   });
 
@@ -81,6 +114,36 @@ describe('SsoRedirectService', () => {
     expect(navSpy).toHaveBeenCalledTimes(1);
     expect(navSpy.mock.calls[0][0]).toContain('/signalk/v1/auth/oidc/login');
     expect(navSpy.mock.calls[0][0]).toContain('noAutoLogin=true');
+    expect(navSpy.mock.calls[0][0]).toContain(`redirect=${encodeURIComponent(currentUrl())}`);
+  });
+
+  // The framed sign-in navigates the top window, so a return target carrying embed=1 would land the
+  // whole browser on the chromeless render: no toolbar, dashboard locked, no way back.
+  it('drops the embed flag from the return target when the sign-in breaks out of a frame', () => {
+    const authStub = new AuthStub();
+    authStub.loginStatusValue = OIDC_STATUS;
+    const { service, navSpy } = setup(authStub);
+    vi.spyOn(service as unknown as { isFramed: () => boolean }, 'isFramed').mockReturnValue(true);
+
+    withLocation('/@halos-org/skip/?embed=1&profile=helm#/page/0', () => {
+      service.manualSignIn();
+    });
+
+    const target = decodeURIComponent(navSpy.mock.calls[0][0]);
+    expect(target).toContain('redirect=/@halos-org/skip/?profile=helm#/page/0');
+    expect(target).not.toContain('embed=1');
+  });
+
+  it('keeps the embed flag when the sign-in is not framed (same window returns to the same view)', () => {
+    const authStub = new AuthStub();
+    authStub.loginStatusValue = OIDC_STATUS;
+    const { service, navSpy } = setup(authStub);
+
+    withLocation('/@halos-org/skip/?embed=1#/page/0', () => {
+      service.manualSignIn();
+    });
+
+    expect(decodeURIComponent(navSpy.mock.calls[0][0])).toContain('redirect=/@halos-org/skip/?embed=1#/page/0');
   });
 
   it('does not auto-redirect when framed; surfaces recovery instead (frame-ancestors blocks the login)', () => {

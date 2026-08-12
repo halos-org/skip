@@ -56,8 +56,7 @@ describe('isSafeReturnTo', () => {
 
 describe('buildLoginRedirectUrl', () => {
   // The param is named `redirect` because that is what both Signal K login endpoints read
-  // (req.query.redirect on the OIDC endpoint, the hash query on /admin/#/login). Sending Skip's
-  // internal name for it, returnTo, left the user on the admin root after signing in.
+  // (req.query.redirect on the OIDC endpoint, the hash query on /admin/#/login).
   it('appends a validated return target as redirect on a query-style (OIDC) login URL', () => {
     const url = buildLoginRedirectUrl({ loginUrl: '/signalk/v1/auth/oidc/login', returnTo: '/page' });
     expect(url).toBe('/signalk/v1/auth/oidc/login?redirect=%2Fpage');
@@ -81,6 +80,24 @@ describe('buildLoginRedirectUrl', () => {
   it('puts redirect in the hash query for the admin login route, where that page reads it', () => {
     const url = buildLoginRedirectUrl({ loginUrl: '/admin/#/login', returnTo: '/@halos-org/skip/#/page/0' });
     expect(url).toBe('/admin/#/login?redirect=%2F%40halos-org%2Fskip%2F%23%2Fpage%2F0');
+  });
+
+  // What manualSignIn() emits on a server without OIDC: both params, in the hash query.
+  it('carries redirect and noAutoLogin together on the admin login route', () => {
+    const url = buildLoginRedirectUrl({ loginUrl: '/admin/#/login', returnTo: '/page/0', noAutoLogin: true });
+    expect(url).toBe('/admin/#/login?redirect=%2Fpage%2F0&noAutoLogin=true');
+  });
+
+  // A return target of Skip's own carries a pre-hash query (?profile=, and ?embed= when framed).
+  // Its '?' and '&' must be encoded, or the server reads a truncated target.
+  it('encodes a return target that carries its own query string', () => {
+    const url = buildLoginRedirectUrl({
+      loginUrl: '/signalk/v1/auth/oidc/login',
+      returnTo: '/@halos-org/skip/?profile=helm&x=1#/page/0'
+    });
+    expect(url).toBe(
+      '/signalk/v1/auth/oidc/login?redirect=%2F%40halos-org%2Fskip%2F%3Fprofile%3Dhelm%26x%3D1%23%2Fpage%2F0'
+    );
   });
 
   it('returns the login URL unchanged when there are no params', () => {
