@@ -16,7 +16,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { mapPreset, type TVideoPreset } from '../../widgets/widget-video/playback-presets.util';
 import { SignalKConnectionService } from '../../core/services/signalk-connection.service';
 import { PluginConfigClientService } from '../../core/services/plugin-config-client.service';
-import { resolveSignalKPluginBaseUrl } from '../../core/utils/signalk-plugin-url.util';
+import { resolveSignalKPluginBaseUrl, resolveSignalKV2ApiBaseUrl } from '../../core/utils/signalk-plugin-url.util';
 import { classifyPluginPresence, type TPluginPresence } from '../../widgets/widget-video/plugin-presence.util';
 import { CameraDiscoveryClient, DiscoveryRateLimitedError } from '../../widgets/widget-video/discovery-client';
 import { CamerasResourceClient, type ISavedCamera } from '../../widgets/widget-video/cameras-resource-client';
@@ -68,11 +68,11 @@ export class VideoCameraSetupComponent implements OnInit, OnDestroy {
     resolveSignalKPluginBaseUrl('sk-video', this.endpoint()?.httpServiceUrl ?? null, this.connection.signalKURL?.url ?? null)
   );
   private readonly v2BaseUrl = computed(() =>
-    this.endpoint()?.httpServiceUrlV2
-    ?? this.endpoint()?.httpServiceUrl?.replace(/\/signalk\/v1\/api\/?$/, '/signalk/v2/api')
-    ?? (this.connection.signalKURL?.url
-      ? `${this.connection.signalKURL.url.replace(/\/$/, '')}/signalk/v2/api`
-      : null)
+    resolveSignalKV2ApiBaseUrl(
+      this.endpoint()?.httpServiceUrlV2,
+      this.endpoint()?.httpServiceUrl ?? null,
+      this.connection.signalKURL?.url ?? null
+    )
   );
 
   protected readonly cameras = signal<ISavedCamera[]>([]);

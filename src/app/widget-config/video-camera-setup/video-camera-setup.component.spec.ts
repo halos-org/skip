@@ -323,6 +323,76 @@ describe('VideoCameraSetupComponent — camera mode', () => {
   });
 });
 
+// The camera-mode block above runs against a server that advertises no v2 endpoint, so the
+// resource URL there is derived from the v1 one. This block pins the other side: an advertised
+// endpoint is used as-is. Its host differs from anything the derivation could produce, so the
+// assertions fail if the advertised value stops winning.
+describe('VideoCameraSetupComponent — camera mode, advertised v2 endpoint', () => {
+  const ADVERTISED_V2 = 'http://v2.h:3000/signalk/v2/api';
+  const resources = {
+    list: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined)
+  };
+  const discovery = { scan: vi.fn().mockResolvedValue([]) };
+  const creds = {
+    set: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn().mockResolvedValue(undefined),
+    presence: vi.fn().mockResolvedValue({ hasUsername: false, hasPassword: false })
+  };
+  const ptz = { move: vi.fn().mockResolvedValue(undefined), stop: vi.fn().mockResolvedValue(undefined) };
+
+  let fixture: ComponentFixture<HostComponent>;
+  let cmp: { manualForm: UntypedFormGroup; addCamera: () => Promise<void> };
+
+  beforeEach(async () => {
+    resources.list.mockClear();
+    resources.save.mockClear();
+
+    await TestBed.configureTestingModule({
+      imports: [HostComponent],
+      providers: [
+        { provide: CamerasResourceClient, useValue: resources },
+        { provide: CameraDiscoveryClient, useValue: discovery },
+        { provide: CameraCredentialsClient, useValue: creds },
+        { provide: PtzClient, useValue: ptz },
+        {
+          provide: SignalKConnectionService,
+          useValue: {
+            serverServiceEndpoint$: of({
+              httpServiceUrl: 'http://h:3000/signalk/v1/api/',
+              httpServiceUrlV2: ADVERTISED_V2
+            }),
+            signalKURL: { url: null }
+          }
+        }
+      ]
+    }).compileComponents();
+    fixture = TestBed.createComponent(HostComponent);
+    const videoGroup = fixture.componentInstance.root.get('video') as UntypedFormGroup;
+    fixture.detectChanges(); // ngOnInit
+    videoGroup.get('sourceKind')?.setValue('camera');
+    await Promise.resolve(); // refreshCameras
+    fixture.detectChanges();
+    cmp = fixture.debugElement.query(By.directive(VideoCameraSetupComponent))
+      .componentInstance as typeof cmp;
+  });
+
+  it('lists cameras from the advertised v2 endpoint, not the one derived from v1', () => {
+    expect(resources.list).toHaveBeenCalledWith(ADVERTISED_V2);
+  });
+
+  it('saves a camera to the advertised v2 endpoint', async () => {
+    cmp.manualForm.patchValue({ name: 'Bow Cam', scheme: 'rtsp', host: '10.0.0.9' });
+    await cmp.addCamera();
+    expect(resources.save).toHaveBeenCalledWith(ADVERTISED_V2, 'bow-cam', {
+      name: 'Bow Cam',
+      enabled: true,
+      source: { scheme: 'rtsp', host: '10.0.0.9' }
+    });
+  });
+});
+
 describe('VideoCameraSetupComponent — upload mode', () => {
   const assets = {
     list: vi.fn(),
