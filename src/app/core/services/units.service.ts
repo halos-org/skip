@@ -506,6 +506,10 @@ export class UnitsService {
     'l/min': Qty.swiftConverter("m^3/s", "liter/minute"),
     'l/h': Qty.swiftConverter("m^3/s", "liter/hour"),
     'g/min': Qty.swiftConverter("m^3/s", "gallon/minute"),
+    // The server's own formulas for these two convert to gallons per SECOND — 3600x short, reported
+    // as SignalK/signalk-server#2951. These factors are the correct ones (1 m³/s = 951019.39 US gal/h),
+    // so Skip and the Signal K admin UI disagree on an imperial fuel rate until that lands. Do not
+    // "reconcile" them with the server's numbers.
     'g/h': Qty.swiftConverter("m^3/s", "gallon/hour"),
     'gal-imp/h': Qty.swiftConverter("m^3/s", "gallon-imp/hour"),
 //  fuel consumption
