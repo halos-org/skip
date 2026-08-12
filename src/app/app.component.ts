@@ -103,9 +103,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       // Embed is strictly read-only: never run the config migration (it writes every user slot and
       // reloads the app), nor surface the manual upgrade-instructions dialog. Defer both to a
-      // full-app session. An anonymous read-only session is in the same position — it is viewing a
-      // shared config it cannot rewrite, and the instructions ask for actions it cannot take.
-      if (this.embed() || this._storage.isReadOnlyContext()) {
+      // full-app session. Any session storage refuses writes from is in the same position — it
+      // cannot rewrite the config, and the instructions ask for actions it cannot take.
+      if (this.embed() || !this._storage.canPersist()) {
         return;
       }
       if (this.settings.configUpgrade()) {

@@ -1,10 +1,9 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { cloneDeep } from 'lodash-es';
-import { IConfig } from '../interfaces/app-settings.interfaces';
 import { StorageService } from './storage.service';
 import { SettingsService } from './settings.service';
 import { ConfigurationUpgradeService } from './configuration-upgrade.service';
 import { buildDefaultConfig } from '../../../default-config/config.default.factory';
+import { isValidConfigShape } from '../utils/config-shape.util';
 
 export interface IProfileSummary {
   name: string;
@@ -71,7 +70,7 @@ export class ProfileService {
     return this.exclusive(async () => {
       await this.refresh();
       const normalized = this.validateNewName(name);
-      await this.storage.setConfig(PROFILE_SCOPE, normalized, cloneDeep(this.buildBlankConfig()));
+      await this.storage.setConfig(PROFILE_SCOPE, normalized, buildDefaultConfig());
       await this.refresh();
     });
   }
@@ -88,7 +87,7 @@ export class ProfileService {
     return this.exclusive(async () => {
       await this.refresh();
       const normalized = this.validateNewName(name);
-      if (!this.isValidConfigShape(config)) {
+      if (!isValidConfigShape(config)) {
         throw new Error('The selected file is not a valid Skip configuration.');
       }
       const { config: prepared, migrated } = this.upgrade.migrateImportedConfig(config);
@@ -104,7 +103,7 @@ export class ProfileService {
       await this.refresh();
       const normalized = this.validateNewName(newName);
       const sourceConfig = await this.storage.getConfig(PROFILE_SCOPE, sourceName);
-      if (!this.isValidConfigShape(sourceConfig)) {
+      if (!isValidConfigShape(sourceConfig)) {
         throw new Error(`Profile "${sourceName}" has no usable configuration to copy.`);
       }
       await this.storage.setConfig(PROFILE_SCOPE, normalized, sourceConfig);
@@ -125,7 +124,7 @@ export class ProfileService {
         throw new Error(`The "${RESERVED_DEFAULT}" profile cannot be renamed.`);
       }
       const sourceConfig = await this.storage.getConfig(PROFILE_SCOPE, oldName);
-      if (!this.isValidConfigShape(sourceConfig)) {
+      if (!isValidConfigShape(sourceConfig)) {
         throw new Error(`Profile "${oldName}" has no usable configuration to rename.`);
       }
       await this.storage.setConfig(PROFILE_SCOPE, normalized, sourceConfig);
@@ -185,18 +184,6 @@ export class ProfileService {
 
   private existingNames(): string[] {
     return this._profiles().map((p) => p.name);
-  }
-
-  private isValidConfigShape(c: unknown): c is IConfig {
-    if (!c || typeof c !== 'object') {
-      return false;
-    }
-    const cfg = c as Record<string, unknown>;
-    return 'app' in cfg && 'theme' in cfg && Array.isArray(cfg['dashboards']);
-  }
-
-  private buildBlankConfig(): IConfig {
-    return buildDefaultConfig();
   }
 
   private validateNewName(name: string): string {

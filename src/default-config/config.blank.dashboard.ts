@@ -6,7 +6,7 @@
 // trackedDevices list, which makes them auto-discover whatever the vessel
 // reports instead of pinning one boat's device ids. Each widget's gridstack
 // `id` equals its widgetProperties.uuid. Page ids here are placeholders: both
-// seed paths (DashboardService and ProfileService.buildBlankConfig) regenerate
+// seed paths (DashboardService and buildDefaultConfig) regenerate
 // a fresh page id per instance.
 // To refresh, re-export a good dashboard config and replace the array below.
 // A live export carries the source vessel in more than its $sources, so strip

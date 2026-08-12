@@ -9,6 +9,8 @@ import { SettingsService } from './settings.service';
 import { Dashboard, DashboardService, IPageSwitchTrigger, widgetOperation } from './dashboard.service';
 import { EmbedModeService } from './embed-mode.service';
 import { StorageService } from './storage.service';
+import { AuthenticationService } from './authentication.service';
+import { of } from 'rxjs';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -79,7 +81,8 @@ describe('DashboardService', () => {
       providers: [
         { provide: SettingsService, useValue: settings },
         { provide: Router, useValue: router },
-        { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => storageBootstrapped, isReadOnlyContext: () => storageReadOnly } },
+        { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => storageBootstrapped, isReadOnlyContext: () => storageReadOnly, canPersist: () => !storageReadOnly } },
+        { provide: AuthenticationService, useValue: { canWriteUserData$: of(true) } },
         { provide: EmbedModeService, useValue: { embed: () => embedActive, profile: () => ephemeralProfile } }
       ]
     });
@@ -659,7 +662,8 @@ describe('DashboardService', () => {
         providers: [
           { provide: SettingsService, useValue: makeSettingsMock(seed()) },
           { provide: Router, useValue: makeRouterStub(null) },
-          { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => true, isReadOnlyContext: () => false } },
+          { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => true, isReadOnlyContext: () => false, canPersist: () => true } },
+          { provide: AuthenticationService, useValue: { canWriteUserData$: of(true) } },
           { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } }
         ]
       });

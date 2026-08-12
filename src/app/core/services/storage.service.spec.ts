@@ -44,8 +44,8 @@ describe('StorageService', () => {
       http.expectNone(() => true);
     });
 
-    it('removeItem throws on an empty name', () => {
-      expect(() => service.removeItem('user', '')).toThrow(/name/i);
+    it('removeItem rejects on an empty name', async () => {
+      await expect(service.removeItem('user', '')).rejects.toThrow(/name/i);
       http.expectNone(() => true);
     });
 
@@ -367,11 +367,12 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
       http.expectNone(() => true);
     });
 
-    // removeItem refuses synchronously, like its sibling slot-name guard.
-    it('rejects a delete for the same reason', () => {
+    // A rejection, not a synchronous throw: ProfileService attaches .catch() to this call, which a
+    // sync throw would skip entirely.
+    it('rejects a delete for the same reason', async () => {
       const { service } = setup({ loggedIn: false });
 
-      expect(() => service.removeItem('user', 'cockpit')).toThrow(/read-only/i);
+      await expect(service.removeItem('user', 'cockpit')).rejects.toThrow(/read-only/i);
       http.expectNone(() => true);
     });
 

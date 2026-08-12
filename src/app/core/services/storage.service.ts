@@ -61,7 +61,6 @@ export class StorageService {
   private _isRemoteContextBootstrapped = false;
   private _isReadOnlyContext = false;
   public storageServiceReady$ = new BehaviorSubject<boolean>(false);
-  private _isLoggedIn = false;
   private _networkStatus: IEndpointStatus | undefined = undefined;
   // Instrumentation toggle
   private _logIO = false; // set to false to silence logging
@@ -104,13 +103,6 @@ export class StorageService {
   constructor() {
     const server = this.server;
     // Subscriptions auto‑teardown via takeUntilDestroyed
-    this._auth.isLoggedIn$
-      .pipe(takeUntilDestroyed())
-      .subscribe(isLoggedIn => {
-        this._isLoggedIn = isLoggedIn;
-        this.isStorageServiceReady();
-      });
-
     server.serverServiceEndpoint$
       .pipe(takeUntilDestroyed())
       .subscribe((status: IEndpointStatus) => {
@@ -161,7 +153,7 @@ export class StorageService {
     // are refused separately in assertWritable().
     if (this._networkStatus?.state === EndpointStatus.Connected && this.serverEndpoint) {
       this.storageServiceReady$.next(true);
-      console.log(`[Remote Storage Service] Authenticated ${this._isLoggedIn}, AppData API: ${this.serverEndpoint}`);
+      console.log(`[Remote Storage Service] AppData API reachable: ${this.serverEndpoint}`);
     } else {
       this.storageServiceReady$.next(false);
     }
@@ -171,6 +163,10 @@ export class StorageService {
    * Wait until storage service is ready for use.
    * Should be called during app initialization to ensure storage is ready
    * before services that depend on it are constructed.
+   *
+   * Ready means the applicationData API is REACHABLE, not that the session may write it — an
+   * anonymous visitor on an allow_readonly server is ready and can read. Callers that are about to
+   * write must consult canPersist(); readiness alone has never implied permission.
    *
    * @param {number} timeoutMs Maximum time to wait in milliseconds.
    * @returns {Promise<boolean>} Resolves true when ready; false on timeout.
@@ -220,10 +216,16 @@ export class StorageService {
 
   /**
    * Whether this session may persist configuration: a signed-in identity whose server-side userLevel
-   * can write. An anonymous read-only visitor and a signed-in `readonly` user both fail it.
+   * can write, holding a config that is its own to write. An anonymous read-only visitor and a
+   * signed-in `readonly` user both fail the first test.
+   *
+   * The second test is what stops a config loaded as someone else's shared view from becoming
+   * writable because the session changed underneath it: an anonymous tab picks up a session
+   * established in another tab on the next loginStatus re-probe, and would otherwise write the
+   * global shared config into whatever user slot its bootstrap name happens to match.
    */
   public canPersist(): boolean {
-    return this._auth.canWriteUserData();
+    return this._auth.canWriteUserData() && !this._isReadOnlyContext;
   }
 
   /**
@@ -522,7 +524,7 @@ export class StorageService {
    *
    * @memberof StorageService
    */
-  public removeItem(scope: string, name: string, forceConfigFileVersion?: number): Promise<void> {
+  public async removeItem(scope: string, name: string, forceConfigFileVersion?: number): Promise<void> {
     this.ensureReady();
     this.assertWritable('removeItem');
     this.assertSlotName(name, 'removeItem');

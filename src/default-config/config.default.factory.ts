@@ -9,9 +9,10 @@ import { UUID } from '../app/core/utils/uuid.util';
  * starts from, and what an anonymous visitor sees when the server publishes no shared dashboard.
  * Each call returns its own deep copy with new page ids, so the exported singletons stay pristine.
  *
- * Lives apart from `config.blank.const` because it reaches into the dashboard seed, which carries a
- * type import from the dashboard service — pulling that chain into the const module would close an
- * import cycle around the very constants it exports.
+ * Lives apart from `config.blank.const` because two unrelated consumers need it — ProfileService for
+ * a new profile, and the bootstrap for an anonymous visitor — and neither should import the other.
+ * Keeping it out of the const module also keeps that module free of the dashboard seed's own import
+ * of the dashboard service, which is type-only today but would close a cycle if it ever carried a value.
  */
 export function buildDefaultConfig(): IConfig {
   const config = cloneDeep(defaultConfig);

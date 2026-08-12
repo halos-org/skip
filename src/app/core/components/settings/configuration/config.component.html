@@ -85,7 +85,7 @@
           <br /><strong>WARNING: This replaces the active profile's configuration.</strong>
         </div>
         <div class="reset-btn btn-div">
-          <button mat-flat-button type="button" class="adv-btn" (click)="resetConfigToDefault()">Default</button>
+          <button [disabled]="!canWriteUserData()" mat-flat-button type="button" class="adv-btn" (click)="resetConfigToDefault()">Default</button>
         </div>
 
         <div class="config-txt">

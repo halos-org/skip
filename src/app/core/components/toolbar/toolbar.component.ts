@@ -39,6 +39,8 @@ const PEEK_HOTZONE_PX = 8;
 export class ToolbarComponent implements OnDestroy {
   protected readonly chrome = inject(ChromeVisibilityService);
   private readonly dashboard = inject(DashboardService);
+  /** Hides the page-management and edit affordances in a session whose edits could never be saved. */
+  protected readonly readOnly = this.dashboard.isReadOnlySession;
   protected readonly uiEvent = inject(uiEventService);
   private readonly app = inject(AppService);
   private readonly settings = inject(SettingsService);

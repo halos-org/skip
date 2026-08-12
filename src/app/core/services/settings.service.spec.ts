@@ -134,8 +134,8 @@ function createService(opts?: SeedOpts): SettingsService {
     ensureLocalStorage();
     seedConfig(opts);
   }
-  // Provide both services in the module so transitive deps resolve to the global stubs
-  // (AuthenticationService / SignalKConnectionService) rather than the real root services. The
+  // Provide both services in the module so transitive deps resolve to the local stubs rather than
+  // the real root services (src/test.ts provides no app services -- see CLAUDE.md). The
   // ReloadService fake keeps the reconfigure/reset reload seam from firing a real reachability
   // probe (network fetch) during these tests; tests that care spy on its reload().
   // The auth stub reports a signed-in, write-capable session: these suites exercise config

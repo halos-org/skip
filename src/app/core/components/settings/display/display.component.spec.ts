@@ -6,6 +6,7 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { ToastService } from '../../../services/toast.service';
 import { AppService } from '../../../services/app-service';
 import { SettingsService } from '../../../services/settings.service';
+import { AuthenticationService } from '../../../services/authentication.service';
 import { PluginConfigClientService } from '../../../services/plugin-config-client.service';
 
 import { SettingsDisplayComponent } from './display.component';
@@ -97,7 +98,10 @@ describe('SettingsNotificationsComponent', () => {
                 { provide: AppService, useClass: AppServiceMock },
                 { provide: ToastService, useClass: ToastServiceMock },
                 { provide: SettingsService, useClass: SettingsServiceMock },
-                { provide: PluginConfigClientService, useClass: PluginConfigClientServiceMock }
+                { provide: PluginConfigClientService, useClass: PluginConfigClientServiceMock },
+                // Enabling the plugin is an admin-gated server write; these cases are about the
+                // prompt's outcome handling, so the session is write-capable.
+                { provide: AuthenticationService, useValue: { canWriteUserData: () => true } }
             ]
         })
             .compileComponents();

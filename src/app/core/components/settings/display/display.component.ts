@@ -5,6 +5,7 @@ import { AppService } from '../../../services/app-service';
 import { ToastService } from '../../../services/toast.service';
 import { SettingsService } from '../../../services/settings.service';
 import { uiEventService } from '../../../services/uiEvent.service';
+import { AuthenticationService } from '../../../services/authentication.service';
 import { PluginConfigClientService } from '../../../services/plugin-config-client.service';
 import { IPluginApiFailure, ISignalkPlugin } from '../../../interfaces/signalk-plugin-config.interfaces';
 import { FormsModule, NgForm } from '@angular/forms';
@@ -50,6 +51,7 @@ export class SettingsDisplayComponent implements OnInit {
   protected readonly uiEvent = inject(uiEventService);
   private readonly responsive = inject(BreakpointObserver);
   private readonly pluginConfig = inject(PluginConfigClientService);
+  private readonly auth = inject(AuthenticationService);
   private readonly destroyRef = inject(DestroyRef);
   protected isPhonePortrait: Signal<BreakpointState>;
   protected nightBrightness = signal<number>(0.27);
@@ -219,6 +221,13 @@ export class SettingsDisplayComponent implements OnInit {
   }
 
   private async enableAndConfigureAutoNight(plugin: ISignalkPlugin, sunFlagPath: string[], seq: number, resolve: (value: AutoNightOutcome) => void): Promise<void> {
+    // Enabling the plugin is a server-side write the Signal K server admin-gates. A session that
+    // cannot write configuration would get a 403 reported as a save failure, so decline up front.
+    if (!this.auth.canWriteUserData()) {
+      this.toast.show('Automatic night mode needs the Derived Data plugin enabled, which requires signing in as an administrator.', 4000, true, 'warn');
+      resolve('declined');
+      return;
+    }
     const nextConfiguration = this.cloneConfig(plugin.state.configuration);
     this.writeBooleanByPath(nextConfiguration, sunFlagPath, true);
 

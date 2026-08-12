@@ -51,9 +51,11 @@
     <div class="toolbar-group toolbar-center">
       @if (!isEditing()) {
         <page-nav-control />
-        <button mat-icon-button class="manage-pages" aria-label="Manage pages" (click)="openPageManager()">
-          <mat-icon>build</mat-icon>
-        </button>
+        @if (!readOnly()) {
+          <button mat-icon-button class="manage-pages" aria-label="Manage pages" (click)="openPageManager()">
+            <mat-icon>build</mat-icon>
+          </button>
+        }
       }
     </div>
 
@@ -66,7 +68,7 @@
           matBadgeColor="warn"
         >notifications</mat-icon>
       </button>
-      @if (!isEditing()) {
+      @if (!isEditing() && !readOnly()) {
         <button mat-icon-button aria-label="Edit page" (click)="enterEdit()">
           <mat-icon>lock_open</mat-icon>
         </button>
