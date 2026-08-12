@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { AppNetworkInitService, IBootstrapIssue } from './app-initNetwork.service';
+import { AppNetworkInitService, IBootstrapIssue, TCookieAuthOutcome } from './app-initNetwork.service';
 import { IConfig, IConnectionConfig } from '../interfaces/app-settings.interfaces';
 import { SignalKConnectionService } from './signalk-connection.service';
 import { AuthenticationService, ILoginStatus } from './authentication.service';
@@ -89,7 +89,7 @@ describe('AppNetworkInitService', () => {
         mockEmbed.embed.mockClear().mockReturnValue(false);
         mockEmbed.profile.mockClear().mockReturnValue(null);
         mockAuth.loginStatusValue = null;
-        mockAuth.refreshLoginStatus.mockClear();
+        mockAuth.refreshLoginStatus.mockReset().mockResolvedValue(null);
         mockSsoRedirect.attemptAutoRedirect.mockClear().mockReturnValue('redirected');
         mockSsoRedirect.resetBudget.mockClear();
         mockSsoRedirect.isBudgetExhausted.mockClear().mockReturnValue(false);
@@ -111,8 +111,8 @@ describe('AppNetworkInitService', () => {
         service = TestBed.inject(AppNetworkInitService);
     });
 
-    function handleCookieAuth(status: ILoginStatus | null): 'redirecting' | 'proceed' | 'auth-blocked' {
-        return (service as unknown as { handleCookieAuth: (s: ILoginStatus | null) => 'redirecting' | 'proceed' | 'auth-blocked' }).handleCookieAuth(status);
+    function handleCookieAuth(status: ILoginStatus | null): TCookieAuthOutcome {
+        return (service as unknown as { handleCookieAuth: (s: ILoginStatus | null) => TCookieAuthOutcome }).handleCookieAuth(status);
     }
 
     function routeToReauth(): void {
@@ -375,6 +375,172 @@ describe('AppNetworkInitService', () => {
 
             expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
             expect(latestIssue().reason).not.toBe('auth-blocked');
+        });
+    });
+
+    // The server hardcodes authenticationRequired:true whenever security is enabled, whatever
+    // allow_readonly says; readOnlyAccess is the field that reports anonymous read. Auto-login still
+    // outranks it, so a device configured to sign its users in keeps doing that (#550).
+    describe('anonymous read-only access (#550)', () => {
+        const readOnly = (extra: Partial<ILoginStatus> = {}): ILoginStatus =>
+            ({ status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: true, ...extra });
+
+        it('readOnlyAccess without OIDC: read-only anonymous session, no redirect', () => {
+            expect(handleCookieAuth(readOnly())).toBe('anonymous');
+
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+            expect(latestIssue().reason).not.toBe('auth-blocked');
+        });
+
+        it('readOnlyAccess with oidcAutoLogin: still redirects (HaLOS keeps its SSO bounce)', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('redirected');
+
+            expect(handleCookieAuth(readOnly({ oidcEnabled: true, oidcAutoLogin: true }))).toBe('redirecting');
+        });
+
+        it('readOnlyAccess with oidcAutoLogin:false: read-only rather than auth-blocked', () => {
+            expect(handleCookieAuth(readOnly({ oidcEnabled: true, oidcAutoLogin: false }))).toBe('anonymous');
+
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+            expect(latestIssue().reason).not.toBe('auth-blocked');
+        });
+
+        it('readOnlyAccess:false: unchanged, the visitor is still sent to sign in', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('redirected');
+
+            expect(handleCookieAuth({ status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: false })).toBe('redirecting');
+        });
+
+        it('readOnlyAccess absent: fails closed to the sign-in path', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('redirected');
+
+            expect(handleCookieAuth({ status: 'notLoggedIn', authenticationRequired: true })).toBe('redirecting');
+        });
+
+        it('an anonymous verdict never reaches the redirect machinery', () => {
+            handleCookieAuth(readOnly());
+
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+            expect(mockSsoRedirect.isBudgetExhausted).not.toHaveBeenCalled();
+        });
+
+        // The redirect being refused says something about this browser, not about what the server
+        // will serve. A server granting anonymous read must still show the instruments.
+        it('falls back to read-only when an auto-login redirect is refused (SSO down)', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('budget-exhausted');
+            mockSsoRedirect.isBudgetExhausted.mockReturnValue(true);
+
+            expect(handleCookieAuth(readOnly({ oidcEnabled: true, oidcAutoLogin: true }))).toBe('anonymous');
+
+            expect(latestIssue().reason).toBe('none');
+        });
+
+        it('falls back to read-only for a framed boot the login endpoint would refuse', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('framed');
+
+            expect(handleCookieAuth(readOnly({ oidcEnabled: true, oidcAutoLogin: true }))).toBe('anonymous');
+
+            expect(latestIssue().reason).toBe('none');
+        });
+
+        it('still blocks when the redirect is refused and the server grants no anonymous read', () => {
+            mockSsoRedirect.attemptAutoRedirect.mockReturnValue('budget-exhausted');
+            mockSsoRedirect.isBudgetExhausted.mockReturnValue(true);
+
+            expect(handleCookieAuth({ status: 'notLoggedIn', authenticationRequired: true, oidcAutoLogin: true })).toBe('auth-blocked');
+
+            expect(latestIssue()).toEqual({ reason: 'auth-blocked', cause: 'budget-exhausted' });
+        });
+    });
+
+    // A session-less visitor has no user-scope slot to load, so the dashboards come from the shared
+    // global scope, falling back to the dashboards shipped in this release (#551).
+    describe('anonymous bootstrap config source (#551)', () => {
+        beforeEach(() => {
+            mockAuth.refreshLoginStatus.mockResolvedValue({
+                status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: true
+            });
+        });
+
+        it('reads the published dashboard from the global scope', async () => {
+            const published = { app: { configVersion: 11 }, theme: null, dashboards: [{ id: 'published' }] } as unknown as IConfig;
+            mockStorage.getConfig.mockResolvedValue(published);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.getConfig).toHaveBeenCalledWith('global', 'default', REMOTE_CONFIG_FILE_VERSION);
+            expect(mockStorage.bootstrapRemoteContext).toHaveBeenCalledWith(
+                expect.objectContaining({ initConfig: published, readOnly: true })
+            );
+            expect(latestStatus()).toBe('ready');
+        });
+
+        it('falls back to the shipped dashboards when the server publishes none', async () => {
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            const context = mockStorage.bootstrapRemoteContext.mock.calls[0][0];
+            expect(context.initConfig.dashboards.length).toBeGreaterThan(0);
+            expect(context.readOnly).toBe(true);
+            expect(latestStatus()).toBe('ready');
+        });
+
+        it('treats an appless 200 {} global slot as nothing published', async () => {
+            mockStorage.getConfig.mockResolvedValue({} as IConfig);
+
+            await service.initNetworkServices();
+
+            const context = mockStorage.bootstrapRemoteContext.mock.calls[0][0];
+            expect(context.initConfig.app).toBeTruthy();
+            expect(latestStatus()).toBe('ready');
+        });
+
+        it('never offers the missing-shared-config recovery to a visitor who has no profile', async () => {
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            // Assert the anonymous path specifically: 'reason: none' is also the initial value, so
+            // it alone would pass with the feature reverted (the redirect path returns early).
+            expect(mockStorage.bootstrapRemoteContext).toHaveBeenCalledWith(expect.objectContaining({ readOnly: true }));
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+            expect(latestIssue().reason).toBe('none');
+        });
+
+        // A 404 and an appless body mean 'nothing published'. Everything else means the operator's
+        // dashboard exists and could not be fetched: showing a different one as if it were the
+        // boat's is worse than saying so.
+        it('surfaces a fetch failure instead of passing off the shipped dashboards as the published one', async () => {
+            mockStorage.getConfig.mockRejectedValue({ status: 500 });
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.bootstrapRemoteContext).not.toHaveBeenCalled();
+            expect(latestStatus()).toBe('degraded');
+        });
+
+        it('falls back to the shipped dashboards when the published config is not a usable Skip config', async () => {
+            mockStorage.getConfig.mockResolvedValue({ app: { configVersion: 11 }, dashboards: 'not-an-array' } as unknown as IConfig);
+
+            await service.initNetworkServices();
+
+            const context = mockStorage.bootstrapRemoteContext.mock.calls[0][0];
+            expect(Array.isArray(context.initConfig.dashboards)).toBe(true);
+            expect(latestStatus()).toBe('ready');
+        });
+
+        it('does not consume the one-shot remote-control migration', async () => {
+            localStorage.setItem('skip.connectionConfig', JSON.stringify({
+                configVersion: 12, skipUUID: 'test-uuid', signalKUrl: 'http://localhost',
+                proxyEnabled: false, signalKSubscribeAll: false, sharedConfigName: 'default',
+                isRemoteControl: false, instanceName: ''
+            }));
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            expect(storedConn()?.configVersion).toBe(12);
         });
     });
 

@@ -20,7 +20,8 @@ describe('ConfigurationUpgradeService', () => {
         initConfig: null,
         listConfigs: vi.fn().mockResolvedValue([]),
         getConfig: vi.fn().mockResolvedValue(null),
-        setConfig: vi.fn().mockResolvedValue(undefined)
+        setConfig: vi.fn().mockResolvedValue(undefined),
+        canPersist: vi.fn().mockReturnValue(true)
     };
 
     const mockAppSettings = {
@@ -36,6 +37,7 @@ describe('ConfigurationUpgradeService', () => {
         mockStorage.listConfigs.mockClear();
         mockStorage.getConfig.mockClear();
         mockStorage.setConfig.mockClear();
+        mockStorage.canPersist.mockClear().mockReturnValue(true);
         mockStorage.initConfig = null;
         mockAppSettings.reloadApp.mockClear();
         mockAppSettings.resetSettings.mockClear();
@@ -52,6 +54,16 @@ describe('ConfigurationUpgradeService', () => {
 
     it('should be created', () => {
         expect(service).toBeTruthy();
+    });
+
+    it('does not migrate anything in a session that cannot write (#552)', async () => {
+        mockStorage.canPersist.mockReturnValue(false);
+
+        await service.runUpgrade(11);
+
+        expect(mockStorage.listConfigs).not.toHaveBeenCalled();
+        expect(mockStorage.setConfig).not.toHaveBeenCalled();
+        expect(mockAppSettings.reloadApp).not.toHaveBeenCalled();
     });
 
     it('removeSplitShellConfigKeys strips the dead split-shell keys, preserving other fields', () => {

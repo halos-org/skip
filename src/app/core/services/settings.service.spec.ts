@@ -10,6 +10,8 @@ import { DefaultAppConfig, DefaultConnectionConfig, DefaultThemeConfig } from '.
 import { IAppConfig, IConfig, IConnectionConfig, INotificationConfig, IThemeConfig } from '../interfaces/app-settings.interfaces';
 import { LATEST_APP_CONFIG_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
 import { Dashboard } from './dashboard.service';
+import { AuthenticationService } from './authentication.service';
+import { BehaviorSubject } from 'rxjs';
 
 interface DefaultConfigGetters {
   getDefaultAppConfig(): IAppConfig;
@@ -132,12 +134,19 @@ function createService(opts?: SeedOpts): SettingsService {
     ensureLocalStorage();
     seedConfig(opts);
   }
-  // Provide both services in the module so transitive deps resolve to the global stubs
-  // (AuthenticationService / SignalKConnectionService) rather than the real root services. The
+  // Provide both services in the module so transitive deps resolve to the local stubs rather than
+  // the real root services (src/test.ts provides no app services -- see CLAUDE.md). The
   // ReloadService fake keeps the reconfigure/reset reload seam from firing a real reachability
   // probe (network fetch) during these tests; tests that care spy on its reload().
+  // The auth stub reports a signed-in, write-capable session: these suites exercise config
+  // persistence, not who is signed in, and StorageService refuses writes without one.
   TestBed.configureTestingModule({
-    providers: [SettingsService, StorageService, { provide: ReloadService, useValue: { reload: () => Promise.resolve() } }]
+    providers: [
+      SettingsService,
+      StorageService,
+      { provide: ReloadService, useValue: { reload: () => Promise.resolve() } },
+      { provide: AuthenticationService, useValue: { isLoggedIn$: new BehaviorSubject(true), canWriteUserData: () => true } }
+    ]
   });
   return TestBed.inject(SettingsService);
 }

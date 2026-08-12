@@ -72,7 +72,8 @@ describe('DashboardComponent', () => {
             activeDashboard: signal(0),
             dashboards: signal([{ id: 'd-0', configuration: [] }]),
             widgetClipboard: signal(null),
-            widgetAction$: new Subject()
+            widgetAction$: new Subject(),
+            isReadOnlySession: signal(false)
         } as unknown as DashboardService;
 
         const mockToastService = {
@@ -727,9 +728,10 @@ describe('DashboardComponent', () => {
 });
 
 // Self-contained (no shared beforeEach): the empty-state "Unlock and Customize" button renders in
-// the static branch, so the embed read-only pin leaves it visible-but-inert without an explicit
-// !embed() gate. Under embed the button must be absent from the DOM. (#216 E6)
-describe('DashboardComponent — embed mode empty state', () => {
+// the static branch, so a session that cannot unlock is left with a visible-but-inert control
+// unless it is gated. Embed was the first such session (#216 E6); an anonymous read-only visitor is
+// another, and clicking it on a device did nothing at all. Both must find it absent from the DOM.
+describe('DashboardComponent — read-only empty state', () => {
     function buildDashboardMock(): DashboardService {
         return {
             updateConfiguration: vi.fn(),
@@ -748,21 +750,24 @@ describe('DashboardComponent — embed mode empty state', () => {
             activeDashboard: signal(0),
             dashboards: signal([{ id: 'd-0', configuration: [] }]),
             widgetClipboard: signal(null),
-            widgetAction$: new Subject()
+            widgetAction$: new Subject(),
+            isReadOnlySession: signal(false)
         } as unknown as DashboardService;
     }
 
-    async function render(embed: boolean): Promise<HTMLElement> {
+    async function render(readOnly: boolean): Promise<HTMLElement> {
+        const dashboardMock = buildDashboardMock();
+        (dashboardMock.isReadOnlySession as unknown as { set: (v: boolean) => void }).set(readOnly);
         await TestBed.configureTestingModule({
             imports: [DashboardComponent],
             providers: [
                 provideRouter([]),
-                { provide: DashboardService, useValue: buildDashboardMock() },
+                { provide: DashboardService, useValue: dashboardMock },
                 { provide: ToastService, useValue: { show: vi.fn() } },
                 { provide: PluginConfigClientService, useValue: { getPlugin: vi.fn(), setPluginEnabled: vi.fn() } },
                 { provide: DialogService, useValue: { openFrameDialog: vi.fn().mockReturnValue(of(null)) } },
                 { provide: uiEventService, useValue: { addHotkeyListener: vi.fn(), removeHotkeyListener: vi.fn(), isDragging: signal(false) } },
-                { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } }
+                { provide: EmbedModeService, useValue: { embed: () => false, profile: () => null } }
             ]
         }).compileComponents();
 
@@ -788,12 +793,12 @@ describe('DashboardComponent — embed mode empty state', () => {
         return fixture.nativeElement as HTMLElement;
     }
 
-    it('hides the Unlock and Customize button under embed', async () => {
+    it('hides the Unlock and Customize button in a session that cannot unlock', async () => {
         const root = await render(true);
         expect(root.querySelector('.empty-state-button')).toBeNull();
     });
 
-    it('shows the Unlock and Customize button when not embedded', async () => {
+    it('shows the Unlock and Customize button in a session that can', async () => {
         const root = await render(false);
         expect(root.querySelector('.empty-state-button')?.textContent).toContain('Unlock and Customize');
     });

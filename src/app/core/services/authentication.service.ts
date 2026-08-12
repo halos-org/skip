@@ -11,7 +11,12 @@ import { distinctUntilChanged, map } from "rxjs/operators";
  */
 export interface ILoginStatus {
   status?: string;
+  // The server hardcodes this to true whenever its security strategy is active, whatever
+  // allow_readonly says; it is false only when security is switched off entirely.
   authenticationRequired?: boolean;
+  // The server's allow_readonly: an anonymous request is granted a readonly principal. This, not
+  // authenticationRequired, is what says a visitor can read without signing in.
+  readOnlyAccess?: boolean;
   userLevel?: string;
   username?: string;
   oidcEnabled?: boolean;
@@ -63,9 +68,15 @@ export class AuthenticationService {
    * read-only session does not present controls that silently fail server-side.
    */
   public canWriteUserData$ = this._loginStatus$.pipe(
-    map(status => status?.status === 'loggedIn' && this.isWriteUserLevel(status.userLevel)),
+    map(() => this.canWriteUserData()),
     distinctUntilChanged()
   );
+
+  /** {@link canWriteUserData$} read synchronously, for callers that must decide at call time. */
+  public canWriteUserData(): boolean {
+    const status = this.loginStatusValue;
+    return status?.status === 'loggedIn' && this.isWriteUserLevel(status.userLevel);
+  }
 
   /**
    * Query `GET /skServer/loginStatus` with credentials so the httpOnly session cookie authenticates

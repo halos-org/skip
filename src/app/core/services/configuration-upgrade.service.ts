@@ -154,6 +154,13 @@ export class ConfigurationUpgradeService {
    * await this.upgradeService.runUpgrade();
    */
   public async runUpgrade(version?: number): Promise<void> {
+    // A migration rewrites every config slot it touches. A session that cannot write would fail on
+    // the first slot after reporting progress on it, so it must not start: the config it is viewing
+    // is not its own to migrate.
+    if (!this._storage.canPersist()) {
+      console.warn('[Configuration Upgrade Service] Read-only session: skipping the configuration migration.');
+      return;
+    }
     this.error.set(null);
     this.upgrading.set(true);
     this.messages.set([]);

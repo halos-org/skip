@@ -12,6 +12,8 @@ import { SignalKConnectionService } from "./signalk-connection.service";
 import { AuthenticationService, ILoginStatus } from './authentication.service';
 import { SsoRedirectService } from './sso-redirect.service';
 import { DefaultConnectionConfig } from '../../../default-config/config.blank.const';
+import { buildDefaultConfig } from '../../../default-config/config.default.factory';
+import { isValidConfigShape } from '../utils/config-shape.util';
 import { cloneDeep } from 'lodash-es';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { DataService } from './data.service';
@@ -22,11 +24,18 @@ import { InternetReachabilityService } from './internet-reachability.service';
 import { EmbedModeService } from './embed-mode.service';
 import { PROFILE_NAME_PATTERN } from './profile.service';
 import { LOCAL_CONFIG_KEYS } from '../constants/config-storage.const';
-import { REMOTE_CONFIG_FILE_VERSION, CONNECTION_CONFIG_VERSION } from '../constants/config-versions.const';
+import { REMOTE_CONFIG_FILE_VERSION, CONNECTION_CONFIG_VERSION, LATEST_APP_CONFIG_VERSION } from '../constants/config-versions.const';
 import { getLocalStorageItem, setLocalStorageItem } from '../utils/local-storage.util';
 
 const CONNECTION_CONFIG_KEY = LOCAL_CONFIG_KEYS.connectionConfig;
+// Where an operator publishes the dashboard anonymous visitors land on. The global applicationData
+// scope is the only one they can read: Signal K admin-gates its writes but not its reads, while the
+// user scope belongs to a signed-in identity an anonymous visitor does not have.
+const ANONYMOUS_CONFIG_SCOPE = 'global';
+const ANONYMOUS_CONFIG_NAME = 'default';
 export type TBootstrapStatus = 'starting' | 'ready' | 'degraded';
+/** Bootstrap auth verdict. 'anonymous' is a session-less read-only visit that must not be redirected. */
+export type TCookieAuthOutcome = 'redirecting' | 'proceed' | 'anonymous' | 'auth-blocked';
 export type TBootstrapIssueReason = 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked';
 export type TAuthBlockedCause = 'budget-exhausted' | 'sign-in-required';
 
@@ -67,11 +76,14 @@ export class AppNetworkInitService implements OnDestroy {
    * Bootstrap auth decision from loginStatus. Returns 'redirecting' when the browser is being
    * sent to the SK/SSO login (caller should stop), or 'proceed' otherwise:
    * - loggedIn   → reset the redirect budget; the storage bootstrap then runs (isLoggedIn is true).
+   * - notLoggedIn + authRequired + readOnlyAccess → the server serves this visitor without a session,
+   *   so read anonymously rather than demanding a sign-in — unless the server asked for auto-login,
+   *   which is a deployment saying its users are expected to arrive signed in.
    * - notLoggedIn + authRequired → auto-redirect when allowed by oidcAutoLogin and the budget; else
    *   surface the auth-blocked recovery state (budget exhausted, or a manual sign-in is required).
    * - auth not required → anonymous read; proceed with no redirect.
    */
-  private handleCookieAuth(status: ILoginStatus | null): 'redirecting' | 'proceed' | 'auth-blocked' {
+  private handleCookieAuth(status: ILoginStatus | null): TCookieAuthOutcome {
     if (status?.status === 'loggedIn') {
       // The budget reset is deferred to a genuinely completed bootstrap (see initNetworkServices'
       // finally), so a loggedIn -> applicationData-401 -> reauth path cannot reset-then-loop.
@@ -83,7 +95,21 @@ export class AppNetworkInitService implements OnDestroy {
       return 'auth-blocked';
     }
     if (status.authenticationRequired) {
-      return this.attemptCookieRedirect(status) === 'redirecting' ? 'redirecting' : 'auth-blocked';
+      if (status.oidcAutoLogin !== true && status.readOnlyAccess) {
+        return 'anonymous';
+      }
+      if (this.attemptCookieRedirect(status) === 'redirecting') {
+        return 'redirecting';
+      }
+      // The redirect was refused (framed, budget spent, or an untrackable budget) — reasons about
+      // this browser, not about what the server will serve. When the server grants anonymous read,
+      // show the instruments instead of a sign-in wall: this is the SSO-is-down case the read-only
+      // path exists for. Clear the auth-blocked issue attemptCookieRedirect already emitted.
+      if (status.readOnlyAccess) {
+        this._bootstrapIssue$.next({ reason: 'none' });
+        return 'anonymous';
+      }
+      return 'auth-blocked';
     }
     // authentication explicitly not required: anonymous read access, no redirect.
     return 'proceed';
@@ -162,6 +188,10 @@ export class AppNetworkInitService implements OnDestroy {
         return;
       }
 
+      if (outcome === 'anonymous') {
+        await this.bootstrapAnonymousConfig();
+      }
+
       let remoteConfig: IConfig | null = null;
       // True when an ephemeral URL `?profile` override was honored (a valid, existing, different
       // slot). The remote-control migration must then ignore the loaded (ephemeral) config and take
@@ -218,7 +248,12 @@ export class AppNetworkInitService implements OnDestroy {
       // the loaded profile, else the legacy local appConfig blob, else identity defaults. An
       // ephemeral `?profile` override is excluded as a source — the device must never adopt the
       // ephemeral slot's identity as its own.
-      this.migrateRemoteControlToDevice(remoteConfig, ephemeralOverrideActive);
+      // An anonymous session has no authoritative profile to lift the remote-control identity from,
+      // and the migration is one-shot: running it here would stamp the connection config as migrated
+      // with identity defaults, so the real identity in the user's profile could never be lifted.
+      if (outcome !== 'anonymous') {
+        this.migrateRemoteControlToDevice(remoteConfig, ephemeralOverrideActive);
+      }
 
       this._bootstrapIssue$.next({ reason: 'none' });
 
@@ -271,6 +306,80 @@ export class AppNetworkInitService implements OnDestroy {
         this.connectionStateMachine.startWebSocketConnection();
       }
     }
+  }
+
+  /**
+   * Loads the configuration an anonymous visitor sees and hands it to storage as a read-only
+   * context. There is no user scope to read — the anonymous principal is not a user — so the source
+   * is the shared global slot an operator publishes, and the dashboards shipped in this release when
+   * none is published. Either way the visitor gets a working app instead of the missing-shared-config
+   * recovery state, which offers to fix a profile they do not have.
+   */
+  private async bootstrapAnonymousConfig(): Promise<void> {
+    const requestedProfile = this.embedMode.profile();
+    if (requestedProfile) {
+      // The parameter selects a user-scope slot, which an anonymous principal has no access to.
+      // Say so rather than rendering the shared config as if the link had worked.
+      console.warn(`[AppInit Network Service] Ignoring ?profile='${requestedProfile}': profiles need a signed-in session. Showing the shared configuration.`);
+    }
+    const storageReady = await this.storage.waitUntilReady();
+    if (!storageReady) {
+      throw new Error('[AppInit Network Service] StorageService did not become ready in time. Cannot bootstrap anonymous configuration.');
+    }
+    this.storage.bootstrapRemoteContext({
+      sharedConfigName: ANONYMOUS_CONFIG_NAME,
+      configFileVersion: REMOTE_CONFIG_FILE_VERSION,
+      initConfig: await this.loadAnonymousConfig(),
+      readOnly: true
+    });
+  }
+
+  /**
+   * The published global config, or the shipped defaults. SK answers a never-created slot with
+   * 200 {} rather than a 404, so an appless body means "nothing published" just as a 404 does —
+   * but nothing else does: a 5xx or a timeout means the operator's dashboard exists and could not
+   * be fetched, and silently showing a different one as if it were the boat's is worse than the
+   * recovery state, so it is rethrown to the bootstrap's handler.
+   *
+   * The published slot is the one configuration in Skip that is necessarily hand-authored — no code
+   * path writes the global scope — so it gets the same shape validation and in-memory migration as
+   * an imported profile. An unusable body falls back rather than booting a half-broken app.
+   */
+  private async loadAnonymousConfig(): Promise<IConfig> {
+    try {
+      const published = await this.storage.getConfig(ANONYMOUS_CONFIG_SCOPE, ANONYMOUS_CONFIG_NAME, REMOTE_CONFIG_FILE_VERSION);
+      if (published?.app) {
+        return this.preparePublishedConfig(published);
+      }
+      console.log('[AppInit Network Service] No shared configuration published; using the dashboards shipped with this version.');
+    } catch (error) {
+      if (error?.status !== 404) {
+        throw error;
+      }
+      console.log('[AppInit Network Service] No shared configuration published (404); using the dashboards shipped with this version.');
+    }
+    return buildDefaultConfig();
+  }
+
+  /**
+   * Screens a published shared config before it becomes the session's configuration. It is the one
+   * config in Skip that is necessarily hand-authored — no code path writes the global scope — so a
+   * body that is merely plausible reaches code that dereferences `theme` and iterates `dashboards`,
+   * and boots an app that throws on the first toast or renders a blank page. An unusable body falls
+   * back to the shipped dashboards instead.
+   *
+   * A version older than this release is rendered as-is with a warning, not migrated: the migration
+   * belongs to the signed-in session that owns a slot, and a read-only visitor must not rewrite one.
+   */
+  private preparePublishedConfig(published: IConfig): IConfig {
+    if (!isValidConfigShape(published)) {
+      console.warn('[AppInit Network Service] The published shared configuration is not a usable Skip config; using the dashboards shipped with this version.');
+      return buildDefaultConfig();
+    }
+    if (published.app?.configVersion !== LATEST_APP_CONFIG_VERSION) {
+      console.warn(`[AppInit Network Service] The published shared configuration is version ${published.app?.configVersion}, not ${LATEST_APP_CONFIG_VERSION}. Rendering it unmigrated; republish it from a current Skip to keep it in step.`);
+    }
+    return published;
   }
 
   /**

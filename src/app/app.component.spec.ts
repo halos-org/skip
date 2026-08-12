@@ -13,6 +13,7 @@ import { EmbedModeService } from './core/services/embed-mode.service';
 import { SettingsService } from './core/services/settings.service';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { StorageService } from './core/services/storage.service';
+import { DialogService } from './core/services/dialog.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
 import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
@@ -53,6 +54,7 @@ describe('AppComponent', () => {
     navigateToNextDashboard: ReturnType<typeof vi.fn>;
     navigateToPreviousDashboard: ReturnType<typeof vi.fn>;
     setStaticDashboard: ReturnType<typeof vi.fn>;
+    isReadOnlySession: ReturnType<typeof signal<boolean>>;
     widgetAction$: Subject<unknown>;
   };
   let uiEvent: {
@@ -82,6 +84,7 @@ describe('AppComponent', () => {
       navigateToNextDashboard: vi.fn(),
       navigateToPreviousDashboard: vi.fn(),
       setStaticDashboard: vi.fn(),
+      isReadOnlySession: signal(false),
       widgetAction$: new Subject(),
     };
     uiEvent = {
@@ -487,6 +490,7 @@ describe('AppComponent — embed mode chrome', () => {
       navigateToNextDashboard: vi.fn(),
       navigateToPreviousDashboard: vi.fn(),
       setStaticDashboard: vi.fn(),
+      isReadOnlySession: signal(false),
       widgetAction$: new Subject(),
     };
     const uiEvent = {
@@ -538,7 +542,7 @@ describe('AppComponent — embed mode chrome', () => {
 // real root SettingsService / ConfigurationUpgradeService (spied) like the chrome suite, plus a
 // toggleable EmbedModeService. (#216 E6)
 describe('AppComponent — embed read-only invariants (#216 E6)', () => {
-  async function render(opts: { embed: boolean; configUpgrade?: boolean; configVersion?: number }) {
+  async function render(opts: { embed: boolean; configUpgrade?: boolean; configVersion?: number; canPersist?: boolean }) {
     const bootstrapIssue$ = new BehaviorSubject<{ reason: string; sharedConfigName?: string }>({ reason: 'none' });
     const appNetworkInitServiceStub = {
       bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
@@ -551,6 +555,7 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
       navigateToNextDashboard: vi.fn(),
       navigateToPreviousDashboard: vi.fn(),
       setStaticDashboard: vi.fn(),
+      isReadOnlySession: signal(false),
       widgetAction$: new Subject(),
     };
     const uiEvent = {
@@ -581,19 +586,40 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     // Drive the constructor effects deterministically through the real root services the component
     // injects: force an upgradeable version and spy the write actions so nothing actually persists.
     const settings = TestBed.inject(SettingsService);
+    // The migration gate asks storage whether this session can write at all; the default here is a
+    // writable session, so the embed cases keep testing embed rather than an incidental read-only.
+    vi.spyOn(TestBed.inject(StorageService), 'canPersist').mockReturnValue(opts.canPersist ?? true);
     const upgrade = TestBed.inject(ConfigurationUpgradeService);
     const runUpgradeSpy = vi.spyOn(upgrade, 'runUpgrade').mockResolvedValue(undefined);
     vi.spyOn(settings, 'getConfigVersion').mockReturnValue(opts.configVersion);
     vi.spyOn(settings, 'resetSettings').mockImplementation(() => undefined);
+    const dialogSpy = vi.spyOn(TestBed.inject(DialogService), 'openFrameDialog').mockReturnValue(new Subject());
     settings.configUpgrade.set(opts.configUpgrade ?? false);
 
     const fixture = TestBed.createComponent(AppComponent);
     (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
     fixture.detectChanges();
-    return { toast, runUpgradeSpy, bootstrapIssue$ };
+    return { toast, runUpgradeSpy, dialogSpy, bootstrapIssue$ };
   }
 
   afterEach(() => vi.restoreAllMocks());
+
+  // A session that cannot write is in embed's position: it can neither run the migration nor act on
+  // the manual instructions, so neither may be raised at it (#552).
+  it('does NOT run the config migration in a session that cannot write', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, canPersist: false, configUpgrade: true, configVersion: 11 });
+    expect(runUpgradeSpy).not.toHaveBeenCalled();
+  });
+
+  it('does NOT raise the upgrade-instructions dialog in a session that cannot write', async () => {
+    const { dialogSpy } = await render({ embed: false, canPersist: false, configUpgrade: true, configVersion: undefined });
+    expect(dialogSpy).not.toHaveBeenCalled();
+  });
+
+  it('DOES raise the upgrade-instructions dialog for a writable session with an unversioned config', async () => {
+    const { dialogSpy } = await render({ embed: false, configUpgrade: true, configVersion: undefined });
+    expect(dialogSpy).toHaveBeenCalled();
+  });
 
   it('does NOT run the config migration under embed even with an upgradeable v11/v12 config', async () => {
     const { runUpgradeSpy } = await render({ embed: true, configUpgrade: true, configVersion: 11 });

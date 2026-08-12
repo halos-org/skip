@@ -30,6 +30,8 @@ export interface IStorageRemoteBootstrapContext {
   sharedConfigName: string;
   configFileVersion: number;
   initConfig: IConfig;
+  /** The config was loaded for a session that cannot own it — a shared, read-only view. */
+  readOnly?: boolean;
 }
 
 interface IPatchAction {
@@ -57,8 +59,8 @@ export class StorageService {
   public sharedConfigName: string;
   private InitConfig: IConfig | null = null;
   private _isRemoteContextBootstrapped = false;
+  private _isReadOnlyContext = false;
   public storageServiceReady$ = new BehaviorSubject<boolean>(false);
-  private _isLoggedIn = false;
   private _networkStatus: IEndpointStatus | undefined = undefined;
   // Instrumentation toggle
   private _logIO = false; // set to false to silence logging
@@ -101,13 +103,6 @@ export class StorageService {
   constructor() {
     const server = this.server;
     // Subscriptions auto‑teardown via takeUntilDestroyed
-    this._auth.isLoggedIn$
-      .pipe(takeUntilDestroyed())
-      .subscribe(isLoggedIn => {
-        this._isLoggedIn = isLoggedIn;
-        this.isStorageServiceReady();
-      });
-
     server.serverServiceEndpoint$
       .pipe(takeUntilDestroyed())
       .subscribe((status: IEndpointStatus) => {
@@ -153,9 +148,12 @@ export class StorageService {
       this.serverEndpoint = this._networkStatus.httpServiceUrl.substring(0, this._networkStatus.httpServiceUrl.length - 4) + "applicationData/"; // this removes 'api/' from the end;
     }
 
-    if (this._networkStatus?.state === EndpointStatus.Connected && this._isLoggedIn && this.serverEndpoint) {
+    // Readiness is about reachability, not identity: Signal K admin-gates only the write verbs on
+    // applicationData, so a session-less visitor on a server with allow_readonly can read it. Writes
+    // are refused separately in assertWritable().
+    if (this._networkStatus?.state === EndpointStatus.Connected && this.serverEndpoint) {
       this.storageServiceReady$.next(true);
-      console.log(`[Remote Storage Service] Authenticated ${this._isLoggedIn}, AppData API: ${this.serverEndpoint}`);
+      console.log(`[Remote Storage Service] AppData API reachable: ${this.serverEndpoint}`);
     } else {
       this.storageServiceReady$.next(false);
     }
@@ -165,6 +163,10 @@ export class StorageService {
    * Wait until storage service is ready for use.
    * Should be called during app initialization to ensure storage is ready
    * before services that depend on it are constructed.
+   *
+   * Ready means the applicationData API is REACHABLE, not that the session may write it — an
+   * anonymous visitor on an allow_readonly server is ready and can read. Callers that are about to
+   * write must consult canPersist(); readiness alone has never implied permission.
    *
    * @param {number} timeoutMs Maximum time to wait in milliseconds.
    * @returns {Promise<boolean>} Resolves true when ready; false on timeout.
@@ -209,6 +211,31 @@ export class StorageService {
   private ensureReady(): void {
     if (!this.storageServiceReady$.getValue()) {
       throw new Error('[StorageService] Not ready: storageServiceReady is false');
+    }
+  }
+
+  /**
+   * Whether this session may persist configuration: a signed-in identity whose server-side userLevel
+   * can write, holding a config that is its own to write. An anonymous read-only visitor and a
+   * signed-in `readonly` user both fail the first test.
+   *
+   * The second test is what stops a config loaded as someone else's shared view from becoming
+   * writable because the session changed underneath it: an anonymous tab picks up a session
+   * established in another tab on the next loginStatus re-probe, and would otherwise write the
+   * global shared config into whatever user slot its bootstrap name happens to match.
+   */
+  public canPersist(): boolean {
+    return this._auth.canWriteUserData() && !this._isReadOnlyContext;
+  }
+
+  /**
+   * Boundary guard for the write verbs. A session that cannot write must not reach the server at
+   * all: the request could only come back 401, and the failure would surface as a save-lost report
+   * for a save the user was never offered.
+   */
+  private assertWritable(op: string): void {
+    if (!this.canPersist()) {
+      throw new Error(`[StorageService] Refusing ${op}: read-only session cannot write configuration.`);
     }
   }
 
@@ -367,6 +394,7 @@ export class StorageService {
    */
   public async setConfig(scope: string, configName: string, config: IConfig, forceConfigFileVersion?: number | string): Promise<null> {
     this.ensureReady();
+    this.assertWritable('setConfig');
     this.assertSlotName(configName, 'setConfig');
 
     const base = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/";
@@ -403,6 +431,11 @@ export class StorageService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public patchConfig(ObjType: TConfigObjectType, value: any, forceConfigFileVersion?: number) {
     this.ensureReady();
+    if (!this.canPersist()) {
+      // Routine autosave in a session that cannot write. Drop it silently: patchFailure$ exists to
+      // tell a user their save was lost, and a read-only visitor was never offered one.
+      return;
+    }
     if (!this.sharedConfigName) {
       const error = new Error('[StorageService] Refusing patchConfig: active config slot name is unset.');
       console.error(error.message);
@@ -491,8 +524,9 @@ export class StorageService {
    *
    * @memberof StorageService
    */
-  public removeItem(scope: string, name: string, forceConfigFileVersion?: number): Promise<void> {
+  public async removeItem(scope: string, name: string, forceConfigFileVersion?: number): Promise<void> {
     this.ensureReady();
+    this.assertWritable('removeItem');
     this.assertSlotName(name, 'removeItem');
     let url = this.serverEndpoint + scope + "/" + SERVER_CONFIG_APPID + "/" + this.configFileVersion;
     if (forceConfigFileVersion) {
@@ -553,6 +587,7 @@ export class StorageService {
     this.sharedConfigName = context.sharedConfigName;
     this.configFileVersion = context.configFileVersion;
     this.InitConfig = cloneDeep(context.initConfig);
+    this._isReadOnlyContext = !!context.readOnly;
     this._isRemoteContextBootstrapped = true;
     console.log(`[Storage Service] Bootstrap handoff applied (sharedConfig=${this.sharedConfigName}, fileVersion=${this.configFileVersion})`);
   }
@@ -569,6 +604,15 @@ export class StorageService {
    */
   public isRemoteContextBootstrapped(): boolean {
     return this._isRemoteContextBootstrapped;
+  }
+
+  /**
+   * Whether the bootstrapped config is a shared, read-only view rather than this device's own
+   * profile. Per-device state derived from the loaded dashboards must not be persisted from one:
+   * the visitor is looking at someone else's configuration.
+   */
+  public isReadOnlyContext(): boolean {
+    return this._isReadOnlyContext;
   }
 
   private logError(error: HttpErrorResponse) {

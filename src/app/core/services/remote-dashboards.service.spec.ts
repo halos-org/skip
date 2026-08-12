@@ -8,7 +8,6 @@ import { Dashboard, DashboardService } from './dashboard.service';
 import { DataService, IPathUpdate } from './data.service';
 import { SettingsService } from './settings.service';
 import { SignalkRequestsService } from './signalk-requests.service';
-import { EmbedModeService } from './embed-mode.service';
 import { States } from '../interfaces/signalk-interfaces';
 
 const SKIP_UUID = 'test-kip-uuid';
@@ -34,6 +33,8 @@ class DashboardServiceStub {
   public activeDashboard = signal<number | null>(null);
   public isDashboardStatic = signal<boolean>(true);
   public navigateTo: Mock = vi.fn();
+  // A session that cannot save must not claim remote-control paths; the service reads this.
+  public isReadOnlySession = signal<boolean>(false);
 }
 
 class DataServiceStub {
@@ -426,9 +427,11 @@ describe('RemoteDashboardsService', () => {
     });
   });
 
-  describe('under embed mode', () => {
+  // Embed was the original case; an anonymous read-only visitor is the same situation and was
+  // observed on a device PUTting three requests the server answered 403.
+  describe('in a session that cannot write', () => {
     beforeEach(() => {
-      TestBed.overrideProvider(EmbedModeService, { useValue: { embed: () => true, profile: () => null } });
+      dashboard.isReadOnlySession.set(true);
     });
 
     it('publishes no remote-control deltas at all, even with remote control enabled at construction', () => {

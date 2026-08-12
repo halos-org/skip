@@ -9,6 +9,8 @@ import { SettingsService } from './settings.service';
 import { Dashboard, DashboardService, IPageSwitchTrigger, widgetOperation } from './dashboard.service';
 import { EmbedModeService } from './embed-mode.service';
 import { StorageService } from './storage.service';
+import { AuthenticationService } from './authentication.service';
+import { of } from 'rxjs';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -67,6 +69,7 @@ describe('DashboardService', () => {
   // Demand persistence (#386) is gated on an authoritative, non-ephemeral, non-embed load; these
   // drive the StorageService/EmbedModeService mocks. Defaults model a normal device boot.
   let storageBootstrapped: boolean;
+  let storageReadOnly: boolean;
   let ephemeralProfile: string | null;
   let embedActive: boolean;
 
@@ -78,7 +81,8 @@ describe('DashboardService', () => {
       providers: [
         { provide: SettingsService, useValue: settings },
         { provide: Router, useValue: router },
-        { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => storageBootstrapped } },
+        { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => storageBootstrapped, isReadOnlyContext: () => storageReadOnly, canPersist: () => !storageReadOnly } },
+        { provide: AuthenticationService, useValue: { canWriteUserData$: of(true) } },
         { provide: EmbedModeService, useValue: { embed: () => embedActive, profile: () => ephemeralProfile } }
       ]
     });
@@ -87,6 +91,7 @@ describe('DashboardService', () => {
 
   beforeEach(() => {
     storageBootstrapped = true;
+    storageReadOnly = false;
     ephemeralProfile = null;
     embedActive = false;
     consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -657,7 +662,8 @@ describe('DashboardService', () => {
         providers: [
           { provide: SettingsService, useValue: makeSettingsMock(seed()) },
           { provide: Router, useValue: makeRouterStub(null) },
-          { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => true } },
+          { provide: StorageService, useValue: { isRemoteContextBootstrapped: () => true, isReadOnlyContext: () => false, canPersist: () => true } },
+          { provide: AuthenticationService, useValue: { canWriteUserData$: of(true) } },
           { provide: EmbedModeService, useValue: { embed: () => embed, profile: () => null } }
         ]
       });
@@ -734,6 +740,24 @@ describe('DashboardService', () => {
 
     it('does NOT persist demand before the authoritative profile has bootstrapped (degraded/seed) (#386)', () => {
       storageBootstrapped = false;
+      setup();
+      TestBed.tick();
+      expect(settings.setRemoteContextDemand).not.toHaveBeenCalled();
+    });
+
+    it('stays locked in a read-only session: the layout cannot be unlocked (#552)', () => {
+      storageReadOnly = true;
+      setup();
+
+      service.toggleStaticDashboard();
+      expect(service.isDashboardStatic()).toBe(true);
+
+      service.setStaticDashboard(false);
+      expect(service.isDashboardStatic()).toBe(true);
+    });
+
+    it('does NOT persist demand from an anonymous read-only view of a shared config (#551)', () => {
+      storageReadOnly = true;
       setup();
       TestBed.tick();
       expect(settings.setRemoteContextDemand).not.toHaveBeenCalled();

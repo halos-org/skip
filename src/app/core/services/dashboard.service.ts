@@ -1,15 +1,16 @@
 import { SettingsService } from './settings.service';
-import { DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
+import { computed, DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { ActivatedRouteSnapshot, NavigationEnd, Router } from '@angular/router';
 import { NgGridStackWidget } from 'gridstack/dist/angular';
 import { UUID } from '../utils/uuid.util';
 import { BehaviorSubject, distinctUntilChanged, filter, map, shareReplay, skip, take } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import isEqual from 'lodash-es/isEqual';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { DefaultDashboard } from '../../../default-config/config.blank.dashboard';
 import { EmbedModeService } from './embed-mode.service';
 import { StorageService } from './storage.service';
+import { AuthenticationService } from './authentication.service';
 import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
 
 /** An optional rule that auto-shows a page when a Signal K path reaches a value. */
@@ -48,12 +49,25 @@ export class DashboardService {
   private readonly _router = inject(Router);
   private readonly _embedMode = inject(EmbedModeService);
   private readonly _storage = inject(StorageService);
+  private readonly _auth = inject(AuthenticationService);
   private readonly _destroyRef = inject(DestroyRef);
   public dashboards = signal<Dashboard[]>([], { equal: isEqual });
   public readonly activeDashboard = signal<number | null>(null);
   private _widgetAction = new BehaviorSubject<widgetOperation | null>(null);
   public widgetAction$ = this._widgetAction.asObservable();
   public isDashboardStatic = signal<boolean>(true);
+  private readonly _canWriteUserData = toSignal(this._auth.canWriteUserData$, { initialValue: false });
+  /**
+   * Sessions whose layout edits could never be persisted: the chromeless embed, and any session
+   * storage refuses writes from — an anonymous visitor, a signed-in `readonly` user, or a shared
+   * read-only config. One predicate, so a guard and an affordance cannot pick different halves.
+   *
+   * A signal rather than a method: the toolbar hides its edit controls off this, and the session's
+   * write capability changes at runtime (a loginStatus re-probe on WebSocket reopen), which a plain
+   * method call in an OnPush template would not pick up.
+   */
+  public readonly isReadOnlySession = computed(() =>
+    this._embedMode.embed() || !this._canWriteUserData() || this._storage.isReadOnlyContext());
   public widgetClipboard = signal<NgGridStackWidget | null>(null);
 
   public readonly layoutEditSaved = signal<number>(0);
@@ -122,10 +136,11 @@ export class DashboardService {
         // Recompute the remote (AIS/DSC) context subscribe demand and persist it per-device (#386),
         // so the next boot's pre-auth subscribe-scope decision reflects the widgets configured.
         // Derive it ONLY from the device's own authoritative profile: skip an ephemeral ?profile
-        // viewer (embed already returned above) and any pre-load/degraded seed (DefaultDashboard
-        // before the real profile bootstrapped). Otherwise a transient viewer or a failed boot would
-        // clobber the device flag and silently under-subscribe the real profile — hiding AIS.
-        if (!this._embedMode.profile() && this._storage.isRemoteContextBootstrapped()) {
+        // viewer (embed already returned above), a read-only view of a shared config, and any
+        // pre-load/degraded seed (DefaultDashboard before the real profile bootstrapped). Otherwise
+        // a transient viewer or a failed boot would clobber the device flag and silently
+        // under-subscribe the real profile — hiding AIS.
+        if (!this._embedMode.profile() && this._storage.isRemoteContextBootstrapped() && !this._storage.isReadOnlyContext()) {
           this._settings.setRemoteContextDemand(dashboardsRequireRemoteContexts(dashboards));
         }
       });
@@ -189,7 +204,8 @@ export class DashboardService {
    */
   public toggleStaticDashboard(): void {
     // Embed mode is strictly read-only: this single choke point stays locked, so never unlock.
-    if (this._embedMode.embed()) return;
+    // An anonymous read-only session is too — its edits could never be saved.
+    if (this.isReadOnlySession()) return;
     this.isDashboardStatic.set(!this.isDashboardStatic());
   }
 
@@ -206,6 +222,7 @@ export class DashboardService {
    * @returns Index (0-based) of the newly inserted dashboard.
    */
   public add(name: string, configuration: NgGridStackWidget[], icon?: string): number {
+    if (this.refuseMutation('add')) return this.activeDashboard() ?? 0;
     let newIndex = 0;
     this.dashboards.update(dashboards => {
       const updated = [...dashboards, { id: UUID.create(), name, icon: icon ?? 'dashboard-dashboard', configuration }];
@@ -233,6 +250,7 @@ export class DashboardService {
    * @param trigger New auto-show trigger, `null`/empty to clear, omitted to leave as-is.
    */
   public update(itemIndex: number, name: string, icon: string, trigger?: IPageSwitchTrigger | null): void {
+    if (this.refuseMutation('update')) return;
     this.dashboards.update(dashboards => dashboards.map((dashboard, i) => {
       if (i !== itemIndex) return dashboard;
       const next: Dashboard = { ...dashboard, name: name, icon: icon ?? 'dashboard-dashboard' };
@@ -253,6 +271,7 @@ export class DashboardService {
    * @param itemIndex The index of the dashboard to delete.
    */
   public delete(itemIndex: number): void {
+    if (this.refuseMutation('delete')) return;
     if (!this.isValidDashboardIndex(itemIndex)) {
       console.error(`[Dashboard Service] Invalid dashboard index: ${itemIndex}`);
       return;
@@ -296,6 +315,7 @@ export class DashboardService {
    * @returns                     The new dashboard's index, or -1 on failure.
    */
   public duplicate(itemIndex: number, newName: string, newIcon: string): number {
+    if (this.refuseMutation('duplicate')) return this.activeDashboard() ?? 0;
     if (!this.isValidDashboardIndex(itemIndex)) {
       console.error(`[Dashboard Service] Invalid dashboard index: ${itemIndex}`);
       return -1;
@@ -536,10 +556,24 @@ export class DashboardService {
    */
   public setStaticDashboard(isStatic: boolean): void {
     // Embed mode is strictly read-only: ignore unlock requests so this single choke point stays
-    // locked. A redundant lock (isStatic=true) still applies.
-    if (this._embedMode.embed() && !isStatic) return;
+    // locked. A redundant lock (isStatic=true) still applies. Same for a read-only session.
+    if (this.isReadOnlySession() && !isStatic) return;
     this.isDashboardStatic.set(isStatic);
   }
+
+  /**
+   * Boundary for structural page edits. Hiding the affordances keeps a read-only visitor from
+   * reaching these; this stops the ones that remain (hotkeys, deep links, a stale open sheet) from
+   * destroying the shared dashboard in memory, where the change would look saved and would become a
+   * real write the moment a session appeared.
+   */
+  private refuseMutation(op: string): boolean {
+    if (!this.isReadOnlySession()) return false;
+    console.warn(`[Dashboard Service] Refusing ${op}: this session cannot save page changes.`);
+    return true;
+  }
+
+
 
   public notifyLayoutEditSaved(): void {
      this.layoutEditSaved.update(v => v + 1);

@@ -29,6 +29,8 @@ const dashboard = {
   navigateTo: vi.fn(),
   navigateToActive: vi.fn(),
   setStaticDashboard: vi.fn(),
+  // The edit and page-management controls are hidden in a session that cannot save page changes.
+  isReadOnlySession: signal(false),
 };
 const bottomSheet = { open: vi.fn(() => ({ afterDismissed: () => of(undefined) })) };
 const uiEvent = {
@@ -57,6 +59,7 @@ describe('ToolbarComponent', () => {
       bottomSheet.open,
       uiEvent.toggleFullScreen, app.toggleDayNightMode, app.toggleNightMode, dialog.openNotifications, router.navigate,
     ]) spy.mockClear();
+    dashboard.isReadOnlySession.set(false);
     chrome.revealed.set(false);
     chrome.peeking.set(false);
     dashboard.isDashboardStatic.set(true);
@@ -177,6 +180,22 @@ describe('ToolbarComponent', () => {
       init();
       expect(el.querySelector('.toolbar-host')!.classList.contains('editing')).toBe(true);
     });
+  });
+
+  it('hides the page-management and edit controls in a session that cannot save changes', () => {
+    chrome.revealed.set(true);
+    init();
+    // Both controls are present for a writable session, so their absence below is the guard working.
+    expect(el.querySelector('.manage-pages')).not.toBeNull();
+    expect(el.querySelector('[aria-label="Edit page"]')).not.toBeNull();
+
+    dashboard.isReadOnlySession.set(true);
+    fixture.detectChanges();
+
+    expect(el.querySelector('.manage-pages')).toBeNull();
+    expect(el.querySelector('[aria-label="Edit page"]')).toBeNull();
+    // Reading the instruments is unaffected: page navigation stays.
+    expect(el.querySelector('page-nav-control')).not.toBeNull();
   });
 
   describe('manage-pages (normal-mode)', () => {

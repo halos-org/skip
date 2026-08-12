@@ -18,6 +18,7 @@ import { AppService } from './core/services/app-service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { ChromeVisibilityService } from './core/services/chrome-visibility.service';
 import { EmbedModeService } from './core/services/embed-mode.service';
+import { StorageService } from './core/services/storage.service';
 import { NotificationsService } from './core/services/notifications.service';
 import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
 import { RemoteDashboardsService } from './core/services/remote-dashboards.service';
@@ -58,6 +59,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly _app = inject(AppService);
   protected readonly chrome = inject(ChromeVisibilityService);
   private readonly _embedMode = inject(EmbedModeService);
+  private readonly _storage = inject(StorageService);
   /** True in the chromeless embed render mode; the shell template unmounts the toolbar when set. */
   protected readonly embed = this._embedMode.embed;
   private readonly _dialog = inject(DialogService);
@@ -101,8 +103,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       // Embed is strictly read-only: never run the config migration (it writes every user slot and
       // reloads the app), nor surface the manual upgrade-instructions dialog. Defer both to a
-      // full-app session.
-      if (this.embed()) {
+      // full-app session. Any session storage refuses writes from is in the same position — it
+      // cannot rewrite the config, and the instructions ask for actions it cannot take.
+      if (this.embed() || !this._storage.canPersist()) {
         return;
       }
       if (this.settings.configUpgrade()) {
