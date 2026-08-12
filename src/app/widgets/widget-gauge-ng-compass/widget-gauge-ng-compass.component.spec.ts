@@ -21,6 +21,8 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
   let internals: CompassInternals;
   let capturedNext: ((u: IPathUpdate) => void) | undefined;
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let observeCount: number;
+  let replayOnObserve: IPathUpdate | undefined;
 
   interface CompassInternals {
     value: () => number | null | undefined;
@@ -45,8 +47,16 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
   beforeEach(async () => {
     capturedNext = undefined;
     options = signal<IWidgetSvcConfig | undefined>(makeConfig());
+    observeCount = 0;
+    replayOnObserve = undefined;
     const streamsFake = {
-      observe(_pathName: string, next: (u: IPathUpdate) => void) { capturedNext = next; }
+      observe(_pathName: string, next: (u: IPathUpdate) => void) {
+        capturedNext = next;
+        observeCount++;
+        // The real directive replays a BehaviorSubject, so a path holding a value delivers it
+        // synchronously inside the same effect run as the clear.
+        if (replayOnObserve) next(replayOnObserve);
+      }
     };
     const unitsFake = {
       getUnitDisplaySymbol: (measure: string | null | undefined): string => measure ?? '',
@@ -114,8 +124,21 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
 
   // The same effect re-runs on a theme change, so an unconditional clear would blink the needle
   // off and back on at every switch.
+  it('shows the new path\'s heading immediately when it has one, without surfacing the clear', () => {
+    capturedNext?.(update(142));
+
+    replayOnObserve = update(271);
+    options.set(makeConfig('self.navigation.headingMagnetic'));
+    fixture.detectChanges();
+
+    expect(internals.dataAvailable()).toBe(true);
+    expect(internals.value()).toBe(271);
+    expect(internals.textValue()).toBe('271');
+  });
+
   it('keeps the heading when the config changes without changing the path', () => {
     capturedNext?.(update(142));
+    const before = observeCount;
 
     fixture.componentRef.setInput('theme', {
       contrast: 'rgba(0,0,0,1)', contrastDim: 'rgba(60,60,60,1)',
@@ -126,6 +149,8 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
     });
     fixture.detectChanges();
 
+    // Positive control: the effect really did re-run, so "no clear" is a decision, not a no-op.
+    expect(observeCount).toBeGreaterThan(before);
     expect(internals.dataAvailable()).toBe(true);
     expect(internals.value()).toBe(142);
     expect(internals.textValue()).toBe('142');

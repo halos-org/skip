@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Subject, BehaviorSubject, Observable } from 'rxjs';
-import { WidgetStreamsDirective } from './widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature, normalizeWidgetPath } from './widget-streams.directive';
 import { DataService, IPathUpdate } from '../services/data.service';
 import { UnitsService } from '../services/units.service';
 import { IWidgetSvcConfig, IWidgetPath } from '../interfaces/widgets-interface';
@@ -899,5 +899,53 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
         expect(dataSvc.timeoutCalls.length).toBeGreaterThanOrEqual(1);
         // The widget must be reset to null ("--"), not left showing the stale 500.
         expect(hits[hits.length - 1]).toBeNull();
+    });
+});
+
+/**
+ * The identity a widget compares to tell a re-point apart from an unrelated reconfigure. The
+ * directive computes it to decide whether to rebuild a subscription; the gauges compute it to decide
+ * whether the reading on screen still describes the path being watched. Both must agree, which is
+ * why it is one exported function rather than two implementations.
+ */
+describe('widgetPathSignature', () => {
+    const base = { path: 'navigation.speedOverGround', pathType: 'number', convertUnitTo: 'knots', source: null, suppressBootstrapNull: true };
+
+    it('returns null for a config with no usable path', () => {
+        expect(widgetPathSignature(undefined)).toBeNull();
+        expect(widgetPathSignature(null)).toBeNull();
+        expect(widgetPathSignature({ ...base, path: null })).toBeNull();
+        expect(widgetPathSignature({ ...base, path: '' })).toBeNull();
+        // Whitespace passes the widget-options required check, so it has to normalize to "no path"
+        // here rather than becoming an identity of its own.
+        expect(widgetPathSignature({ ...base, path: '   ' })).toBeNull();
+    });
+
+    it('treats a trimmed path and its padded form as the same reading', () => {
+        expect(widgetPathSignature({ ...base, path: '  navigation.speedOverGround  ' }))
+            .toBe(widgetPathSignature(base));
+    });
+
+    it('treats an unset source and the default source as the same reading', () => {
+        expect(widgetPathSignature({ ...base, source: null })).toBe(widgetPathSignature({ ...base, source: 'default' }));
+        expect(widgetPathSignature({ ...base, source: '  ' })).toBe(widgetPathSignature({ ...base, source: 'default' }));
+    });
+
+    it('separates readings that differ in path, source, type, unit or bootstrap-null policy', () => {
+        const sig = widgetPathSignature(base);
+        expect(widgetPathSignature({ ...base, path: 'navigation.speedThroughWater' })).not.toBe(sig);
+        expect(widgetPathSignature({ ...base, source: 'gps-2' })).not.toBe(sig);
+        expect(widgetPathSignature({ ...base, pathType: 'string' })).not.toBe(sig);
+        // A unit change re-expresses the number, so the displayed reading is no longer the same one.
+        expect(widgetPathSignature({ ...base, convertUnitTo: 'kph' })).not.toBe(sig);
+        expect(widgetPathSignature({ ...base, suppressBootstrapNull: false })).not.toBe(sig);
+    });
+
+    it('normalizeWidgetPath yields undefined for anything that is not a usable path', () => {
+        expect(normalizeWidgetPath('  a.b  ')).toBe('a.b');
+        expect(normalizeWidgetPath('')).toBeUndefined();
+        expect(normalizeWidgetPath('   ')).toBeUndefined();
+        expect(normalizeWidgetPath(null)).toBeUndefined();
+        expect(normalizeWidgetPath(42)).toBeUndefined();
     });
 });

@@ -28,6 +28,8 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
   let sizeUpdates: LinearGaugeOptions[];
   let capturedNext: ((u: IPathUpdate) => void) | undefined;
+  let observeCount: number;
+  let replayOnObserve: IPathUpdate | undefined;
 
   interface LinearInternals {
     effectiveUnit: WritableSignal<string>;
@@ -77,12 +79,20 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
     options = signal<IWidgetSvcConfig | undefined>(makeConfig());
     sizeUpdates = [];
     capturedNext = undefined;
+    observeCount = 0;
+    replayOnObserve = undefined;
 
     await TestBed.configureTestingModule({
       imports: [WidgetGaugeNgLinearComponent],
       providers: [
         { provide: WidgetRuntimeDirective, useValue: { options } },
-        { provide: WidgetStreamsDirective, useValue: { observe: (_p: string, next: (u: IPathUpdate) => void) => { capturedNext = next; } } },
+        { provide: WidgetStreamsDirective, useValue: { observe: (_p: string, next: (u: IPathUpdate) => void) => {
+          capturedNext = next;
+          observeCount++;
+          // The real directive replays a BehaviorSubject, so a path holding a value delivers it
+          // synchronously inside the same effect run as the clear.
+          if (replayOnObserve) next(replayOnObserve);
+        } } },
         { provide: WidgetMetadataDirective, useValue: { zones: () => [], observe: () => undefined } },
         { provide: UnitsService, useValue: unitsFake }
       ]
@@ -243,13 +253,29 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
 
     // The same effect re-runs on a theme change, so an unconditional clear would blink the bar off
     // and back on at every switch.
+    it('shows the new path\'s reading immediately when it has one, without surfacing the clear', () => {
+      capturedNext?.(update(6.5, 'knots'));
+
+      replayOnObserve = update(31.2, 'm');
+      options.set(makeConfig('vertical', 'self.environment.depth.belowTransducer'));
+      fixture.detectChanges();
+
+      expect(internals.dataAvailable()).toBe(true);
+      expect(internals.value()).toBe(31.2);
+      // The rendered header, not just the signal: this is what the user reads.
+      expect(fixture.nativeElement.querySelector('.gaugeUnit').textContent.trim()).toBe('m');
+    });
+
     it('keeps the reading when the config changes without changing the path', () => {
       capturedNext?.(update(6.5, 'knots'));
       expect(internals.dataAvailable()).toBe(true);
+      const before = observeCount;
 
       fixture.componentRef.setInput('theme', { ...theme, cardColor: '#eee', background: '#fff' });
       fixture.detectChanges();
 
+      // Positive control: the effect really did re-run, so "no clear" is a decision, not a no-op.
+      expect(observeCount).toBeGreaterThan(before);
       expect(internals.dataAvailable()).toBe(true);
       expect(internals.value()).toBe(6.5);
       expect(internals.effectiveUnit()).toBe('knots');

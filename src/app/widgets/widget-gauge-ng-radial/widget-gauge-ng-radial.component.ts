@@ -144,7 +144,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
   private viewReady = signal(false);
   protected gaugeOptions: RadialGaugeOptions = {} as RadialGaugeOptions;
   /** Identity of the path the state below describes; null until the first subscription. */
-  private lastPathSignature: string | null = null;
+  private lastPathSignature: string | null | undefined = undefined;
 
   /**
    * Drop the reading when the widget is re-pointed at another path.
@@ -157,7 +157,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
    * theme changes, which would blink the needle off and back on at every switch.
    */
   private clearReadingOnRepoint(signature: string | null): void {
-    if (this.lastPathSignature !== null && this.lastPathSignature !== signature) {
+    if (this.lastPathSignature !== undefined && this.lastPathSignature !== signature) {
       this.dataAvailable.set(false);
       this.value.set(undefined);
       this.effectiveUnit.set('');
@@ -172,11 +172,13 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       const cfg = this.runtime.options();
       const theme = this.theme();
       if (!cfg || !theme) return;
-      if (!cfg.paths?.['gaugePath'].path) return;
-      const signature = widgetPathSignature(cfg.paths['gaugePath']);
+      // Computed before the no-path bail-out, and null exactly when there is no usable path: the
+      // streams directive drops the subscription in that case, so the reading has to go with it.
+      const signature = widgetPathSignature(cfg.paths?.['gaugePath']);
 
       untracked(() => {
         this.clearReadingOnRepoint(signature);
+        if (!signature) return;
         this.streams.observe('gaugePath', path => {
         if (path.state !== this.pathDataState()) {
           this.pathDataState.set((path.state as States) || null);

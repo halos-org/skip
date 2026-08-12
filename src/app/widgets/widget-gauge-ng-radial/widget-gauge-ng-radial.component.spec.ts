@@ -9,6 +9,7 @@ import { UnitsService } from '../../core/services/units.service';
 import { IPathUpdate } from '../../core/services/data.service';
 import { IWidgetSvcConfig, IPathArray } from '../../core/interfaces/widgets-interface';
 import { IScale } from '../../core/utils/dataScales.util';
+import { States } from '../../core/interfaces/signalk-interfaces';
 
 /**
  * Regression tests for the gauge's displayScale reinterpretation — the P2b unit-flip mechanic.
@@ -33,6 +34,7 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
   let capturedNext: ((u: IPathUpdate) => void) | undefined;
   let observeCount: number;
   let lastObservedPath: string;
+  let replayOnObserve: IPathUpdate | undefined;
 
   interface GaugeInternals {
     effectiveUnit: WritableSignal<string>;
@@ -41,6 +43,7 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
     textValue: () => string;
     dataAvailable: () => boolean;
     optionsReady: () => boolean;
+    pathDataState: () => States | null;
   }
 
   // convertUnitTo is the stored authoring unit; a tagged measure that differs is the flip target.
@@ -75,11 +78,15 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
     observeCount = 0;
     lastObservedPath = '';
 
+    replayOnObserve = undefined;
     const streamsFake = {
       observe(pathName: string, next: (u: IPathUpdate) => void) {
         lastObservedPath = pathName;
         capturedNext = next;
         observeCount++;
+        // The real directive's base is a BehaviorSubject, so a path that already holds a value
+        // replays it synchronously, inside the same effect run as the clear.
+        if (replayOnObserve) next(replayOnObserve);
       }
     };
     const metadataFake = { zones: () => [], observe: () => undefined };
@@ -195,18 +202,86 @@ describe('WidgetGaugeNgRadialComponent displayScale reinterpretation (P2b flip)'
     expect(internals.effectiveUnit()).toBe('');
   });
 
+  // The clear is only correct because it runs in the same synchronous block as the resubscribe: the
+  // directive's base is a BehaviorSubject, so a path that already holds a value replays it at once.
+  // Separating the two would blank the gauge on every re-point, which is the difference between
+  // clearing STALE data and clearing ALL data.
+  it('shows the new path\'s reading immediately when it has one, without surfacing the clear', () => {
+    capturedNext?.(update(42, 'percent'));
+    expect(internals.value()).toBe(42);
+
+    replayOnObserve = update(71, 'percent');
+    options.set(makeConfig('self.test.live'));
+    fixture.detectChanges();
+
+    expect(internals.dataAvailable()).toBe(true);
+    expect(internals.value()).toBe(71);
+    expect(internals.textValue()).toBe('');
+  });
+
+  // Zone colours are driven by the path's state, so carrying an old path's alarm onto a new one is
+  // the same lie as carrying its value.
+  it('clears the zone state on a re-point, so an old alarm colour cannot carry over', () => {
+    capturedNext?.({ data: { value: 42, timestamp: null, measure: 'percent' }, state: States.Alarm });
+    expect(internals.pathDataState()).toBe(States.Alarm);
+
+    options.set(makeConfig('self.test.silent'));
+    fixture.detectChanges();
+
+    expect(internals.pathDataState()).toBeNull();
+  });
+
+  // Clearing the path tears the subscription down in the directive, so the reading has to go too —
+  // otherwise the dial keeps a number with nothing feeding it.
+  it('clears the reading when the path is cleared entirely', () => {
+    capturedNext?.(update(42, 'percent'));
+    expect(internals.dataAvailable()).toBe(true);
+
+    const cleared = makeConfig();
+    (cleared.paths as IPathArray)['gaugePath'].path = null;
+    options.set(cleared);
+    fixture.detectChanges();
+
+    expect(internals.dataAvailable()).toBe(false);
+    expect(internals.value()).toBeUndefined();
+    expect(internals.textValue()).toBe('--');
+  });
+
+  // A path-less config has no signature, so it must not read as "nothing has been shown yet" and
+  // suppress the clear on the re-point after it.
+  it('still clears on the re-point that follows a cleared path', () => {
+    capturedNext?.(update(42, 'percent'));
+
+    const cleared = makeConfig();
+    (cleared.paths as IPathArray)['gaugePath'].path = null;
+    options.set(cleared);
+    fixture.detectChanges();
+
+    options.set(makeConfig('self.test.live'));
+    fixture.detectChanges();
+    capturedNext?.(update(7, 'percent'));
+    expect(internals.dataAvailable()).toBe(true);
+
+    options.set(makeConfig('self.test.silent'));
+    fixture.detectChanges();
+    expect(internals.dataAvailable()).toBe(false);
+  });
+
   // The same effect re-runs on a theme change, so an unconditional clear would blink the needle off
   // and back on at every switch.
   it('keeps the reading when the config changes without changing the path', () => {
     capturedNext?.(update(42, 'percent'));
     expect(internals.dataAvailable()).toBe(true);
 
+    const before = observeCount;
     fixture.componentRef.setInput('theme', {
       contrast: '#000', contrastDim: '#333', contrastDimmer: '#666',
       cardColor: '#eee', background: '#fff'
     });
     fixture.detectChanges();
 
+    // Positive control: the effect really did re-run, so "no clear" is a decision, not a no-op.
+    expect(observeCount).toBeGreaterThan(before);
     expect(internals.dataAvailable()).toBe(true);
     expect(internals.value()).toBe(42);
     expect(internals.textValue()).toBe('');

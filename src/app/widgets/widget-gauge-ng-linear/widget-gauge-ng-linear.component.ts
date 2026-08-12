@@ -104,7 +104,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
   /** Measure the incoming value was converted to (server-resolved for this display path). '' = boot placeholder. */
   private effectiveUnit = signal<string>('');
   /** Identity of the path the state above describes; null until the first subscription. */
-  private lastPathSignature: string | null = null;
+  private lastPathSignature: string | null | undefined = undefined;
 
   /**
    * Drop the reading when the widget is re-pointed at another path.
@@ -117,7 +117,7 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
    * on theme changes, which would blink the bar off and back on at every switch.
    */
   private clearReadingOnRepoint(signature: string | null): void {
-    if (this.lastPathSignature !== null && this.lastPathSignature !== signature) {
+    if (this.lastPathSignature !== undefined && this.lastPathSignature !== signature) {
       this.dataAvailable.set(false);
       this.value.set(undefined);
       this.textValue.set('--');
@@ -166,11 +166,13 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       const cfg = this.runtime.options();
       const theme = this.theme();
       if (!cfg || !theme) return;
-      if (!cfg.paths?.['gaugePath'].path) return;
-      const signature = widgetPathSignature(cfg.paths['gaugePath']);
+      // Computed before the no-path bail-out, and null exactly when there is no usable path: the
+      // streams directive drops the subscription in that case, so the reading has to go with it.
+      const signature = widgetPathSignature(cfg.paths?.['gaugePath']);
 
       untracked(() => {
         this.clearReadingOnRepoint(signature);
+        if (!signature) return;
         this.streams.observe('gaugePath', path => {
           const raw = (path?.data?.value as number) ?? null;
           const measure = path.data.measure ?? '';

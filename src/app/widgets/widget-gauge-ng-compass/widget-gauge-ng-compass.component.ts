@@ -125,7 +125,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
   private currentState = signal<States>(States.Normal);
   private lastAppliedState: States | null = null;
   /** Identity of the path the reading state describes; null until the first subscription. */
-  private lastPathSignature: string | null = null;
+  private lastPathSignature: string | null | undefined = undefined;
 
   /**
    * Drop the reading when the widget is re-pointed at another path.
@@ -138,7 +138,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
    * theme changes, which would blink the needle off and back on at every switch.
    */
   private clearReadingOnRepoint(signature: string | null): void {
-    if (this.lastPathSignature !== null && this.lastPathSignature !== signature) {
+    if (this.lastPathSignature !== undefined && this.lastPathSignature !== signature) {
       this.dataAvailable.set(false);
       this.value.set(undefined);
       this.textValue.set('--');
@@ -168,10 +168,13 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       const theme = this.theme();
       if (!cfg || !theme) return;
       const pCfg = cfg.paths?.['gaugePath'];
-      if (!pCfg?.path) return;
+      // Computed before the no-path bail-out, and null exactly when there is no usable path: the
+      // streams directive drops the subscription in that case, so the reading has to go with it.
       const signature = widgetPathSignature(pCfg);
       untracked(() => {
         this.clearReadingOnRepoint(signature);
+        const path = pCfg?.path;
+        if (!signature || !path) return;
         this.streams.observe('gaugePath', pkt => {
         let raw = (pkt?.data?.value as number) ?? null;
         this.dataAvailable.set(raw != null);
@@ -179,7 +182,7 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
           this.value.set(0);
           this.textValue.set('--');
         } else {
-          if (this.negToPortPaths.includes(pCfg.path)) raw = convertNegToPortDegree(raw);
+          if (this.negToPortPaths.includes(path)) raw = convertNegToPortDegree(raw);
           const clamped = Math.min(Math.max(raw, 0), 360);
           this.value.set(clamped);
           this.textValue.set(clamped.toFixed(0));
