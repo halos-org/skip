@@ -304,13 +304,22 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
     // with its own now-stale scale, sections and size — and wins the last frame. Under a steady
     // reading nothing repaints afterwards, leaving the old face on screen for good. The server's
     // measure resolving after the first value delivers exactly this batch on an ordinary boot.
-    const rebuilding = !!(changes.zones || changes.radialSize || changes.units || changes.minValue || changes.maxValue);
-    if (changes.value && !changes.value.firstChange && !rebuilding) {
-        this.gauge.setValueAnimated(changes.value.currentValue);
-    }
-    if (changes.zones) {
+    // Everything the library only reads while constructing a gauge. subType and barGauge pick the
+    // class itself; decimals reaches the LCD through buildOptions; zone sections are converted with
+    // `units` and clamped to [minValue, maxValue], so a scale move has to recompute the bands rather
+    // than the axis alone or they desync from the value. One startGauge(true) applies the whole batch
+    // in a single pass: buildOptions re-reads every input, so a second rebuild would repeat the work
+    // on inputs the first one already carried. A rebuild while units is still '' (boot) self-corrects
+    // when the first value sets it.
+    const rebuilding = !!(changes.zones || changes.radialSize || changes.units || changes.minValue
+      || changes.maxValue || changes.subType || changes.barGauge || changes.decimals);
+    if (rebuilding) {
       this.pendingStructuralRebuild = true;
-      this.startGauge(true); // sections require rebuild
+      this.startGauge(true);
+      return;
+    }
+    if (changes.value && !changes.value.firstChange) {
+        this.gauge.setValueAnimated(changes.value.currentValue);
     }
     if (changes.title) {
       this.gauge.setTitleString(changes.title.currentValue);
@@ -320,19 +329,6 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
     }
     if(changes.frameColor) {
       this.gauge.setFrameDesign(SteelFrameColors[changes.frameColor.currentValue]);
-    }
-    if (changes.radialSize){
-      this.pendingStructuralRebuild = true;
-      this.startGauge(true); // radial geometry change
-    }
-    if (changes.units || changes.minValue || changes.maxValue) {
-      // Zone sections are converted with `units` and clamped to [minValue, maxValue]. When the
-      // server-resolved measure lands (units) or the reinterpreted scale bounds move (min/max), the
-      // sections must be rebuilt, not just the axis, or the bands desync from the scale and value.
-      // startGauge(true) applies the new min/max via buildOptions and recomputes the sections in one
-      // pass; a rebuild while units is still '' (boot) self-corrects when the first value sets it.
-      this.pendingStructuralRebuild = true;
-      this.startGauge(true);
     }
   }
 

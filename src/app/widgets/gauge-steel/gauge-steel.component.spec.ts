@@ -242,6 +242,133 @@ describe('GaugeSteelComponent', () => {
     expect(seeded).toEqual([1800]);
   });
 
+  // #558: subType, barGauge and decimals are read only when the gauge object is constructed, so
+  // editing them in widget options produced no visible effect until some unrelated event -- a
+  // window resize, or the server's unit metadata landing -- happened to rebuild the gauge.
+  it('rebuilds as the other library type when subType changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-subtype');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Radial).toHaveBeenCalledTimes(1);
+
+    fixture.componentRef.setInput('subType', 'linear');
+    internals.ngOnChanges({ subType: new SimpleChange('radial', 'linear', false) });
+
+    expect(steel.Linear).toHaveBeenCalledTimes(1);
+  });
+
+  it('rebuilds as a bargraph when the Digital Meter setting is turned on', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+    steel.LinearBargraph = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-bargauge');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('barGauge', false);
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Linear).toHaveBeenCalledTimes(1);
+
+    fixture.componentRef.setInput('barGauge', true);
+    internals.ngOnChanges({ barGauge: new SimpleChange(false, true, false) });
+
+    expect(steel.LinearBargraph).toHaveBeenCalledTimes(1);
+  });
+
+  it('rebuilds with the new LCD precision when decimals changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-decimals');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('decimals', 2);
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      gaugeOptions: { lcdDecimals?: number };
+    };
+    internals.startGauge(true);
+    expect(internals.gaugeOptions.lcdDecimals).toBe(2);
+
+    fixture.componentRef.setInput('decimals', 0);
+    internals.ngOnChanges({ decimals: new SimpleChange(2, 0, false) });
+
+    expect(internals.gaugeOptions.lcdDecimals).toBe(0);
+    expect(steel.Linear).toHaveBeenCalledTimes(2);
+  });
+
+  // A rebuild constructs the replacement from buildOptions, which re-reads the title, background and
+  // frame inputs. Calling their setters as well would target whichever gauge object happened to exist
+  // at that point in the batch -- the one the rebuild discards -- so the batch carries them through
+  // the rebuild instead.
+  it('carries a title change batched with a rebuild into the replacement gauge', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    const titleSetter = vi.fn();
+    steel.Linear = vi.fn(function (this: FakeGauge & { setTitleString: (t: string) => void }) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+      this.setTitleString = titleSetter;
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-title-batch');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('title', 'Old');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      gaugeOptions: { titleString?: string };
+    };
+    internals.startGauge(true);
+
+    fixture.componentRef.setInput('title', 'New');
+    fixture.componentRef.setInput('maxValue', 200);
+    internals.ngOnChanges({
+      title: new SimpleChange('Old', 'New', false),
+      maxValue: new SimpleChange(100, 200, false),
+    });
+
+    expect(internals.gaugeOptions.titleString).toBe('New');
+    expect(titleSetter).not.toHaveBeenCalled();
+  });
+
   it('still animates a value change that stands alone', () => {
     const animated: number[] = [];
     const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
