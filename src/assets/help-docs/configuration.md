@@ -18,7 +18,7 @@ Open **Menu > Connection**:
 
 Application configuration is stored on the server under a Signal K user account, so profiles and saved changes need a signed-in session.
 
-Without one, Skip does not necessarily stop there. A server that allows read-only access can show you a dashboard its administrator published for visitors — you can watch the instruments, but nothing you change is kept. See **Read-Only Access Without Signing In** under Advanced Features.
+Without one, Skip does not necessarily stop there. A server that allows read-only access can show you a dashboard its administrator published for visitors — you can watch the instruments, but nothing you change is kept. See [Read-Only Access Without Signing In](#/help/anonymous-default.md).
 
 ## Creating a Signal K User
 

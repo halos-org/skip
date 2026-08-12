@@ -47,7 +47,7 @@ curl -s -X POST "$SERVER/signalk/v1/applicationData/global/skip/11/default" \
   --data-binary @SkipConfig.json
 ```
 
-The URL is fixed in three places, and all three have to match or Skip will not find what you published:
+Every segment of that URL is fixed, and all four have to match or Skip will not find what you published:
 
 | Segment | Value | Meaning |
 |---|---|---|
@@ -61,20 +61,22 @@ The URL is fixed in three places, and all three have to match or Skip will not f
 Fetch it back without any credentials. This is the request an anonymous visitor's browser makes:
 
 ```bash
-curl -s "$SERVER/signalk/v1/applicationData/global/skip/11/default"
+curl -is "$SERVER/signalk/v1/applicationData/global/skip/11/default"
 ```
 
-A slot that was never created answers `{}` rather than an error, so an empty object means nothing was published — check the URL rather than the file. Then open Skip in a private browser window and confirm you land on your pages without being asked to sign in.
+A published slot answers `200` with the JSON you uploaded. One that was never published answers `404` with an empty body — so a 404 here means nothing is at that URL, not that your request was malformed. Check the URL before suspecting the file.
+
+Then open Skip in a private browser window and confirm you land on your pages without being asked to sign in.
 
 ## What an Anonymous Visitor Cannot Do
 
 The session is read-only throughout, not merely undecorated:
 
-- Nothing is saved. Settings changes, layout edits and page changes are refused rather than silently dropped.
+- Nothing is saved. Page and layout changes are refused outright; a setting that would normally autosave is dropped instead, since the session has nowhere to put it.
 - The layout stays locked, and the page-management and edit controls are hidden rather than shown and inert.
 - Profiles are unavailable. They live under a user account, so a `?profile=` link is ignored with a warning rather than honoured.
 
-A visitor who signs in gets their own profile and full write access, exactly as before. The shared dashboard is never written back to their account.
+A visitor who signs in gets their own profile and full write access. The shared dashboard is never written back to their account.
 
 ## Keeping It Current
 
