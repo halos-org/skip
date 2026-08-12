@@ -136,6 +136,14 @@ export class ProfileService {
         console.warn(`[ProfileService] Old profile slot "${oldName}" may not have been removed; an orphan copy could remain until the next refresh.`);
       }
 
+      // A rename preserves the configuration, so the session's write path follows the slot to its new
+      // name whatever happens next. Leaving it behind would point every later save at the slot this
+      // rename just deleted — including when the reload below is declined, and in a `?profile`
+      // session, which takes the else branch and never reloads at all.
+      if (this.storage.sharedConfigName === oldName) {
+        this.storage.sharedConfigName = normalized;
+      }
+
       // Repersist + reload ONLY when the renamed slot is the persisted per-device default. Keying off
       // the ephemeral active name (getActiveProfileName) would write a URL-selected `?profile`
       // override's name into the persisted device default — the override must stay ephemeral.

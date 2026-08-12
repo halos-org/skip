@@ -26,6 +26,11 @@ export class ReloadService {
   /**
    * Reload the app only if the server is reachable; otherwise keep the shell and show a persistent
    * Retry toast that re-runs this same gated reload (so recovery never leaves the app).
+   *
+   * Deliberately reports nothing. A caller cannot act on "the reload was committed": the navigation
+   * is asynchronous and can still be cancelled, and `performReload` short-circuits under the test
+   * flag, so the only honest contract is that state must be correct whether or not the page is
+   * replaced.
    */
   public async reload(): Promise<void> {
     if (await this.isServerReachable()) {

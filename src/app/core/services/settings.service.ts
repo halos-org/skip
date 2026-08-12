@@ -335,11 +335,22 @@ export class SettingsService {
    * Points this device at a different profile (named config slot) and reloads so the bootstrap
    * loads it. The active profile is per-device: persisted in the always-local connectionConfig.
    *
+   * The storage write path is deliberately NOT repointed here. On a reload that lands, the document
+   * is replaced and the bootstrap sets it from the persisted name, so an assignment here has no
+   * successor to observe it. Every case where it would be observed is a case where the app carries
+   * on with the previous profile's configuration in memory — ReloadService declining a server that
+   * does not answer, a navigation the user cancels, the `__SKIP_TEST__` short-circuit — and there
+   * `patchConfig`, which builds every path from `sharedConfigName`, would write that configuration
+   * into the newly selected profile's slot and replace its dashboards.
+   *
+   * The persisted name is written regardless, before a navigation that does not return. A switch
+   * that does not reload is therefore deferred rather than lost: the toast's Retry, or any later
+   * reload, boots onto the profile that was asked for.
+   *
    * @param {string} name Profile (config slot) name to make active on this device.
    */
   public setActiveProfile(name: string): void {
     this.sharedConfigName = name;
-    this.storage.sharedConfigName = name; // keep the storage write-path slot name coherent
     this.saveConnectionConfigToLocalStorage();
     void this._reload.reload();
   }
@@ -492,13 +503,18 @@ export class SettingsService {
       dashboards: this.getDefaultDashboardsConfig()
     };
 
-    this.storage.setConfig('user', this.sharedConfigName, newDefaultConfig)
+    // The slot the session actually loaded, which is what the UI calls the active profile and what
+    // the reset copy promises to replace. It parts company with the persisted device default when a
+    // profile switch was persisted but its reload declined, and during a `?profile` session.
+    const loadedSlot = this.storage.sharedConfigName || this.sharedConfigName;
+
+    this.storage.setConfig('user', loadedSlot, newDefaultConfig)
       .then(() => {
-        console.log("[AppSettings Service] Replaced server config name: " + this.sharedConfigName + ", with default configuration values");
+        console.log("[AppSettings Service] Replaced server config name: " + loadedSlot + ", with default configuration values");
         void this._reload.reload();
       })
       .catch(error => {
-        console.error("[AppSettings Service] Error replacing server config name: " + this.sharedConfigName + ", with default configuration values", error);
+        console.error("[AppSettings Service] Error replacing server config name: " + loadedSlot + ", with default configuration values", error);
         this.snackBar.open(
           'Problem saving configuration to the server. Resolve this issue before Skip can be used reliably.',
           'Close',

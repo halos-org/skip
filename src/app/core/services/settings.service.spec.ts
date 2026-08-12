@@ -297,10 +297,39 @@ describe('SettingsService', () => {
       expect(cc.sharedConfigName).toBe('cockpit');
     });
 
-    it('setActiveProfile keeps StorageService.sharedConfigName coherent', () => {
+    // #520: the write path must never move off the profile whose configuration is in memory.
+    // patchConfig builds every path from it, so repointing while the old config is still loaded
+    // replaces the newly selected profile's dashboards with the old profile's content. The reload
+    // that would make the move safe replaces the document, and the bootstrap sets this field then.
+    it('never repoints the storage write path off the loaded profile', () => {
       const storage = TestBed.inject(StorageService);
+      // The bootstrap hands the loaded slot to StorageService; stand in for that here.
+      storage.sharedConfigName = 'profileA';
+
       service.setActiveProfile('cockpit');
-      expect(storage.sharedConfigName).toBe('cockpit');
+
+      expect(storage.sharedConfigName).toBe('profileA');
+    });
+
+    it('persists the chosen profile, so the reload it asks for boots onto it', () => {
+      service.setActiveProfile('cockpit');
+
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
+      expect(cc.sharedConfigName).toBe('cockpit');
+    });
+
+    // The two names diverge while a switch is deferred, and "reset the active profile" has to mean
+    // the one on screen. Targeting the pending name would blank a profile the user is not looking at.
+    it('resets the loaded profile, not the one a pending switch is waiting to load', () => {
+      const storage = TestBed.inject(StorageService);
+      storage.sharedConfigName = 'profileA';
+      storage.storageServiceReady$.next(true);
+      const setConfig = vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
+      service.setActiveProfile('cockpit');
+
+      service.resetSettings();
+
+      expect(setConfig).toHaveBeenCalledWith('user', 'profileA', expect.anything());
     });
   });
 
@@ -359,7 +388,7 @@ describe('SettingsService', () => {
 
     it('keys demand by the CURRENT profile so a switch cannot overwrite a sibling profile (#386)', () => {
       const service = createService({ remoteContextDemand: { profileA: false } });
-      service.setActiveProfile('night');       // switch device to a different profile (reload mocked)
+      service.setActiveProfile('night'); // switch device to a different profile (reload mocked)
       service.setRemoteContextDemand(true);    // night needs AIS
       const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.remoteContextDemand).toEqual({ profileA: false, night: true }); // profileA preserved
