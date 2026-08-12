@@ -14,6 +14,7 @@ import { SsoRedirectService } from './sso-redirect.service';
 import { DefaultConnectionConfig } from '../../../default-config/config.blank.const';
 import { buildDefaultConfig } from '../../../default-config/config.default.factory';
 import { isValidConfigShape } from '../utils/config-shape.util';
+import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
 import { cloneDeep } from 'lodash-es';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { DataService } from './data.service';
@@ -326,10 +327,17 @@ export class AppNetworkInitService implements OnDestroy {
     if (!storageReady) {
       throw new Error('[AppInit Network Service] StorageService did not become ready in time. Cannot bootstrap anonymous configuration.');
     }
+    const initConfig = await this.loadAnonymousConfig();
+    // The subscribe scope was chosen before the session was known, from a demand value computed for
+    // this device's own profile (#386). An anonymous visitor renders someone else's configuration, so
+    // that value describes the wrong dashboards: a device whose own profile needs no remote contexts
+    // would leave a shared dashboard's AIS and DSC widgets empty for the life of the page, with no
+    // error anywhere. Recompute from what is actually being rendered — the socket is still closed.
+    this.connection.setSubscribeAll(dashboardsRequireRemoteContexts(initConfig.dashboards));
     this.storage.bootstrapRemoteContext({
       sharedConfigName: ANONYMOUS_CONFIG_NAME,
       configFileVersion: REMOTE_CONFIG_FILE_VERSION,
-      initConfig: await this.loadAnonymousConfig(),
+      initConfig,
       readOnly: true
     });
   }

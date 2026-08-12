@@ -95,6 +95,24 @@ export class SignalKConnectionService {
    * @return {Promise<void>} - A promise that resolves when the operation is complete.
    * @memberof SignalKConnectionService
    */
+  /**
+   * Re-scopes the WebSocket subscription. The scope is picked before the bootstrap knows whose
+   * configuration it will render, so a boot that ends up rendering a different one corrects it here.
+   * The delta service reads the flag when the socket opens, so this only takes effect while the
+   * socket is still closed; it also survives an HTTP retry, which re-emits from currentSubscribeAll.
+   *
+   * @param {boolean} subscribeAll - True to subscribe to every context, false for `self` only.
+   * @memberof SignalKConnectionService
+   */
+  public setSubscribeAll(subscribeAll: boolean): void {
+    this.currentSubscribeAll = subscribeAll;
+    const current = this.serverServiceEndpoint$.getValue();
+    if (current.subscribeAll === subscribeAll) {
+      return;
+    }
+    this.serverServiceEndpoint$.next({ ...current, subscribeAll });
+  }
+
   public async initializeConnection(skUrl: ISignalKUrl, proxyEnabled?: boolean, subscribeAll?: boolean): Promise<void> {
     if (!skUrl.url) {
       console.log("[Connection Service] Connection initialization called with null or empty URL value");

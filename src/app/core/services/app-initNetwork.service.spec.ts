@@ -31,7 +31,8 @@ describe('AppNetworkInitService', () => {
     const state$ = new BehaviorSubject<ConnectionState>(ConnectionState.Disconnected);
 
     const mockConnection = {
-        initializeConnection: vi.fn().mockResolvedValue(undefined)
+        initializeConnection: vi.fn().mockResolvedValue(undefined),
+        setSubscribeAll: vi.fn()
     };
 
     const mockAuth = {
@@ -86,6 +87,7 @@ describe('AppNetworkInitService', () => {
         mockStorage.getConfig.mockReset().mockResolvedValue(validRemoteConfig());
         mockStorage.listConfigs.mockReset().mockResolvedValue([]);
         mockStorage.bootstrapRemoteContext.mockClear();
+        mockConnection.setSubscribeAll.mockClear();
         mockEmbed.embed.mockClear().mockReturnValue(false);
         mockEmbed.profile.mockClear().mockReturnValue(null);
         mockAuth.loginStatusValue = null;
@@ -456,6 +458,17 @@ describe('AppNetworkInitService', () => {
     // A session-less visitor has no user-scope slot to load, so the dashboards come from the shared
     // global scope, falling back to the dashboards shipped in this release (#551).
     describe('anonymous bootstrap config source (#551)', () => {
+        // The pre-auth scope comes from the stored per-device demand map, so these tests have to seed
+        // localStorage rather than the in-memory config: initNetworkServices reloads it on entry.
+        const storeAnonConn = (remoteContextDemand: Record<string, boolean>): void => {
+            localStorage.setItem('skip.connectionConfig', JSON.stringify({
+                configVersion: 13, skipUUID: 'test-uuid', signalKUrl: 'http://localhost',
+                proxyEnabled: false, signalKSubscribeAll: false, sharedConfigName: 'default',
+                isRemoteControl: false, instanceName: '', remoteContextDemand
+            }));
+            mockConnection.initializeConnection.mockClear();
+        };
+
         beforeEach(() => {
             mockAuth.refreshLoginStatus.mockResolvedValue({
                 status: 'notLoggedIn', authenticationRequired: true, readOnlyAccess: true
@@ -473,6 +486,37 @@ describe('AppNetworkInitService', () => {
                 expect.objectContaining({ initConfig: published, readOnly: true })
             );
             expect(latestStatus()).toBe('ready');
+        });
+
+        // The subscribe scope is picked pre-auth from the device's OWN profile demand, which describes
+        // dashboards this session is not rendering (#561). A device whose profile needs no remote
+        // contexts must not starve a shared dashboard's AIS widgets.
+        it('widens the subscribe scope when the published dashboard needs remote contexts', async () => {
+            storeAnonConn({ default: false });
+            mockStorage.getConfig.mockResolvedValue({
+                app: { configVersion: 11 },
+                theme: null,
+                dashboards: [{ configuration: [{ input: { widgetProperties: { type: 'widget-ais-radar' } } }] }]
+            } as unknown as IConfig);
+
+            await service.initNetworkServices();
+
+            expect(mockConnection.initializeConnection).toHaveBeenCalledWith(expect.anything(), true, false);
+            expect(mockConnection.setSubscribeAll).toHaveBeenCalledWith(true);
+        });
+
+        it('narrows the subscribe scope when the published dashboard needs none', async () => {
+            storeAnonConn({ default: true });
+            mockStorage.getConfig.mockResolvedValue({
+                app: { configVersion: 11 },
+                theme: null,
+                dashboards: [{ configuration: [{ input: { widgetProperties: { type: 'widget-numeric' } } }] }]
+            } as unknown as IConfig);
+
+            await service.initNetworkServices();
+
+            expect(mockConnection.initializeConnection).toHaveBeenCalledWith(expect.anything(), true, true);
+            expect(mockConnection.setSubscribeAll).toHaveBeenCalledWith(false);
         });
 
         it('falls back to the shipped dashboards when the server publishes none', async () => {
