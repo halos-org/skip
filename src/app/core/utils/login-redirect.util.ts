@@ -1,3 +1,8 @@
+// The parameter name both Signal K login endpoints read: the OIDC login endpoint takes
+// req.query.redirect, and the admin login page reads `redirect` out of its hash query. Skip calls
+// the value a returnTo internally; `redirect` is the server's wire name for it.
+const LOGIN_REDIRECT_PARAM = 'redirect';
+
 // Skip routes that must never be a returnTo target — redirecting back to them would loop the
 // SSO bounce instead of returning the user to real content.
 const SELF_ROUTE_PATHS = ['/login'];
@@ -55,10 +60,10 @@ export function isSafeReturnTo(target: string | null | undefined): boolean {
 }
 
 /**
- * Builds the login redirect URL, appending a validated `returnTo` and an optional `noAutoLogin`
- * flag. Handles both query-style login URLs (OIDC, e.g. `/signalk/v1/auth/oidc/login`) and hash
- * routes (admin login, e.g. `/admin/#/login`) by placing the params in the correct component.
- * An unsafe `returnTo` is dropped (the redirect still proceeds without it).
+ * Builds the login redirect URL, appending a validated return target as `redirect` and an optional
+ * `noAutoLogin` flag. Handles both query-style login URLs (OIDC, e.g. `/signalk/v1/auth/oidc/login`)
+ * and hash routes (admin login, e.g. `/admin/#/login`) by placing the params in the correct
+ * component. An unsafe `returnTo` is dropped (the redirect still proceeds without it).
  */
 export function buildLoginRedirectUrl(opts: {
   loginUrl: string;
@@ -67,7 +72,7 @@ export function buildLoginRedirectUrl(opts: {
 }): string {
   const params: [string, string][] = [];
   if (opts.returnTo && isSafeReturnTo(opts.returnTo)) {
-    params.push(['returnTo', opts.returnTo]);
+    params.push([LOGIN_REDIRECT_PARAM, opts.returnTo]);
   }
   if (opts.noAutoLogin) {
     params.push(['noAutoLogin', 'true']);

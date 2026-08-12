@@ -289,7 +289,7 @@ sequenceDiagram
   else notLoggedIn AND authenticationRequired
     SK-->>Skip: {notLoggedIn, oidcEnabled, oidcAutoLogin, oidcLoginUrl}
     Skip->>Skip: "Signing in via SSO…"; check budget
-    Skip->>SK: redirect to oidcLoginUrl?returnTo=<relative-validated> (budget-guarded)
+    Skip->>SK: redirect to oidcLoginUrl?redirect=<relative-validated> (budget-guarded)
     SK->>IdP: auth-code + PKCE
     IdP-->>SK: callback -> sets JAUTHENTICATION cookie
     SK-->>Skip: redirect back; loginStatus -> loggedIn (budget reset)
