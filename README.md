@@ -235,6 +235,8 @@ Typical complementary components you may install (most are often bundled with Si
 **Navigation & Charting**
 - **Freeboard-SK** (pre-installed) – Multi-station, web chart plotter dedicated to Signal K: routes, waypoints, charts, alarms, weather layers, and instrument overlays.
 
+The integration runs both ways. Skip's **Freeboard-SK** widget puts the plotter on a Skip page, and the `@halos-org/skip-freeboard-panel` plugin puts Skip inside Freeboard — a toolbar button that opens Skip in a side panel, plus Wind Steer chart widgets. Skip declares that plugin as a dependency, so installing Skip from the app store brings it along.
+
 **Visual Flow / Automation**
 - **Node-RED** – Low-code, flow-based wiring of devices, APIs, online services, and custom logic (alert escalation, device control automation, data enrichment, protocol bridging).
 
@@ -261,7 +263,7 @@ Skip is one part of a Signal K stack, and it's easy to extend in two directions:
 
 ## Getting Started
 
-You need [Node.js](https://nodejs.org/en/download) 20 or later and npm. Node 24 is what CI builds and tests on. Any editor works; the repo carries Visual Studio Code settings. Skip's dev server needs a Signal K server to talk to — your own, or https://demo.signalk.org, which has no authentication and so limits what you can exercise.
+You need [Node.js](https://nodejs.org/en/download) 20 or later and npm. Node 24 is what CI builds and tests on. Any editor works; the repo carries Visual Studio Code settings. Skip's dev server needs a Signal K server to talk to. Use your own where you can: https://demo.signalk.org grants anonymous read-only access and hands out no user session, so Skip boots there as a read-only visitor and cannot save a configuration. That is fine for watching live data, and not enough for working on anything that writes.
 
 ```bash
 git clone https://github.com/halos-org/skip.git     # or your fork
