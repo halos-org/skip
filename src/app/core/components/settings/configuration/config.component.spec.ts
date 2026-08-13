@@ -143,6 +143,7 @@ describe('SettingsConfigComponent', () => {
   it('warns that creating a profile switches onto it and reloads', () => {
     component['createProfile']();
     const [data] = dialogMock.openNameDialog.mock.calls.at(-1) as [{ description?: string }];
+    expect(data.description).toMatch(/switches to it/i);
     expect(data.description).toMatch(/reloads/i);
   });
 
@@ -150,6 +151,8 @@ describe('SettingsConfigComponent', () => {
     component['duplicateProfile']('cockpit');
     const [data] = dialogMock.openNameDialog.mock.calls.at(-1) as [{ description?: string }];
     expect(data.description).toMatch(/"cockpit"/);
+    expect(data.description).toMatch(/left untouched/i);
+    expect(data.description).toMatch(/switches to the copy/i);
     expect(data.description).toMatch(/reloads/i);
   });
 

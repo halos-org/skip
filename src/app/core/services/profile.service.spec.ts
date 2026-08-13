@@ -84,6 +84,12 @@ describe('ProfileService', () => {
       await expect(service.switchProfile('ghost')).rejects.toThrow(/no longer exists/i);
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
     });
+
+    it('refuses to switch when the queue did not drain, rather than reloading over the pending write', async () => {
+      storage.awaitQueueDrain.mockResolvedValueOnce(false);
+      await expect(service.switchProfile('default')).rejects.toThrow(/could not be saved/i);
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
   });
 
   describe('create', () => {
@@ -112,12 +118,27 @@ describe('ProfileService', () => {
       expect(settings.setActiveProfile).toHaveBeenCalledWith('cockpit');
     });
 
-    it('drains the write queue before activating, so a save queued against the old profile is not lost', async () => {
+    it('waits for the drain to settle before activating, not merely calling it', async () => {
+      // A deferred drain: call order alone would also pass for code that fires awaitQueueDrain()
+      // and activates without awaiting it. Holding the promise open is what distinguishes them.
+      let releaseDrain!: (drained: boolean) => void;
+      storage.awaitQueueDrain.mockReturnValueOnce(new Promise<boolean>((resolve) => { releaseDrain = resolve; }));
       await service.refresh();
-      await service.createProfile('cockpit');
-      const drained = storage.awaitQueueDrain.mock.invocationCallOrder[0];
-      const activated = settings.setActiveProfile.mock.invocationCallOrder[0];
-      expect(drained).toBeLessThan(activated);
+      const pending = service.createProfile('cockpit');
+      await Promise.resolve();
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+      releaseDrain(true);
+      await pending;
+      expect(settings.setActiveProfile).toHaveBeenCalledWith('cockpit');
+    });
+
+    it('does not activate when the queue did not drain — the reload would abandon the pending write', async () => {
+      storage.awaitQueueDrain.mockResolvedValueOnce(false);
+      await service.refresh();
+      await expect(service.createProfile('cockpit')).rejects.toThrow(/could not be saved/i);
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+      // The slot itself was written before the drain failed, so it must survive as an inactive profile.
+      expect(storage.setConfig).toHaveBeenCalledWith('user', 'cockpit', expect.anything());
     });
 
     it.each(['', '   ', 'default', 'profileA', 'bad/name', 'bad.name', 'a~b', 'a::b'])(
@@ -162,6 +183,13 @@ describe('ProfileService', () => {
       await service.refresh();
       storage.setConfig.mockRejectedValueOnce(new Error('500'));
       await expect(service.duplicateProfile('profileA', 'profileB')).rejects.toThrow();
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
+
+    it('does not activate the copy when the queue did not drain', async () => {
+      storage.awaitQueueDrain.mockResolvedValueOnce(false);
+      await service.refresh();
+      await expect(service.duplicateProfile('profileA', 'profileB')).rejects.toThrow(/could not be saved/i);
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
     });
   });
