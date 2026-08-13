@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { Subject } from 'rxjs';
+import { HttpTestingController } from '@angular/common/http/testing';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IMeta, IPathValueData, IPathMetaData } from '../interfaces/app-interfaces';
 import { ISignalKDataValueUpdate, ISkMetadata, States } from '../interfaces/signalk-interfaces';
 import { DataService, IPathUpdate, IPathUpdateWithPath } from './data.service';
 import { SignalKDeltaService } from './signalk-delta.service';
+import { SignalKConnectionService } from './signalk-connection.service';
 
 describe('DataService', () => {
   let service: DataService;
@@ -1007,5 +1009,264 @@ describe('DataService', () => {
     expect(foreignValues.at(-1)).toBe(7);
     // Self stays at its initial null emission; the foreign value never leaks onto it.
     expect(selfValues).not.toContain(7);
+  });
+});
+
+/** Backfill of path metadata the stream did not deliver. See `DataService.backfillMetaOverRest`. */
+describe('DataService REST meta backfill', () => {
+  let service: DataService;
+  let http: HttpTestingController;
+  let dataPathUpdates$: Subject<IPathValueData>;
+  let metadataUpdates$: Subject<IMeta>;
+  let selfUpdates$: Subject<string>;
+  let endpoint$: BehaviorSubject<{ httpServiceUrl: string | null }>;
+  const API = 'http://boat.example/signalk/v1/api/';
+
+  const value = (path: string, v: number): IPathValueData =>
+    ({ context: undefined, path, source: 'default', timestamp: '2026-01-01T00:00:01.000Z', value: v });
+
+  const boot = (httpServiceUrl: string | null = API): void => {
+    dataPathUpdates$ = new Subject<IPathValueData>();
+    metadataUpdates$ = new Subject<IMeta>();
+    selfUpdates$ = new Subject<string>();
+    endpoint$ = new BehaviorSubject<{ httpServiceUrl: string | null }>({ httpServiceUrl });
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        DataService,
+        {
+          provide: SignalKDeltaService,
+          useValue: {
+            subscribeDataPathsUpdates: () => dataPathUpdates$.asObservable(),
+            subscribeMetadataUpdates: () => metadataUpdates$.asObservable(),
+            subscribeNotificationsUpdates: () => new Subject<ISignalKDataValueUpdate>().asObservable(),
+            subscribeSelfUpdates: () => selfUpdates$.asObservable(),
+          },
+        },
+        {
+          provide: SignalKConnectionService,
+          useValue: { serverServiceEndpoint$: endpoint$, serverVersion$: new BehaviorSubject('2.27.0') },
+        },
+      ],
+    });
+
+    service = TestBed.inject(DataService);
+    http = TestBed.inject(HttpTestingController);
+  };
+
+  beforeEach(() => boot());
+  afterEach(() => http.verify());
+
+  const BEARING = 'self.navigation.course.calcValues.bearingTrue';
+  const BEARING_URL = `${API}vessels/self/navigation/course/calcValues/bearingTrue/meta`;
+
+  // On a real connection every delta names its context as the vessel's self URN; `context: undefined`
+  // is a test convenience. Without a case that pushes one, the guard could reject every delta that
+  // states a context and the suite would still pass while the fetch never fired in production.
+  it('fetches for a delta whose context is the vessel\'s own self URN', () => {
+    const urn = 'vessels.urn:mrn:signalk:uuid:abc';
+    selfUpdates$.next(urn);
+    service.subscribePath(BEARING, 'default').subscribe();
+
+    dataPathUpdates$.next({ ...value('navigation.course.calcValues.bearingTrue', 1.396), context: urn });
+
+    http.expectOne(BEARING_URL).flush({ units: 'rad' });
+    expect(service.getPathMeta(BEARING)?.units).toBe('rad');
+  });
+
+  // The budget has to measure answers, not deltas. A path updating faster than the server replies
+  // would otherwise spend all three attempts concurrently, on the same unanswered question.
+  it('keeps one request per path outstanding however fast the deltas arrive', () => {
+    service.subscribePath(BEARING, 'default').subscribe();
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.1));
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.2));
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.3));
+
+    const pending = http.match(BEARING_URL);
+    expect(pending).toHaveLength(1);
+    pending[0].flush({ units: 'rad' });
+  });
+
+  // A 200 is not proof of metadata. Anything accepted here is cached, and a non-empty cache stops
+  // the path ever asking again — so a gateway's JSON error envelope would be permanent.
+  it('rejects a 200 whose body carries no metadata key', () => {
+    service.subscribePath(BEARING, 'default').subscribe();
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+
+    http.expectOne(BEARING_URL).flush({ status: 'KO', message: 'Authentication required' });
+
+    expect(service.getPathMeta(BEARING)).toBeFalsy();
+  });
+
+  // The cache key for a foreign context named `self.<something>` is indistinguishable from a self
+  // path's, so self-ness is recorded from the delta. Registration must consult that record, not the
+  // key's shape, or the guard the delta side enforces is bypassed one call site over.
+  it('does not fetch at registration for a foreign context whose cache key looks like self', () => {
+    const forged = 'self.evil.navigation.speedOverGround';
+    dataPathUpdates$.next({ ...value('navigation.speedOverGround', 7), context: 'self.evil' });
+
+    service.subscribePath(forged, 'default').subscribe();
+
+    http.expectNone(`${API}vessels/self/evil/navigation/speedOverGround/meta`);
+  });
+
+  it('fetches a subscribed path\'s meta when a value arrives without it, and applies what comes back', () => {
+    const metas: (ISkMetadata | null)[] = [];
+    service.subscribePath(BEARING, 'default').subscribe();
+    service.getPathMetaObservable(BEARING).subscribe(m => metas.push(m));
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+
+    const req = http.expectOne(BEARING_URL);
+    expect(req.request.method).toBe('GET');
+    req.flush({ units: 'rad', displayUnits: { targetUnit: 'degree' } });
+
+    // displayUnits is the half that turns radians into degrees; units alone only picks the group.
+    expect(metas.at(-1)?.units).toBe('rad');
+    expect(metas.at(-1)?.displayUnits?.targetUnit).toBe('degree');
+    expect(service.getPathDisplayUnits(BEARING)?.targetUnit).toBe('degree');
+  });
+
+  it('does not fetch when the stream already delivered the path\'s meta', () => {
+    service.subscribePath('self.navigation.speedOverGround', 'default').subscribe();
+    metadataUpdates$.next({ context: undefined, path: 'navigation.speedOverGround', meta: { units: 'm/s' } as ISkMetadata });
+
+    dataPathUpdates$.next(value('navigation.speedOverGround', 3.2));
+
+    http.expectNone(`${API}vessels/self/navigation/speedOverGround/meta`);
+  });
+
+  it('does not fetch for a path nothing is displaying', () => {
+    // A self-subscribed stream carries every path on the vessel; only what a widget is bound to is
+    // worth a request.
+    dataPathUpdates$.next(value('navigation.speedOverGround', 3.2));
+
+    http.expectNone(`${API}vessels/self/navigation/speedOverGround/meta`);
+  });
+
+  // A 404 means "not yet" as often as "never": the path's metadata is registered on the server when
+  // the path materialises, and the first value can beat it. Spending the attempt on that answer
+  // would reproduce the very defect this fixes.
+  it('retries on a later value when the server answers 404, up to a ceiling', () => {
+    service.subscribePath('self.some.undocumented.path', 'default').subscribe();
+    const url = `${API}vessels/self/some/undocumented/path/meta`;
+
+    for (let i = 1; i <= 3; i++) {
+      dataPathUpdates$.next(value('some.undocumented.path', i));
+      http.expectOne(url).flush('not found', { status: 404, statusText: 'Not Found' });
+    }
+
+    // The ceiling holds: further values cost nothing.
+    dataPathUpdates$.next(value('some.undocumented.path', 4));
+    dataPathUpdates$.next(value('some.undocumented.path', 5));
+    http.expectNone(url);
+  });
+
+  it('stops asking once a retry succeeds', () => {
+    service.subscribePath(BEARING, 'default').subscribe();
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.1));
+    http.expectOne(BEARING_URL).flush('not found', { status: 404, statusText: 'Not Found' });
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.2));
+    http.expectOne(BEARING_URL).flush({ units: 'rad' });
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.3));
+    http.expectNone(BEARING_URL);
+  });
+
+  it('leaves a foreign-context path alone; the endpoint it would query is self', () => {
+    service.subscribePath('vessels.abc.navigation.speedOverGround', 'default').subscribe();
+
+    dataPathUpdates$.next({ context: 'vessels.abc', path: 'navigation.speedOverGround', source: 'default', timestamp: '2026-01-01T00:00:01.000Z', value: 7 });
+    // afterEach's verify() fails on any request at all.
+  });
+
+  // A context is a delta field, not a property of the cache key. Deriving self-ness from the key's
+  // `self.` prefix would let a delta claiming `context: 'self.evil'` steer a vessels/self query.
+  it('leaves a foreign context alone even when it makes the cache key look like self', () => {
+    service.subscribePath('self.evil.navigation.speedOverGround', 'default').subscribe();
+
+    dataPathUpdates$.next({ context: 'self.evil', path: 'navigation.speedOverGround', source: 'default', timestamp: '2026-01-01T00:00:01.000Z', value: 7 });
+  });
+
+  it('percent-encodes each path segment so a request cannot leave vessels/self', () => {
+    const hostile = 'displays.%2e%2e/%2e%2e/skServer/loginStatus#';
+    service.subscribePath(`self.${hostile}`, 'default').subscribe();
+
+    dataPathUpdates$.next(value(hostile, 1));
+
+    const req = http.expectOne(r => r.url.startsWith(`${API}vessels/self/`));
+    expect(req.request.url).toBe(`${API}vessels/self/displays/%252e%252e%2F%252e%252e%2FskServer%2FloginStatus%23/meta`);
+    req.flush('not found', { status: 404, statusText: 'Not Found' });
+  });
+
+  it('does not fetch before the endpoint is known, and does not spend the attempt waiting', () => {
+    boot(null);
+    service.subscribePath(BEARING, 'default').subscribe();
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+    http.expectNone(BEARING_URL);
+
+    // Discovery completes; the next value fetches, proving no attempt was consumed while it waited.
+    endpoint$.next({ httpServiceUrl: API });
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.4));
+    http.expectOne(BEARING_URL).flush({ units: 'rad' });
+  });
+
+  it('tolerates an API root published without a trailing slash', () => {
+    boot('http://boat.example/signalk/v1/api');
+    service.subscribePath(BEARING, 'default').subscribe();
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+
+    http.expectOne(BEARING_URL).flush({ units: 'rad' });
+  });
+
+  it('ignores a response body that carries no metadata, and keeps the path eligible', () => {
+    service.subscribePath(BEARING, 'default').subscribe();
+
+    for (const body of [null, {}, ['rad']]) {
+      dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+      http.expectOne(BEARING_URL).flush(body);
+      expect(service.getPathMeta(BEARING)).toBeNull();
+    }
+  });
+
+  // The delta-time trigger waits for a delta the path may never send again — a change-driven sensor,
+  // or course calculations after the course goes idle. Placing the widget is the event that matters.
+  it('fetches when a widget is placed on a path that already has a cached value', () => {
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+    http.expectNone(BEARING_URL); // nothing displays it yet
+
+    service.subscribePath(BEARING, 'default').subscribe();
+
+    http.expectOne(BEARING_URL).flush({ units: 'rad' });
+    expect(service.getPathMeta(BEARING)?.units).toBe('rad');
+  });
+
+  // The tree API and the electrical widgets take a path's meta without a value registration.
+  it('fetches for a consumer that observes meta without subscribing to values', () => {
+    service.getPathMetaObservable(BEARING).subscribe();
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+
+    http.expectOne(BEARING_URL).flush({ units: 'rad' });
+  });
+
+  it('lets a meta delta that lands mid-flight stand, rather than merging the response over it', () => {
+    const metas: (ISkMetadata | null)[] = [];
+    service.subscribePath(BEARING, 'default').subscribe();
+    service.getPathMetaObservable(BEARING).subscribe(m => metas.push(m));
+
+    dataPathUpdates$.next(value('navigation.course.calcValues.bearingTrue', 1.396));
+    const req = http.expectOne(BEARING_URL);
+
+    metadataUpdates$.next({ context: undefined, path: 'navigation.course.calcValues.bearingTrue', meta: { units: 'rad', description: 'from the stream' } as ISkMetadata });
+    req.flush({ units: 'rad', description: 'from REST' });
+
+    expect(metas.at(-1)?.description).toBe('from the stream');
   });
 });
