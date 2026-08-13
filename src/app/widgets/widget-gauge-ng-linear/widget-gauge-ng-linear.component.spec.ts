@@ -9,6 +9,7 @@ import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.d
 import { UnitsService } from '../../core/services/units.service';
 import { IWidgetSvcConfig, IPathArray } from '../../core/interfaces/widgets-interface';
 import { States } from '../../core/interfaces/signalk-interfaces';
+import { IPathUpdate } from '../../core/services/data.service';
 
 /**
  * The label and the unit are rendered by the component as one header row on the card, so the gauge
@@ -26,11 +27,15 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
   let internals: LinearInternals;
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
   let sizeUpdates: LinearGaugeOptions[];
+  let capturedNext: ((u: IPathUpdate) => void) | undefined;
+  let observeCount: number;
+  let replayOnObserve: IPathUpdate | undefined;
 
   interface LinearInternals {
     effectiveUnit: WritableSignal<string>;
     dataAvailable: WritableSignal<boolean>;
     currentState: WritableSignal<string>;
+    value: () => number | null | undefined;
     barColor: (cfg: IWidgetSvcConfig, theme: unknown, state: string) => string;
     optionsReady: () => boolean;
     textValue: () => string;
@@ -45,16 +50,19 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
     cardColor: '#111', background: '#000'
   };
 
-  const makeConfig = (subType = 'vertical'): IWidgetSvcConfig => {
+  const makeConfig = (subType = 'vertical', path: string | null = 'self.navigation.speedOverGround'): IWidgetSvcConfig => {
     const dflt = WidgetGaugeNgLinearComponent.DEFAULT_CONFIG;
     const gaugePath = (dflt.paths as IPathArray)['gaugePath'];
     return {
       ...dflt,
       ignoreZones: true,
       gauge: { ...dflt.gauge, type: 'ngLinear', subType },
-      paths: { gaugePath: { ...gaugePath, path: 'self.navigation.speedOverGround', convertUnitTo: 'knots' } }
+      paths: { gaugePath: { ...gaugePath, path, convertUnitTo: 'knots' } }
     };
   };
+
+  const update = (value: unknown, measure?: string): IPathUpdate =>
+    ({ data: { value, timestamp: null, measure }, state: States.Normal }) as unknown as IPathUpdate;
 
   const unitsFake = {
     convertBetweenMeasures: (from: string, to: string, value: number): number => from === to ? value : value,
@@ -70,12 +78,21 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
   beforeEach(async () => {
     options = signal<IWidgetSvcConfig | undefined>(makeConfig());
     sizeUpdates = [];
+    capturedNext = undefined;
+    observeCount = 0;
+    replayOnObserve = undefined;
 
     await TestBed.configureTestingModule({
       imports: [WidgetGaugeNgLinearComponent],
       providers: [
         { provide: WidgetRuntimeDirective, useValue: { options } },
-        { provide: WidgetStreamsDirective, useValue: { observe: () => undefined } },
+        { provide: WidgetStreamsDirective, useValue: { observe: (_p: string, next: (u: IPathUpdate) => void) => {
+          capturedNext = next;
+          observeCount++;
+          // The real directive replays a BehaviorSubject, so a path holding a value delivers it
+          // synchronously inside the same effect run as the clear.
+          if (replayOnObserve) next(replayOnObserve);
+        } } },
         { provide: WidgetMetadataDirective, useValue: { zones: () => [], observe: () => undefined } },
         { provide: UnitsService, useValue: unitsFake }
       ]
@@ -214,6 +231,80 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
       cfg.ignoreZones = false;
       internals.dataAvailable.set(false);
       expect(internals.barColor(cfg, themed, States.Alarm)).toBe('rgba(0,0,0,0)');
+    });
+  });
+
+  // #534: a rebuilt subscription against a silent path replays nothing (the leading null is
+  // suppressed), so the callback never runs and the previous path's reading stayed on the bar.
+  describe('re-point', () => {
+    it('clears the reading when re-pointed at a path that reports nothing', () => {
+      capturedNext?.(update(6.5, 'knots'));
+      expect(internals.dataAvailable()).toBe(true);
+      expect(internals.value()).toBe(6.5);
+
+      options.set(makeConfig('vertical', 'self.environment.depth.belowTransducer'));
+      fixture.detectChanges();
+
+      expect(internals.dataAvailable()).toBe(false);
+      expect(internals.value()).toBeUndefined();
+      expect(internals.textValue()).toBe('--');
+      expect(internals.effectiveUnit()).toBe('');
+    });
+
+    // The same effect re-runs on a theme change, so an unconditional clear would blink the bar off
+    // and back on at every switch.
+    it('shows the new path\'s reading immediately when it has one, without surfacing the clear', () => {
+      capturedNext?.(update(6.5, 'knots'));
+
+      replayOnObserve = update(31.2, 'm');
+      options.set(makeConfig('vertical', 'self.environment.depth.belowTransducer'));
+      fixture.detectChanges();
+
+      expect(internals.dataAvailable()).toBe(true);
+      expect(internals.value()).toBe(31.2);
+      // The rendered header, not just the signal: this is what the user reads.
+      expect(fixture.nativeElement.querySelector('.gaugeUnit').textContent.trim()).toBe('m');
+    });
+
+    // Clearing the path entirely drops the subscription, so the reading has to go with it. This is
+    // what pins the clear ahead of the no-path bail-out rather than after it.
+    it('clears the reading when the path is cleared entirely', () => {
+      capturedNext?.(update(6.5, 'knots'));
+      expect(internals.dataAvailable()).toBe(true);
+
+      options.set(makeConfig('vertical', null));
+      fixture.detectChanges();
+
+      expect(internals.dataAvailable()).toBe(false);
+      expect(internals.value()).toBeUndefined();
+      expect(internals.textValue()).toBe('--');
+    });
+
+    // currentState drives the value text's colour independently of dataAvailable, so without the
+    // reset an alarm-red readout from the old path survives onto the new one.
+    it('clears the zone state on a re-point', () => {
+      capturedNext?.({ ...update(6.5, 'knots'), state: States.Alarm });
+      expect(internals.currentState()).toBe(States.Alarm);
+
+      options.set(makeConfig('vertical', 'self.environment.depth.belowTransducer'));
+      fixture.detectChanges();
+
+      expect(internals.currentState()).toBe(States.Normal);
+    });
+
+    it('keeps the reading when the config changes without changing the path', () => {
+      capturedNext?.(update(6.5, 'knots'));
+      expect(internals.dataAvailable()).toBe(true);
+      const before = observeCount;
+
+      fixture.componentRef.setInput('theme', { ...theme, cardColor: '#eee', background: '#fff' });
+      fixture.detectChanges();
+
+      // Positive control: the effect really did re-run, so "no clear" is a decision, not a no-op.
+      expect(observeCount).toBeGreaterThan(before);
+      expect(internals.dataAvailable()).toBe(true);
+      expect(internals.value()).toBe(6.5);
+      expect(internals.effectiveUnit()).toBe('knots');
     });
   });
 });

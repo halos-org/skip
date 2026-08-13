@@ -16,7 +16,7 @@ import { getHighlights } from '../../core/utils/zones-highlight.utils';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature } from '../../core/directives/widget-streams.directive';
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
 import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
@@ -143,6 +143,38 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
   private pathDataState = signal<States | null>(null);
   private viewReady = signal(false);
   protected gaugeOptions: RadialGaugeOptions = {} as RadialGaugeOptions;
+  /**
+   * Identity of the path the reading state describes. Three states: `undefined` before the first
+   * effect run (nothing has been shown, so there is nothing to clear), `null` for a config with no
+   * usable path, and the signature otherwise. `null` is a real identity rather than a second
+   * "not yet" — a cleared path must still compare unequal to the path that follows it.
+   */
+  private lastPathSignature: string | null | undefined = undefined;
+
+  /**
+   * Drop the reading when the widget is re-pointed at another path.
+   *
+   * The subscription is rebuilt on every run of the data effect, a theme change included, and
+   * `suppressBootstrapNull` gives each rebuild a fresh suppression closure. Against a path that
+   * reports nothing the replayed leading null is therefore filtered and the stream callback never
+   * runs — leaving the previous path's needle and value on screen, presented as a live reading of
+   * the new one. Clearing unconditionally here is wrong for the same reason: this effect re-runs on
+   * theme changes, which would blink the needle off and back on at every switch.
+   *
+   * The reading comes back because `observe()` below is passed a new closure on every effect run:
+   * the directive compares callback identity as well as the signature, so it rebuilds and replays
+   * the new path's value into this component. A stable callback reference would make that
+   * early-return instead, and the gauge would stay blank on a live path until the next delta.
+   */
+  private clearReadingOnRepoint(signature: string | null): void {
+    if (this.lastPathSignature !== undefined && this.lastPathSignature !== signature) {
+      this.dataAvailable.set(false);
+      this.value.set(undefined);
+      this.effectiveUnit.set('');
+      this.pathDataState.set(null);
+    }
+    this.lastPathSignature = signature;
+  }
 
   constructor() {
     // Data subscription effect
@@ -150,9 +182,14 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
       const cfg = this.runtime.options();
       const theme = this.theme();
       if (!cfg || !theme) return;
-      if (!cfg.paths?.['gaugePath'].path) return;
+      // Computed before the no-path bail-out, and null exactly when there is no usable path: the
+      // streams directive drops the subscription in that case, so the reading has to go with it.
+      const signature = widgetPathSignature(cfg.paths?.['gaugePath']);
 
-      untracked(() => this.streams.observe('gaugePath', path => {
+      untracked(() => {
+        this.clearReadingOnRepoint(signature);
+        if (!signature) return;
+        this.streams.observe('gaugePath', path => {
         if (path.state !== this.pathDataState()) {
           this.pathDataState.set((path.state as States) || null);
         }
@@ -172,7 +209,8 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
           // clamp
           this.value.set(Math.min(Math.max(raw, lower), upper));
         }
-      }));
+        });
+      });
     });
 
     // Metadata observation (idempotent) – only when zones not ignored

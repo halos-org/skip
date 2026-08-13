@@ -16,7 +16,7 @@ import { getColors } from '../../core/utils/themeColors.utils';
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature } from '../../core/directives/widget-streams.directive';
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
 import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
@@ -103,6 +103,39 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
   private currentState = signal<string>(States.Normal);
   /** Measure the incoming value was converted to (server-resolved for this display path). '' = boot placeholder. */
   private effectiveUnit = signal<string>('');
+  /**
+   * Identity of the path the reading state describes. Three states: `undefined` before the first
+   * effect run (nothing has been shown, so there is nothing to clear), `null` for a config with no
+   * usable path, and the signature otherwise. `null` is a real identity rather than a second
+   * "not yet" — a cleared path must still compare unequal to the path that follows it.
+   */
+  private lastPathSignature: string | null | undefined = undefined;
+
+  /**
+   * Drop the reading when the widget is re-pointed at another path.
+   *
+   * The subscription is rebuilt on every run of the data effect, a theme change included, and
+   * `suppressBootstrapNull` gives each rebuild a fresh suppression closure. Against a path that
+   * reports nothing the replayed leading null is therefore filtered and the stream callback never
+   * runs — leaving the previous path's bar, value and unit on screen, presented as a live reading
+   * of the new one. Clearing unconditionally here is wrong for the same reason: this effect re-runs
+   * on theme changes, which would blink the bar off and back on at every switch.
+   *
+   * The reading comes back because `observe()` below is passed a new closure on every effect run:
+   * the directive compares callback identity as well as the signature, so it rebuilds and replays
+   * the new path's value into this component. A stable callback reference would make that
+   * early-return instead, and the gauge would stay blank on a live path until the next delta.
+   */
+  private clearReadingOnRepoint(signature: string | null): void {
+    if (this.lastPathSignature !== undefined && this.lastPathSignature !== signature) {
+      this.dataAvailable.set(false);
+      this.value.set(undefined);
+      this.textValue.set('--');
+      this.effectiveUnit.set('');
+      this.currentState.set(States.Normal);
+    }
+    this.lastPathSignature = signature;
+  }
 
   protected adjustedScale = computed<IScale>(() => {
     const cfg = this.runtime.options();
@@ -143,11 +176,13 @@ export class WidgetGaugeNgLinearComponent implements AfterViewInit {
       const cfg = this.runtime.options();
       const theme = this.theme();
       if (!cfg || !theme) return;
-      if (!cfg.paths?.['gaugePath'].path) return;
+      // Computed before the no-path bail-out, and null exactly when there is no usable path: the
+      // streams directive drops the subscription in that case, so the reading has to go with it.
+      const signature = widgetPathSignature(cfg.paths?.['gaugePath']);
 
       untracked(() => {
-        // Reset the tagged measure so a stale unit never paints the new subscription's value.
-        this.effectiveUnit.set('');
+        this.clearReadingOnRepoint(signature);
+        if (!signature) return;
         this.streams.observe('gaugePath', path => {
           const raw = (path?.data?.value as number) ?? null;
           const measure = path.data.measure ?? '';

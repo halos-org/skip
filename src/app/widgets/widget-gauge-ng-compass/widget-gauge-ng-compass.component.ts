@@ -15,7 +15,7 @@ import { States } from '../../core/interfaces/signalk-interfaces';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature, normalizeWidgetPath } from '../../core/directives/widget-streams.directive';
 import { ITheme } from '../../core/services/app-service';
 import { UnitsService } from '../../core/services/units.service';
 
@@ -124,6 +124,38 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
   protected colorStrokeTicks = '';
   private currentState = signal<States>(States.Normal);
   private lastAppliedState: States | null = null;
+  /**
+   * Identity of the path the reading state describes. Three states: `undefined` before the first
+   * effect run (nothing has been shown, so there is nothing to clear), `null` for a config with no
+   * usable path, and the signature otherwise. `null` is a real identity rather than a second
+   * "not yet" — a cleared path must still compare unequal to the path that follows it.
+   */
+  private lastPathSignature: string | null | undefined = undefined;
+
+  /**
+   * Drop the reading when the widget is re-pointed at another path.
+   *
+   * The subscription is rebuilt on every run of the data effect, a theme change included, and
+   * `suppressBootstrapNull` gives each rebuild a fresh suppression closure. Against a path that
+   * reports nothing the replayed leading null is therefore filtered and the stream callback never
+   * runs — leaving the previous path's needle and value on screen, presented as a live reading of
+   * the new one. Clearing unconditionally here is wrong for the same reason: this effect re-runs on
+   * theme changes, which would blink the needle off and back on at every switch.
+   *
+   * The reading comes back because `observe()` below is passed a new closure on every effect run:
+   * the directive compares callback identity as well as the signature, so it rebuilds and replays
+   * the new path's value into this component. A stable callback reference would make that
+   * early-return instead, and the gauge would stay blank on a live path until the next delta.
+   */
+  private clearReadingOnRepoint(signature: string | null): void {
+    if (this.lastPathSignature !== undefined && this.lastPathSignature !== signature) {
+      this.dataAvailable.set(false);
+      this.value.set(undefined);
+      this.textValue.set('--');
+      this.currentState.set(States.Normal);
+    }
+    this.lastPathSignature = signature;
+  }
 
   private readonly negToPortPaths = [
     "self.environment.wind.angleApparent",
@@ -146,22 +178,32 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       const theme = this.theme();
       if (!cfg || !theme) return;
       const pCfg = cfg.paths?.['gaugePath'];
-      if (!pCfg?.path) return;
-      untracked(() => this.streams.observe('gaugePath', pkt => {
+      // Computed before the no-path bail-out, and null exactly when there is no usable path: the
+      // streams directive drops the subscription in that case, so the reading has to go with it.
+      const signature = widgetPathSignature(pCfg);
+      untracked(() => {
+        this.clearReadingOnRepoint(signature);
+        // Normalized, like the signature and the subscription: the widget-options required check
+        // accepts a padded path, which would subscribe fine and then miss this list, clamping a
+        // negative apparent wind angle to 0 instead of converting it to its 0-360 bearing.
+        const path = normalizeWidgetPath(pCfg?.path);
+        if (!signature || !path) return;
+        this.streams.observe('gaugePath', pkt => {
         let raw = (pkt?.data?.value as number) ?? null;
         this.dataAvailable.set(raw != null);
         if (raw == null) {
           this.value.set(0);
           this.textValue.set('--');
         } else {
-          if (this.negToPortPaths.includes(pCfg.path)) raw = convertNegToPortDegree(raw);
+          if (this.negToPortPaths.includes(path)) raw = convertNegToPortDegree(raw);
           const clamped = Math.min(Math.max(raw, 0), 360);
           this.value.set(clamped);
           this.textValue.set(clamped.toFixed(0));
         }
         const newState = (pkt?.state ?? States.Normal) as States;
         if (newState !== this.currentState()) this.currentState.set(newState);
-      }));
+        });
+      });
     });
 
     // Build options when config/theme changes
