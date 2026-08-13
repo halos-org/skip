@@ -1,8 +1,8 @@
-import { ChartStatsDomain } from './chart-stats.util';
+import { GraphStatsDomain } from './graph-stats.util';
 
 /**
  * Signal K paths interpreted as signed angles (-π, π]. Every other radian path defaults to the
- * direction domain [0, 2π). A per-chart override still wins over this allowlist.
+ * direction domain [0, 2π). A per-graph override still wins over this allowlist.
  */
 const SIGNED_ANGLE_PATHS: ReadonlySet<string> = new Set<string>([
   'self.navigation.attitude.roll',
@@ -22,17 +22,17 @@ export function normalizeAnglePathKey(path: string): string {
 /**
  * Resolve how a path's radian values should be interpreted. Non-radian paths are `scalar`; a
  * `signed`/`direction` override wins for any radian path; otherwise the allowlist selects `signed`
- * and everything else is `direction`. Single source of truth for both chart engines.
+ * and everything else is `direction`. Single source of truth for both graph engines.
  */
 export function resolveAngleDomain(
   path: string,
   baseUnit: string | null | undefined,
   override?: 'signed' | 'direction'
-): ChartStatsDomain {
+): GraphStatsDomain {
   // A positively non-radian unit is scalar even if a stale override lingers on the config.
   if (baseUnit != null && baseUnit !== '' && baseUnit !== 'rad') return 'scalar';
   // Radian, or an unknown unit (metadata not yet published — common when viewing history while the
-  // producing instrument is idle): an explicit override wins, so angular charts aren't silently
+  // producing instrument is idle): an explicit override wins, so angular graphs aren't silently
   // reverted to linear stats when the base unit can't be read.
   if (override === 'signed' || override === 'direction') return override;
   // Unknown unit and no override: we can't tell it's angular, so stay scalar.

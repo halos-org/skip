@@ -18,7 +18,7 @@ registerChartComponents();
 
 /**
  * Connection status and diagnostics: server session identity (SSO), server/stream state, versions,
- * internet reachability, and a live delta-throughput chart. Read-only — the connection itself is
+ * internet reachability, and a live delta-throughput graph. Read-only — the connection itself is
  * auto-configured (same-origin, server-discovered endpoints), so there is nothing to edit here.
  * Skip authenticates only through the server's same-origin session (SSO); it has no credential
  * entry of its own.
@@ -82,16 +82,16 @@ export class ConnectionStatusComponent implements AfterViewInit, OnDestroy {
   });
 
   private _chart: Chart | null = null;
-  private textColor: string; // Store the computed text color for chart styling
+  private textColor: string; // Store the computed text color for graph styling
 
   ngAfterViewInit(): void {
     const canvas = this.activityGraph()?.nativeElement;
     if (!canvas) return;
     this.textColor = window.getComputedStyle(canvas).color;
     this._chart?.destroy();
-    this.startChart(canvas);
+    this.startGraph(canvas);
 
-    // Get real-time WebSocket Delta update statistics for chart
+    // Get real-time WebSocket Delta update statistics for graph
     this.DataService.getSignalkDeltaUpdateStatistics().pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe((update: IDeltaUpdate) => {
@@ -107,9 +107,9 @@ export class ConnectionStatusComponent implements AfterViewInit, OnDestroy {
 
   /**
    * Initializes the Chart.js line chart for displaying WebSocket delta statistics.
-   * Creates a time-series chart showing data update frequency over time.
+   * Creates a time-series graph showing data update frequency over time.
    */
-  private startChart(canvas: HTMLCanvasElement) {
+  private startGraph(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     this._chart = new Chart(ctx, {

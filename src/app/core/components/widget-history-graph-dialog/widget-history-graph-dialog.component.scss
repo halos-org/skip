@@ -1,0 +1,62 @@
+:host {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+.dialogue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.dialog-close-icon {
+  margin-right: 15px;
+}
+
+mat-dialog-content.history-dialog-content {
+  padding: 0px 24px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 70vw;
+  min-height: 55vh;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+.time-select {
+  flex-grow: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.graph-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.graph-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+
+  canvas {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+}
+
+.history-message {
+  margin: 0;
+  padding: 1rem 0;
+}
+
+.error {
+  color: var(--mat-sys-error);
+}

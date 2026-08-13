@@ -1,7 +1,7 @@
 /**
  * Ownership: authoritative Skip series schema for the app's History-API consumers.
  *
- * Kept in `core/contracts` so the dashboard series sync and the chart widgets share one series
+ * Kept in `core/contracts` so the dashboard series sync and the graph widgets share one series
  * definition. Formerly re-exported from the bundled kip-plugin; that provider was retired, so the
  * schema now lives here.
  */
@@ -17,7 +17,7 @@ export interface IElectricalTrackedDeviceRef {
 
 interface ISkipSeriesDefinitionBase {
   seriesId: string;
-  datasetUuid: string;
+  seriesUuid: string;
   ownerWidgetUuid: string;
   ownerWidgetSelector: string | null;
   path: string;

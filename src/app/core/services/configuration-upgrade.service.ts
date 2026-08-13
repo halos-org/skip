@@ -687,9 +687,9 @@ export class ConfigurationUpgradeService {
   }
 
   /**
-   * v12 -> v13: retire the recorder's config footprint. The client-side chart recorder was removed,
+   * v12 -> v13: retire the recorder's config footprint. The client-side graph recorder was removed,
    * so the app-level dataset registry and the per-widget `datasetUUID` / `chartEngine` fields it fed
-   * are dead. Strip them and stamp v13. Genuine chart inputs (path/source/window/units) are untouched.
+   * are dead. Strip them and stamp v13. Genuine graph inputs (path/source/window/units) are untouched.
    */
   private upgradeConfigV12toV13(config: IConfig): IConfig | null {
     try {

@@ -11,8 +11,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 
 import { BooleanMultiControlOptionsComponent, IAddNewPathObject } from '../boolean-multicontrol-options/boolean-multicontrol-options.component';
-import { DisplayChartOptionsComponent } from '../display-chart-options/display-chart-options.component';
-import { DatasetChartOptionsComponent } from '../dataset-chart-options/dataset-chart-options.component';
+import { GraphDisplayOptionsComponent } from '../graph-display-options/graph-display-options.component';
+import { GraphDataOptionsComponent } from '../graph-data-options/graph-data-options.component';
 import { AppService } from '../../core/services/app-service';
 import type { ElectricalTrackedDevice, IDynamicControl, IDynamicControlGroup, IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { MIN_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
@@ -36,7 +36,7 @@ type IWidgetPathControls = {
   selector: 'modal-widget-config',
   templateUrl: './root-modal-widget-config.component.html',
   styleUrls: ['./root-modal-widget-config.component.scss'],
-  imports: [FormsModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatTabsModule, MatCheckboxModule, MatSelectModule, MatDividerModule, MatButtonModule, DisplayDatetimeComponent, DisplayChartOptionsComponent, DatasetChartOptionsComponent, BooleanMultiControlOptionsComponent, PathsOptionsComponent, SelectAutopilotComponent, AisTargetOptionsComponent, BmsBankSetupComponent, SolarChargerSetupComponent, ElectricalFamilySetupComponent, VideoCameraSetupComponent]
+  imports: [FormsModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatTabsModule, MatCheckboxModule, MatSelectModule, MatDividerModule, MatButtonModule, DisplayDatetimeComponent, GraphDisplayOptionsComponent, GraphDataOptionsComponent, BooleanMultiControlOptionsComponent, PathsOptionsComponent, SelectAutopilotComponent, AisTargetOptionsComponent, BmsBankSetupComponent, SolarChargerSetupComponent, ElectricalFamilySetupComponent, VideoCameraSetupComponent]
 })
 export class RootModalWidgetConfigComponent implements OnInit {
   // Property name constants to avoid magic strings

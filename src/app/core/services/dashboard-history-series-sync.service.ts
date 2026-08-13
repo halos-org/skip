@@ -112,7 +112,7 @@ export class DashboardHistorySeriesSyncService {
 
     return {
       seriesId: `${widgetUuid}:datachart`,
-      datasetUuid: widgetUuid,
+      seriesUuid: widgetUuid,
       ownerWidgetUuid: widgetUuid,
       ownerWidgetSelector: widgetType,
       path,
@@ -151,7 +151,7 @@ export class DashboardHistorySeriesSyncService {
       series.push({
         ...shared,
         seriesId: `${widgetUuid}:wind-direction`,
-        datasetUuid: `${widgetUuid}-twd`,
+        seriesUuid: `${widgetUuid}-twd`,
         path: dirPath,
         source: this.normalizeString(dir?.source) ?? 'default',
       });
@@ -162,7 +162,7 @@ export class DashboardHistorySeriesSyncService {
       series.push({
         ...shared,
         seriesId: `${widgetUuid}:wind-speed`,
-        datasetUuid: `${widgetUuid}-tws`,
+        seriesUuid: `${widgetUuid}-tws`,
         path: spdPath,
         source: this.normalizeString(spd?.source) ?? 'default',
       });
@@ -195,7 +195,7 @@ export class DashboardHistorySeriesSyncService {
     const suffix = descriptor.familyKey;
     return {
       seriesId: `${widgetUuid}:${suffix}-template`,
-      datasetUuid: `${widgetUuid}:${suffix}-template`,
+      seriesUuid: `${widgetUuid}:${suffix}-template`,
       ownerWidgetUuid: widgetUuid,
       ownerWidgetSelector: descriptor.selector,
       path: `${descriptor.selfRootPath}.*`,
@@ -351,7 +351,7 @@ export class DashboardHistorySeriesSyncService {
 
       seriesBySignature.set(signature, {
         seriesId: `${widgetUuid}:auto:${pathKey}:${sourceKey}`,
-        datasetUuid: `${widgetUuid}:${pathKey}:${sourceKey}`,
+        seriesUuid: `${widgetUuid}:${pathKey}:${sourceKey}`,
         ownerWidgetUuid: widgetUuid,
         ownerWidgetSelector: widgetType,
         path,

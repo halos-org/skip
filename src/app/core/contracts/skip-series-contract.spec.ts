@@ -4,7 +4,7 @@ import { ISkipConcreteSeriesDefinition, ISkipSeriesDefinition, ISkipTemplateSeri
 describe('skip-series-contract guards', () => {
     const concreteSeries: ISkipConcreteSeriesDefinition = {
         seriesId: 'widget-1:datachart',
-        datasetUuid: 'widget-1',
+        seriesUuid: 'widget-1',
         ownerWidgetUuid: 'widget-1',
         ownerWidgetSelector: 'widget-data-chart',
         path: 'navigation.speedThroughWater',
@@ -21,7 +21,7 @@ describe('skip-series-contract guards', () => {
 
     const templateSeries: ISkipTemplateSeriesDefinition = {
         seriesId: 'widget-2:bms-template',
-        datasetUuid: 'widget-2:bms-template',
+        seriesUuid: 'widget-2:bms-template',
         ownerWidgetUuid: 'widget-2',
         ownerWidgetSelector: 'widget-bms',
         path: 'self.electrical.batteries.*',
@@ -39,7 +39,7 @@ describe('skip-series-contract guards', () => {
 
     const solarTemplateSeries: ISkipTemplateSeriesDefinition = {
         seriesId: 'widget-3:solar-template',
-        datasetUuid: 'widget-3:solar-template',
+        seriesUuid: 'widget-3:solar-template',
         ownerWidgetUuid: 'widget-3',
         ownerWidgetSelector: 'widget-solar-charger',
         path: 'self.electrical.solar.*',

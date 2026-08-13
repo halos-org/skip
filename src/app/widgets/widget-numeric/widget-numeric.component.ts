@@ -1,7 +1,7 @@
 import { Component, OnDestroy, AfterViewInit, ElementRef, inject, signal, viewChild, effect, untracked, input, OnInit, computed } from '@angular/core';
 import { ChangeDetectionStrategy } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
-import { MinichartComponent } from '../minichart/minichart.component';
+import { MinigraphComponent } from '../minigraph/minigraph.component';
 import { reduceMinMax } from './numeric-minmax.util';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
@@ -26,7 +26,7 @@ const LABEL_ROW_FRACTION = 0.1;
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './widget-numeric.component.html',
   styleUrls: ['./widget-numeric.component.scss'],
-  imports: [MinichartComponent]
+  imports: [MinigraphComponent]
 })
 export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy {
   public id = input.required<string>();
@@ -68,7 +68,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private readonly canvas = inject(CanvasService);
   private readonly unitsService = inject(UnitsService);
-  protected miniChart = viewChild(MinichartComponent);
+  protected miniGraph = viewChild(MinigraphComponent);
   private canvasMainRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
 
   protected showMiniChart = signal<boolean>(false);
@@ -176,18 +176,18 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
         if (sig) {
           this.stream?.observe('numericPath', this.onNumericValue);
           this.streamRegistered = true;
-          this.updateMiniChartVisibility();
+          this.updateMiniGraphVisibility();
         }
       });
     });
 
     effect(() => {
       const show = this.showMiniChart();
-      const chart = this.miniChart();
+      const graph = this.miniGraph();
       const cfg = this.runtime?.options();
       const pathInfo = cfg?.paths?.['numericPath'];
       const effUnit = this.effectiveUnit();
-      const miniChartSignature = [
+      const miniGraphSignature = [
         cfg?.showMiniChart ? '1' : '0',
         pathInfo?.path ?? '',
         pathInfo?.source ?? 'default',
@@ -199,11 +199,11 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
         cfg?.verticalChart ? '1' : '0',
         cfg?.color ?? ''
       ].join('|');
-      if (!miniChartSignature) return;
+      if (!miniGraphSignature) return;
       if (!show) return;
-      if (!chart) return; // will re-run when present
-      this.setMiniChart(chart);
-      chart.startChart();
+      if (!graph) return; // will re-run when present
+      this.setMiniGraph(graph);
+      graph.startGraph();
     });
   }
 
@@ -236,7 +236,7 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.streamRegistered && this.subscriptionSignature()) {
       this.stream?.observe('numericPath', this.onNumericValue);
       this.streamRegistered = true;
-      this.updateMiniChartVisibility();
+      this.updateMiniGraphVisibility();
     }
   }
 
@@ -267,23 +267,23 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     this.maxValueTextHeight = Math.max(1, Math.floor(this.valueBoxBottom() - this.labelBaselineY()));
   }
 
-  private updateMiniChartVisibility(): void {
+  private updateMiniGraphVisibility(): void {
     this.showMiniChart.set(!!this.runtime.options()?.showMiniChart);
   }
 
-  private setMiniChart(chart: MinichartComponent): void {
+  private setMiniGraph(graph: MinigraphComponent): void {
     const cfg = this.runtime.options();
     if (!cfg) return;
     const pathInfo = cfg.paths?.['numericPath'];
-    chart.dataPath = pathInfo?.path ?? null;
-    chart.dataSource = pathInfo?.source ?? 'default';
-    chart.color = cfg.color ?? 'contrast';
-    chart.convertUnitTo = this.effectiveUnit();
-    chart.numDecimal = cfg.numDecimal ?? 1;
-    chart.yScaleMin = cfg.yScaleMin ?? 0;
-    chart.yScaleMax = cfg.yScaleMax ?? 10;
-    chart.inverseYAxis = cfg.inverseYAxis ?? false;
-    chart.verticalChart = cfg.verticalChart ?? false;
+    graph.dataPath = pathInfo?.path ?? null;
+    graph.dataSource = pathInfo?.source ?? 'default';
+    graph.color = cfg.color ?? 'contrast';
+    graph.convertUnitTo = this.effectiveUnit();
+    graph.numDecimal = cfg.numDecimal ?? 1;
+    graph.yScaleMin = cfg.yScaleMin ?? 0;
+    graph.yScaleMax = cfg.yScaleMax ?? 10;
+    graph.inverseYAxis = cfg.inverseYAxis ?? false;
+    graph.verticalChart = cfg.verticalChart ?? false;
   }
 
   private setColors(): void {

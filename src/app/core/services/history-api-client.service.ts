@@ -281,7 +281,7 @@ export class HistoryApiClientService {
       }
       const status = error instanceof HttpErrorResponse ? error.status : 0;
       // 404 / 501: the server has no history provider (plugin/API missing) — a stable "unavailable",
-      // reported as null so trend charts degrade to a clean empty state.
+      // reported as null so trend graphs degrade to a clean empty state.
       if (status === 404 || status === 501) {
         console.warn(`[HistoryApiClientService] History API not available (status ${status}); no provider`);
         return null;
