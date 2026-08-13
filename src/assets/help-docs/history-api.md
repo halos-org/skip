@@ -50,9 +50,9 @@ After history data loads:
 - Old points are removed to maintain a rolling window based on the configured time scale.
 
 ### When History Is Not Available
-- If no History API plugin is installed, or the provider reports that a path is not recorded, history requests are skipped silently.
-- The graph shows live data only, starting from when it was opened.
-- This is expected behavior and does not indicate an error.
+- If no History API plugin is installed, the graph widgets show a "History data unavailable" state, and the pop-up history dialog reports that no historical data is available. They do not fall back to live data.
+- If a provider is installed but reports that a path is not recorded, history seeding is skipped and the graph shows live data only, starting from when it was opened.
+- Neither case indicates an error.
 
 ## Provider Plugin Configuration
 

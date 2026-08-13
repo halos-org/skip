@@ -154,7 +154,7 @@ Grafana integration with other widgets
 ![Embedded Webpage Concept Image](./images/SkipGaugeSample3-1024x508.png)
 
 ## Historical Data
-Skip graphs recent history for your numeric data by reading it from an external Signal K History API provider (such as `signalk-to-influxdb2` or `signalk-parquet`). Press and hold (long-press) a widget to open its history dialog, or use a Data Graph or Wind Trends widget to see recent trends. Skip does **not** record or store data itself — the detail and time span available depend on whatever provider your Signal K server runs, and graphs show live data only when no provider is present. See the [History-API Provider](src/assets/help-docs/history-api.md) help file for setup.
+Skip graphs recent history for your numeric data by reading it from an external Signal K History API provider (such as `signalk-to-influxdb2` or `signalk-parquet`). Press and hold (long-press) a widget to open its history dialog, or use a Data Graph or Wind Trends widget to see recent trends. Skip does **not** record or store data itself — the detail and time span available depend on whatever provider your Signal K server runs, and without a provider both the history dialog and the graph widgets show an empty state. See the [History-API Provider](src/assets/help-docs/history-api.md) help file for setup.
 
 ## Night Modes
 Keep your night vision with automatic or manual day and night switching to a color preserving dim mode or an all Red theme. The images below look very dark, but at night... they are perfect!
