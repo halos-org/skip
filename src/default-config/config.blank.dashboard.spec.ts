@@ -7,6 +7,7 @@ import { WidgetWindTrendsChartComponent } from '../app/widgets/widget-windtrends
 import { WidgetAutopilotComponent } from '../app/widgets/widget-autopilot/widget-autopilot.component';
 import { WidgetHorizonComponent } from '../app/widgets/widget-horizon/widget-horizon.component';
 import { WidgetHeelGaugeComponent } from '../app/widgets/widget-heel-gauge/widget-heel-gauge.component';
+import { WidgetSimpleLinearComponent } from '../app/widgets/widget-simple-linear/widget-simple-linear.component';
 
 // The shipped seed is stamped at LATEST_APP_CONFIG_VERSION, so config migrations never run on a
 // fresh install/profile. A widget whose path shape drifts from its DEFAULT_CONFIG therefore ships
@@ -124,7 +125,7 @@ describe('attitude widget path config shape', () => {
 // back disagreeing — a bearing left at 'unitless' renders raw radians beside the same bearing in
 // degrees, and neither page tells the user which is lying.
 describe('seed self-consistency', () => {
-  interface SeedWidget { input?: { widgetProperties?: { type?: string; config?: { displayName?: string; paths?: Record<string, { path?: string; convertUnitTo?: string }> } } } }
+  interface SeedWidget { input?: { widgetProperties?: { type?: string; config?: { displayName?: string; paths?: Record<string, { path?: string; convertUnitTo?: string; pathSkUnitsFilter?: string | null }> } } } }
   const seedWidgets = (): SeedWidget[] => DefaultDashboard.flatMap(dash => (dash.configuration ?? []) as SeedWidget[]);
 
   it('uses one unit per Signal K path across every page', () => {
@@ -141,6 +142,24 @@ describe('seed self-consistency', () => {
       .filter(([, units]) => units.size > 1)
       .map(([path, units]) => `${path}: ${[...units].join(' vs ')}`);
     expect(disagreements).toEqual([]);
+  });
+
+  // A seeded unit filter narrows the path picker to paths publishing that unit, so a general-purpose
+  // gauge that ships one hides every path it is not already filtered to — including the one it is
+  // bound to. The seed carried four Compact Linear gauges filtered to Volt on tank-level and
+  // temperature paths (#541); correcting DEFAULT_CONFIG could not reach them, because the seed is
+  // stored config stamped at LATEST and no migration touches it.
+  it('seeds widget-simple-linear with the unfiltered path picker from its DEFAULT_CONFIG', () => {
+    const defaults = WidgetSimpleLinearComponent.DEFAULT_CONFIG.paths as Record<string, { pathSkUnitsFilter?: string | null; convertUnitTo?: string }>;
+    const seeded = seedWidgets().filter(w => w.input?.widgetProperties?.type === 'widget-simple-linear');
+    expect(seeded.length).toBeGreaterThan(0);
+
+    for (const widget of seeded) {
+      const paths = (widget.input?.widgetProperties?.config?.paths ?? {}) as Record<string, { pathSkUnitsFilter?: string | null }>;
+      for (const [slot, seedPath] of Object.entries(paths)) {
+        expect(seedPath.pathSkUnitsFilter, `seed simple-linear ${slot}.pathSkUnitsFilter`).toBe(defaults[slot]?.pathSkUnitsFilter ?? null);
+      }
+    }
   });
 
   it('carries no stray whitespace in page or widget names', () => {
