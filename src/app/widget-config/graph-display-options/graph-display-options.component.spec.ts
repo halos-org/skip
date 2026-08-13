@@ -5,7 +5,7 @@ import { MatCheckboxChange } from '@angular/material/checkbox';
 import { MatRadioChange } from '@angular/material/radio';
 import { GraphDisplayOptionsComponent } from './graph-display-options.component';
 
-describe('ChartOptionsComponent', () => {
+describe('GraphDisplayOptionsComponent', () => {
     let component: GraphDisplayOptionsComponent;
     let fixture: ComponentFixture<GraphDisplayOptionsComponent>;
 

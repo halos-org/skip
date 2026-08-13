@@ -15,8 +15,8 @@ import type { IGraphDatapoint } from '../../core/interfaces/graph-data.interface
 
 const themeMock = new Proxy({}, { get: () => '#000000' }) as unknown as ITheme;
 
-function chartValueData(component: MinigraphComponent): unknown[] {
-  return (component as unknown as { chart: { data: { datasets: { data: unknown[] }[] } } }).chart.data.datasets[0].data;
+function graphValueData(component: MinigraphComponent): unknown[] {
+  return component.lineChartData.datasets[0].data;
 }
 
 describe('MinigraphComponent', () => {
@@ -79,7 +79,7 @@ describe('MinigraphComponent', () => {
     component.startGraph();
 
     expect(() => stream.next(HISTORY_UNAVAILABLE)).not.toThrow();
-    expect(chartValueData(component).length).toBe(0);
+    expect(graphValueData(component).length).toBe(0);
   });
 
   it('graphs a backfill batch and then a live point off the history stream', () => {
@@ -95,6 +95,6 @@ describe('MinigraphComponent', () => {
     stream.next(batch);
     stream.next({ timestamp: 3000, data: { value: 3 } });
 
-    expect(chartValueData(component).length).toBe(3);
+    expect(graphValueData(component).length).toBe(3);
   });
 });

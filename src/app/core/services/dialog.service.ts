@@ -119,7 +119,7 @@ export class DialogService {
    * @param {IWidgetHistoryGraphDialogData} data Widget history dialog payload.
    * @returns {Promise<MatDialogRef<WidgetHistoryGraphDialogComponent>>} Dialog reference.
    *
-   * @remarks The history chart dialog (and its chart.js dependency) is lazy-loaded so it stays out
+   * @remarks The history graph dialog (and its chart.js dependency) is lazy-loaded so it stays out
    * of the initial bundle and is only fetched the first time a user opens widget history.
    *
    * @example
