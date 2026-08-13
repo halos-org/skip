@@ -106,9 +106,10 @@ type UnitConverter = (v: any) => any;
  * A target with no entry that is not a measure of the path's own group degrades to 'unitless': the
  * raw SI value with no label. That is how #536 surfaced — the metric presets emit `L/h` where Skip's
  * measure is `l/h`. Targets Skip genuinely has no conversion for (kW, horsepower, Wh, mAh, atm, torr,
- * Bf, fps, the duration formats, and every mass/area/dataSize target — halos-org/skip#570) belong in
- * that fallback and are deliberately absent here. A units.service.spec case pins this table against
- * the full built-in preset vocabulary; extend both together.
+ * Bf, fps, the duration formats, every dataSize target, and the mass and area targets outside the
+ * kilogram/pound and square-metre/square-foot pairs — gram, ounce, stone, acre, hectare and the
+ * rest) belong in that fallback and are deliberately absent here. A units.service.spec case pins this table against the full built-in
+ * preset vocabulary; extend both together.
  */
 const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
   kn: 'knots',
@@ -118,6 +119,8 @@ const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
   meter: 'm',
   mile: 'mi',
   foot: 'feet',
+  pound: 'lbs',
+  kilogram: 'kg',
   degree: 'deg',
   radian: 'rad',
   gradian: 'grad',
@@ -233,6 +236,14 @@ export class UnitsService {
       { measure: 'psi', description: "psi" },
       { measure: 'mmHg', description: "mmHg" },
       { measure: 'inHg', description: "inHg" },
+    ] },
+    { group: 'Mass', units: [
+      { measure: 'kg', description: "Kilograms (base)"},
+      { measure: 'lbs', symbol: 'lb', description: "Pounds"},
+    ] },
+    { group: 'Area', units: [
+      { measure: 'm2', symbol: 'm²', description: "Square Meters (base)"},
+      { measure: 'sqft', symbol: 'ft²', description: "Square Feet"},
     ] },
     { group: 'Density', units: [ { measure: 'kg/m3', description: "Air density - kg/cubic meter (base)"} ] },
     { group: 'Time', units: [
@@ -496,6 +507,12 @@ export class UnitsService {
     'kph': Qty.swiftConverter("m/s", "kph"),
     'm/s': function(v) { return v; },
     'mph': Qty.swiftConverter("m/s", "mph"),
+// mass
+    'kg': function(v) { return v; },
+    'lbs': Qty.swiftConverter('kg', 'lbs'),
+// area
+    'm2': function(v) { return v; },
+    'sqft': Qty.swiftConverter('m^2', 'ft^2'),
 // volume
     "liter": Qty.swiftConverter('m^3', 'liter'),
     "gallon": Qty.swiftConverter('m^3', 'gallon'),

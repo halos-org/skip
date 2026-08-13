@@ -148,6 +148,28 @@ describe('UnitsService', () => {
       expect(service.getConversionsForPath('self.environment.outside.pressure').base).toBe('mbar');
     });
 
+    // #570: getConversionsForPath filters _conversionList for a group holding the path's SI unit, so
+    // a unit in no group came back empty and the path degraded to 'unitless' — a displacement or a
+    // sail area rendered as a raw number with no label, on every preset including metric.
+    it('resolves a mass path to its own group rather than degrading it to unitless', () => {
+      const service = setupWithData('kg', { targetUnit: 'kg' });
+      const resolved = service.getConversionsForPath('self.design.displacement');
+      expect(resolved.base).toBe('kg');
+      expect(resolved.conversions.some(g => g.group === 'Mass')).toBe(true);
+    });
+
+    it('resolves an area path to its own group rather than degrading it to unitless', () => {
+      const service = setupWithData('m2', { targetUnit: 'm2' });
+      const resolved = service.getConversionsForPath('self.sails.inventory.main.area');
+      expect(resolved.base).toBe('m2');
+      expect(resolved.conversions.some(g => g.group === 'Area')).toBe(true);
+    });
+
+    it('honours the imperial mass and area targets the server presets ask for', () => {
+      expect(setupWithData('kg', { targetUnit: 'pound' }).getConversionsForPath('self.design.displacement').base).toBe('lbs');
+      expect(setupWithData('m2', { targetUnit: 'sqft' }).getConversionsForPath('self.sails.inventory.main.area').base).toBe('sqft');
+    });
+
     it('falls back to unitless when the path has no server displayUnits', () => {
       const service = setupWithData('m/s', undefined);
       expect(service.getConversionsForPath('self.navigation.speedOverGround').base).toBe('unitless');
@@ -174,7 +196,7 @@ describe('UnitsService', () => {
     it('resolves the identity target of every group Skip supports (the server`s `base` category)', () => {
       // `base` is always-valid on the server and emits targetUnit === the path's own SI unit, so it
       // reaches Skip for any path — a second route into the resolver that no preset exercises.
-      for (const unit of ['m/s', 'K', 'Pa', 'm', 'rad', 'rad/s', 'm3', 'V', 'A', 'W', 'ratio', 'Hz', 's', 'C', 'm3/s', 'J']) {
+      for (const unit of ['m/s', 'K', 'Pa', 'm', 'rad', 'rad/s', 'm3', 'V', 'A', 'W', 'ratio', 'Hz', 's', 'C', 'm3/s', 'J', 'kg', 'm2']) {
         const service = setupWithData(unit, { targetUnit: unit });
         expect(service.getConversionsForPath('self.some.path').base, `base target ${unit}`).toBe(unit);
       }
@@ -187,6 +209,10 @@ describe('UnitsService', () => {
         ['m3/s', 'L/min', 'l/min'], ['m', 'meter', 'm'], ['rad', 'radian', 'rad'],
         ['rad', 'gradian', 'grad'], ['Hz', 'hertz', 'Hz'], ['W', 'watt', 'W'],
         ['s', 'second', 's'], ['s', 'minute', 'Minutes'], ['s', 'day', 'Days'],
+        // The definitions file has no `kg` conversion key, so `kilogram` is the metric mass option
+        // the admin Data Browser actually offers — the preset path reaches `kg` only through the
+        // server's targetUnit === siUnit shortcut.
+        ['kg', 'kilogram', 'kg'],
       ];
       for (const [unit, target, measure] of cases) {
         const service = setupWithData(unit, { targetUnit: target });
@@ -224,10 +250,9 @@ describe('UnitsService', () => {
     // logs nothing for an unmappable target — which is what #536 reported for fuel rate: the metric
     // presets emit volumeRate 'L/h' and Skip's Flow measure is 'l/h'.
     //
-    // Categories deliberately absent: mass (kg) and area (m2) have no Skip conversion group at all, so
-    // even their identity target fails (#570); dataSize, dateTime and boolean are not Signal K numeric
-    // units; and angleDegrees (baseUnit 'deg') is left out because Skip's only 'deg' measure converts
-    // FROM radians, so honouring it would scale an already-degrees value by 57.3 (#574).
+    // Categories deliberately absent: dataSize, dateTime and boolean are not Signal K numeric units;
+    // and angleDegrees (baseUnit 'deg') is left out because Skip's only 'deg' measure converts FROM
+    // radians, so honouring it would scale an already-degrees value by 57.3 (#574).
     const PRESET_TARGET_VOCABULARY: { category: string; unit: string; target: string; measure: string }[] = [
       { category: 'angle', unit: 'rad', target: 'degree', measure: 'deg' },
       { category: 'angularVelocity', unit: 'rad/s', target: 'deg/s', measure: 'deg/s' },
@@ -243,6 +268,10 @@ describe('UnitsService', () => {
       { category: 'frequency', unit: 'Hz', target: 'rpm', measure: 'rpm' },
       { category: 'length', unit: 'm', target: 'm', measure: 'm' },
       { category: 'length', unit: 'm', target: 'foot', measure: 'feet' },
+      { category: 'area', unit: 'm2', target: 'm2', measure: 'm2' },
+      { category: 'area', unit: 'm2', target: 'sqft', measure: 'sqft' },
+      { category: 'mass', unit: 'kg', target: 'kg', measure: 'kg' },
+      { category: 'mass', unit: 'kg', target: 'pound', measure: 'lbs' },
       { category: 'percentage', unit: 'ratio', target: 'percent', measure: 'percent' },
       { category: 'power', unit: 'W', target: 'W', measure: 'W' },
       { category: 'pressure', unit: 'Pa', target: 'mbar', measure: 'mbar' },
@@ -293,6 +322,20 @@ describe('UnitsService', () => {
       expect(service.getUnitDisplaySymbol('gal-imp/h')).toBe('imp gal/h');
       expect(service.getUnitDisplaySymbol('gallon-imp')).toBe('imp gal');
       expect(service.getUnitDisplaySymbol('btu')).toBe('BTU');
+    });
+
+    it('converts and labels the mass and area targets', () => {
+      const service = setup();
+      // js-quantities accepts `sqft` as a unit name of its own, so `swiftConverter('m^2','sqft')`
+      // is the identity rather than an error — the plausible spelling would ship every area 10.76x
+      // too small with nothing failing. Same shape for a mass unit one row away in the library.
+      expect(service.convertToUnit('lbs', 1) as number).toBeCloseTo(2.2046226, 5);
+      expect(service.convertToUnit('sqft', 1) as number).toBeCloseTo(10.7639104, 5);
+      expect(service.convertToUnit('kg', 1) as number).toBe(1);
+      expect(service.convertToUnit('m2', 1) as number).toBe(1);
+      expect(service.getUnitDisplaySymbol('lbs')).toBe('lb');
+      expect(service.getUnitDisplaySymbol('sqft')).toBe('ft²');
+      expect(service.getUnitDisplaySymbol('m2')).toBe('m²');
     });
 
     it('keeps the label-matches-conversion invariant for every aliased category (symbol + working conversion)', () => {
