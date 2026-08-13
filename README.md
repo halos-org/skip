@@ -10,7 +10,7 @@
 [![Community Videos](https://img.shields.io/badge/Community-Videos-purple)](src/assets/help-docs/community.md)
 [![Contact](https://img.shields.io/badge/Contact-Get_in_touch-success)](src/assets/help-docs/contact-us.md)
 
-**Skip is a Signal K marine instrument panel and dashboard: touch-optimized and ready-to-use across all your devices.**
+**Skip is a Signal K marine instrument panel and dashboard: equally at home under a finger, a mouse, or a keyboard, and ready to use across all your devices.**
 
 Skip turns your Signal K data into clear, purpose-built instrument dashboards. Install it from the Signal K app store, then open Skip in a browser and it's ready to go. A single instance works everywhere — no per-device deployment is needed.
 
@@ -18,12 +18,12 @@ Skip is designed for sailors and boaters who want:
 
 - A **ready-to-use, classic marine app experience** with minimal setup.
 - A **modern, polished interface** optimized for marine displays.
-- **Touch-optimized design**: touch-first, intuitive design for tablets, phones, and other touch-enabled devices.
+- **Every input treated as first class**: touch targets sized for a tablet on a moving boat, pointer and keyboard paths that are just as direct at the navstation — no input reduced to a fallback.
 - **Cross-platform support**: runs on phones, tablets, laptops, Raspberry Pi, Web Enabled TV or other fixed displays - anywhere you can run a web browser.
 - **Instant access to all Signal K data**: displays gauges, graphs, switches, and other widgets right out of the box.
 - **Flexible dashboards**: customize layouts, drag-and-drop widgets, night/day mode, kiosk/fullscreen and remote control support.
 
-With Skip, you get the **clarity of a purpose-built marine instrument panel** combined with the flexibility of Signal K. It's simple, reliable, and highly usable — a modern, touch-first instrument panel for [Signal K](https://signalk.org) vessels.
+With Skip, you get the **clarity of a purpose-built marine instrument panel** combined with the flexibility of Signal K. It's simple, reliable, and highly usable — a modern instrument panel for [Signal K](https://signalk.org) vessels, whatever you drive it with.
 
 ![A Skip dashboard on a wide screen, with speed, depth, course, engine, wind, heel, battery and barometer widgets](./images/dashboard-landscape.png)
 
