@@ -106,10 +106,18 @@ describe('ProfileService', () => {
       config.dashboards.forEach((d, i) => expect(d.id).not.toBe(DefaultDashboard[i].id));
     });
 
-    it('does not auto-switch into the created profile', async () => {
+    it('activates the created profile', async () => {
       await service.refresh();
       await service.createProfile('cockpit');
-      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+      expect(settings.setActiveProfile).toHaveBeenCalledWith('cockpit');
+    });
+
+    it('drains the write queue before activating, so a save queued against the old profile is not lost', async () => {
+      await service.refresh();
+      await service.createProfile('cockpit');
+      const drained = storage.awaitQueueDrain.mock.invocationCallOrder[0];
+      const activated = settings.setActiveProfile.mock.invocationCallOrder[0];
+      expect(drained).toBeLessThan(activated);
     });
 
     it.each(['', '   ', 'default', 'profileA', 'bad/name', 'bad.name', 'a~b', 'a::b'])(
@@ -142,6 +150,19 @@ describe('ProfileService', () => {
       await service.refresh();
       await expect(service.duplicateProfile('profileA', 'profileB')).rejects.toThrow(/no usable configuration/i);
       expect(storage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('activates the copy, not the source', async () => {
+      await service.refresh();
+      await service.duplicateProfile('profileA', 'profileB');
+      expect(settings.setActiveProfile).toHaveBeenCalledWith('profileB');
+    });
+
+    it('surfaces a storage failure and never activates', async () => {
+      await service.refresh();
+      storage.setConfig.mockRejectedValueOnce(new Error('500'));
+      await expect(service.duplicateProfile('profileA', 'profileB')).rejects.toThrow();
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
     });
   });
 

@@ -75,7 +75,7 @@ export class SettingsConfigComponent {
       .openNameDialog({
         title: 'New profile',
         name: '',
-        description: 'The profile starts from the pages shipped with this version of Skip. You can change everything in it afterwards.',
+        description: 'The profile starts from the pages shipped with this version of Skip. Skip switches to it and reloads; you can change everything in it afterwards.',
         confirmBtnText: 'Create',
         cancelBtnText: 'Cancel'
       })
@@ -110,7 +110,13 @@ export class SettingsConfigComponent {
 
   protected duplicateProfile(name: string): void {
     this.dialog
-      .openNameDialog({ title: 'Duplicate profile', name: `${name} copy`, confirmBtnText: 'Duplicate', cancelBtnText: 'Cancel' })
+      .openNameDialog({
+        title: 'Duplicate profile',
+        name: `${name} copy`,
+        description: `The copy starts as an exact copy of "${name}", which is left untouched. Skip switches to the copy and reloads.`,
+        confirmBtnText: 'Duplicate',
+        cancelBtnText: 'Cancel'
+      })
       .afterClosed()
       .subscribe(async (result) => {
         if (!result?.name) {
