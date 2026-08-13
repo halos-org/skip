@@ -178,9 +178,12 @@ reviews:
         implementation-status language ("Step 3", "TODO", "currently implemented
         as"), build narratives, and unchecked checklist items.
 
-        Exception: files under `docs/` ending in `-plan.md` are historical
-        planning records. Do not flag them for describing what was done at the
-        time, and do not ask for them to be updated or deleted.
+        There is no `docs/` tree: planning records live in git history, and
+        anything documenting current behaviour belongs in `README.md` (for users)
+        or `CLAUDE.md` (for contributors). Do not suggest adding one — a separate
+        document describing how the code works is how it drifts out of sync.
+        `src/assets/help-docs/**` is the in-app help content and is user-facing
+        prose, not developer documentation.
 
 knowledge_base:
   code_guidelines:

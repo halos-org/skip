@@ -204,7 +204,7 @@ Skip is one part of a Signal K stack, and it's easy to extend in two directions:
 
 **Signal K Plugins** — domain-specific enrichment (polars, performance calculations, derived environmental data, routing aids) published into the Signal K data model, which Skip can then display.
 
-**Skip Widgets** — visual components that read Signal K path data and API v2 features. Scaffolding a new one takes only a few moments: run `npm run generate:widget`, or ask your AI to build one from the Skip project instructions. See `CLAUDE.md` and `docs/widget-schematic.md` for details.
+**Skip Widgets** — visual components that read Signal K path data and API v2 features. Scaffolding a new one takes only a few moments: run `npm run generate:widget`, or ask your AI to build one from the Skip project instructions. See `CLAUDE.md` for details.
 
 ## Getting Started
 
@@ -249,11 +249,11 @@ For comprehensive development guidance, start with `CLAUDE.md`:
 
 ### Widget Creation Workflow
 1. Scaffold with `npm run generate:widget` (Host2 schematic-first path).
-2. Use `docs/widget-schematic.md` for CLI flags, prompting behavior, and troubleshooting.
+2. See `tools/schematics/create-host2-widget/schema.json` for the available options and their prompts.
 3. Follow the Host2 runtime/stream patterns documented in `CLAUDE.md`.
 
 ### Key Priorities
-- **Widget Development**: Use Host2 patterns and scaffold with the `create-host2-widget` schematic (see `docs/widget-schematic.md`).
+- **Widget Development**: Use Host2 patterns and scaffold with the `create-host2-widget` schematic.
 - **Angular Patterns**: Use signals, standalone components, and modern control flow.
 - **Theming**: Follow Skip's theme system for consistent UI.
 - **Code Quality**: Run `npm run lint` before commits.
