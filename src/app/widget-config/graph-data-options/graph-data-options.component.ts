@@ -10,7 +10,7 @@ import { DataService } from '../../core/services/data.service';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatInputModule } from '@angular/material/input';
 import { IPathMetaData, ISkPathData } from '../../core/interfaces/app-interfaces';
-import { debounceTime } from 'rxjs';
+import { debounceTime, tap } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { pathRequiredValidator, pathSlotWarning } from '../../core/utils/path-validators.util';
 
@@ -38,13 +38,33 @@ export class GraphDataOptionsComponent implements OnInit {
   protected pathWarning = signal<string | null>(null);
   /** The path `pathSources` was last built for, so re-deriving needs a real path change. */
   private _sourcesForPath: string | null = null;
+  /** Base unit of the selected path, or null when the server publishes none for it. */
+  private pathUnit = signal<string | null>(null);
   protected maxDuration = computed<number>(() => this.timeScale().value === 'day' ? 365 : 60);
+  /**
+   * The angle range only changes how radian values are read, so it is offered for radian paths and
+   * withheld from every path with another unit. An unknown unit keeps it: metadata is missing while
+   * the producing instrument is idle, and the override is then the only way to keep the graph
+   * angular (see `resolveAngleDomain`).
+   */
+  protected angleRangeControl = computed<FormControl<'signed' | 'direction' | null> | undefined>(() => {
+    const control = this.datachartAngleRange();
+    if (!control) return undefined;
+    const unit = this.pathUnit();
+    return unit === null || unit === 'rad' ? control : undefined;
+  });
 
   ngOnInit(): void {
     this.refreshNumericPaths();
     this.filteredNumericPaths.set(this.numericPaths());
 
-    this.datachartPath().valueChanges.pipe(debounceTime(300), takeUntilDestroyed(this._destroyRef)).subscribe(value => {
+    // The unit gates whether the angle range is shown at all, so it is read ahead of the debounce:
+    // behind it the control stays editable for 300 ms on a path it does not belong to.
+    this.datachartPath().valueChanges.pipe(
+      tap(value => this.refreshPathUnit(value)),
+      debounceTime(300),
+      takeUntilDestroyed(this._destroyRef)
+    ).subscribe(value => {
       this.refreshNumericPaths();
       const term = (value || '').toLowerCase().trim();
       if (!term) {
@@ -66,6 +86,7 @@ export class GraphDataOptionsComponent implements OnInit {
     this.datachartPath().updateValueAndValidity({ emitEvent: false });
     const currentPath = this.datachartPath()?.value;
     this.refreshPathWarning(currentPath);
+    this.refreshPathUnit(currentPath);
     this.setPathSourcesFor(currentPath);
     this.setInitFormState();
   }
@@ -78,6 +99,10 @@ export class GraphDataOptionsComponent implements OnInit {
     this.pathWarning.set(pathSlotWarning(path, path ? this.data.getPathObject(path) : null, {
       pathType: 'number', supportsPutOnly: false, zonesOnly: false, selfOnly: this.filterSelfPaths().value
     }));
+  }
+
+  private refreshPathUnit(path: string | null): void {
+    this.pathUnit.set(path ? this.data.getPathUnitType(path) : null);
   }
 
   /**
