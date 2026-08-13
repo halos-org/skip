@@ -274,6 +274,71 @@ describe('GaugeSteelComponent', () => {
     expect(steel.Linear).toHaveBeenCalledTimes(1);
   });
 
+  // The geometry keys are per-class: the radial reads `size`, the linear pair reads `width`/`height`
+  // and falls back to the canvas element's dimensions when they are missing — which the outgoing
+  // radial had set square. A leftover `size` therefore renders the linear gauge at the tile's
+  // shorter side, and no resize follows the flip to correct it.
+  it('re-derives the geometry for the new class when subType changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    const linearOptions: Record<string, unknown>[] = [];
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+    steel.Linear = vi.fn(function (this: FakeGauge, _id: string, opts: Record<string, unknown>) {
+      linearOptions.push({ ...opts });
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-geometry');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      onResized: (e: ResizeObserverEntry) => void;
+    };
+    internals.onResized({ contentRect: { width: 400, height: 150 } } as ResizeObserverEntry);
+    internals.startGauge(true);
+
+    fixture.componentRef.setInput('subType', 'linear');
+    internals.ngOnChanges({ subType: new SimpleChange('radial', 'linear', false) });
+
+    expect(linearOptions).toHaveLength(1);
+    expect(linearOptions[0]['width']).toBe(400);
+    expect(linearOptions[0]['height']).toBe(150);
+    expect(linearOptions[0]['size']).toBeUndefined();
+  });
+
+  // Zone band colours are resolved from the theme inside buildOptions and baked into the Section
+  // objects at construction, so a day/night switch has to rebuild or the bands keep the old colours.
+  it('rebuilds when the theme changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-theme');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Radial).toHaveBeenCalledTimes(1);
+
+    internals.ngOnChanges({ theme: new SimpleChange(null, {}, false) });
+
+    expect(steel.Radial).toHaveBeenCalledTimes(2);
+  });
+
   it('rebuilds as a bargraph when the Digital Meter setting is turned on', () => {
     const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
     steel.Linear = vi.fn(function (this: FakeGauge) {
