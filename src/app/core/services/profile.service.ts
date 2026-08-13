@@ -129,6 +129,16 @@ export class ProfileService {
       }
       await this.storage.setConfig(PROFILE_SCOPE, normalized, sourceConfig);
 
+      // A rename preserves the configuration, so the session's write path follows the slot to its new
+      // name whatever happens next. Leaving it behind would point every later save at the slot this
+      // rename is about to delete — including when the reload below is declined, and in a `?profile`
+      // session, which takes the else branch and never reloads at all. It moves before the removal
+      // because `patchConfig` bakes the slot name in at enqueue time: a save queued during the
+      // removal's drain would otherwise target a slot the queue deletes ahead of it, and fail.
+      if (this.storage.sharedConfigName === oldName) {
+        this.storage.sharedConfigName = normalized;
+      }
+
       // Failure is surfaced via awaitQueueDrain() below; swallow the per-write rejection.
       void this.storage.removeItem(PROFILE_SCOPE, oldName).catch(() => undefined);
       const drained = await this.storage.awaitQueueDrain();
@@ -156,6 +166,13 @@ export class ProfileService {
       }
       if (name === this.settings.getActiveProfileName()) {
         throw new Error('The active profile cannot be deleted. Switch to another profile first.');
+      }
+      // The persisted name is what the next boot loads, and it parts company with the loaded slot
+      // whenever a switch was persisted but its reload declined. Deleting it there would leave the
+      // device pointed at a slot that no longer exists, and the next reload lands on the degraded
+      // "no shared configuration" recovery instead of the dashboards on screen.
+      if (name === this.settings.getPersistedProfileName()) {
+        throw new Error('This profile is set to load on the next reload and cannot be deleted. Switch to another profile first.');
       }
       if (this.existingNames().length <= 1) {
         throw new Error('The last remaining profile cannot be deleted.');

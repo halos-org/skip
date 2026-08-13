@@ -198,6 +198,16 @@ describe('ProfileService', () => {
       expect(storage.removeItem).not.toHaveBeenCalled();
     });
 
+    // A switch whose reload was declined leaves the persisted name on a profile that is not loaded,
+    // so the loaded-slot guard above no longer covers it. Deleting it there points the device at a
+    // slot that no longer exists, and the next reload lands on the degraded recovery screen.
+    it('blocks deleting the profile a deferred switch will boot into', async () => {
+      setup(makeStorageMock(['default', 'profileA', 'cockpit']), makeSettingsMock('profileA', 'cockpit'));
+      await service.refresh();
+      await expect(service.deleteProfile('cockpit')).rejects.toThrow(/next reload/i);
+      expect(storage.removeItem).not.toHaveBeenCalled();
+    });
+
     it('blocks deleting the reserved default profile', async () => {
       await service.refresh();
       await expect(service.deleteProfile('default')).rejects.toThrow(/default/i);
@@ -260,6 +270,43 @@ describe('ProfileService', () => {
       expect(storage.setConfig).toHaveBeenCalledWith('user', 'night', expect.anything());
       expect(storage.removeItem).toHaveBeenCalledWith('user', 'day');
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
+
+    // The rename deletes the old slot, so a write path left on that name posts every later save
+    // against a slot the server no longer has. A rename preserves the config, so the write path
+    // follows the name — including when the reload is declined and when there is no reload at all.
+    it('moves the write path onto the new name, whatever happens to the reload', async () => {
+      const s = makeStorageMock(['default', 'profileA']);
+      s.sharedConfigName = 'profileA';
+      setup(s, makeSettingsMock('profileA'));
+      await service.refresh();
+
+      await service.renameProfile('profileA', 'newName');
+
+      expect(s.sharedConfigName).toBe('newName');
+    });
+
+    it('moves the write path when the ephemerally-active slot is renamed, which never reloads', async () => {
+      const s = makeStorageMock(['default', 'day']);
+      s.sharedConfigName = 'day';
+      setup(s, makeSettingsMock('day', 'default'));
+      await service.refresh();
+
+      await service.renameProfile('day', 'night');
+
+      expect(s.sharedConfigName).toBe('night');
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
+
+    it('leaves the write path alone when some other profile is renamed', async () => {
+      const s = makeStorageMock(['default', 'profileA', 'other']);
+      s.sharedConfigName = 'profileA';
+      setup(s, makeSettingsMock('profileA'));
+      await service.refresh();
+
+      await service.renameProfile('other', 'renamed');
+
+      expect(s.sharedConfigName).toBe('profileA');
     });
 
     it('blocks renaming the reserved default profile', async () => {

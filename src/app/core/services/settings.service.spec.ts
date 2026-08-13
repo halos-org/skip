@@ -297,10 +297,55 @@ describe('SettingsService', () => {
       expect(cc.sharedConfigName).toBe('cockpit');
     });
 
-    it('setActiveProfile keeps StorageService.sharedConfigName coherent', () => {
+    // #520: the write path must never move off the profile whose configuration is in memory.
+    // patchConfig builds every path from it, so repointing while the old config is still loaded
+    // replaces the newly selected profile's dashboards with the old profile's content. The reload
+    // that would make the move safe replaces the document, and the bootstrap sets this field then.
+    it('never repoints the storage write path off the loaded profile', () => {
       const storage = TestBed.inject(StorageService);
+      // The bootstrap hands the loaded slot to StorageService; stand in for that here.
+      storage.sharedConfigName = 'profileA';
+
       service.setActiveProfile('cockpit');
-      expect(storage.sharedConfigName).toBe('cockpit');
+
+      expect(storage.sharedConfigName).toBe('profileA');
+    });
+
+    // The two names diverge while a switch is deferred, and "reset the active profile" has to mean
+    // the one on screen. Targeting the pending name would blank a profile the user is not looking at.
+    it('resets the loaded profile, not the one a pending switch is waiting to load', () => {
+      const storage = TestBed.inject(StorageService);
+      storage.bootstrapRemoteContext({
+        sharedConfigName: 'profileA',
+        configFileVersion: 11,
+        initConfig: { app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig
+      });
+      storage.storageServiceReady$.next(true);
+      const setConfig = vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
+      service.setActiveProfile('cockpit');
+
+      service.resetSettings();
+
+      expect(setConfig).toHaveBeenCalledWith('user', 'profileA', expect.anything());
+    });
+
+    // The demand is computed from the dashboards in memory, which belong to the loaded profile. Under
+    // the pending name it would be read back pre-auth at the next boot as that profile's answer, and
+    // a wrong `false` does not fail open — that boot would subscribe to no AIS targets (#386).
+    it('records remote-context demand under the loaded profile while a switch is deferred', () => {
+      const storage = TestBed.inject(StorageService);
+      storage.bootstrapRemoteContext({
+        sharedConfigName: 'profileA',
+        configFileVersion: 11,
+        initConfig: { app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig
+      });
+      service.setActiveProfile('cockpit');
+
+      service.setRemoteContextDemand(true);
+
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
+      expect(cc.remoteContextDemand['profileA']).toBe(true);
+      expect(cc.remoteContextDemand['cockpit']).toBeUndefined();
     });
   });
 
