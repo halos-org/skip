@@ -10,7 +10,7 @@ import { DataService } from '../../core/services/data.service';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatInputModule } from '@angular/material/input';
 import { IPathMetaData, ISkPathData } from '../../core/interfaces/app-interfaces';
-import { debounceTime } from 'rxjs';
+import { debounceTime, tap } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { pathRequiredValidator, pathSlotWarning } from '../../core/utils/path-validators.util';
 
@@ -58,7 +58,13 @@ export class GraphDataOptionsComponent implements OnInit {
     this.refreshNumericPaths();
     this.filteredNumericPaths.set(this.numericPaths());
 
-    this.datachartPath().valueChanges.pipe(debounceTime(300), takeUntilDestroyed(this._destroyRef)).subscribe(value => {
+    // The unit gates whether the angle range is shown at all, so it is read ahead of the debounce:
+    // behind it the control stays editable for 300 ms on a path it does not belong to.
+    this.datachartPath().valueChanges.pipe(
+      tap(value => this.refreshPathUnit(value)),
+      debounceTime(300),
+      takeUntilDestroyed(this._destroyRef)
+    ).subscribe(value => {
       this.refreshNumericPaths();
       const term = (value || '').toLowerCase().trim();
       if (!term) {
@@ -67,7 +73,6 @@ export class GraphDataOptionsComponent implements OnInit {
         this.filteredNumericPaths.set(this.numericPaths().filter(p => p.path.toLowerCase().includes(term)));
       }
       this.refreshPathWarning(value);
-      this.refreshPathUnit(value);
       // An unoffered path never appears in the autocomplete, so typing is the only way to enter one
       // and (optionSelected) never fires. Re-derive here too, or the previous path's concrete source
       // stays pinned to a path that will never fill it.

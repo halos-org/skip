@@ -208,7 +208,9 @@ describe('GraphDataOptionsComponent', () => {
     expect(showsAngleRange(mountWithAngleRange('self.environment.wind.angleApparent'))).toBe(true);
   });
 
-  it('hides the angle range once the path changes to a non-angular one (#368)', async () => {
+  it('hides the angle range as soon as the path changes to a non-angular one (#368)', async () => {
+    // Behind the 300 ms path debounce the control would stay editable for a path it does not
+    // belong to.
     vi.useFakeTimers();
     try {
       pathUnits['self.environment.wind.angleApparent'] = 'rad';
@@ -217,6 +219,9 @@ describe('GraphDataOptionsComponent', () => {
       expect(showsAngleRange(fx)).toBe(true);
 
       fx.componentInstance.datachartPath().setValue('self.propulsion.port.temperature');
+      fx.detectChanges();
+      expect(showsAngleRange(fx)).toBe(false);
+
       await vi.advanceTimersByTimeAsync(400);
       fx.detectChanges();
       expect(showsAngleRange(fx)).toBe(false);
