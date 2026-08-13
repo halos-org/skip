@@ -106,8 +106,9 @@ type UnitConverter = (v: any) => any;
  * A target with no entry that is not a measure of the path's own group degrades to 'unitless': the
  * raw SI value with no label. That is how #536 surfaced — the metric presets emit `L/h` where Skip's
  * measure is `l/h`. Targets Skip genuinely has no conversion for (kW, horsepower, Wh, mAh, atm, torr,
- * Bf, fps, the duration formats, and every dataSize target) belong in that fallback and are
- * deliberately absent here. A units.service.spec case pins this table against the full built-in
+ * Bf, fps, the duration formats, every dataSize target, and the mass and area targets outside the
+ * kilogram/pound and square-metre/square-foot pairs — gram, ounce, stone, acre, hectare and the
+ * rest) belong in that fallback and are deliberately absent here. A units.service.spec case pins this table against the full built-in
  * preset vocabulary; extend both together.
  */
 const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
@@ -119,6 +120,7 @@ const SERVER_TARGET_UNIT_ALIASES: Record<string, string> = {
   mile: 'mi',
   foot: 'feet',
   pound: 'lbs',
+  kilogram: 'kg',
   degree: 'deg',
   radian: 'rad',
   gradian: 'grad',

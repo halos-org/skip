@@ -196,7 +196,7 @@ describe('UnitsService', () => {
     it('resolves the identity target of every group Skip supports (the server`s `base` category)', () => {
       // `base` is always-valid on the server and emits targetUnit === the path's own SI unit, so it
       // reaches Skip for any path — a second route into the resolver that no preset exercises.
-      for (const unit of ['m/s', 'K', 'Pa', 'm', 'rad', 'rad/s', 'm3', 'V', 'A', 'W', 'ratio', 'Hz', 's', 'C', 'm3/s', 'J']) {
+      for (const unit of ['m/s', 'K', 'Pa', 'm', 'rad', 'rad/s', 'm3', 'V', 'A', 'W', 'ratio', 'Hz', 's', 'C', 'm3/s', 'J', 'kg', 'm2']) {
         const service = setupWithData(unit, { targetUnit: unit });
         expect(service.getConversionsForPath('self.some.path').base, `base target ${unit}`).toBe(unit);
       }
@@ -209,6 +209,10 @@ describe('UnitsService', () => {
         ['m3/s', 'L/min', 'l/min'], ['m', 'meter', 'm'], ['rad', 'radian', 'rad'],
         ['rad', 'gradian', 'grad'], ['Hz', 'hertz', 'Hz'], ['W', 'watt', 'W'],
         ['s', 'second', 's'], ['s', 'minute', 'Minutes'], ['s', 'day', 'Days'],
+        // The definitions file has no `kg` conversion key, so `kilogram` is the metric mass option
+        // the admin Data Browser actually offers — the preset path reaches `kg` only through the
+        // server's targetUnit === siUnit shortcut.
+        ['kg', 'kilogram', 'kg'],
       ];
       for (const [unit, target, measure] of cases) {
         const service = setupWithData(unit, { targetUnit: target });
@@ -318,6 +322,20 @@ describe('UnitsService', () => {
       expect(service.getUnitDisplaySymbol('gal-imp/h')).toBe('imp gal/h');
       expect(service.getUnitDisplaySymbol('gallon-imp')).toBe('imp gal');
       expect(service.getUnitDisplaySymbol('btu')).toBe('BTU');
+    });
+
+    it('converts and labels the mass and area targets', () => {
+      const service = setup();
+      // js-quantities accepts `sqft` as a unit name of its own, so `swiftConverter('m^2','sqft')`
+      // is the identity rather than an error — the plausible spelling would ship every area 10.76x
+      // too small with nothing failing. Same shape for a mass unit one row away in the library.
+      expect(service.convertToUnit('lbs', 1) as number).toBeCloseTo(2.2046226, 5);
+      expect(service.convertToUnit('sqft', 1) as number).toBeCloseTo(10.7639104, 5);
+      expect(service.convertToUnit('kg', 1) as number).toBe(1);
+      expect(service.convertToUnit('m2', 1) as number).toBe(1);
+      expect(service.getUnitDisplaySymbol('lbs')).toBe('lb');
+      expect(service.getUnitDisplaySymbol('sqft')).toBe('ft²');
+      expect(service.getUnitDisplaySymbol('m2')).toBe('m²');
     });
 
     it('keeps the label-matches-conversion invariant for every aliased category (symbol + working conversion)', () => {
