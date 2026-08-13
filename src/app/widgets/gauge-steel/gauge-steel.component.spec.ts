@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SimpleChange } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GaugeSteelComponent } from './gauge-steel.component';
+import { GaugeSteelComponent, SteelBackgroundColors, SteelFrameColors } from './gauge-steel.component';
 import { UnitsService } from '../../core/services/units.service';
 import { States } from '../../core/interfaces/signalk-interfaces';
 
@@ -240,6 +240,309 @@ describe('GaugeSteelComponent', () => {
 
     expect(animated).toEqual([]);
     expect(seeded).toEqual([1800]);
+  });
+
+  // #558: subType, barGauge and decimals are read only when the gauge object is constructed, so
+  // editing them in widget options produced no visible effect until some unrelated event -- a
+  // window resize, or the server's unit metadata landing -- happened to rebuild the gauge.
+  it('rebuilds as the other library type when subType changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-subtype');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Radial).toHaveBeenCalledTimes(1);
+
+    fixture.componentRef.setInput('subType', 'linear');
+    internals.ngOnChanges({ subType: new SimpleChange('radial', 'linear', false) });
+
+    expect(steel.Linear).toHaveBeenCalledTimes(1);
+  });
+
+  // The geometry keys are per-class: the radial reads `size`, the linear pair reads `width`/`height`
+  // and falls back to the canvas element's dimensions when they are missing — which the outgoing
+  // radial had set square. A leftover `size` therefore renders the linear gauge at the tile's
+  // shorter side, and no resize follows the flip to correct it.
+  it('re-derives the geometry for the new class when subType changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    const linearOptions: Record<string, unknown>[] = [];
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+    steel.Linear = vi.fn(function (this: FakeGauge, _id: string, opts: Record<string, unknown>) {
+      linearOptions.push({ ...opts });
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-geometry');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      onResized: (e: ResizeObserverEntry) => void;
+    };
+    internals.onResized({ contentRect: { width: 400, height: 150 } } as ResizeObserverEntry);
+    internals.startGauge(true);
+
+    fixture.componentRef.setInput('subType', 'linear');
+    internals.ngOnChanges({ subType: new SimpleChange('radial', 'linear', false) });
+
+    expect(linearOptions).toHaveLength(1);
+    expect(linearOptions[0]['width']).toBe(400);
+    expect(linearOptions[0]['height']).toBe(150);
+    expect(linearOptions[0]['size']).toBeUndefined();
+  });
+
+  // Zone band colours are resolved from the theme inside buildOptions and baked into the Section
+  // objects at construction, so a day/night switch has to rebuild or the bands keep the old colours.
+  it('rebuilds when the theme changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-theme');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Radial).toHaveBeenCalledTimes(1);
+
+    internals.ngOnChanges({ theme: new SimpleChange(null, {}, false) });
+
+    expect(steel.Radial).toHaveBeenCalledTimes(2);
+  });
+
+  it('rebuilds as a bargraph when the Digital Meter setting is turned on', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+    steel.LinearBargraph = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-bargauge');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('barGauge', false);
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Linear).toHaveBeenCalledTimes(1);
+
+    fixture.componentRef.setInput('barGauge', true);
+    internals.ngOnChanges({ barGauge: new SimpleChange(false, true, false) });
+
+    expect(steel.LinearBargraph).toHaveBeenCalledTimes(1);
+  });
+
+  it('rebuilds with the new LCD precision when decimals changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-decimals');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('decimals', 2);
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      gaugeOptions: { lcdDecimals?: number };
+    };
+    internals.startGauge(true);
+    expect(internals.gaugeOptions.lcdDecimals).toBe(2);
+
+    fixture.componentRef.setInput('decimals', 0);
+    internals.ngOnChanges({ decimals: new SimpleChange(2, 0, false) });
+
+    expect(internals.gaugeOptions.lcdDecimals).toBe(0);
+    expect(steel.Linear).toHaveBeenCalledTimes(2);
+  });
+
+  // A rebuild constructs the replacement from buildOptions, which re-reads the title, background and
+  // frame inputs. Calling their setters as well would target whichever gauge object happened to exist
+  // at that point in the batch -- the one the rebuild discards -- so the batch carries them through
+  // the rebuild instead.
+  it('carries a title change batched with a rebuild into the replacement gauge', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    const titleSetter = vi.fn();
+    steel.Linear = vi.fn(function (this: FakeGauge & { setTitleString: (t: string) => void }) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+      this.setTitleString = titleSetter;
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-title-batch');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('title', 'Old');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      gaugeOptions: { titleString?: string };
+    };
+    internals.startGauge(true);
+
+    fixture.componentRef.setInput('title', 'New');
+    fixture.componentRef.setInput('maxValue', 200);
+    internals.ngOnChanges({
+      title: new SimpleChange('Old', 'New', false),
+      maxValue: new SimpleChange(100, 200, false),
+    });
+
+    expect(internals.gaugeOptions.titleString).toBe('New');
+    expect(titleSetter).not.toHaveBeenCalled();
+  });
+
+  // The batch runs ONE rebuild: buildOptions re-reads every input, so a second would repeat the work
+  // on inputs the first already carried -- and the library cannot cancel the discarded gauge's tween,
+  // so it keeps repainting the canvas with its stale scale and wins the last frame.
+  it('rebuilds once for a batch carrying several structural changes', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Section = vi.fn((lower: number, upper: number, color: string) => ({ lower, upper, color }));
+    steel.Linear = vi.fn(function (this: FakeGauge) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-one-rebuild');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('units', 'V');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+    fixture.componentRef.setInput('decimals', 2);
+    fixture.componentRef.setInput('zones', []);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+    expect(steel.Linear).toHaveBeenCalledTimes(1);
+
+    fixture.componentRef.setInput('maxValue', 200);
+    fixture.componentRef.setInput('decimals', 0);
+    fixture.componentRef.setInput('zones', [{ upper: 50, state: States.Alarm }]);
+    internals.ngOnChanges({
+      maxValue: new SimpleChange(100, 200, false),
+      decimals: new SimpleChange(2, 0, false),
+      zones: new SimpleChange([], [{ upper: 50, state: States.Alarm }], false),
+    });
+
+    expect(steel.Linear).toHaveBeenCalledTimes(2);
+  });
+
+  // The setters run only on a batch with no structural change; buildOptions carries these inputs
+  // through a rebuild. Both halves need pinning -- deleting the setters is otherwise invisible.
+  it('applies a standalone title, background and frame change through the live setters', () => {
+    const calls: string[] = [];
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    steel.Radial = vi.fn(function (this: FakeGauge & Record<string, unknown>) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+      this.setTitleString = () => { calls.push('title'); };
+      this.setBackgroundColor = () => { calls.push('background'); };
+      this.setFrameDesign = () => { calls.push('frame'); };
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-live-setters');
+    fixture.componentRef.setInput('subType', 'radial');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+    };
+    internals.startGauge(true);
+
+    internals.ngOnChanges({ title: new SimpleChange('Old', 'New', false) });
+    internals.ngOnChanges({ backgroundColor: new SimpleChange('carbon', 'white', false) });
+    internals.ngOnChanges({ frameColor: new SimpleChange('anthracite', 'brass', false) });
+
+    expect(calls).toEqual(['title', 'background', 'frame']);
+    // No rebuild: none of these is structural.
+    expect(steel.Radial).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries the background and frame through a rebuild, without calling their setters', () => {
+    const steel = (globalThis as unknown as { steelseries: Record<string, unknown> }).steelseries;
+    const bgSetter = vi.fn();
+    const frameSetter = vi.fn();
+    steel.Linear = vi.fn(function (this: FakeGauge & Record<string, unknown>) {
+      this.setValue = vi.fn();
+      this.setValueAnimated = vi.fn();
+      this.setBackgroundColor = bgSetter;
+      this.setFrameDesign = frameSetter;
+    });
+
+    fixture.componentRef.setInput('widgetUUID', 'uuid-carry-colors');
+    fixture.componentRef.setInput('subType', 'linear');
+    fixture.componentRef.setInput('backgroundColor', 'carbon');
+    fixture.componentRef.setInput('frameColor', 'anthracite');
+    fixture.componentRef.setInput('minValue', 0);
+    fixture.componentRef.setInput('maxValue', 100);
+
+    const internals = component as unknown as {
+      startGauge: (f?: boolean) => void;
+      ngOnChanges: (c: Record<string, SimpleChange>) => void;
+      gaugeOptions: { backgroundColor?: string; frameDesign?: string };
+    };
+    internals.startGauge(true);
+
+    fixture.componentRef.setInput('backgroundColor', 'white');
+    fixture.componentRef.setInput('frameColor', 'brass');
+    fixture.componentRef.setInput('maxValue', 200);
+    internals.ngOnChanges({
+      backgroundColor: new SimpleChange('carbon', 'white', false),
+      frameColor: new SimpleChange('anthracite', 'brass', false),
+      maxValue: new SimpleChange(100, 200, false),
+    });
+
+    expect(internals.gaugeOptions.backgroundColor).toBe(SteelBackgroundColors['white']);
+    expect(internals.gaugeOptions.frameDesign).toBe(SteelFrameColors['brass']);
+    expect(bgSetter).not.toHaveBeenCalled();
+    expect(frameSetter).not.toHaveBeenCalled();
   });
 
   it('still animates a value change that stands alone', () => {

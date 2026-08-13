@@ -60,6 +60,9 @@ export const SteelFrameColors = {
 'glossyMetal': steelseries.FrameDesign.GLOSSY_METAL
 }
 
+/** Inputs the steelseries gauge exposes a live setter for; every other input needs a rebuild. */
+const LIVE_APPLIED_INPUTS = ['value', 'title', 'backgroundColor', 'frameColor'];
+
 @Component({
   selector: 'gauge-steel',
   templateUrl: './gauge-steel.component.html',
@@ -97,6 +100,7 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
   private lastSizeSignature = '';
   private resizeTimer: number | null = null;
   private pendingStructuralRebuild = false;
+  private lastRect: { width: number; height: number } | null = null;
 
   ngOnInit(): void {
     this.buildOptions();
@@ -273,20 +277,35 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
+  /**
+   * Write the geometry keys the current gauge class reads, and drop the other class's. The radial
+   * takes `size`; the linear pair takes `width`/`height` and ignores `size`, falling back to the
+   * canvas element's current dimensions when they are absent — which the outgoing radial had set
+   * square. Leaving a stale key behind therefore builds a linear gauge at the radial's side length
+   * in a tile that is not square, and no resize follows to correct it.
+   */
+  private applyGeometry(): string {
+    const rect = this.lastRect;
+    if (!rect) return this.lastSizeSignature;
+    if (this.subType() === 'radial') {
+      const size = Math.floor(Math.min(rect.height, rect.width));
+      delete this.gaugeOptions['width'];
+      delete this.gaugeOptions['height'];
+      this.gaugeOptions['size'] = size;
+      return 'radial:' + size;
+    }
+    const w = Math.floor(rect.width);
+    const h = Math.floor(rect.height);
+    delete this.gaugeOptions['size'];
+    this.gaugeOptions['width'] = w;
+    this.gaugeOptions['height'] = h;
+    return `linear:${w}x${h}`;
+  }
+
   onResized(event: ResizeObserverEntry):void {
     if (event.contentRect.height < 50 || event.contentRect.width < 50) return;
-    let signature: string;
-    if (this.subType() === 'radial') {
-      const size =  Math.floor(Math.min(event.contentRect.height, event.contentRect.width));
-      this.gaugeOptions['size'] = size;
-      signature = 'radial:' + size;
-    } else {
-      const w = Math.floor(event.contentRect.width);
-      const h = Math.floor(event.contentRect.height);
-      this.gaugeOptions['width'] = w;
-      this.gaugeOptions['height'] = h;
-      signature = `linear:${w}x${h}`;
-    }
+    this.lastRect = { width: event.contentRect.width, height: event.contentRect.height };
+    const signature = this.applyGeometry();
     if (signature === this.lastSizeSignature) return; // no meaningful change
     this.lastSizeSignature = signature;
     if (this.resizeTimer) window.clearTimeout(this.resizeTimer);
@@ -304,13 +323,28 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
     // with its own now-stale scale, sections and size — and wins the last frame. Under a steady
     // reading nothing repaints afterwards, leaving the old face on screen for good. The server's
     // measure resolving after the first value delivers exactly this batch on an ordinary boot.
-    const rebuilding = !!(changes.zones || changes.radialSize || changes.units || changes.minValue || changes.maxValue);
-    if (changes.value && !changes.value.firstChange && !rebuilding) {
-        this.gauge.setValueAnimated(changes.value.currentValue);
-    }
-    if (changes.zones) {
+    // Listed by what the library CAN apply to a live gauge, so anything else rebuilds by default.
+    // Inverted deliberately: an input added later costs a needless rebuild at worst, where a missing
+    // entry in a rebuild list does nothing at all and shows nothing on screen — which is #558.
+    // subType and barGauge pick the gauge class itself; decimals is captured into a closure at
+    // construction; zone sections are converted with `units` and clamped to [minValue, maxValue], so
+    // a scale move has to recompute the bands rather than the axis alone or they desync from the
+    // value; `theme` supplies the section colours. One startGauge(true) applies the whole batch in a
+    // single pass, since buildOptions re-reads every input. A rebuild while units is still '' (boot)
+    // self-corrects when the first value sets it.
+    const rebuilding = Object.keys(changes).some(key => !LIVE_APPLIED_INPUTS.includes(key));
+    if (rebuilding) {
+      // The geometry keys are per-class, so a subType flip has to re-derive them from the last
+      // observed rect; no resize follows the flip to do it.
+      if (changes.subType) {
+        this.lastSizeSignature = this.applyGeometry();
+      }
       this.pendingStructuralRebuild = true;
-      this.startGauge(true); // sections require rebuild
+      this.startGauge(true);
+      return;
+    }
+    if (changes.value && !changes.value.firstChange) {
+        this.gauge.setValueAnimated(changes.value.currentValue);
     }
     if (changes.title) {
       this.gauge.setTitleString(changes.title.currentValue);
@@ -320,19 +354,6 @@ export class GaugeSteelComponent implements OnInit, OnChanges, OnDestroy {
     }
     if(changes.frameColor) {
       this.gauge.setFrameDesign(SteelFrameColors[changes.frameColor.currentValue]);
-    }
-    if (changes.radialSize){
-      this.pendingStructuralRebuild = true;
-      this.startGauge(true); // radial geometry change
-    }
-    if (changes.units || changes.minValue || changes.maxValue) {
-      // Zone sections are converted with `units` and clamped to [minValue, maxValue]. When the
-      // server-resolved measure lands (units) or the reinterpreted scale bounds move (min/max), the
-      // sections must be rebuilt, not just the axis, or the bands desync from the scale and value.
-      // startGauge(true) applies the new min/max via buildOptions and recomputes the sections in one
-      // pass; a rebuild while units is still '' (boot) self-corrects when the first value sets it.
-      this.pendingStructuralRebuild = true;
-      this.startGauge(true);
     }
   }
 
