@@ -8,11 +8,7 @@ tone_instructions: >-
   restating the diff. Silence beats a nitpick.
 
 reviews:
-  # `chill`, not `assertive`: main has required_conversation_resolution enabled,
-  # so every comment CodeRabbit leaves is a merge gate until somebody resolves
-  # it. A style nit that blocks a merge costs more than it finds. Raise this to
-  # `assertive` if that protection is ever relaxed.
-  profile: chill
+  profile: assertive
   poem: false
   in_progress_fortune: false
 
