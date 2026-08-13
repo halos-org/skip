@@ -1,5 +1,9 @@
-import { Component, OnInit, input, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, input, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { merge } from 'rxjs';
 import { AppService } from '../../core/services/app-service';
+import { describeSmoothingWindow } from '../../core/utils/graph-window.util';
+import type { TimeScaleFormat } from '../../core/interfaces/graph-data.interfaces';
 import { MatCardModule } from '@angular/material/card';
 import { MatOptionModule } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
@@ -18,6 +22,7 @@ import { MatRadioChange, MatRadioModule } from '@angular/material/radio';
 })
 export class GraphDisplayOptionsComponent implements OnInit {
   private app = inject(AppService);
+  private readonly _destroyRef = inject(DestroyRef);
 
   readonly datasetAverageArray = input.required<FormControl<string>>();
   readonly showAverageData = input.required<FormControl<boolean>>();
@@ -42,7 +47,12 @@ export class GraphDisplayOptionsComponent implements OnInit {
 
   readonly numDecimal = input.required<FormControl<number>>();
   readonly color = input.required<FormControl<string>>();
+  /** The graph window the smoothing span is derived from; owned by the Data tab. */
+  readonly timeScale = input.required<FormControl<string>>();
+  readonly period = input.required<FormControl<number>>();
   protected colors: { label: string; value: string }[] = [];
+  /** How far back the moving average reaches, phrased for the hint ('2.5 min'). */
+  protected smoothingWindow = signal<string>('');
 
   ngOnInit(): void {
     this.colors = this.app.configurableThemeColors;
@@ -50,9 +60,20 @@ export class GraphDisplayOptionsComponent implements OnInit {
       this.trackAgainstAverage().disable();
     }
 
+    this.refreshSmoothingWindow();
+    // The span is a fraction of the graph window, so it follows edits made on the Data tab while
+    // this dialog stays open.
+    merge(this.timeScale().valueChanges, this.period().valueChanges)
+      .pipe(takeUntilDestroyed(this._destroyRef))
+      .subscribe(() => this.refreshSmoothingWindow());
+
     if (this.enableMinMaxScaleLimit()) {
       this.setValueScaleOptionsControls(this.enableMinMaxScaleLimit().value);
     }
+  }
+
+  private refreshSmoothingWindow(): void {
+    this.smoothingWindow.set(describeSmoothingWindow(this.timeScale().value as TimeScaleFormat, this.period().value));
   }
 
   private setValueScaleOptionsControls(enableMinMaxScaleLimit: boolean) {

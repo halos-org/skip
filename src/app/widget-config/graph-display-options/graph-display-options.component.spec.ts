@@ -31,6 +31,8 @@ describe('GraphDisplayOptionsComponent', () => {
             yScaleMax: new UntypedFormControl({ value: 120, disabled: true }),
             numDecimal: new UntypedFormControl(2),
             color: new UntypedFormControl('contrast'),
+            timeScale: new UntypedFormControl('minute'),
+            period: new UntypedFormControl(10),
             ...overrides,
         };
 
@@ -86,6 +88,29 @@ describe('GraphDisplayOptionsComponent', () => {
         expect(yScaleMax.disabled).toBe(true);
         expect(yScaleSuggestedMin.disabled).toBe(false);
         expect(yScaleSuggestedMax.disabled).toBe(false);
+    });
+
+    it('states the smoothing span the graph actually averages over (#598)', () => {
+        const text = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text()).toContain('2.5 min');
+
+        component.period().setValue(20);
+        fixture.detectChanges();
+        expect(text()).toContain('5 min');
+    });
+
+    it('keeps the series toggles and their reference lines in one card (#598)', () => {
+        const cards = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.flex-item-rounded-card'));
+        const seriesCards = cards.filter(card => (card.textContent ?? '').includes('Show Maximum Line'));
+        expect(seriesCards).toHaveLength(1);
+        expect(seriesCards[0].textContent).toContain('Display Data Points');
+    });
+
+    it('offers the main series as a choice between the live value and the smoothed trend (#598)', () => {
+        const labels = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('mat-radio-button'))
+            .map(button => (button.textContent ?? '').trim());
+        expect(labels).toContain('Live Value');
+        expect(labels).toContain('Smoothed Trend');
     });
 
     it('should enable and disable trackAgainstAverage from checkbox events', () => {

@@ -39,17 +39,41 @@
         name="showAverageData"
         [formControl]="showAverageData()"
         (change)="enableTrackAgainstMovingAverage($event)">
-          Display Moving Average
+          Show Smoothed Trend
       </mat-checkbox>
-      <mat-checkbox class="full-width" style="margin-left: 25px;"
-        name="trackAgainstAverage"
-        [formControl]="trackAgainstAverage()">
-          Track Against Moving Average
-      </mat-checkbox>
+      @if (smoothingWindow()) {
+        <span class="mat-caption graph-option-caption">Moving average over the last {{ smoothingWindow() }}, a quarter of the graph window.</span>
+      }
+      <div class="graph-option-subgroup">
+        <p class="no-margin">Main Series</p>
+        <mat-radio-group class="graph-option-radio-group" aria-label="Select the main series"
+          name="trackAgainstAverage"
+          [formControl]="trackAgainstAverage()">
+          <mat-radio-button class="graph-option-radio-button" [value]="false">Live Value</mat-radio-button>
+          <mat-radio-button class="graph-option-radio-button" [value]="true">Smoothed Trend</mat-radio-button>
+        </mat-radio-group>
+        <span class="mat-caption graph-option-caption">The reading and the bold line follow the main series. The other one becomes the shaded band.</span>
+      </div>
       <mat-checkbox
         name="verticalChart"
         [formControl]="verticalChart()">
         Vertical Data Graph
+      </mat-checkbox>
+      <p class="no-margin" style="margin-top: 10px;">Reference Lines</p>
+      <mat-checkbox class="full-width"
+        name="showDatasetMaximumValueLine"
+        [formControl]="showDatasetMaximumValueLine()">
+          Show Maximum Line
+      </mat-checkbox>
+      <mat-checkbox class="full-width"
+        name="showDatasetAverageValueLine"
+        [formControl]="showDatasetAverageValueLine()">
+          Show Window Average Line
+      </mat-checkbox>
+      <mat-checkbox class="full-width" #minLine
+        name="showDatasetMinimumValueLine"
+        [formControl]="showDatasetMinimumValueLine()">
+          Show Minimum Line
       </mat-checkbox>
     </div>
 
@@ -127,26 +151,6 @@
           name="showTimeScale"
           [formControl]="showTimeScale()">
             Show Scale Ticks
-        </mat-checkbox>
-      </div>
-    </div>
-    <div class="flex-item-rounded-card rounded-card-color">
-      <div>
-        <p class="no-margin">Series</p>
-        <mat-checkbox class="full-width"
-          name="showDatasetMaximumValueLine"
-          [formControl]="showDatasetMaximumValueLine()">
-            Show Maximum Line
-        </mat-checkbox>
-        <mat-checkbox class="full-width"
-          name="showDatasetAverageValueLine"
-          [formControl]="showDatasetAverageValueLine()">
-            Show Average Line
-        </mat-checkbox>
-        <mat-checkbox class="full-width" #minLine
-          name="showDatasetMinimumValueLine"
-          [formControl]="showDatasetMinimumValueLine()">
-            Show Minimum Line
         </mat-checkbox>
       </div>
     </div>
