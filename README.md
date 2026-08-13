@@ -53,6 +53,8 @@ The same instance serves every one of them. Each page reflows to the screen it i
 | --- | --- |
 | ![A portrait Skip page with depth, speed, VMG, waypoint bearing and distance, heel, wind steering, and wind trend graphs](./images/dashboard-sailing.png) | ![The same dashboard on a phone-width screen](./images/dashboard-narrow.png) |
 
+In the phone screenshot, the barometer graph draws its title over its value. That is a defect, not the intended layout — see [issue #595](https://github.com/halos-org/skip/issues/595).
+
 # Design Goals
 
 Skip has two guiding goals: **flawless usability** and **seamless integration with Signal K**.
@@ -142,7 +144,7 @@ Skip displays every value in the units set by your Signal K server's **unit pref
 
 ## Widget Library
 
-Every widget is a visual presentation control with configuration options of its own. The Add Widget dialog groups them into four categories.
+Every widget is a visual presentation control with configuration options of its own. The Add Widget dialog groups them into four categories. A few widgets read data that a Signal K plugin has to publish; those are named below, and the Add Widget dialog lists each widget's dependencies and marks the ones your server is missing.
 
 **Core** — the everyday readouts and controls.
 
@@ -175,20 +177,20 @@ Every widget is a visual presentation control with configuration options of its 
 **Component** — larger, composite displays.
 
 - **Windsteer** – Combines wind, wind sectors, heading, course over ground, and next waypoint into one steering display.
-- **Freeboard-SK** – Adds the Freeboard-SK chart plotter as a widget, with automatic sign-in.
+- **Freeboard-SK** – Adds the Freeboard-SK chart plotter as a widget, with automatic sign-in. Needs Freeboard-SK itself plus the `tracks`, `resources-provider`, and `course-provider` plugins; Signal K server ships all four.
 - **Autopilot Head** – Autopilot controls for Signal K v1 and v2 Autopilot API devices.
 - **Data Graph** – Graphs any numeric path over a configurable window, with actuals, moving and period averages, and min/max.
-- **Hoeken's Anchor Alarm** – Map-first anchor alarm with circle, sector, and polygon watch zones, a scope calculator, and track overlays.
-- **Anchor Watch** – Server-side drift detection with a configurable alarm radius, automatic radius from rode and depth, position history, and GPS bow-offset compensation.
+- **Hoeken's Anchor Alarm** – Map-first anchor alarm with circle, sector, and polygon watch zones, a scope calculator, and track overlays. Needs the `hoekens-anchor-alarm` plugin.
+- **Anchor Watch** – Server-side drift detection with a configurable alarm radius, automatic radius from rode and depth, position history, and GPS bow-offset compensation. Needs the `anchoralarm` plugin.
 - **AIS Radar** – AIS targets with range rings, interactive target details, and quick zoom and filtering.
 - **Embed Webpage Viewer** – Embeds external web apps (Grafana, Node-RED, other Signal K apps) into your dashboard.
 - **Video** – Plays video from a URL with built-in player controls.
 
 **Racing** — start-line and performance tools.
 
-- **Racesteer (BETA)** – Fuses polar performance data with live conditions to guide steering, tacking, and gybing angles.
-- **Racer - Start Line Insight** – Set and adjust the start line ends, and see distance to the line, the favored end, and the bias. Integrates with Freeboard-SK.
-- **Racer - Start Timer** – Racing countdown with OCS status and automatic switching to a target page at the start.
+- **Racesteer** – Fuses polar performance data with live conditions to guide steering, tacking, and gybing angles. Needs the `signalk-polar-performance-plugin` plugin for its polar data. Skip lists it as **Racesteer (BETA)** in the Add Widget dialog.
+- **Racer - Start Line Insight** – Set and adjust the start line ends, and see distance to the line, the favored end, and the bias. Integrates with Freeboard-SK. Needs the `signalk-racer` plugin.
+- **Racer - Start Timer** – Racing countdown with OCS status and automatic switching to a target page at the start. Needs the `signalk-racer` plugin.
 - **Countdown Timer** – Simple start countdown with start, pause, sync, and reset.
 - **Wind Trends** – Live true wind trends on dual axes for direction and speed, with live values and moving averages.
 
