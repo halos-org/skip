@@ -444,7 +444,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "number",
                   "isPathConfigurable": true,
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": "V",
+                  "pathSkUnitsFilter": null,
                   "convertUnitTo": "percent"
                 }
               },
@@ -1467,7 +1467,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "number",
                   "isPathConfigurable": true,
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": "V",
+                  "pathSkUnitsFilter": null,
                   "convertUnitTo": "celsius"
                 }
               },
@@ -1563,7 +1563,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "number",
                   "isPathConfigurable": true,
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": "V",
+                  "pathSkUnitsFilter": null,
                   "convertUnitTo": "celsius"
                 }
               },
@@ -1648,7 +1648,7 @@ export const DefaultDashboard: Dashboard[] = [
                   "pathType": "number",
                   "isPathConfigurable": true,
                   "showPathSkUnitsFilter": true,
-                  "pathSkUnitsFilter": "V",
+                  "pathSkUnitsFilter": null,
                   "convertUnitTo": "percent"
                 }
               },

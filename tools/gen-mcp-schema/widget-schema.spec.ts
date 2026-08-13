@@ -52,6 +52,19 @@ describe('extractWidgetSchemas', () => {
     });
   });
 
+  // A general-purpose gauge that presets a unit filter shows the user a path picker narrowed to that
+  // unit, so every path it is not filtered to disappears from the list (#541).
+  it('leaves a general-purpose gauge unfiltered (simple-linear)', () => {
+    const gaugePath = bySelector('widget-simple-linear')?.pathSlots.find((s) => s.slot === 'gaugePath');
+    expect(gaugePath).toMatchObject({
+      slot: 'gaugePath',
+      defaultPath: null,
+      isPathConfigurable: true,
+      defaultConvertUnitTo: 'unitless',
+      expectedSkUnit: null,
+    });
+  });
+
   it('captures default-bound, required slots (wind-steer heading)', () => {
     const heading = bySelector('widget-wind-steer')?.pathSlots.find((s) => s.slot === 'headingPath');
     expect(heading).toMatchObject({
