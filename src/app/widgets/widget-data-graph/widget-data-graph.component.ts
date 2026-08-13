@@ -58,8 +58,8 @@ const TIME_SCALE_SUFFIX: Partial<Record<TimeScaleFormat, string>> = {
 };
 
 @Component({
-  // The selector doubles as the persisted widget `type` in stored dashboards, so it keeps the
-  // pre-rename "chart" spelling until a config migration renames it (#592).
+  // This string is the widget `type` in saved dashboards, so changing it needs a config
+  // migration (#592).
   selector: 'widget-data-chart',
   templateUrl: './widget-data-graph.component.html',
   styleUrl: './widget-data-graph.component.scss',

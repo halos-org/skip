@@ -38,8 +38,8 @@ interface IDataPointRow {
 }
 
 @Component({
-  // The selector doubles as the persisted widget `type` in stored dashboards, so it keeps the
-  // pre-rename "chart" spelling until a config migration renames it (#592).
+  // This string is the widget `type` in saved dashboards, so changing it needs a config
+  // migration (#592).
   selector: 'widget-windtrends-chart',
   templateUrl: './widget-windtrends-graph.component.html',
   styleUrl: './widget-windtrends-graph.component.scss',

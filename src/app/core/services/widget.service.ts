@@ -490,8 +490,8 @@ export class WidgetService {
       defaultHeight: 6,
       category: 'Component',
       requiredPlugins: [],
-      // Persisted widget `type` in stored dashboards; keeps the pre-rename spelling until a
-      // config migration renames it (#592).
+      // This string is the widget `type` in saved dashboards; changing it needs a config
+      // migration (#592).
       selector: 'widget-data-chart',
       componentClassName: 'WidgetDataGraphComponent'
     },
@@ -623,8 +623,8 @@ export class WidgetService {
       defaultHeight: 8,
       category: 'Racing',
       requiredPlugins: [],
-      // Persisted widget `type` in stored dashboards; keeps the pre-rename spelling until a
-      // config migration renames it (#592).
+      // This string is the widget `type` in saved dashboards; changing it needs a config
+      // migration (#592).
       selector: 'widget-windtrends-chart',
       componentClassName: 'WidgetWindTrendsGraphComponent'
     },
