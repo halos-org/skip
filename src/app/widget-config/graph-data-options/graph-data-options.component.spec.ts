@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UntypedFormControl } from '@angular/forms';
+import { FormControl, UntypedFormControl } from '@angular/forms';
 import { GraphDataOptionsComponent } from './graph-data-options.component';
 import { DataService } from '../../core/services/data.service';
 import { UnitsService } from '../../core/services/units.service';
@@ -13,9 +13,11 @@ describe('GraphDataOptionsComponent', () => {
   let component: GraphDataOptionsComponent;
   let fixture: ComponentFixture<GraphDataOptionsComponent>;
   let pathObject: Partial<ISkPathData> | null;
+  let pathUnits: Record<string, string>;
 
   beforeEach(async () => {
     pathObject = null;
+    pathUnits = {};
     await TestBed.configureTestingModule({
       imports: [GraphDataOptionsComponent],
       providers: [
@@ -24,6 +26,7 @@ describe('GraphDataOptionsComponent', () => {
           useValue: {
             getPathsAndMetaByType: () => [],
             getPathObject: () => pathObject,
+            getPathUnitType: (path: string) => pathUnits[path] ?? null,
           },
         },
         {
@@ -168,6 +171,55 @@ describe('GraphDataOptionsComponent', () => {
       pathControl.setValue('self.propulsion.port.temperature');
       await vi.advanceTimersByTimeAsync(400);
       expect(sourceControl.value).toBe('default');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  const mountWithAngleRange = (path: string) => {
+    const fx = TestBed.createComponent(GraphDataOptionsComponent);
+    const set = fx.componentRef.setInput.bind(fx.componentRef) as (k: string, v: unknown) => void;
+    set('filterSelfPaths', new UntypedFormControl(false));
+    set('datachartPath', new UntypedFormControl(path));
+    set('datachartSource', new UntypedFormControl({ value: '', disabled: true }));
+    set('datachartAngleRange', new FormControl<'signed' | 'direction' | null>(null));
+    set('timeScale', new UntypedFormControl(''));
+    set('period', new UntypedFormControl(''));
+    fx.detectChanges();
+    return fx;
+  };
+
+  const showsAngleRange = (fx: ComponentFixture<GraphDataOptionsComponent>) =>
+    ((fx.nativeElement as HTMLElement).textContent ?? '').includes('Angle display range');
+
+  it('hides the angle range for a path with a non-angular unit (#368)', () => {
+    pathUnits['self.propulsion.port.temperature'] = 'K';
+    expect(showsAngleRange(mountWithAngleRange('self.propulsion.port.temperature'))).toBe(false);
+  });
+
+  it('offers the angle range for a radian path (#368)', () => {
+    pathUnits['self.environment.wind.angleApparent'] = 'rad';
+    expect(showsAngleRange(mountWithAngleRange('self.environment.wind.angleApparent'))).toBe(true);
+  });
+
+  it('offers the angle range while the path publishes no unit (#368)', () => {
+    // An idle instrument publishes no metadata, and the override is then the only way to keep a
+    // graph angular — see resolveAngleDomain.
+    expect(showsAngleRange(mountWithAngleRange('self.environment.wind.angleApparent'))).toBe(true);
+  });
+
+  it('hides the angle range once the path changes to a non-angular one (#368)', async () => {
+    vi.useFakeTimers();
+    try {
+      pathUnits['self.environment.wind.angleApparent'] = 'rad';
+      pathUnits['self.propulsion.port.temperature'] = 'K';
+      const fx = mountWithAngleRange('self.environment.wind.angleApparent');
+      expect(showsAngleRange(fx)).toBe(true);
+
+      fx.componentInstance.datachartPath().setValue('self.propulsion.port.temperature');
+      await vi.advanceTimersByTimeAsync(400);
+      fx.detectChanges();
+      expect(showsAngleRange(fx)).toBe(false);
     } finally {
       vi.useRealTimers();
     }

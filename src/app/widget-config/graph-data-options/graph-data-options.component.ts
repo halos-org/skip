@@ -38,7 +38,21 @@ export class GraphDataOptionsComponent implements OnInit {
   protected pathWarning = signal<string | null>(null);
   /** The path `pathSources` was last built for, so re-deriving needs a real path change. */
   private _sourcesForPath: string | null = null;
+  /** Base unit of the selected path, or null when the server publishes none for it. */
+  private pathUnit = signal<string | null>(null);
   protected maxDuration = computed<number>(() => this.timeScale().value === 'day' ? 365 : 60);
+  /**
+   * The angle range only changes how radian values are read, so it is offered for radian paths and
+   * withheld from every path with another unit. An unknown unit keeps it: metadata is missing while
+   * the producing instrument is idle, and the override is then the only way to keep the graph
+   * angular (see `resolveAngleDomain`).
+   */
+  protected angleRangeControl = computed<FormControl<'signed' | 'direction' | null> | undefined>(() => {
+    const control = this.datachartAngleRange();
+    if (!control) return undefined;
+    const unit = this.pathUnit();
+    return unit === null || unit === 'rad' ? control : undefined;
+  });
 
   ngOnInit(): void {
     this.refreshNumericPaths();
@@ -53,6 +67,7 @@ export class GraphDataOptionsComponent implements OnInit {
         this.filteredNumericPaths.set(this.numericPaths().filter(p => p.path.toLowerCase().includes(term)));
       }
       this.refreshPathWarning(value);
+      this.refreshPathUnit(value);
       // An unoffered path never appears in the autocomplete, so typing is the only way to enter one
       // and (optionSelected) never fires. Re-derive here too, or the previous path's concrete source
       // stays pinned to a path that will never fill it.
@@ -66,6 +81,7 @@ export class GraphDataOptionsComponent implements OnInit {
     this.datachartPath().updateValueAndValidity({ emitEvent: false });
     const currentPath = this.datachartPath()?.value;
     this.refreshPathWarning(currentPath);
+    this.refreshPathUnit(currentPath);
     this.setPathSourcesFor(currentPath);
     this.setInitFormState();
   }
@@ -78,6 +94,10 @@ export class GraphDataOptionsComponent implements OnInit {
     this.pathWarning.set(pathSlotWarning(path, path ? this.data.getPathObject(path) : null, {
       pathType: 'number', supportsPutOnly: false, zonesOnly: false, selfOnly: this.filterSelfPaths().value
     }));
+  }
+
+  private refreshPathUnit(path: string | null): void {
+    this.pathUnit.set(path ? this.data.getPathUnitType(path) : null);
   }
 
   /**
