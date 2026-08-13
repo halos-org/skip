@@ -7,6 +7,7 @@ import { WidgetStreamsDirective } from '../../core/directives/widget-streams.dir
 import { UnitsService } from '../../core/services/units.service';
 import { IPathUpdate } from '../../core/services/data.service';
 import { IWidgetSvcConfig, IPathArray } from '../../core/interfaces/widgets-interface';
+import { States } from '../../core/interfaces/signalk-interfaces';
 
 /**
  * A compass with no heading must still show its rose, with no needle and a '--' readout — a needle
@@ -28,11 +29,12 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
     value: () => number | null | undefined;
     textValue: () => string;
     dataAvailable: () => boolean;
+    currentState: () => string;
     optionsReady: () => boolean;
     gaugeOptions: { needle?: boolean };
   }
 
-  const makeConfig = (path = 'self.navigation.headingTrue'): IWidgetSvcConfig => {
+  const makeConfig = (path: string | null = 'self.navigation.headingTrue'): IWidgetSvcConfig => {
     const dflt = WidgetGaugeNgCompassComponent.DEFAULT_CONFIG;
     const gaugePath = (dflt.paths as IPathArray)['gaugePath'];
     return {
@@ -120,6 +122,32 @@ describe('WidgetGaugeNgCompassComponent no-data state', () => {
     expect(internals.dataAvailable()).toBe(false);
     expect(internals.value()).toBeUndefined();
     expect(internals.textValue()).toBe('--');
+  });
+
+  // Clearing the path entirely drops the subscription, so the heading has to go with it. This is
+  // what pins the clear ahead of the no-path bail-out rather than after it.
+  it('clears the heading when the path is cleared entirely', () => {
+    capturedNext?.(update(142));
+    expect(internals.dataAvailable()).toBe(true);
+
+    options.set(makeConfig(null));
+    fixture.detectChanges();
+
+    expect(internals.dataAvailable()).toBe(false);
+    expect(internals.value()).toBeUndefined();
+    expect(internals.textValue()).toBe('--');
+  });
+
+  // currentState colours the heading text independently of dataAvailable, so without the reset an
+  // alarm-red readout from the old path survives onto the new one.
+  it('clears the zone state on a re-point', () => {
+    capturedNext?.({ ...update(142), state: States.Alarm } as IPathUpdate);
+    expect(internals.currentState()).toBe(States.Alarm);
+
+    options.set(makeConfig('self.navigation.headingMagnetic'));
+    fixture.detectChanges();
+
+    expect(internals.currentState()).toBe(States.Normal);
   });
 
   // The same effect re-runs on a theme change, so an unconditional clear would blink the needle

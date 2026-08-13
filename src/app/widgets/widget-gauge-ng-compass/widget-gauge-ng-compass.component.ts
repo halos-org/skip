@@ -15,7 +15,7 @@ import { States } from '../../core/interfaces/signalk-interfaces';
 import { getColors } from '../../core/utils/themeColors.utils';
 import { SkipResizeObserverDirective } from '../../core/directives/skip-resize-observer.directive';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective, widgetPathSignature } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature, normalizeWidgetPath } from '../../core/directives/widget-streams.directive';
 import { ITheme } from '../../core/services/app-service';
 import { UnitsService } from '../../core/services/units.service';
 
@@ -124,7 +124,12 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
   protected colorStrokeTicks = '';
   private currentState = signal<States>(States.Normal);
   private lastAppliedState: States | null = null;
-  /** Identity of the path the reading state describes; null until the first subscription. */
+  /**
+   * Identity of the path the reading state describes. Three states: `undefined` before the first
+   * effect run (nothing has been shown, so there is nothing to clear), `null` for a config with no
+   * usable path, and the signature otherwise. `null` is a real identity rather than a second
+   * "not yet" — a cleared path must still compare unequal to the path that follows it.
+   */
   private lastPathSignature: string | null | undefined = undefined;
 
   /**
@@ -136,6 +141,11 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
    * runs — leaving the previous path's needle and value on screen, presented as a live reading of
    * the new one. Clearing unconditionally here is wrong for the same reason: this effect re-runs on
    * theme changes, which would blink the needle off and back on at every switch.
+   *
+   * The reading comes back because `observe()` below is passed a new closure on every effect run:
+   * the directive compares callback identity as well as the signature, so it rebuilds and replays
+   * the new path's value into this component. A stable callback reference would make that
+   * early-return instead, and the gauge would stay blank on a live path until the next delta.
    */
   private clearReadingOnRepoint(signature: string | null): void {
     if (this.lastPathSignature !== undefined && this.lastPathSignature !== signature) {
@@ -173,7 +183,10 @@ export class WidgetGaugeNgCompassComponent implements AfterViewInit {
       const signature = widgetPathSignature(pCfg);
       untracked(() => {
         this.clearReadingOnRepoint(signature);
-        const path = pCfg?.path;
+        // Normalized, like the signature and the subscription: the widget-options required check
+        // accepts a padded path, which would subscribe fine and then miss this list, clamping a
+        // negative apparent wind angle to 0 instead of converting it to its 0-360 bearing.
+        const path = normalizeWidgetPath(pCfg?.path);
         if (!signature || !path) return;
         this.streams.observe('gaugePath', pkt => {
         let raw = (pkt?.data?.value as number) ?? null;

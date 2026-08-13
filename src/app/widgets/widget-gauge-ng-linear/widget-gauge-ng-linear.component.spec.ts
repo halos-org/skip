@@ -50,7 +50,7 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
     cardColor: '#111', background: '#000'
   };
 
-  const makeConfig = (subType = 'vertical', path = 'self.navigation.speedOverGround'): IWidgetSvcConfig => {
+  const makeConfig = (subType = 'vertical', path: string | null = 'self.navigation.speedOverGround'): IWidgetSvcConfig => {
     const dflt = WidgetGaugeNgLinearComponent.DEFAULT_CONFIG;
     const gaugePath = (dflt.paths as IPathArray)['gaugePath'];
     return {
@@ -264,6 +264,32 @@ describe('WidgetGaugeNgLinearComponent header row and sizing', () => {
       expect(internals.value()).toBe(31.2);
       // The rendered header, not just the signal: this is what the user reads.
       expect(fixture.nativeElement.querySelector('.gaugeUnit').textContent.trim()).toBe('m');
+    });
+
+    // Clearing the path entirely drops the subscription, so the reading has to go with it. This is
+    // what pins the clear ahead of the no-path bail-out rather than after it.
+    it('clears the reading when the path is cleared entirely', () => {
+      capturedNext?.(update(6.5, 'knots'));
+      expect(internals.dataAvailable()).toBe(true);
+
+      options.set(makeConfig('vertical', null));
+      fixture.detectChanges();
+
+      expect(internals.dataAvailable()).toBe(false);
+      expect(internals.value()).toBeUndefined();
+      expect(internals.textValue()).toBe('--');
+    });
+
+    // currentState drives the value text's colour independently of dataAvailable, so without the
+    // reset an alarm-red readout from the old path survives onto the new one.
+    it('clears the zone state on a re-point', () => {
+      capturedNext?.({ ...update(6.5, 'knots'), state: States.Alarm });
+      expect(internals.currentState()).toBe(States.Alarm);
+
+      options.set(makeConfig('vertical', 'self.environment.depth.belowTransducer'));
+      fixture.detectChanges();
+
+      expect(internals.currentState()).toBe(States.Normal);
     });
 
     it('keeps the reading when the config changes without changing the path', () => {
