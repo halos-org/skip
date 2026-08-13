@@ -30,6 +30,13 @@ function makeStorageMock(userNames: string[] = ['default', 'profileA']) {
   };
 }
 
+/** A promise plus its resolver, for tests that need to hold an async step open and release it. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => { resolve = r; });
+  return { promise, resolve };
+}
+
 function makeSettingsMock(active = 'profileA', persisted = active) {
   return {
     getActiveProfileName: vi.fn(() => active),
@@ -60,6 +67,22 @@ describe('ProfileService', () => {
 
   beforeEach(() => setup());
 
+  /**
+   * Make the server's listing reflect the slots written so far, so a test can assert what the user
+   * would see in the profile list. The default mock returns a fixed listing, under which a created
+   * profile is invisible however the service refreshes.
+   */
+  function listConfigsReflectsWrites(): void {
+    const base = [{ scope: 'user', name: 'default' }, { scope: 'user', name: 'profileA' }];
+    storage.listConfigs.mockImplementation(() =>
+      Promise.resolve([
+        ...base,
+        ...storage.setConfig.mock.calls.map(([scope, name]) => ({ scope, name })),
+        { scope: 'global', name: 'sharedThing' }
+      ])
+    );
+  }
+
   it('should be created', () => {
     expect(service).toBeTruthy();
   });
@@ -84,6 +107,12 @@ describe('ProfileService', () => {
       await expect(service.switchProfile('ghost')).rejects.toThrow(/no longer exists/i);
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
     });
+
+    it('refuses to switch when the queue did not drain, rather than reloading over the pending write', async () => {
+      storage.awaitQueueDrain.mockResolvedValueOnce(false);
+      await expect(service.switchProfile('default')).rejects.toThrow(/could not be saved/i);
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
   });
 
   describe('create', () => {
@@ -106,10 +135,40 @@ describe('ProfileService', () => {
       config.dashboards.forEach((d, i) => expect(d.id).not.toBe(DefaultDashboard[i].id));
     });
 
-    it('does not auto-switch into the created profile', async () => {
+    it('activates the created profile', async () => {
       await service.refresh();
       await service.createProfile('cockpit');
+      expect(settings.setActiveProfile).toHaveBeenCalledWith('cockpit');
+    });
+
+    it('waits for the drain to settle before activating, not merely calling it', async () => {
+      // Code that fires awaitQueueDrain() without awaiting it activates anyway, and both call-order
+      // and a fixed microtask flush would still pass — the flush lands while createProfile is inside
+      // its first refresh(), long before the drain. Gate on the mock being entered, hold the drain
+      // open across a full macrotask, and only then assert nothing has activated.
+      const drain = deferred<boolean>();
+      const entered = deferred<void>();
+      storage.awaitQueueDrain.mockImplementationOnce(() => { entered.resolve(); return drain.promise; });
+      await service.refresh();
+      const pending = service.createProfile('cockpit');
+      await entered.promise;
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(settings.setActiveProfile).not.toHaveBeenCalled();
+      drain.resolve(true);
+      await pending;
+      expect(settings.setActiveProfile).toHaveBeenCalledWith('cockpit');
+    });
+
+    it('does not activate when the queue did not drain — the reload would abandon the pending write', async () => {
+      listConfigsReflectsWrites();
+      storage.awaitQueueDrain.mockResolvedValueOnce(false);
+      await service.refresh();
+      await expect(service.createProfile('cockpit')).rejects.toThrow(/could not be saved/i);
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+      // The slot is written before the drain runs, so the cancellation has to leave the user a
+      // profile they can see and switch to by hand — not a write with nothing on screen to show it.
+      expect(storage.setConfig).toHaveBeenCalledWith('user', 'cockpit', expect.anything());
+      expect(service.profiles()).toContainEqual({ name: 'cockpit', isActive: false });
     });
 
     it.each(['', '   ', 'default', 'profileA', 'bad/name', 'bad.name', 'a~b', 'a::b'])(
@@ -142,6 +201,28 @@ describe('ProfileService', () => {
       await service.refresh();
       await expect(service.duplicateProfile('profileA', 'profileB')).rejects.toThrow(/no usable configuration/i);
       expect(storage.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('activates the copy, not the source', async () => {
+      await service.refresh();
+      await service.duplicateProfile('profileA', 'profileB');
+      expect(settings.setActiveProfile).toHaveBeenCalledWith('profileB');
+    });
+
+    it('surfaces a storage failure and never activates', async () => {
+      await service.refresh();
+      storage.setConfig.mockRejectedValueOnce(new Error('500'));
+      await expect(service.duplicateProfile('profileA', 'profileB')).rejects.toThrow();
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+    });
+
+    it('does not activate the copy when the queue did not drain', async () => {
+      listConfigsReflectsWrites();
+      storage.awaitQueueDrain.mockResolvedValueOnce(false);
+      await service.refresh();
+      await expect(service.duplicateProfile('profileA', 'profileB')).rejects.toThrow(/could not be saved/i);
+      expect(settings.setActiveProfile).not.toHaveBeenCalled();
+      expect(service.profiles()).toContainEqual({ name: 'profileB', isActive: false });
     });
   });
 

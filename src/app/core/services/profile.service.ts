@@ -50,28 +50,48 @@ export class ProfileService {
     );
   }
 
-  /** Make a profile active on this device. Verifies the slot still exists, drains pending writes, then persists + reloads. */
+  /** Make a profile active on this device. Verifies the slot still exists, drains pending writes (rejecting if they do not land), then persists + reloads. */
   public async switchProfile(name: string): Promise<void> {
     return this.exclusive(async () => {
       await this.refresh();
       if (!this.existingNames().includes(name)) {
         throw new Error(`Profile "${name}" no longer exists — it may have been deleted on another device.`);
       }
-      const drained = await this.storage.awaitQueueDrain();
-      if (!drained) {
-        console.warn('[ProfileService] Pending changes to the previous profile may not have been saved before switching.');
-      }
-      this.settings.setActiveProfile(name);
+      await this.activate(name);
     });
   }
 
-  /** Create a new profile from a blank default config. Does not switch. */
+  /**
+   * Drain the write queue, then point the device at `name` (which persists and reloads).
+   * Callers hold the mutation lock already, so this never re-enters `exclusive`.
+   *
+   * The drain is what keeps a save that is still queued against the outgoing profile from being
+   * abandoned by the reload. A freshly written slot needs no existence check — the write that
+   * created it was awaited — so only `switchProfile`, which targets a slot it did not write,
+   * verifies the name first.
+   *
+   * A drain that reports failure (a patch failed, or the wait timed out) cancels the switch rather
+   * than reloading over the pending write. The loss is silent and unrecoverable otherwise: the
+   * reload discards the queue, and the user sees the new profile with no sign that the last edits
+   * to the old one never landed. `deleteProfile` already treats the same signal as an error. A
+   * created slot survives the cancellation as an inactive profile, which the refreshed list shows.
+   */
+  private async activate(name: string): Promise<void> {
+    const drained = await this.storage.awaitQueueDrain();
+    if (!drained) {
+      throw new Error('Pending changes to the current profile could not be saved, so the switch was cancelled. Retry once the connection recovers.');
+    }
+    this.settings.setActiveProfile(name);
+  }
+
+  /** Create a new profile from a blank default config, then switch onto it (which reloads). */
   public async createProfile(name: string): Promise<void> {
     return this.exclusive(async () => {
       await this.refresh();
       const normalized = this.validateNewName(name);
       await this.storage.setConfig(PROFILE_SCOPE, normalized, buildDefaultConfig());
       await this.refresh();
+      await this.activate(normalized);
     });
   }
 
@@ -97,7 +117,7 @@ export class ProfileService {
     });
   }
 
-  /** Copy an existing profile's config under a new name. */
+  /** Copy an existing profile's config under a new name, then switch onto the copy (which reloads). */
   public async duplicateProfile(sourceName: string, newName: string): Promise<void> {
     return this.exclusive(async () => {
       await this.refresh();
@@ -108,6 +128,7 @@ export class ProfileService {
       }
       await this.storage.setConfig(PROFILE_SCOPE, normalized, sourceConfig);
       await this.refresh();
+      await this.activate(normalized);
     });
   }
 

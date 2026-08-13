@@ -140,6 +140,22 @@ describe('SettingsConfigComponent', () => {
     expect(data.description).toMatch(/shipped with this version/i);
   });
 
+  it('warns that creating a profile switches onto it and reloads', () => {
+    component['createProfile']();
+    const [data] = dialogMock.openNameDialog.mock.calls.at(-1) as [{ description?: string }];
+    expect(data.description).toMatch(/switches to it/i);
+    expect(data.description).toMatch(/reloads/i);
+  });
+
+  it('warns that duplicating switches onto the copy and reloads, naming the untouched source', () => {
+    component['duplicateProfile']('cockpit');
+    const [data] = dialogMock.openNameDialog.mock.calls.at(-1) as [{ description?: string }];
+    expect(data.description).toMatch(/"cockpit"/);
+    expect(data.description).toMatch(/left untouched/i);
+    expect(data.description).toMatch(/switches to the copy/i);
+    expect(data.description).toMatch(/reloads/i);
+  });
+
   it('offers no such description when renaming, which starts from nothing', () => {
     component['renameProfile']('cockpit');
     const [data] = dialogMock.openNameDialog.mock.calls.at(-1) as [{ description?: string }];
