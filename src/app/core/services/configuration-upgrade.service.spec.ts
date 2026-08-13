@@ -171,7 +171,7 @@ describe('ConfigurationUpgradeService', () => {
         const widgetCfg = written.dashboards[0].configuration[0].input.widgetProperties.config;
         expect('datasetUUID' in widgetCfg).toBe(false);
         expect('chartEngine' in widgetCfg).toBe(false);
-        // Genuine chart inputs survive.
+        // Genuine graph inputs survive.
         expect(widgetCfg.datachartPath).toBe('self.foo');
     });
 

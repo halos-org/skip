@@ -3,7 +3,7 @@ import { DefaultDashboard } from './config.blank.dashboard';
 import { WidgetPositionComponent } from '../app/widgets/widget-position/widget-position.component';
 import { WidgetWindComponent } from '../app/widgets/widget-windsteer/widget-windsteer.component';
 import { WidgetRacesteerComponent } from '../app/widgets/widget-racesteer/widget-racesteer.component';
-import { WidgetWindTrendsChartComponent } from '../app/widgets/widget-windtrends-chart/widget-windtrends-chart.component';
+import { WidgetWindTrendsGraphComponent } from '../app/widgets/widget-windtrends-graph/widget-windtrends-graph.component';
 import { WidgetAutopilotComponent } from '../app/widgets/widget-autopilot/widget-autopilot.component';
 import { WidgetHorizonComponent } from '../app/widgets/widget-horizon/widget-horizon.component';
 import { WidgetHeelGaugeComponent } from '../app/widgets/widget-heel-gauge/widget-heel-gauge.component';
@@ -183,7 +183,7 @@ describe('wind-family path config shape', () => {
     { type: 'widget-racesteer', config: WidgetRacesteerComponent.DEFAULT_CONFIG,
       choice: ['headingPath', 'trueWindAngle', 'courseOverGround'],
       fixed: ['appWindAngle', 'appWindSpeed', 'trueWindSpeed', 'nextWaypointBearing', 'set', 'drift'] },
-    { type: 'widget-windtrends-chart', config: WidgetWindTrendsChartComponent.DEFAULT_CONFIG,
+    { type: 'widget-windtrends-chart', config: WidgetWindTrendsGraphComponent.DEFAULT_CONFIG,
       choice: ['trueWindDirection'],
       fixed: ['trueWindSpeed'] },
   ];

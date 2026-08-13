@@ -1,0 +1,14 @@
+@if (hasPath()) {
+  <canvas #widgetDataGraph style="z-index: inherit;"></canvas>
+  @if (historyUnavailable()) {
+    <div class="empty-state history-unavailable">
+      <p>History data unavailable</p>
+      <p class="hint">A Signal K history provider is required for trend graphs.</p>
+    </div>
+  }
+} @else {
+  <div class="empty-state">
+    <p>Ready to configure</p>
+    <p class="hint">In edit mode, tap to configure</p>
+  </div>
+}

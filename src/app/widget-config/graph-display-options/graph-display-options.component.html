@@ -1,0 +1,155 @@
+<div class="tab-content">
+
+  <div class="graph-flex-container">
+    <mat-form-field class="full-width">
+      <mat-label>Color</mat-label>
+      <mat-select
+        placeholder="Select Color..."
+        name="color"
+        [formControl]="color()"
+        required>
+        @for(color of colors; track $index) {
+          <mat-option value='{{color.value}}'>{{color.label}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="graph-flex-container">
+
+    <div class="flex-item-rounded-card rounded-card-color">
+      <p>Series</p>
+      <mat-form-field style="margin-left: 10px;">
+        <mat-label>Value Decimal Places</mat-label>
+        <input matInput type="number"
+          min="0" max="5"
+          placeholder="Enter or select number..."
+          name="numDecimal"
+          [formControl]="numDecimal()"
+          required>
+      </mat-form-field>
+
+
+      <mat-checkbox class="full-width" style="margin-top: 10px;"
+        name="showDataPoints"
+        [formControl]="showDataPoints()">
+          Display Data Points
+      </mat-checkbox>
+      <mat-checkbox class="full-width"
+        name="showAverageData"
+        [formControl]="showAverageData()"
+        (change)="enableTrackAgainstMovingAverage($event)">
+          Display Moving Average
+      </mat-checkbox>
+      <mat-checkbox class="full-width" style="margin-left: 25px;"
+        name="trackAgainstAverage"
+        [formControl]="trackAgainstAverage()">
+          Track Against Moving Average
+      </mat-checkbox>
+      <mat-checkbox
+        name="verticalChart"
+        [formControl]="verticalChart()">
+        Vertical Data Graph
+      </mat-checkbox>
+    </div>
+
+    <div class="flex-item-rounded-card rounded-card-color">
+      <div>
+        <p class="no-margin">Data Scale</p>
+        <span class="mat-caption">(Default node is automatic scale)</span>
+
+        <mat-radio-group class="graph-option-radio-group" aria-label="Select an option"
+          name="enableMinMaxScaleLimit"
+          [formControl]="enableMinMaxScaleLimit()">
+          <mat-radio-button class="graph-option-radio-button"
+          (change)="setScaleControls($event)"
+          [value]="false">Auto Scale</mat-radio-button>
+
+          <div class="graph-option-radio-button-config">
+            <mat-form-field class="graph-option-radio-button-config-form-field">
+              <mat-label>Suggested Min</mat-label>
+              <input matInput type="number"
+                name="yScaleSuggestedMin"
+                [formControl]="yScaleSuggestedMin()">
+            </mat-form-field>
+
+            <mat-form-field class="graph-option-radio-button-config-form-field">
+              <mat-label>Suggested Max</mat-label>
+              <input matInput type="number"
+                name="yScaleSuggestedMax"
+                [formControl]="yScaleSuggestedMax()">
+            </mat-form-field>
+          </div>
+
+          <mat-radio-button class="graph-option-radio-button"
+            (change)="setScaleControls($event)"
+            [value]="true">
+              Fixed Scale
+          </mat-radio-button>
+
+          <div class="graph-option-radio-button-config">
+            <div class="graph-option-radio-button-config-item">
+              <mat-form-field class="graph-option-radio-button-config-form-field">
+                <mat-label>Min</mat-label>
+                <input matInput type="number"
+                  name="yScaleMin"
+                  [formControl]="yScaleMin()"
+                  required>
+              </mat-form-field>
+            </div>
+            <div class="graph-option-radio-button-config-item">
+              <mat-form-field class="graph-option-radio-button-config-form-field">
+                <mat-label>Max</mat-label>
+                <input matInput type="number"
+                  name="yScaleMax"
+                  [formControl]="yScaleMax()"
+                  required>
+              </mat-form-field>
+            </div>
+          </div>
+        </mat-radio-group>
+        <mat-checkbox class="full-width"
+          name="showYScale"
+          [formControl]="showYScale()">
+            Show Scale Ticks
+        </mat-checkbox>
+        <mat-checkbox
+          name="inverseYAxis"
+          [formControl]="inverseYAxis()">
+          Inverse Scale
+        </mat-checkbox>
+      </div>
+    </div>
+    <div class="flex-item-rounded-card rounded-card-color">
+      <div>
+        <p class="no-margin">Time Scale</p>
+        <mat-checkbox class="full-width"
+          name="showTimeScale"
+          [formControl]="showTimeScale()">
+            Show Scale Ticks
+        </mat-checkbox>
+      </div>
+    </div>
+    <div class="flex-item-rounded-card rounded-card-color">
+      <div>
+        <p class="no-margin">Series</p>
+        <mat-checkbox class="full-width"
+          name="showDatasetMaximumValueLine"
+          [formControl]="showDatasetMaximumValueLine()">
+            Show Maximum Line
+        </mat-checkbox>
+        <mat-checkbox class="full-width"
+          name="showDatasetAverageValueLine"
+          [formControl]="showDatasetAverageValueLine()">
+            Show Average Line
+        </mat-checkbox>
+        <mat-checkbox class="full-width" #minLine
+          name="showDatasetMinimumValueLine"
+          [formControl]="showDatasetMinimumValueLine()">
+            Show Minimum Line
+        </mat-checkbox>
+      </div>
+    </div>
+  </div>
+
+</div>

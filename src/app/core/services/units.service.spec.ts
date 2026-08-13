@@ -39,7 +39,7 @@ describe('UnitsService', () => {
     });
 
     it('renders no symbol for the Unitless measures, so no gauge prints the word "unitless"', () => {
-      // The steel gauge, the linear and radial gauges, the data chart title and the history dialog's
+      // The steel gauge, the linear and radial gauges, the data graph title and the history dialog's
       // axis all label themselves from this seam with a resolved measure, which is 'unitless' whenever
       // the server states no preference for the path (#536).
       const service = setup();

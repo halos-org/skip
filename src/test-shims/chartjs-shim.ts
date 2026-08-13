@@ -6,8 +6,8 @@
  * canvas, so a chart built against the environment's canvas stub ends up with a falsy `ctx` and
  * silently drops everything a component feeds it. Specs used to guard against that with a per-file
  * `vi.mock('chart.js')`, which only works if that file is the first in its worker to pull the module
- * in. `widget-numeric` reaches chart.js through `MinichartComponent` without mocking it, so whenever
- * that spec loaded first the real library won and minichart's own mock arrived too late — an
+ * in. `widget-numeric` reaches chart.js through `MinigraphComponent` without mocking it, so whenever
+ * that spec loaded first the real library won and minigraph's own mock arrived too late — an
  * order-dependent failure that looked like a flake (#544).
  *
  * Aliasing removes the race: every spec gets this module, whoever loads it first.

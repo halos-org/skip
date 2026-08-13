@@ -271,7 +271,7 @@ export interface IWidgetSvcConfig {
   numDecimal?: number;
   /** Used by multiple Widget: number of fixed Integer places to display */
   numInt?: number;
-  /** Display the mini chart or not flag */
+  /** Display the mini graph or not flag */
   showMiniChart?: boolean;
 
   /** The widget's path configuration property used for Observable setup. This property can be either contain an object with one key:string per path with it's value as a IWidgetPath object, or an Array of IWidgetPaths. Array is used by multi-control widgets where key:strings Objects are not appropriate. The Key:string Object should be used for typical widgets. */
@@ -410,57 +410,57 @@ export interface IWidgetSvcConfig {
   /** Used to select a group for the convertUnitTo conversion. */
   convertUnitToGroup?: string;
 
-  /** Datachart widget Dataset option: Path for the dataset */
+  /** Data-graph widget option: Path for the series */
   datachartPath?: string | null,
-  /** Datachart widget Dataset option: Source for the dataset */
+  /** Data-graph widget option: Source for the series */
   datachartSource?: string | null,
-  /** Datachart widget option: how radian angles are displayed - 'signed' (-180..180) or 'direction' (0..360). Null/undefined uses the path default. */
+  /** Data-graph widget option: how radian angles are displayed - 'signed' (-180..180) or 'direction' (0..360). Null/undefined uses the path default. */
   datachartAngleRange?: 'signed' | 'direction' | null,
-  /** Specifies which average data points property the chart dataset will be built with. Values can be: avg, sma, ema, ema */
+  /** Specifies which average data points property the graph series will be built with. Values can be: avg, sma, ema, ema */
   datasetAverageArray?: string;
-  /** Display chart dataset as data points */
+  /** Display graph series as data points */
   showDataPoints?: boolean;
-  /** Used by datachart & windtrend chart Widget to set datapoint configuration */
+  /** Used by the data-graph & wind-trends graph Widget to set datapoint configuration */
   timeScale?: string;
-  /** Used by datachart & windtrend chart Widget to set period configuration */
+  /** Used by the data-graph & wind-trends graph Widget to set period configuration */
   period?: number;
-  /** Specifies if the chart should track against the average dataset instead of the value (default setting) */
+  /** Specifies if the graph should track against the average series instead of the value (default setting) */
   trackAgainstAverage?: boolean;
-  /** Specifies which average data points property (1=avg, 2=ema or 3=dema) the chart dataset will be built with */
+  /** Specifies which average data points property (1=avg, 2=ema or 3=dema) the graph series will be built with */
   showAverageData?: boolean;
-  /** Display chart dataset minimum value line */
+  /** Display graph series minimum value line */
   showDatasetMinimumValueLine?: boolean;
-  /** Display chart dataset maximum value line */
+  /** Display graph series maximum value line */
   showDatasetMaximumValueLine?: boolean;
-  /** Display chart dataset average value line */
+  /** Display graph series average value line */
   showDatasetAverageValueLine?: boolean;
-  /** Display chart dataset angle average value line */
+  /** Display graph series angle average value line */
   showDatasetAngleAverageValueLine?: boolean;
   /** Used by historical data Widget */
   animateGraph?: boolean;
-  /** Display chart time (x axis) scale */
+  /** Display graph time (x axis) scale */
   showTimeScale?: boolean;
-  /** Display chart y scale */
+  /** Display graph y scale */
   showYScale?: boolean;
-  /** Chart y scale suggested minimum. Scale will extend beyond this number automatically if values are below */
+  /** Graph y scale suggested minimum. Scale will extend beyond this number automatically if values are below */
   yScaleSuggestedMin?: number;
-  /** Chart y scale suggested maximum. Scale will extend beyond this number automatically if values are above */
+  /** Graph y scale suggested maximum. Scale will extend beyond this number automatically if values are above */
   yScaleSuggestedMax?: number;
-  /** Chart y scale suggested minimum is zero */
+  /** Graph y scale suggested minimum is zero */
   startScaleAtZero?: boolean;
-  /** Limit chart value axis (y) scale to min and max value */
+  /** Limit graph value axis (y) scale to min and max value */
   enableMinMaxScaleLimit?: boolean;
-  /** Chart y scale minimum */
+  /** Graph y scale minimum */
   yScaleMin?: number;
-  /** Chart y scale maximum */
+  /** Graph y scale maximum */
   yScaleMax?: number;
-  /** Inverse Chart Y axis */
+  /** Inverse graph Y axis */
   inverseYAxis?: boolean;
-  /** Chart data flow direction. True = vertical (top to bottom), False = horizontal (left to right) */
+  /** Graph data flow direction. True = vertical (top to bottom), False = horizontal (left to right) */
   verticalChart?: boolean;
-  /** Chart scale minimum value */
+  /** Graph scale minimum value */
   minValue?: number;
-  /** Chart scale maximum value */
+  /** Graph scale maximum value */
   maxValue?: number;
 
  /** Used by IFrame widget: URL lo load in the iframe */

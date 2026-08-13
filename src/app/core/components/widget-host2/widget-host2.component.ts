@@ -366,7 +366,7 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   }
 
   /**
-   * Long-press on a locked dashboard opens the widget's history chart directly.
+   * Long-press on a locked dashboard opens the widget's history graph directly.
    * Gating (locked-only + history eligibility) lives in the internal opener, so
    * a long-press on a non-eligible widget is a silent no-op.
    */

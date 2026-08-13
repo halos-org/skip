@@ -47,7 +47,7 @@ describe('WidgetHost2Component', () => {
             resolveSeriesForWidget: vi.fn().mockReturnValue([
                 {
                     seriesId: 'widget-1:auto:navigation-speedthroughwater:default',
-                    datasetUuid: 'widget-1:navigation-speedthroughwater:default',
+                    seriesUuid: 'widget-1:navigation-speedthroughwater:default',
                     ownerWidgetUuid: 'widget-1',
                     ownerWidgetSelector: 'widget-numeric',
                     path: 'navigation.speedThroughWater',
@@ -226,7 +226,7 @@ describe('WidgetHost2Component', () => {
         historySyncMock.resolveSeriesForWidget.mockReturnValue([
             {
                 seriesId: 'widget-1:auto:navigation-speedthroughwater:default',
-                datasetUuid: 'widget-1:navigation-speedthroughwater:default',
+                seriesUuid: 'widget-1:navigation-speedthroughwater:default',
                 ownerWidgetUuid: 'widget-1',
                 ownerWidgetSelector: 'widget-numeric',
                 path: 'navigation.speedThroughWater',
@@ -252,7 +252,7 @@ describe('WidgetHost2Component', () => {
         const templateSeries = [
             {
                 seriesId: 'widget-1:bms-template',
-                datasetUuid: 'widget-1:bms-template',
+                seriesUuid: 'widget-1:bms-template',
                 ownerWidgetUuid: 'widget-1',
                 ownerWidgetSelector: 'widget-bms',
                 path: 'self.electrical.batteries.*',
@@ -288,7 +288,7 @@ describe('WidgetHost2Component', () => {
         const templateSeries = [
             {
                 seriesId: 'widget-1:solar-template',
-                datasetUuid: 'widget-1:solar-template',
+                seriesUuid: 'widget-1:solar-template',
                 ownerWidgetUuid: 'widget-1',
                 ownerWidgetSelector: 'widget-solar-charger',
                 path: 'self.electrical.solar.*',

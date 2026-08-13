@@ -118,7 +118,7 @@ export class WidgetService {
   private readonly _componentTypeMap: Record<string, () => Promise<Type<unknown>>> = {
     WidgetNumericComponent: () => import('../../widgets/widget-numeric/widget-numeric.component').then(m => m.WidgetNumericComponent),
     WidgetTextComponent: () => import('../../widgets/widget-text/widget-text.component').then(m => m.WidgetTextComponent),
-    WidgetWindTrendsChartComponent: () => import('../../widgets/widget-windtrends-chart/widget-windtrends-chart.component').then(m => m.WidgetWindTrendsChartComponent),
+    WidgetWindTrendsGraphComponent: () => import('../../widgets/widget-windtrends-graph/widget-windtrends-graph.component').then(m => m.WidgetWindTrendsGraphComponent),
     WidgetWindComponent: () => import('../../widgets/widget-windsteer/widget-windsteer.component').then(m => m.WidgetWindComponent),
     WidgetSliderComponent: () => import('../../widgets/widget-slider/widget-slider.component').then(m => m.WidgetSliderComponent),
     WidgetSimpleLinearComponent: () => import('../../widgets/widget-simple-linear/widget-simple-linear.component').then(m => m.WidgetSimpleLinearComponent),
@@ -140,7 +140,7 @@ export class WidgetService {
     WidgetHoekensAnchorAlarmComponent: () => import('../../widgets/widget-hoekens-anchor-alarm/widget-hoekens-anchor-alarm.component').then(m => m.WidgetHoekensAnchorAlarmComponent),
     WidgetAnchorAlarmComponent: () => import('../../widgets/widget-anchor-alarm/widget-anchor-alarm.component').then(m => m.WidgetAnchorAlarmComponent),
     WidgetDatetimeComponent: () => import('../../widgets/widget-datetime/widget-datetime.component').then(m => m.WidgetDatetimeComponent),
-    WidgetDataChartComponent: () => import('../../widgets/widget-data-chart/widget-data-chart.component').then(m => m.WidgetDataChartComponent),
+    WidgetDataGraphComponent: () => import('../../widgets/widget-data-graph/widget-data-graph.component').then(m => m.WidgetDataGraphComponent),
     WidgetBooleanSwitchComponent: () => import('../../widgets/widget-boolean-switch/widget-boolean-switch.component').then(m => m.WidgetBooleanSwitchComponent),
     WidgetMultiStateSwitchComponent: () => import('../../widgets/widget-multi-state-switch/widget-multi-state-switch.component').then(m => m.WidgetMultiStateSwitchComponent),
     WidgetZonesStatePanelComponent: () => import('../../widgets/widget-zones-state-panel/widget-zones-state-panel.component').then(m => m.WidgetZonesStatePanelComponent),
@@ -156,7 +156,7 @@ export class WidgetService {
   private readonly _widgetDefinition: readonly WidgetDescription[] = [
     {
       name: 'Numeric',
-      description: 'Displays numeric data in a clear and concise format, with options to show minimum and/or maximum recorded values. Includes an optional background mini plot for quick visual trend insights.',
+      description: 'Displays numeric data in a clear and concise format, with options to show minimum and/or maximum recorded values. Includes an optional background mini graph for quick visual trend insights.',
       icon: 'numericWidget',
       minWidth: 1,
       minHeight: 2,
@@ -481,17 +481,19 @@ export class WidgetService {
       componentClassName: 'WidgetAutopilotComponent'
     },
     {
-      name: 'Realtime Data Plot',
-      description: 'Visualizes data on a real-time plot with multiple preconfigured series including actuals, SMA and period overall averages and Min/Max. Requires the Skip Dataset to be configured.',
-      icon: 'datachartWidget',
+      name: 'Data Graph',
+      description: 'Graphs any numeric path over a configurable time window, with preconfigured series including actuals, SMA and period overall averages and Min/Max. Seeds from the Signal K History API when a provider is available.',
+      icon: 'datagraphWidget',
       minWidth: 2,
       minHeight: 3,
       defaultWidth: 6,
       defaultHeight: 6,
       category: 'Component',
       requiredPlugins: [],
+      // Persisted widget `type` in stored dashboards; keeps the pre-rename spelling until a
+      // config migration renames it (#592).
       selector: 'widget-data-chart',
-      componentClassName: 'WidgetDataChartComponent'
+      componentClassName: 'WidgetDataGraphComponent'
     },
     {
       name: "Hoeken's Anchor Alarm",
@@ -613,7 +615,7 @@ export class WidgetService {
     },
     {
       name: 'Wind Trends',
-      description: 'A real-time wind trends graph with dual axes for direction and speed. Displays live values and simple moving averages over the current period’s average.',
+      description: 'A live wind trends graph with dual axes for direction and speed. Displays live values and simple moving averages over the current period’s average.',
       icon: 'windtrendsWidget',
       minWidth: 8,
       minHeight: 6,
@@ -621,8 +623,10 @@ export class WidgetService {
       defaultHeight: 8,
       category: 'Racing',
       requiredPlugins: [],
+      // Persisted widget `type` in stored dashboards; keeps the pre-rename spelling until a
+      // config migration renames it (#592).
       selector: 'widget-windtrends-chart',
-      componentClassName: 'WidgetWindTrendsChartComponent'
+      componentClassName: 'WidgetWindTrendsGraphComponent'
     },
   ];
 

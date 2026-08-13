@@ -9,9 +9,9 @@ describe('angle-domain.util', () => {
   });
 
   it('honors an explicit override when the base unit is unknown (metadata not yet published)', () => {
-    // A history chart commonly views past data while the producing instrument is idle, so
+    // A history graph commonly views past data while the producing instrument is idle, so
     // getPathUnitType returns null; an explicit signed/direction override must still drive circular
-    // stats instead of silently reverting the chart to linear math.
+    // stats instead of silently reverting the graph to linear math.
     expect(resolveAngleDomain('environment.wind.angleApparent', null, 'signed')).toBe('signed');
     expect(resolveAngleDomain('some.plugin.windShift', undefined, 'direction')).toBe('direction');
   });

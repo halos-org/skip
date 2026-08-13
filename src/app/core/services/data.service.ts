@@ -64,7 +64,7 @@ const typeFromUnits = (units: string | undefined): string | undefined => {
 /**
  * Builds an {@link IPathData} whose `timestamp` Date is created lazily and memoized on first
  * access. This runs on the hot path (once per delta per registered path), and the large majority
- * of consumers (numeric gauges, charts, text) only ever read `value` and never touch `timestamp`,
+ * of consumers (numeric gauges, graphs, text) only ever read `value` and never touch `timestamp`,
  * so deferring the `new Date(...)` avoids a short-lived allocation per delta and the GC pressure it
  * causes over long sessions on low-power devices. The public `Date | null` contract is preserved.
  */
@@ -301,7 +301,7 @@ export class DataService implements OnDestroy {
    * Subscribe to a `(path, source)` stream, sharing one registration across co-subscribers and
    * bumping its refCount. Callers must balance every call with an {@link unsubscribePath}.
    *
-   * Churning and lifecycle-scoped consumers (widgets, per-selection rebinds, chart streams) should
+   * Churning and lifecycle-scoped consumers (widgets, per-selection rebinds, graph streams) should
    * prefer {@link acquirePath}, whose idempotent, forgery-proof release closure makes balanced
    * teardown far harder to get wrong than a raw `unsubscribePath(path, source)` call. App-lifetime
    * singletons that subscribe once and never release may call this directly.
