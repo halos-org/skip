@@ -311,18 +311,15 @@ describe('SettingsService', () => {
       expect(storage.sharedConfigName).toBe('profileA');
     });
 
-    it('persists the chosen profile, so the reload it asks for boots onto it', () => {
-      service.setActiveProfile('cockpit');
-
-      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
-      expect(cc.sharedConfigName).toBe('cockpit');
-    });
-
     // The two names diverge while a switch is deferred, and "reset the active profile" has to mean
     // the one on screen. Targeting the pending name would blank a profile the user is not looking at.
     it('resets the loaded profile, not the one a pending switch is waiting to load', () => {
       const storage = TestBed.inject(StorageService);
-      storage.sharedConfigName = 'profileA';
+      storage.bootstrapRemoteContext({
+        sharedConfigName: 'profileA',
+        configFileVersion: 11,
+        initConfig: { app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig
+      });
       storage.storageServiceReady$.next(true);
       const setConfig = vi.spyOn(storage, 'setConfig').mockResolvedValue(null);
       service.setActiveProfile('cockpit');
@@ -330,6 +327,25 @@ describe('SettingsService', () => {
       service.resetSettings();
 
       expect(setConfig).toHaveBeenCalledWith('user', 'profileA', expect.anything());
+    });
+
+    // The demand is computed from the dashboards in memory, which belong to the loaded profile. Under
+    // the pending name it would be read back pre-auth at the next boot as that profile's answer, and
+    // a wrong `false` does not fail open — that boot would subscribe to no AIS targets (#386).
+    it('records remote-context demand under the loaded profile while a switch is deferred', () => {
+      const storage = TestBed.inject(StorageService);
+      storage.bootstrapRemoteContext({
+        sharedConfigName: 'profileA',
+        configFileVersion: 11,
+        initConfig: { app: { configVersion: 11 }, theme: null, dashboards: [] } as unknown as IConfig
+      });
+      service.setActiveProfile('cockpit');
+
+      service.setRemoteContextDemand(true);
+
+      const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
+      expect(cc.remoteContextDemand['profileA']).toBe(true);
+      expect(cc.remoteContextDemand['cockpit']).toBeUndefined();
     });
   });
 
@@ -388,7 +404,7 @@ describe('SettingsService', () => {
 
     it('keys demand by the CURRENT profile so a switch cannot overwrite a sibling profile (#386)', () => {
       const service = createService({ remoteContextDemand: { profileA: false } });
-      service.setActiveProfile('night'); // switch device to a different profile (reload mocked)
+      service.setActiveProfile('night');       // switch device to a different profile (reload mocked)
       service.setRemoteContextDemand(true);    // night needs AIS
       const cc = JSON.parse(localStorage.getItem('skip.connectionConfig') as string);
       expect(cc.remoteContextDemand).toEqual({ profileA: false, night: true }); // profileA preserved

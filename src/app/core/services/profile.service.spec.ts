@@ -198,6 +198,16 @@ describe('ProfileService', () => {
       expect(storage.removeItem).not.toHaveBeenCalled();
     });
 
+    // A switch whose reload was declined leaves the persisted name on a profile that is not loaded,
+    // so the loaded-slot guard above no longer covers it. Deleting it there points the device at a
+    // slot that no longer exists, and the next reload lands on the degraded recovery screen.
+    it('blocks deleting the profile a deferred switch will boot into', async () => {
+      setup(makeStorageMock(['default', 'profileA', 'cockpit']), makeSettingsMock('profileA', 'cockpit'));
+      await service.refresh();
+      await expect(service.deleteProfile('cockpit')).rejects.toThrow(/next reload/i);
+      expect(storage.removeItem).not.toHaveBeenCalled();
+    });
+
     it('blocks deleting the reserved default profile', async () => {
       await service.refresh();
       await expect(service.deleteProfile('default')).rejects.toThrow(/default/i);

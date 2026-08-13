@@ -335,17 +335,13 @@ export class SettingsService {
    * Points this device at a different profile (named config slot) and reloads so the bootstrap
    * loads it. The active profile is per-device: persisted in the always-local connectionConfig.
    *
-   * The storage write path is deliberately NOT repointed here. On a reload that lands, the document
-   * is replaced and the bootstrap sets it from the persisted name, so an assignment here has no
-   * successor to observe it. Every case where it would be observed is a case where the app carries
-   * on with the previous profile's configuration in memory — ReloadService declining a server that
-   * does not answer, a navigation the user cancels, the `__SKIP_TEST__` short-circuit — and there
-   * `patchConfig`, which builds every path from `sharedConfigName`, would write that configuration
-   * into the newly selected profile's slot and replace its dashboards.
+   * The storage write path is deliberately NOT repointed here: the bootstrap alone moves it, so it
+   * always names the configuration that is actually in memory. Repointing it would send every save
+   * made after a reload that did not happen into the newly selected slot, replacing that profile's
+   * dashboards with the ones still on screen.
    *
-   * The persisted name is written regardless, before a navigation that does not return. A switch
-   * that does not reload is therefore deferred rather than lost: the toast's Retry, or any later
-   * reload, boots onto the profile that was asked for.
+   * The persisted name is written regardless, so a switch whose reload does not happen is deferred
+   * rather than lost.
    *
    * @param {string} name Profile (config slot) name to make active on this device.
    */
@@ -431,13 +427,14 @@ export class SettingsService {
     this.saveConnectionConfigToLocalStorage();
   }
 
-  // Remote (AIS/DSC) context subscribe demand (#386), recorded under the ACTIVE profile — callers
-  // (the dashboard save effect) only reach here for the device's own authoritative, non-ephemeral
-  // profile, so this.sharedConfigName is the profile the demand was computed for and matches the key
-  // the next boot reads. Consumed pre-auth at the next boot; the no-op guard avoids churning
-  // localStorage on every unrelated dashboard save.
+  // Remote (AIS/DSC) context subscribe demand (#386), recorded under the LOADED slot — the demand is
+  // computed from the dashboards in memory, which belong to the profile actually loaded, not to a
+  // pending switch or a persisted default. Keying it anywhere else files one profile's answer under
+  // another's name, and the next boot reads it pre-auth to pick subscribe scope: a wrong `false`
+  // does not fail open, so that boot subscribes to no AIS targets. Consumed pre-auth at the next
+  // boot; the no-op guard avoids churning localStorage on every unrelated dashboard save.
   public setRemoteContextDemand(needsRemoteContexts: boolean) {
-    const profile = this.sharedConfigName;
+    const profile = this.getActiveProfileName();
     if (this.remoteContextDemand[profile] === needsRemoteContexts) return;
     this.remoteContextDemand[profile] = needsRemoteContexts;
     this.saveConnectionConfigToLocalStorage();
@@ -506,7 +503,7 @@ export class SettingsService {
     // The slot the session actually loaded, which is what the UI calls the active profile and what
     // the reset copy promises to replace. It parts company with the persisted device default when a
     // profile switch was persisted but its reload declined, and during a `?profile` session.
-    const loadedSlot = this.storage.sharedConfigName || this.sharedConfigName;
+    const loadedSlot = this.getActiveProfileName();
 
     this.storage.setConfig('user', loadedSlot, newDefaultConfig)
       .then(() => {
