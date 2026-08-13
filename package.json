@@ -50,8 +50,6 @@
     "public/**",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md",
-    "CONTRIBUTORS.md",
     "package.json"
   ],
   "scripts": {
