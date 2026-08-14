@@ -71,6 +71,20 @@ describe('GraphDisplayOptionsComponent', () => {
         expect(controls.trackAgainstAverage.disabled).toBe(true);
     });
 
+    it('drops a stored main-series choice that its own smoothing toggle contradicts (#600)', () => {
+        // Otherwise the disabled group reads Smoothed Trend, and switching smoothing back on moves
+        // the widget reading off the live value without the user choosing it.
+        const localFixture = TestBed.createComponent(GraphDisplayOptionsComponent);
+        const controls = applyRequiredInputs(localFixture, {
+            showAverageData: new UntypedFormControl(false),
+            trackAgainstAverage: new UntypedFormControl({ value: true, disabled: false })
+        });
+
+        localFixture.detectChanges();
+
+        expect(controls.trackAgainstAverage.value).toBe(false);
+    });
+
     it('should enable and disable fixed scale controls based on radio selection', () => {
         const yScaleMin = component.yScaleMin();
         const yScaleMax = component.yScaleMax();

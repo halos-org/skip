@@ -57,6 +57,9 @@ export class GraphDisplayOptionsComponent implements OnInit {
   ngOnInit(): void {
     this.colors = this.app.configurableThemeColors;
     if (this.showAverageData() && !this.showAverageData()?.value) {
+      // Reset as well as disable: a stored choice of the smoothed trend, held while nothing smooths,
+      // would otherwise take effect the moment smoothing is switched back on.
+      this.trackAgainstAverage().setValue(false);
       this.trackAgainstAverage().disable();
     }
 
