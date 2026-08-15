@@ -4,6 +4,7 @@ import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatIconModule } from '@angular/material/icon';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { WidgetHostBottomSheetComponent } from '../widget-host-bottom-sheet/widget-host-bottom-sheet.component';
+import { RouterOverlayNavigationService } from '../../services/router-overlay-navigation.service';
 import { ActionMenuItem } from './action-menu-item';
 
 /** Below this width the menu is a bottom drawer; above it, a pop-over at the tap point. */
@@ -28,6 +29,7 @@ export class ActionMenuComponent {
 
   private readonly _breakpoint = inject(BreakpointObserver);
   private readonly _bottomSheet = inject(MatBottomSheet);
+  private readonly _overlayNavigation = inject(RouterOverlayNavigationService);
   private readonly _anchor = viewChild.required<ElementRef<HTMLElement>>('anchor');
   private readonly _trigger = viewChild.required(MatMenuTrigger);
 
@@ -37,11 +39,14 @@ export class ActionMenuComponent {
       // and immediately dismisses it on touch devices (first seen on Linux Firefox, but real mobile
       // browsers do it too — the drawer vanishes the instant it opens). Disable backdrop-close on the
       // phone path; the always-present Cancel row is the exit.
-      this._bottomSheet.open(WidgetHostBottomSheetComponent, {
+      const sheet = this._bottomSheet.open(WidgetHostBottomSheetComponent, {
         data: { items: this.items() },
         disableClose: true,
-      })
-        .afterDismissed()
+      });
+      // A bottom sheet is as blocking as a dialog, and MatBottomSheet publishes no opened stream
+      // for the Back guard to pick it up on its own.
+      this._overlayNavigation.guardOverlay(() => sheet.dismiss(), sheet.afterDismissed());
+      sheet.afterDismissed()
         .subscribe((id?: string) => {
           if (id && id !== 'cancel') this.selected.emit(id);
         });

@@ -23,7 +23,7 @@ import { AuthenticationInterceptor } from './app/core/interceptors/authenticatio
 import { HTTP_INTERCEPTORS, withInterceptorsFromDi, provideHttpClient } from '@angular/common/http';
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { AppOverlayContainer } from './app/core/utils/app-overlay-container';
-import { RouterOverlayNavigationService } from './app/core/services/router-overlay-navigation.service';
+import { OVERLAY_BACK_GUARD_PROVIDERS, RouterOverlayNavigationService } from './app/core/services/router-overlay-navigation.service';
 
 if (environment.production) {
   enableProdMode();
@@ -104,8 +104,9 @@ bootstrapApplication(AppComponent, {
       const appNetInitSvc = inject(AppNetworkInitService);
       return appNetInitSvc.initNetworkServices();
     }),
-    // Ensure overlays (dialogs/bottom sheets) close on route navigation,
-    // including standard routerLink clicks from overlay content.
+    // Owns what navigation does to overlays: browser Back closes the topmost one, a real route
+    // change closes them all. The providers hand Material's own closeOnNavigation over to it.
+    ...OVERLAY_BACK_GUARD_PROVIDERS,
     provideAppInitializer(() => {
       inject(RouterOverlayNavigationService);
     }),

@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppService } from '../../services/app-service';
 import { ChromeVisibilityService, CHROME_HOVER_DWELL_MS } from '../../services/chrome-visibility.service';
@@ -32,7 +32,7 @@ const dashboard = {
   // The edit and page-management controls are hidden in a session that cannot save page changes.
   isReadOnlySession: signal(false),
 };
-const bottomSheet = { open: vi.fn(() => ({ afterDismissed: () => of(undefined) })) };
+const bottomSheet = { open: vi.fn(() => ({ afterDismissed: () => of(undefined), dismiss: vi.fn() })), dismiss: vi.fn() };
 const uiEvent = {
   toggleFullScreen: vi.fn(),
   fullscreenSupported: signal(true),
@@ -41,7 +41,7 @@ const uiEvent = {
 const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn(), appVersion: signal('1.0.0') };
 const settings = { autoNightMode: signal(false) };
 const dialog = { openNotifications: vi.fn() };
-const router = { navigate: vi.fn() };
+const router = { navigate: vi.fn(), events: EMPTY };
 const alarmCount = signal(0);
 const notifications = {
   observerNotificationsInfo: () =>
