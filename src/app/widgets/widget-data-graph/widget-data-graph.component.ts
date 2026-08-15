@@ -133,6 +133,23 @@ export class WidgetDataGraphComponent implements OnDestroy {
   // True when no history provider is available, so the widget shows the
   // "history unavailable" empty state instead of a blank graph (no recorder live-only fallback).
   protected historyUnavailable = signal<boolean>(false);
+  /** The reading shown in the header, converted and unit-suffixed; empty until data arrives. */
+  protected reading = signal<string>('');
+  /**
+   * The widget label carries the graph window ("SOG (30 s)"), which a time-axis title would charge
+   * the graph a whole row to say. Both hide together: a window on its own reads as a stray fragment.
+   */
+  protected headerLabel = computed<string>(() => {
+    const cfg = this.runtime.options();
+    if (!cfg?.showLabel) return '';
+    const suffix = TIME_SCALE_SUFFIX[cfg.timeScale as TimeScaleFormat];
+    // A config still carrying a legacy TimeScaleFormat has no abbreviation, so it gets the bare name.
+    return suffix ? `${cfg.displayName ?? ''} (${cfg.period} ${suffix})` : `${cfg.displayName ?? ''}`;
+  });
+  protected headerColors = computed<{ label: string; reading: string }>(() => {
+    const colors = this.getThemeColors();
+    return { label: colors.chartLabel, reading: colors.chartValue };
+  });
   private datachartPath = computed<string | null>(() => this.runtime.options()?.datachartPath ?? null);
   // Reactive resolved measure: resolvePathMeasure() reads a non-signal meta cache, so it is folded
   // through the path's meta subject here to re-emit when the server's units/displayUnits land late or
@@ -216,6 +233,7 @@ export class WidgetDataGraphComponent implements OnDestroy {
     this.lastAverageValue = NaN;
     this.lastMinimumValue = NaN;
     this.lastMaximumValue = NaN;
+    this.reading.set('');
     this.historyUnavailable.set(false);
 
     // Synthesize the config + cadence the axis/streaming options expect, derived from the widget's
@@ -270,12 +288,6 @@ export class WidgetDataGraphComponent implements OnDestroy {
       textStrokeWidth: 3
     };
     const insideGrid = { display: true, drawTicks: false, color: theme.contrastDimmer };
-    // The graph window rides on the widget label instead of a time-axis title, which would cost the
-    // graph a whole row to say what the label can say in four characters. The axis title rendered
-    // independently of the label toggle, so the subtitle carries the window on its own when the
-    // label is off rather than taking it down with the name.
-    const suffix = TIME_SCALE_SUFFIX[seriesConfig.timeScaleFormat];
-    const windowSuffix = suffix ? ` (${seriesConfig.period} ${suffix})` : '';
 
     if (cfg.verticalChart) {
       this.lineChartOptions.scales = {
@@ -381,33 +393,11 @@ export class WidgetDataGraphComponent implements OnDestroy {
       }
     }
     this.lineChartOptions.plugins = {
-      title: {
-        display: true,
-        align: "end",
-        padding: {
-          top: 3,
-          bottom: 0
-        },
-        text: "",
-        font: {
-          size: 32,
-
-        },
-        color: this.getThemeColors().chartValue
-      },
-      subtitle: {
-        display: cfg.showLabel || !!windowSuffix,
-        align: "start",
-        padding: {
-          top: -35,
-          bottom: 20
-        },
-        text: `  ${cfg.showLabel ? `${cfg.displayName}${windowSuffix}` : windowSuffix.trimStart()}`,
-        font: {
-          size: 22,
-        },
-        color: this.getThemeColors().chartLabel
-      },
+      // The label and the reading are laid out by the template, not by Chart.js: two plugin blocks
+      // overlaid on one row cannot see each other's width, so they collided on any widget too narrow
+      // for both. The template wraps instead.
+      title: { display: false },
+      subtitle: { display: false },
       annotation: {
         annotations: {
           minimumLine: {
@@ -839,10 +829,7 @@ export class WidgetDataGraphComponent implements OnDestroy {
     const trackValue: number = cfg.trackAgainstAverage ? (point.data.sma ?? point.data.value) : point.data.value;
     const convertedTrack = this.unitsService.convertToUnit(measure, trackValue);
     if (convertedTrack !== null && Number.isFinite(convertedTrack)) {
-      const titlePlugin = this.chart.options.plugins?.title;
-      if (titlePlugin) {
-        titlePlugin.text = `${convertedTrack.toFixed(cfg.numDecimal)} ${this.unitsService.getUnitDisplaySymbol(measure)} `;
-      }
+      this.reading.set(`${convertedTrack.toFixed(cfg.numDecimal)} ${this.unitsService.getUnitDisplaySymbol(measure)}`.trim());
     }
 
     // A missing rolling stat (insufficient history yet) converts like the pre-existing code's

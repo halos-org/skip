@@ -1,11 +1,19 @@
 @if (hasPath()) {
-  <canvas #widgetDataGraph style="z-index: inherit;"></canvas>
-  @if (historyUnavailable()) {
-    <div class="empty-state history-unavailable">
-      <p>History data unavailable</p>
-      <p class="hint">A Signal K history provider is required for trend graphs.</p>
-    </div>
-  }
+  <div class="graph-header">
+    @if (headerLabel()) {
+      <span class="graph-header-label" [style.color]="headerColors().label">{{ headerLabel() }}</span>
+    }
+    <span class="graph-header-reading" [style.color]="headerColors().reading">{{ reading() }}</span>
+  </div>
+  <div class="graph-canvas">
+    <canvas #widgetDataGraph style="z-index: inherit;"></canvas>
+    @if (historyUnavailable()) {
+      <div class="empty-state history-unavailable">
+        <p>History data unavailable</p>
+        <p class="hint">A Signal K history provider is required for trend graphs.</p>
+      </div>
+    }
+  </div>
 } @else {
   <div class="empty-state">
     <p>Ready to configure</p>
