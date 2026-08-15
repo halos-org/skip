@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Subject } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { MatBottomSheet } from '@angular/material/bottom-sheet';
+import { MAT_DIALOG_DEFAULT_OPTIONS, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_BOTTOM_SHEET_DEFAULT_OPTIONS, MatBottomSheet } from '@angular/material/bottom-sheet';
 import { Router, NavigationStart } from '@angular/router';
-import { MAT_DIALOG_DEFAULT_OPTIONS } from '@angular/material/dialog';
-import { MAT_BOTTOM_SHEET_DEFAULT_OPTIONS } from '@angular/material/bottom-sheet';
 import { EmbedModeService } from './embed-mode.service';
-import { OVERLAY_BACK_GUARD_PROVIDERS, RouterOverlayNavigationService } from './router-overlay-navigation.service';
+import { OVERLAY_DEFAULT_OPTIONS_PROVIDERS, RouterOverlayNavigationService } from './router-overlay-navigation.service';
 
 interface DialogStub { afterClosed: () => Subject<unknown>; close: () => void }
 
@@ -149,9 +147,36 @@ describe('RouterOverlayNavigationService', () => {
     // Material disposes the overlay from its own location listener, which runs before this service
     // sees the pop: the overlay vanishes, and the guard entry standing behind it unwinds into a
     // second Back that changes the page. Dropping this provider silently restores that.
-    const values = OVERLAY_BACK_GUARD_PROVIDERS.map(p => p as { provide: unknown; useValue: { closeOnNavigation: boolean } });
+    const values = OVERLAY_DEFAULT_OPTIONS_PROVIDERS.map(p => p as { provide: unknown; useValue: Record<string, unknown> });
     expect(values.map(p => p.provide)).toEqual([MAT_DIALOG_DEFAULT_OPTIONS, MAT_BOTTOM_SHEET_DEFAULT_OPTIONS]);
-    expect(values.every(p => p.useValue.closeOnNavigation === false)).toBe(true);
+    expect(values.every(p => p.useValue['closeOnNavigation'] === false)).toBe(true);
+  });
+
+  it('keeps the app-wide dialog styling in the same provider', () => {
+    // A second provider for the token replaces the first rather than merging with it, so these
+    // options have to travel with closeOnNavigation or dialogs silently lose their backdrop.
+    const dialogOptions = (OVERLAY_DEFAULT_OPTIONS_PROVIDERS[0] as { useValue: Record<string, unknown> }).useValue;
+    expect(dialogOptions).toMatchObject({
+      hasBackdrop: true,
+      disableClose: false,
+      autoFocus: 'first-tabbable',
+      delayFocusTrap: true,
+      backdropClass: 'dialogBackdrop'
+    });
+  });
+
+  it('does not unwind guard entries into the route a real navigation is entering (#393)', () => {
+    // closeAll() makes every open overlay report closed. An entry still on the stack would then
+    // release into a history.back() that takes the user off the page they just asked for.
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    create();
+    const dialog = openDialog();
+
+    routerEvents.next(new NavigationStart(1, '/page/2', 'imperative'));
+    openDialogs.pop();
+    dialog.closed.next(undefined);
+
+    expect(backSpy).not.toHaveBeenCalled();
   });
 
   it('dismisses a guarded bottom sheet on Back (#393)', () => {

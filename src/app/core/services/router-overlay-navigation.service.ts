@@ -8,14 +8,28 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EmbedModeService } from './embed-mode.service';
 
 /**
- * Material's `closeOnNavigation` disposes an overlay from inside the CDK's own location listener,
- * which runs before this service sees the pop — the overlay was gone, and the guard entry it stood
- * behind was then unwound into a second Back that changed the page after all. Closing on navigation
- * is this service's job instead: it closes one overlay for a guarded Back and all of them for a real
- * route change.
+ * The app's overlay defaults, in one place because a provider for either token replaces it wholesale
+ * rather than merging — a second `MAT_DIALOG_DEFAULT_OPTIONS` provider silently drops the backdrop
+ * class and focus settings from the first.
+ *
+ * `closeOnNavigation` is off for both because Material implements it by disposing the overlay from
+ * inside the CDK's own location listener, which runs before this service sees the pop: the overlay
+ * was gone, and the guard entry it stood behind was then unwound into a second Back that changed the
+ * page after all. Closing on navigation is this service's job instead — one overlay for a guarded
+ * Back, all of them for a real route change.
  */
-export const OVERLAY_BACK_GUARD_PROVIDERS: Provider[] = [
-  { provide: MAT_DIALOG_DEFAULT_OPTIONS, useValue: { closeOnNavigation: false } },
+export const OVERLAY_DEFAULT_OPTIONS_PROVIDERS: Provider[] = [
+  {
+    provide: MAT_DIALOG_DEFAULT_OPTIONS,
+    useValue: {
+      hasBackdrop: true,
+      disableClose: false,
+      autoFocus: 'first-tabbable',
+      delayFocusTrap: true,
+      backdropClass: 'dialogBackdrop',
+      closeOnNavigation: false
+    }
+  },
   { provide: MAT_BOTTOM_SHEET_DEFAULT_OPTIONS, useValue: { closeOnNavigation: false } }
 ];
 
@@ -64,6 +78,10 @@ export class RouterOverlayNavigationService {
         // separates a Back standing on a guard entry from a real navigation.
         if (this._stack.length > 0 && event.navigationTrigger === 'popstate') return;
         if (this._consumingPop) return;
+        // Drop the entries before closing anything. The route the user asked for is already
+        // committing, and an entry still on the stack when its overlay reports closed would unwind
+        // into a history.back() that takes them off that route again.
+        this._stack.length = 0;
         if (this._dialog.openDialogs.length > 0) {
           this._dialog.closeAll();
         }
