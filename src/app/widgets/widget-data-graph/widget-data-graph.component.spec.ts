@@ -142,10 +142,11 @@ describe('WidgetDataGraphComponent', () => {
     expect(averageLine?.label?.content).toBe('5.0');
   });
 
-  const readTitle = (): string | undefined =>
-    (fixture.componentInstance.lineChartOptions.plugins as unknown as {
-      title?: { text?: string };
-    }).title?.text;
+  const readHeader = (selector: '.graph-header-label' | '.graph-header-reading'): string | null => {
+    const el = (fixture.nativeElement as HTMLElement).querySelector(selector);
+    return el ? (el.textContent ?? '').trim() : null;
+  };
+  const readTitle = (): string | null => readHeader('.graph-header-reading');
 
   it('labels the value from the path-resolved measure, not the stored convertUnitTo', async () => {
     const emissions$ = new Subject<IGraphDatapoint>();
@@ -160,16 +161,11 @@ describe('WidgetDataGraphComponent', () => {
     emissions$.next({ timestamp: 1000, data: { value: 5 } });
 
     expect(resolveSpy).toHaveBeenCalledWith('self.navigation.speedOverGround');
+    fixture.detectChanges();
     const title = readTitle();
     expect(title).toContain('knots');
     expect(title).not.toContain('celsius');
   });
-
-  interface SubtitleState { display?: boolean; text?: string }
-  const readSubtitle = (): SubtitleState | undefined =>
-    (fixture.componentInstance.lineChartOptions.plugins as unknown as {
-      subtitle?: SubtitleState;
-    }).subtitle;
 
   interface AxisState {
     type?: string;
@@ -184,20 +180,36 @@ describe('WidgetDataGraphComponent', () => {
     await setup(makeConfig({ displayName: 'SOG', timeScale: 'second', period: 30, showTimeScale: true }));
 
     // The axis title cost the graph a whole row to say this; the label says it in four characters.
-    // Nothing else carries the window, so the suffix is the only indicator the user has left.
-    expect(readSubtitle()?.text).toContain('SOG (30 s)');
+    expect(readHeader('.graph-header-label')).toBe('SOG (30 s)');
     expect(readAxis('x')?.title?.display ?? false).toBe(false);
   });
 
-  it('keeps the graph window on screen when the widget label is hidden', async () => {
-    // The removed axis title rendered independently of Show Label, so hiding the name must not
-    // take the window with it.
+  it('takes the graph window down with the widget label (#602)', async () => {
+    // A window with no name in front of it reads as a stray fragment, and Show Label is what the
+    // user reached for to get rid of it.
     await setup(makeConfig({ displayName: 'SOG', timeScale: 'minute', period: 10, showLabel: false }));
 
-    const subtitle = readSubtitle();
-    expect(subtitle?.display).toBe(true);
-    expect(subtitle?.text?.trim()).toBe('(10 min)');
-    expect(subtitle?.text).not.toContain('SOG');
+    expect(readHeader('.graph-header-label')).toBeNull();
+  });
+
+  it('lays out the label and the reading as siblings, never overlaid (#602)', async () => {
+    // Two Chart.js plugin blocks forced onto one row could not see each other's width and drew
+    // through each other on a narrow widget. One flex row wraps instead.
+    const emissions$ = new Subject<IGraphDatapoint>();
+    historyMock.getBackfillThenLive.mockReturnValue(emissions$);
+    await setup(makeConfig({ displayName: 'SOG', timeScale: 'second', period: 30, numDecimal: 1 }));
+
+    emissions$.next({ timestamp: 1000, data: { value: 7 } });
+    fixture.detectChanges();
+
+    const header = (fixture.nativeElement as HTMLElement).querySelector('.graph-header');
+    expect(header?.querySelector('.graph-header-label')?.textContent?.trim()).toBe('SOG (30 s)');
+    expect(header?.querySelector('.graph-header-reading')?.textContent?.trim()).toBe('7.0 knots');
+    const plugins = fixture.componentInstance.lineChartOptions.plugins as unknown as {
+      title?: { display?: boolean }; subtitle?: { display?: boolean };
+    };
+    expect(plugins.title?.display).toBe(false);
+    expect(plugins.subtitle?.display).toBe(false);
   });
 
   it('falls back to the bare label for a legacy time scale with no abbreviation', async () => {
@@ -205,7 +217,7 @@ describe('WidgetDataGraphComponent', () => {
     // `?? format` default would render "SOG (30 Last 30 Minutes)" on those.
     await setup(makeConfig({ displayName: 'SOG', timeScale: 'Last 30 Minutes', period: 30 }));
 
-    expect(readSubtitle()?.text?.trim()).toBe('SOG');
+    expect(readHeader('.graph-header-label')).toBe('SOG');
   });
 
   it.each([
