@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveWindowMs,
   deriveDataSourceInfo,
+  describeSmoothingWindow,
   TARGET_POINTS_PER_WINDOW,
   MIN_SAMPLE_TIME_MS,
   SMOOTHING_PERIOD_FACTOR
@@ -69,6 +70,26 @@ describe('graph-window.util', () => {
       expect(info.sampleTime).toBeGreaterThanOrEqual(1);
       expect(info.maxDataPoints).toBeGreaterThanOrEqual(1);
       expect(info.smoothingPeriod).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('describeSmoothingWindow', () => {
+    it('reports a quarter of the display window in the unit that reads best', () => {
+      expect(describeSmoothingWindow('Last Minute', 0)).toBe('15 s');
+      expect(describeSmoothingWindow('minute', 10)).toBe('2.5 min');
+      expect(describeSmoothingWindow('hour', 2)).toBe('30 min');
+      expect(describeSmoothingWindow('hour', 12)).toBe('3 h');
+      expect(describeSmoothingWindow('day', 4)).toBe('1 day');
+      expect(describeSmoothingWindow('day', 10)).toBe('2.5 days');
+    });
+
+    it('stays truthful for a window so short the average spans milliseconds', () => {
+      // 1 s of data at the 100 ms sample floor leaves a 2-point average.
+      expect(describeSmoothingWindow('second', 1)).toBe('200 ms');
+    });
+
+    it('describes nothing when the window is empty', () => {
+      expect(describeSmoothingWindow('minute', 0)).toBe('');
     });
   });
 });

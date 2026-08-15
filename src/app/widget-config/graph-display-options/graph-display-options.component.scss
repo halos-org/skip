@@ -16,6 +16,16 @@
   margin: 0px;
 }
 
+.graph-option-caption {
+  display: block;
+  margin: 2px 0px 6px 0px;
+  color: var(--mat-sys-outline);
+}
+
+.graph-option-subgroup {
+  margin-left: 25px;
+}
+
 .graph-option-radio-group {
   display: flex;
   flex-direction: column;

@@ -47,6 +47,32 @@ export function resolveWindowMs(timeScaleFormat: TimeScaleFormat, period: number
  * window with a floor sampling interval for very small windows. The point count tracks the target
  * (never far above it), so no separate buffer cap is needed.
  */
+/** Largest unit first, so the first unit the span reaches is the one it is reported in. */
+const SMOOTHING_WINDOW_UNITS: readonly { ms: number; one: string; many: string }[] = [
+  { ms: 24 * 60 * 60_000, one: 'day', many: 'days' },
+  { ms: 60 * 60_000, one: 'h', many: 'h' },
+  { ms: 60_000, one: 'min', many: 'min' },
+  { ms: 1_000, one: 's', many: 's' }
+];
+
+/**
+ * How much time the moving average spans, phrased for a settings hint ('2.5 min'). The span is the
+ * smoothing period at the window's own sampling cadence, so it stays true to what the graph plots
+ * rather than restating the 25 % factor. Empty for a window with no length.
+ */
+export function describeSmoothingWindow(timeScaleFormat: TimeScaleFormat, period: number): string {
+  const windowMs = resolveWindowMs(timeScaleFormat, period);
+  if (windowMs <= 0) return '';
+  const info = deriveDataSourceInfo(windowMs);
+  const spanMs = info.smoothingPeriod * info.sampleTime;
+  for (const unit of SMOOTHING_WINDOW_UNITS) {
+    if (spanMs < unit.ms) continue;
+    const value = Math.round((spanMs / unit.ms) * 10) / 10;
+    return `${value} ${value === 1 ? unit.one : unit.many}`;
+  }
+  return `${Math.round(spanMs)} ms`;
+}
+
 export function deriveDataSourceInfo(windowMs: number): IGraphDataSourceInfo {
   const sampleTime = windowMs > 0
     ? Math.max(MIN_SAMPLE_TIME_MS, Math.round(windowMs / TARGET_POINTS_PER_WINDOW))
