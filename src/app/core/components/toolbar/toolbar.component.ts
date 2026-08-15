@@ -13,6 +13,7 @@ import { AppService } from '../../services/app-service';
 import { SettingsService } from '../../services/settings.service';
 import { DialogService } from '../../services/dialog.service';
 import { NotificationsService } from '../../services/notifications.service';
+import { RouterOverlayNavigationService } from '../../services/router-overlay-navigation.service';
 import { PageNavControlComponent } from '../page-nav-control/page-nav-control.component';
 import { PageManagerBottomSheetComponent } from '../page-manager-bottom-sheet/page-manager-bottom-sheet.component';
 
@@ -48,6 +49,7 @@ export class ToolbarComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly notifications = inject(NotificationsService);
   private readonly bottomSheet = inject(MatBottomSheet);
+  private readonly overlayNavigation = inject(RouterOverlayNavigationService);
 
   protected readonly isNightMode = this.app.isNightMode;
   protected readonly autoNightMode = this.settings.autoNightMode;
@@ -134,10 +136,11 @@ export class ToolbarComponent implements OnDestroy {
     // A sheet page op (e.g. deleting a lower page) can reassign the active page without
     // navigating, leaving the URL on a now-stale index; re-sync the route on dismiss so the
     // page dots stay tappable.
-    this.bottomSheet
-      .open(PageManagerBottomSheetComponent)
-      .afterDismissed()
-      .subscribe(() => this.dashboard.navigateToActive());
+    const sheet = this.bottomSheet.open(PageManagerBottomSheetComponent);
+    // A bottom sheet is as blocking as a dialog, and MatBottomSheet publishes no opened stream for
+    // the Back guard to pick it up on its own.
+    this.overlayNavigation.guardOverlay(() => sheet.dismiss(), sheet.afterDismissed());
+    sheet.afterDismissed().subscribe(() => this.dashboard.navigateToActive());
   }
 
   protected openNotifications(): void {

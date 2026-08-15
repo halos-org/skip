@@ -15,7 +15,6 @@ import { SignalKConnectionService } from './app/core/services/signalk-connection
 import { DataService } from './app/core/services/data.service';
 import { AuthenticationService } from './app/core/services/authentication.service';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
-import { MAT_DIALOG_DEFAULT_OPTIONS } from '@angular/material/dialog';
 import { BrowserModule, bootstrapApplication } from '@angular/platform-browser';
 import { AppNetworkInitService } from './app/core/services/app-initNetwork.service';
 import { ConnectionStateMachine } from './app/core/services/connection-state-machine.service';
@@ -23,7 +22,7 @@ import { AuthenticationInterceptor } from './app/core/interceptors/authenticatio
 import { HTTP_INTERCEPTORS, withInterceptorsFromDi, provideHttpClient } from '@angular/common/http';
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { AppOverlayContainer } from './app/core/utils/app-overlay-container';
-import { RouterOverlayNavigationService } from './app/core/services/router-overlay-navigation.service';
+import { OVERLAY_DEFAULT_OPTIONS_PROVIDERS, RouterOverlayNavigationService } from './app/core/services/router-overlay-navigation.service';
 
 if (environment.production) {
   enableProdMode();
@@ -41,17 +40,6 @@ bootstrapApplication(AppComponent, {
       provide: HTTP_INTERCEPTORS,
       useClass: AuthenticationInterceptor,
       multi: true,
-    },
-    // MatDialog App wide default config
-    {
-      provide: MAT_DIALOG_DEFAULT_OPTIONS,
-      useValue: {
-        hasBackdrop: true,
-        disableClose: false,
-        autoFocus: "first-tabbable",
-        delayFocusTrap: true,
-        backdropClass: "dialogBackdrop"
-      },
     },
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
@@ -104,8 +92,9 @@ bootstrapApplication(AppComponent, {
       const appNetInitSvc = inject(AppNetworkInitService);
       return appNetInitSvc.initNetworkServices();
     }),
-    // Ensure overlays (dialogs/bottom sheets) close on route navigation,
-    // including standard routerLink clicks from overlay content.
+    // Overlay defaults live with the service that depends on one of them: it owns what navigation
+    // does to overlays, so browser Back closes the topmost one and a real route change closes all.
+    ...OVERLAY_DEFAULT_OPTIONS_PROVIDERS,
     provideAppInitializer(() => {
       inject(RouterOverlayNavigationService);
     }),

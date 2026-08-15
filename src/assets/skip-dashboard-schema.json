@@ -581,7 +581,7 @@
     "configFileVersion": 11,
     "configVersion": 19,
     "schemaVersion": 1,
-    "skipVersion": "1.5.0"
+    "skipVersion": "1.4.1"
   },
   "widgets": [
     {
