@@ -166,7 +166,9 @@ Every widget is a visual presentation control with configuration options of its 
 - **Compass** – Faceplate or card-style rotating compass with several cardinal indicator options.
 - **Level Gauge** – Dual-scale heel indicator: a ±5° fine level for trim tuning and a ±40° arc for sea state.
 - **Pitch & Roll** – Horizon-style attitude indicator with live pitch and roll degrees.
+- **Sea Horizon** – Marine attitude indicator in a steel case: heel scale with caution and alarm bands, trim ladder, LCD readouts, and optional damping.
 - **Classic Steel** – Traditional steel-look linear and radial gauges with range sizes and zone highlights.
+- **Steel Compass** – Classic steel binnacle compass: the card turns under a fixed pointer, heading on an LCD window.
 - **Battery Monitor** – Battery banks and individual batteries: state of charge, current, voltage, power, temperature, capacity, and time remaining.
 - **Solar Charger** – Live panel output, battery-side metrics, and charger and relay status.
 - **AC/DC Charger** – Charger output and charging state with voltage, current, power, temperature, and stage indicators.

@@ -223,6 +223,20 @@
       </mask>
       <rect width="24" height="24" fill="currentColor" mask="url(#lineMdCompassTwotone0)" />
     </svg>
+    <svg id="steelCompassGauge" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+        <path fill="var(--mat-sys-primary)" fill-opacity="0.4" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z" />
+        <circle cx="12" cy="12" r="5.6" />
+      </g>
+      <g fill="currentColor">
+        <path d="M10.6 3.3H13.4L12 6.3Z" />
+        <g transform="rotate(28 12 12)">
+          <path d="M12 7.6 13.4 11.9 12 11 10.6 11.9Z" />
+          <circle cx="12" cy="16.6" r="0.9" />
+        </g>
+        <circle cx="12" cy="12" r="1.5" />
+      </g>
+    </svg>
     <svg id="steelGauge" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
       <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
         <path fill="var(--mat-sys-primary)" fill-opacity="0.4" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z" />
@@ -265,6 +279,26 @@
         <path d="M7 12h10" />
       </g>
       <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    </svg>
+    <svg id="seaHorizonGauge" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <defs>
+        <clipPath id="seaHorizonGaugeClip">
+          <circle cx="12" cy="12" r="9" />
+        </clipPath>
+      </defs>
+      <g clip-path="url(#seaHorizonGaugeClip)">
+        <circle fill="var(--mat-sys-primary)" cx="12" cy="12" r="9" fill-opacity="0.4" />
+        <!-- Sea, heeled: the waterline runs across a tilted world -->
+        <path fill="currentColor" d="M-2 13.6 26 8.8V24H-2Z" />
+      </g>
+      <!-- Heel scale index and the deck bar reference -->
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+        <path d="M6 6a9 9 0 0 1 12 0" />
+        <path d="M12 3v2.5" />
+        <path d="M6.5 12H9.5" />
+        <path d="M14.5 12h3" />
+      </g>
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" />
     </svg>
     <svg id="embedWidget" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20">
       <path fill="currentColor" d="M17 4H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m-3 6.5L12.5 12l1.5 1.5V15l-3-3l3-3zm1 4.5v-1.5l1.5-1.5l-1.5-1.5V9l3 3z" />

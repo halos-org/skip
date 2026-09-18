@@ -1,0 +1,118 @@
+// The instrument is a physical object: brushed metal, glass and an LCD look the same whatever
+// theme the rest of the dashboard is in, exactly as the steelseries gauges do. The bezel finish and
+// the dial face are configurable, through gauge.faceColor and gauge.backgroundColor.
+//
+// The 20px inset is what the Classic Steel gauge ends up with, so the two dials come out the same
+// diameter in the same tile: that widget nests two `.wrapper` divs — its own and the shared gauge's
+// — and the unscoped `::ng-deep .wrapper { padding: 10px }` rule in its stylesheet applies to both.
+// This instrument paints its bezel to the edge of its viewBox, so without the inset a 300px tile
+// gives 300px here against 260px there. The ResizeObserver reads `contentRect`, so the texture
+// tiles keep scaling with the painted square rather than the padded box.
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.sea-horizon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.horizon-line {
+  stroke: #e6eef1;
+  stroke-width: 2.2;
+}
+
+.ladder line {
+  stroke: #e6eef1;
+}
+
+.ladder-labels text {
+  fill: #e6eef1;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.window-rim {
+  fill: none;
+  stroke: #0a0c0d;
+  stroke-width: 3;
+  opacity: 0.9;
+}
+
+.bands path {
+  opacity: 0.8;
+}
+
+// Paired tick groups: a dark copy offset by a pixel under a bright one reads as engraving without
+// a filter, which would cost a raster pass on every frame on a Pi-class target.
+.ticks-shadow line {
+  stroke: #000;
+  stroke-opacity: 0.5;
+}
+
+// Stroke and fill are bound per element instead: the engraved marks take their ink from the face,
+// the way steelseries' tick labels take theirs from the background's labelColor / symbolColor. A CSS
+// declaration here would beat those presentation attributes, so there is none.
+.numerals text {
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+.limit-index line {
+  stroke: #d8352c;
+  stroke-width: 2.6;
+}
+
+.pointer-shadow {
+  fill: #000;
+  opacity: 0.45;
+}
+
+.pointer-face {
+  fill: #d8352c;
+  stroke: #7a1610;
+  stroke-width: 0.8;
+}
+
+// Deck bar, gunwale ticks and mast stub, in the orange Skip's steel gauges use for markers.
+.reference {
+  line {
+    stroke: #f08a1e;
+  }
+
+  circle {
+    fill: #f08a1e;
+  }
+}
+
+.no-data {
+  circle {
+    fill: #05090b;
+    opacity: 0.66;
+  }
+
+  text {
+    fill: #9aa5a9;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+  }
+}
+
+// LCD digits in steelseries' own STANDARD ink colour.
+.lcd text {
+  fill: rgb(35 42 52);
+  font-weight: 700;
+}

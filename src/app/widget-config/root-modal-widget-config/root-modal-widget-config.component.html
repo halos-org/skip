@@ -685,8 +685,8 @@
                 </ng-container>
               }
               <!-- Steelgauge -->
-              @if (widgetConfig?.gauge?.type === "steel" || widgetConfig?.gauge?.type === 'horizon') {
-                @if (widgetConfig?.gauge?.type !== 'horizon') {
+              @if (widgetConfig?.gauge?.type === "steel" || widgetConfig?.gauge?.type === 'steelCompass' || widgetConfig?.gauge?.type === 'horizon' || widgetConfig?.gauge?.type === 'seaHorizon') {
+                @if (widgetConfig?.gauge?.type === 'steel' || widgetConfig?.gauge?.type === 'steelCompass' || widgetConfig?.gauge?.type === 'seaHorizon') {
                   <mat-form-field formGroupName="gauge">
                     <mat-label>Background Style</mat-label>
                     <mat-select
@@ -731,6 +731,67 @@
                       Show Frame
                     </mat-checkbox>
                   </div>
+                }
+                @if (widgetConfig?.gauge?.type === 'seaHorizon') {
+                  <div formGroupName="gauge">
+                    <mat-checkbox name="invertPitch" formControlName="invertPitch">
+                      Reverse Trim Axis
+                    </mat-checkbox>
+                  </div>
+                  <div formGroupName="gauge">
+                    <mat-checkbox name="invertRoll" formControlName="invertRoll">
+                      Reverse Heel Axis
+                    </mat-checkbox>
+                  </div>
+                  <div formGroupName="gauge">
+                    <mat-checkbox name="noFrameVisible" formControlName="noFrameVisible">
+                      Show Frame
+                    </mat-checkbox>
+                  </div>
+                  <!-- The two angles bound each other: the widget draws caution up to the alarm angle, so
+                       a pair that crosses would store one thing and draw another. Each field's limit
+                       follows the other's live value, and the field being edited is the one that turns
+                       invalid. -->
+                  <mat-form-field formGroupName="gauge">
+                    <mat-label>Caution Heel Angle</mat-label>
+                    <input
+                      type="number"
+                      min="1"
+                      [max]="(formMaster.value.gauge?.heelAlarmAngle ?? 45) - 1"
+                      matInput
+                      placeholder="Heel angle where the scale turns amber..."
+                      name="heelCautionAngle"
+                      formControlName="heelCautionAngle"
+                    />
+                    <span matTextSuffix>°</span>
+                    <mat-error>Must be below the alarm angle</mat-error>
+                  </mat-form-field>
+                  <mat-form-field formGroupName="gauge">
+                    <mat-label>Alarm Heel Angle</mat-label>
+                    <input
+                      type="number"
+                      [min]="(formMaster.value.gauge?.heelCautionAngle ?? 1) + 1"
+                      max="45"
+                      matInput
+                      placeholder="Heel angle of the red limit index..."
+                      name="heelAlarmAngle"
+                      formControlName="heelAlarmAngle"
+                    />
+                    <span matTextSuffix>°</span>
+                    <mat-error>Must be above the caution angle</mat-error>
+                  </mat-form-field>
+                  <mat-form-field formGroupName="gauge">
+                    <mat-label>Damping</mat-label>
+                    <mat-select
+                      placeholder="Select damping..."
+                      formControlName="damping"
+                      name="damping">
+                      <mat-option [value]="0">Off</mat-option>
+                      <mat-option [value]="1">1 second</mat-option>
+                      <mat-option [value]="3">3 seconds</mat-option>
+                      <mat-option [value]="5">5 seconds</mat-option>
+                    </mat-select>
+                  </mat-form-field>
                 }
                 <mat-form-field formGroupName="gauge">
                   <mat-label>Frame Style</mat-label>
@@ -823,6 +884,18 @@
             </paths-options>
           </div>
         </mat-tab>
+      }
+      <!-- Steel compass card -->
+      @if (widgetConfig?.gauge?.type === "steelCompass") {
+      <mat-tab label="Settings" formGroupName="gauge">
+        <div class="display-content tab-content">
+          <p>
+            <mat-checkbox formControlName="degreeScale" name="degreeScale">
+              Print the degree scale on the card
+            </mat-checkbox>
+          </p>
+        </div>
+      </mat-tab>
       }
       <!-- Gauge stuff -->
       @if (widgetConfig?.gauge?.type === "steel") {

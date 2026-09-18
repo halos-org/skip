@@ -1,0 +1,301 @@
+<svg
+  class="sea-horizon"
+  viewBox="0 0 300 300"
+  preserveAspectRatio="xMidYMid meet"
+  role="img"
+  [attr.aria-label]="ariaLabel()"
+>
+  <defs>
+    <!-- Bezel finish. Circle stacks for most finishes, a wedge ring for the brushed ones. -->
+    @for (g of frameGradients(); track g.id) {
+      @if (g.kind === 'linear') {
+        <linearGradient
+          [attr.id]="g.id" gradientUnits="userSpaceOnUse"
+          [attr.x1]="g.x1" [attr.y1]="g.y1" [attr.x2]="g.x2" [attr.y2]="g.y2"
+        >
+          @for (s of g.stops; track $index) {
+            <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+          }
+        </linearGradient>
+      } @else {
+        <radialGradient
+          [attr.id]="g.id" gradientUnits="userSpaceOnUse"
+          [attr.cx]="g.cx" [attr.cy]="g.cy" [attr.r]="g.r"
+        >
+          @for (s of g.stops; track $index) {
+            <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+          }
+        </radialGradient>
+      }
+    }
+    @for (w of frameWedges(); track w.id) {
+      <linearGradient
+        [attr.id]="w.id" gradientUnits="userSpaceOnUse"
+        [attr.x1]="w.x1" [attr.y1]="w.y1" [attr.x2]="w.x2" [attr.y2]="w.y2"
+      >
+        <stop offset="0" [attr.stop-color]="w.c0" />
+        <stop offset="1" [attr.stop-color]="w.c1" />
+      </linearGradient>
+    }
+
+    <!-- Dial face. A gradient, a repeating tile or a conical sweep, depending on the finish. -->
+    @if (backgroundGradient(); as bg) {
+      <linearGradient
+        [attr.id]="bg.id" gradientUnits="userSpaceOnUse"
+        [attr.x1]="bg.x1" [attr.y1]="bg.y1" [attr.x2]="bg.x2" [attr.y2]="bg.y2"
+      >
+        @for (s of bg.stops; track $index) {
+          <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+        }
+      </linearGradient>
+    }
+    @if (backgroundTexture(); as tex) {
+      @for (g of tex.gradients; track g.id) {
+        <linearGradient
+          [attr.id]="g.id" gradientUnits="userSpaceOnUse"
+          [attr.x1]="g.x1" [attr.y1]="g.y1" [attr.x2]="g.x2" [attr.y2]="g.y2"
+        >
+          @for (s of g.stops; track $index) {
+            <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+          }
+        </linearGradient>
+      }
+      <pattern
+        [attr.id]="tex.id" patternUnits="userSpaceOnUse"
+        x="0" y="0" [attr.width]="tex.size" [attr.height]="tex.size"
+        [attr.patternTransform]="texturePatternTransform()"
+      >
+        @for (shape of tex.shapes; track $index) {
+          <path [attr.d]="shape.d" [attr.fill]="shape.fill" />
+        }
+      </pattern>
+    }
+    @for (w of backgroundWedges(); track w.id) {
+      <linearGradient
+        [attr.id]="w.id" gradientUnits="userSpaceOnUse"
+        [attr.x1]="w.x1" [attr.y1]="w.y1" [attr.x2]="w.x2" [attr.y2]="w.y2"
+      >
+        <stop offset="0" [attr.stop-color]="w.c0" />
+        <stop offset="1" [attr.stop-color]="w.c1" />
+      </linearGradient>
+    }
+    <clipPath [attr.id]="ids().face">
+      <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="faceShadowR" />
+    </clipPath>
+
+    <linearGradient [attr.id]="ids().sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2E5E78" />
+      <stop offset="1" stop-color="#53809A" />
+    </linearGradient>
+    <linearGradient [attr.id]="ids().sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12414F" />
+      <stop offset="1" stop-color="#07222C" />
+    </linearGradient>
+
+    <!-- Face shading, from the steel gauges' own background: a rim shadow and a side vignette. -->
+    <radialGradient
+      [attr.id]="ids().shadow" gradientUnits="userSpaceOnUse"
+      [attr.cx]="cx" [attr.cy]="cy" [attr.r]="faceShadowR"
+    >
+      @for (s of faceShadowStops; track $index) {
+        <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+      }
+    </radialGradient>
+    <!-- The vignette runs from x = radius to x = width - radius (124.766 to 175.234 here), not
+         across the face: that is drawBackground.js's own createLinearGradient(radius, 0, width -
+         radius, 0), reproduced as is. With the default pad spread the flanks outside that span
+         sit at the end stops' 25% black, which is exactly the darkened sides the real gauge has. -->
+    <linearGradient
+      [attr.id]="ids().vignette" gradientUnits="userSpaceOnUse"
+      [attr.x1]="faceShadowR" y1="0" [attr.x2]="300 - faceShadowR" y2="0"
+    >
+      @for (s of faceVignetteStops; track $index) {
+        <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+      }
+    </linearGradient>
+
+    <!-- Glass dome across the upper half -->
+    <linearGradient
+      [attr.id]="ids().glass" gradientUnits="userSpaceOnUse"
+      x1="0" [attr.y1]="glassGrad.y1" x2="0" [attr.y2]="glassGrad.y2"
+    >
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.275" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.015" />
+    </linearGradient>
+
+    <linearGradient [attr.id]="ids().lcdBezel" x1="0" y1="0" x2="0" y2="1">
+      @for (s of lcdBezelStops; track $index) {
+        <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+      }
+    </linearGradient>
+    <linearGradient [attr.id]="ids().lcdFace" x1="0" y1="0" x2="0" y2="1">
+      @for (s of lcdFaceStops; track $index) {
+        <stop [attr.offset]="s.o" [attr.stop-color]="s.c" />
+      }
+    </linearGradient>
+
+    <clipPath [attr.id]="ids().window">
+      <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="winR" />
+    </clipPath>
+  </defs>
+
+  <!-- Case -->
+  @if (frameVisible()) {
+    <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="frameR" fill="#848484" stroke="rgba(132,132,132,0.5)" />
+    @for (layer of frameLayers(); track $index) {
+      <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="layer.r" [attr.fill]="layer.fill" />
+    }
+    @for (w of frameWedges(); track w.id) {
+      <path [attr.d]="w.d" [attr.fill]="'url(#' + w.id + ')'" />
+    }
+    <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="frameInnerR" fill="#BFBFBF" />
+    <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="faceR" [attr.fill]="haloColor()" />
+  }
+
+  <!-- The face. steelseries draws its background whether or not the frame is shown, and at the same
+       extent as the shading and glass above — so it follows the same transform they do. -->
+  <g [attr.transform]="overlayTransform()">
+    <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="faceShadowR" [attr.fill]="faceFill()" />
+    @for (w of backgroundWedges(); track w.id) {
+      <path [attr.d]="w.d" [attr.fill]="'url(#' + w.id + ')'" />
+    }
+    @if (turnedScribes().length) {
+      <g [attr.clip-path]="url().face" fill="none" [attr.stroke-width]="scribeStrokeWidth()">
+        @for (scribe of turnedScribes(); track $index) {
+          <circle [attr.cx]="scribe.cx" [attr.cy]="scribe.cy" [attr.r]="scribe.r" [attr.stroke]="scribe.stroke" />
+        }
+      </g>
+    }
+    @if (faceVignette()) {
+      <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="faceShadowR" [attr.fill]="url().vignette" />
+    }
+  </g>
+
+  <g [attr.transform]="dialTransform()">
+    <!-- Horizon window. The world rotates against a boat-fixed dial. -->
+    <g [attr.clip-path]="url().window">
+      <g
+        class="world"
+        [attr.transform]="worldTransform()"
+        [style.transition]="ready() ? motionTransition() : 'none'"
+      >
+        <rect x="-340" y="-520" width="980" height="670" [attr.fill]="url().sky" />
+        <rect x="-340" [attr.y]="cy" width="980" height="660" [attr.fill]="url().sea" />
+        <line x1="-340" [attr.y1]="cy" x2="640" [attr.y2]="cy" class="horizon-line" />
+
+        <g class="ladder">
+          @for (rung of ladderRungs; track $index) {
+            <line
+              [attr.x1]="rung.x1"
+              [attr.y1]="rung.y"
+              [attr.x2]="rung.x2"
+              [attr.y2]="rung.y"
+              [attr.stroke-width]="rung.major ? 1.8 : 1.1"
+              [attr.opacity]="rung.major ? 0.95 : 0.5"
+            />
+          }
+        </g>
+        <g class="ladder-labels">
+          @for (label of ladderLabels; track $index) {
+            <text [attr.x]="label.x" [attr.y]="label.y" [attr.text-anchor]="label.anchor">{{ label.text }}</text>
+          }
+        </g>
+      </g>
+    </g>
+    <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="winR" class="window-rim" />
+
+    <!-- Heel scale: nominal / caution / alarm, then ticks, numerals and the limit index -->
+    <g class="bands">
+      @for (band of heelBands(); track $index) {
+        <path [attr.d]="band.d" [attr.fill]="band.fill" />
+      }
+    </g>
+    <g class="ticks-shadow" transform="translate(0 1)">
+      @for (tick of heelTicks; track $index) {
+        <line
+          [attr.x1]="tick.x1"
+          [attr.y1]="tick.y1"
+          [attr.x2]="tick.x2"
+          [attr.y2]="tick.y2"
+          [attr.stroke-width]="tick.major ? 2.6 : 1.4"
+        />
+      }
+    </g>
+    <g class="ticks">
+      @for (tick of heelTicks; track $index) {
+        <line
+          [attr.x1]="tick.x1"
+          [attr.y1]="tick.y1"
+          [attr.x2]="tick.x2"
+          [attr.y2]="tick.y2"
+          [attr.stroke]="tick.major ? labelColor() : symbolColor()"
+          [attr.stroke-width]="tick.major ? 2.4 : 1.2"
+        />
+      }
+    </g>
+    <g class="numerals">
+      @for (numeral of heelNumerals; track $index) {
+        <text
+          [attr.x]="numeral.x" [attr.y]="numeral.y" [attr.transform]="numeral.transform"
+          [attr.fill]="labelColor()" [attr.stroke]="haloColor()"
+        >{{ numeral.text }}</text>
+      }
+    </g>
+    <g class="limit-index">
+      @for (limit of limitIndexes(); track $index) {
+        <line [attr.x1]="limit.x1" [attr.y1]="limit.y1" [attr.x2]="limit.x2" [attr.y2]="limit.y2" />
+      }
+    </g>
+
+    <!-- Rim pointer: reads the heel scale -->
+    <g
+      class="pointer"
+      [attr.transform]="pointerTransform()"
+      [style.transition]="ready() ? motionTransition() : 'none'"
+    >
+      <path [attr.d]="pointerPath" class="pointer-shadow" transform="translate(0 1.5)" />
+      <path [attr.d]="pointerPath" class="pointer-face" />
+    </g>
+
+    <!-- Fixed boat reference: a deck bar with a mast stub, not an aircraft -->
+    <g class="reference">
+      <line [attr.x1]="cx - 46" [attr.y1]="cy" [attr.x2]="cx - 18" [attr.y2]="cy" stroke-width="3.4" stroke-linecap="round" />
+      <line [attr.x1]="cx + 18" [attr.y1]="cy" [attr.x2]="cx + 46" [attr.y2]="cy" stroke-width="3.4" stroke-linecap="round" />
+      <line [attr.x1]="cx - 46" [attr.y1]="cy" [attr.x2]="cx - 46" [attr.y2]="cy + 8" stroke-width="3.4" />
+      <line [attr.x1]="cx + 46" [attr.y1]="cy" [attr.x2]="cx + 46" [attr.y2]="cy + 8" stroke-width="3.4" />
+      <line [attr.x1]="cx" [attr.y1]="cy - 15" [attr.x2]="cx" [attr.y2]="cy + 3" stroke-width="2.4" />
+      <circle [attr.cx]="cx" [attr.cy]="cy" r="3.2" />
+    </g>
+
+    @if (noData()) {
+      <g class="no-data">
+        <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="winR" />
+        <text [attr.x]="cx" [attr.y]="cy - 22" text-anchor="middle">NO DATA</text>
+      </g>
+    }
+
+    <!-- LCD insets -->
+    <g class="lcd">
+      <rect
+        [attr.x]="lcdHeel.x - 2" [attr.y]="lcdHeel.y - 2"
+        [attr.width]="lcdHeel.w + 4" [attr.height]="lcdHeel.h + 4" rx="2.5" [attr.fill]="url().lcdBezel"
+      />
+      <rect [attr.x]="lcdHeel.x" [attr.y]="lcdHeel.y" [attr.width]="lcdHeel.w" [attr.height]="lcdHeel.h" rx="1.5" [attr.fill]="url().lcdFace" />
+      <text [attr.x]="cx" [attr.y]="lcdHeel.textY" [attr.font-size]="lcdHeel.size" text-anchor="middle">{{ heelText() }}</text>
+
+      <rect
+        [attr.x]="lcdTrim.x - 2" [attr.y]="lcdTrim.y - 2"
+        [attr.width]="lcdTrim.w + 4" [attr.height]="lcdTrim.h + 4" rx="2.5" [attr.fill]="url().lcdBezel"
+      />
+      <rect [attr.x]="lcdTrim.x" [attr.y]="lcdTrim.y" [attr.width]="lcdTrim.w" [attr.height]="lcdTrim.h" rx="1.5" [attr.fill]="url().lcdFace" />
+      <text [attr.x]="cx" [attr.y]="lcdTrim.textY" [attr.font-size]="lcdTrim.size" text-anchor="middle">{{ trimText() }}</text>
+    </g>
+  </g>
+
+  <!-- Face shading and glass sit above the dial, exactly as the steel gauges layer them. They follow
+       the dial's extent, which is the face with the case on and the whole tile with it off. -->
+  <g [attr.transform]="overlayTransform()" pointer-events="none">
+    <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="faceShadowR" [attr.fill]="url().shadow" />
+    <path class="glass" [attr.d]="glassPath" [attr.fill]="url().glass" />
+  </g>
+</svg>

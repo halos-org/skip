@@ -1445,6 +1445,63 @@
     {
       "bindingKind": "paths-record",
       "category": "Gauge",
+      "componentClassName": "WidgetSteelCompassComponent",
+      "defaultConfig": {
+        "dataTimeout": 5,
+        "displayName": "Heading",
+        "enableTimeout": false,
+        "filterSelfPaths": true,
+        "gauge": {
+          "backgroundColor": "carbon",
+          "degreeScale": true,
+          "faceColor": "anthracite",
+          "type": "steelCompass"
+        },
+        "paths": {
+          "gaugePath": {
+            "convertUnitTo": "deg",
+            "description": "Heading",
+            "isPathConfigurable": true,
+            "path": null,
+            "pathSkUnitsFilter": "rad",
+            "pathType": "number",
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": null,
+            "suppressBootstrapNull": true
+          }
+        },
+        "supportAutomaticHistoricalSeries": true,
+        "updateInterval": 500
+      },
+      "defaultHeight": 6,
+      "defaultWidth": 4,
+      "description": "A classic steel binnacle compass: the card turns under a fixed pointer, with the heading shown on an LCD window. Pairs with the Classic Steel gauges.",
+      "icon": "steelCompassGauge",
+      "minHeight": 2,
+      "minWidth": 1,
+      "name": "Steel Compass",
+      "pathSlots": [
+        {
+          "defaultConvertUnitTo": "deg",
+          "defaultPath": null,
+          "description": "Heading",
+          "expectedSkUnit": "rad",
+          "hideFromConfig": false,
+          "isPathConfigurable": true,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "number",
+          "slot": "gaugePath",
+          "source": null
+        }
+      ],
+      "requiredPlugins": [],
+      "selector": "widget-gauge-steel-compass"
+    },
+    {
+      "bindingKind": "paths-record",
+      "category": "Gauge",
       "componentClassName": "WidgetHeelGaugeComponent",
       "defaultConfig": {
         "color": "contrast",
@@ -2613,6 +2670,94 @@
       "pathSlots": [],
       "requiredPlugins": [],
       "selector": "widget-racetimer"
+    },
+    {
+      "bindingKind": "paths-record",
+      "category": "Gauge",
+      "componentClassName": "WidgetSeaHorizonComponent",
+      "defaultConfig": {
+        "dataTimeout": 5,
+        "displayName": "Sea Horizon",
+        "enableTimeout": true,
+        "filterSelfPaths": true,
+        "gauge": {
+          "backgroundColor": "carbon",
+          "damping": 0,
+          "faceColor": "anthracite",
+          "heelAlarmAngle": 30,
+          "heelCautionAngle": 20,
+          "invertPitch": false,
+          "invertRoll": false,
+          "noFrameVisible": true,
+          "type": "seaHorizon"
+        },
+        "numDecimal": 1,
+        "paths": {
+          "gaugePitchPath": {
+            "convertUnitTo": "deg",
+            "description": "Attitude Pitch Data",
+            "isPathConfigurable": false,
+            "path": "self.navigation.attitude",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "rad",
+            "pathType": "number",
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
+          "gaugeRollPath": {
+            "convertUnitTo": "deg",
+            "description": "Attitude Roll Data",
+            "isPathConfigurable": false,
+            "path": "self.navigation.attitude",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "rad",
+            "pathType": "number",
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          }
+        },
+        "supportAutomaticHistoricalSeries": false,
+        "updateInterval": 1000
+      },
+      "defaultHeight": 6,
+      "defaultWidth": 4,
+      "description": "Marine attitude indicator in a classic steel case. Sea instead of earth, a pitch ladder ruled for a hull rather than an aircraft, and a heel scale to 45° with nominal, caution and alarm bands plus a configurable red limit index. Shows heel and trim on an LCD, with optional damping for a noisy sensor in a seaway.",
+      "icon": "seaHorizonGauge",
+      "minHeight": 2,
+      "minWidth": 1,
+      "name": "Sea Horizon",
+      "pathSlots": [
+        {
+          "defaultConvertUnitTo": "deg",
+          "defaultPath": "self.navigation.attitude",
+          "description": "Attitude Pitch Data",
+          "expectedSkUnit": "rad",
+          "hideFromConfig": false,
+          "isPathConfigurable": false,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "number",
+          "slot": "gaugePitchPath",
+          "source": "default"
+        },
+        {
+          "defaultConvertUnitTo": "deg",
+          "defaultPath": "self.navigation.attitude",
+          "description": "Attitude Roll Data",
+          "expectedSkUnit": "rad",
+          "hideFromConfig": false,
+          "isPathConfigurable": false,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "number",
+          "slot": "gaugeRollPath",
+          "source": "default"
+        }
+      ],
+      "requiredPlugins": [],
+      "selector": "widget-sea-horizon"
     },
     {
       "bindingKind": "paths-record",

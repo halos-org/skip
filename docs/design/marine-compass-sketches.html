@@ -1,0 +1,828 @@
+<title>Skip Compass Sketchboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    /* page chrome — light */
+    --ground: #E4E8EA;
+    --surface: #F6F8F9;
+    --surface-sunk: #DCE2E4;
+    --rule: #C2CBCE;
+    --rule-soft: #D6DDDF;
+    --ink: #10181C;
+    --ink-2: #44555C;
+    --ink-3: #6D7E85;
+    --accent: #C31C23;
+    --accent-ink: #FFFFFF;
+    --chip: #E8EDEE;
+    --shadow: 0 1px 2px rgba(16,24,28,.09), 0 8px 24px rgba(16,24,28,.07);
+    --stage: #C8D0D3;
+
+    /* fonts */
+    --f-disp: 'Saira Condensed', 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --f-body: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    --f-mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+
+    --gauge: 268px;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1417;
+      --surface: #161F23;
+      --surface-sunk: #0A1013;
+      --rule: #2A383E;
+      --rule-soft: #1F2C31;
+      --ink: #EAF0F2;
+      --ink-2: #A6B7BD;
+      --ink-3: #7A8C93;
+      --accent: #E23A41;
+      --accent-ink: #12181A;
+      --chip: #1D282D;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+      --stage: #090E10;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1417;
+    --surface: #161F23;
+    --surface-sunk: #0A1013;
+    --rule: #2A383E;
+    --rule-soft: #1F2C31;
+    --ink: #EAF0F2;
+    --ink-2: #A6B7BD;
+    --ink-3: #7A8C93;
+    --accent: #E23A41;
+    --accent-ink: #12181A;
+    --chip: #1D282D;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    --stage: #090E10;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+
+  /* ---------- header ---------- */
+  header.masthead { padding-block: 40px 20px; }
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 12px;
+  }
+  .eyebrow b { color: var(--accent); font-weight: 600; }
+  h1 {
+    font-family: var(--f-disp);
+    font-weight: 700;
+    font-size: clamp(34px, 6.4vw, 58px);
+    line-height: 1.02;
+    letter-spacing: -.005em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .standfirst { max-width: 64ch; color: var(--ink-2); font-size: 16.5px; margin: 0; }
+  .standfirst code {
+    font-family: var(--f-mono); font-size: .88em;
+    background: var(--chip); padding: 1px 5px; border-radius: 3px; color: var(--ink);
+  }
+
+  /* ---------- control bar ---------- */
+  .bench {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 20;
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-block: 1px solid var(--rule);
+    margin-top: 28px;
+  }
+  .bench-in {
+    max-width: 1240px; margin: 0 auto; padding: 12px 20px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px;
+  }
+  .ctl { display: flex; align-items: center; gap: 10px; }
+  .ctl > label, .ctl > .ctl-label {
+    font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3); white-space: nowrap;
+  }
+  .ctl-head { flex: 1 1 320px; min-width: 240px; }
+  input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--accent); height: 22px; }
+  .readout {
+    font-family: var(--f-mono); font-variant-numeric: tabular-nums;
+    font-size: 17px; font-weight: 600; min-width: 62px; text-align: right;
+  }
+  .seg { display: flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-family: var(--f-disp); font-weight: 600; font-size: 14px;
+    letter-spacing: .04em; padding: 5px 13px; border: 0; cursor: pointer;
+    background: var(--surface); color: var(--ink-2);
+    border-right: 1px solid var(--rule);
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+  .swing {
+    font-family: var(--f-disp); font-weight: 600; font-size: 14px; letter-spacing: .05em;
+    padding: 6px 15px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .swing[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .swing .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .55; }
+  .swing[aria-pressed="true"] .dot { opacity: 1; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  button:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* ---------- variant grid ---------- */
+  .grid {
+    display: grid; gap: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(302px, 1fr));
+    padding-block: 30px 8px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .card.chosen { border-color: var(--accent); }
+  .card.built { border-color: var(--accent); }
+  .built-flag {
+    font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    background: var(--accent); color: var(--accent-ink);
+    padding: 2px 8px; border-radius: 3px; align-self: center;
+  }
+  @media (min-width: 960px) {
+    .card[data-key="D"] { grid-column: span 2; }
+    .card[data-key="D"] .stage svg { width: calc(var(--gauge) * 1.22); height: calc(var(--gauge) * 1.22); }
+  }
+  .card.chosen .tag { background: var(--accent); color: var(--accent-ink); }
+  .stage {
+    background: var(--stage);
+    display: grid; place-items: center;
+    padding: 22px 16px;
+    border-bottom: 1px solid var(--rule-soft);
+    background-image: radial-gradient(circle at 50% 42%, rgba(255,255,255,.06), transparent 62%);
+  }
+  .stage svg { width: var(--gauge); height: var(--gauge); max-width: 100%; display: block; }
+  .card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .card-head { display: flex; align-items: baseline; gap: 10px; }
+  .tag {
+    font-family: var(--f-disp); font-weight: 700; font-size: 14px;
+    width: 24px; height: 24px; flex: none; border-radius: 3px;
+    display: grid; place-items: center;
+    background: var(--chip); color: var(--ink-2);
+    transform: translateY(2px);
+  }
+  .card h2 {
+    font-family: var(--f-disp); font-weight: 600; font-size: 24px;
+    letter-spacing: .005em; margin: 0; line-height: 1.1;
+  }
+  .card p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  dl.spec { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 13px; }
+  dl.spec dt {
+    font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3); padding-top: 2px;
+  }
+  dl.spec dd { margin: 0; color: var(--ink); }
+  dl.spec dd code { font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); }
+  .pick {
+    margin-top: auto; align-self: flex-start;
+    font-family: var(--f-disp); font-weight: 600; font-size: 14.5px; letter-spacing: .05em;
+    padding: 7px 18px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--rule); background: transparent; color: var(--ink);
+  }
+  .pick:hover { border-color: var(--ink-3); }
+  .card.chosen .pick {
+    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+  }
+
+  /* ---------- finishes ---------- */
+  section.finishes { padding-block: 42px 10px; border-top: 1px solid var(--rule); margin-top: 34px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 6px; }
+  .sec-head h2 { font-family: var(--f-disp); font-weight: 600; font-size: 28px; margin: 0; }
+  .sec-head p { margin: 0; color: var(--ink-2); max-width: 58ch; font-size: 14.5px; }
+  .swatches {
+    display: grid; gap: 18px; margin-top: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  }
+  .swatch { text-align: center; }
+  .swatch .stage { border: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft); border-radius: 4px; padding: 14px; }
+  .swatch svg { width: 142px; height: 142px; }
+  .swatch h3 { font-family: var(--f-disp); font-weight: 600; font-size: 16px; margin: 9px 0 1px; }
+  .swatch span { font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); }
+
+  /* ---------- notes + footer ---------- */
+  section.notes { padding-block: 40px 0; border-top: 1px solid var(--rule); margin-top: 40px; }
+  .note-cols { display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); margin-top: 20px; }
+  .note h3 {
+    font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--rule-soft);
+  }
+  .note ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; }
+  .note li { margin-bottom: 7px; }
+  .note code { font-family: var(--f-mono); font-size: 12.2px; color: var(--ink); }
+
+  footer.verdict {
+    margin-top: 44px; border-top: 2px solid var(--ink);
+    padding-block: 22px 56px;
+    display: flex; flex-wrap: wrap; gap: 12px 26px; align-items: baseline;
+  }
+  footer .lead {
+    font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  #verdict { font-family: var(--f-disp); font-weight: 600; font-size: 22px; }
+  #verdict em { font-style: normal; color: var(--ink-3); font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Skip · widget sketch-up · <b>pick one</b></p>
+    <h1>Marine compass, five ways</h1>
+    <p class="standfirst">
+      Five compass faces drawn in the Classic Steel idiom — black-metal bezel, anthracite dial,
+      LCD window, red pointer — so the family reads with the existing <code>widget-gauge-steel</code>
+      RPM face. Every dial below runs off one heading, so you can swing them together and see which
+      one still reads at a glance. <strong>B is built</strong> and shipped as the Steel Compass
+      widget; the other four stay here as the alternatives it was picked over.
+    </p>
+  </header>
+</div>
+
+<div class="bench">
+  <div class="bench-in">
+    <div class="ctl ctl-head">
+      <label for="hdg">Heading</label>
+      <input id="hdg" type="range" min="0" max="359" step="1" value="47" aria-label="Heading in degrees">
+      <span class="readout" id="hdgOut">047°</span>
+    </div>
+    <div class="ctl">
+      <button class="swing" id="swing" type="button" aria-pressed="false"><span class="dot"></span>Swing ±12°</button>
+    </div>
+    <div class="ctl">
+      <span class="ctl-label" id="sizeLabel">Tile size</span>
+      <div class="seg" role="group" aria-labelledby="sizeLabel">
+        <button type="button" data-size="172" aria-pressed="false">1×1</button>
+        <button type="button" data-size="268" aria-pressed="true">2×2</button>
+        <button type="button" data-size="360" aria-pressed="false">Helm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="grid" id="grid"></div>
+
+  <section class="finishes">
+    <div class="sec-head">
+      <h2>Finishes</h2>
+      <p>The same face in four material pairs. These map straight onto the frame and background
+        options <code>gauge-steel</code> already exposes, so a finish is a config field, not a
+        second widget — night red included.</p>
+    </div>
+    <div class="swatches" id="swatches"></div>
+  </section>
+
+  <section class="notes">
+    <div class="sec-head"><h2>What each one costs</h2></div>
+    <div class="note-cols">
+      <div class="note">
+        <h3>Already in the box</h3>
+        <ul>
+          <li><code>src/assets/steelseries-min.js</code> ships a <code>Compass</code> and a
+            <code>WindDirection</code> gauge — A and B are close to what those draw out of the box.</li>
+          <li><code>widget-gauge-ng-compass</code> already does rotating-card and faceplate modes on
+            canvas-gauges, so the <em>behaviour</em> (card vs needle, cardinal letters vs numbers) is
+            settled — this is a skin, not new physics.</li>
+          <li>C, D and E want overlays neither library draws; those are our own SVG on top of, or
+            instead of, the canvas.</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>Paths it would read</h3>
+        <ul>
+          <li><code>navigation.headingMagnetic</code> — the card or needle, all five.</li>
+          <li><code>navigation.courseOverGroundTrue</code> — the amber chevron on C.</li>
+          <li><code>environment.wind.angleApparent</code> — the cyan barb on C, already the
+            negative-to-port path the compass widget special-cases.</li>
+          <li><code>navigation.courseGreatCircle.nextPoint.bearingTrue</code> — waypoint diamond on C.</li>
+          <li><code>steering.autopilot.target.headingMagnetic</code> and
+            <code>steering.rudderAngle</code> — the bug and rudder strip on D.</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>Things to decide with the sketch</h3>
+        <ul>
+          <li>Card or needle. A rotating card matches the binnacle on the boat; a needle matches the
+            RPM gauge on the same dashboard. They can't both be the default.</li>
+          <li>Magnetic or true, and whether the dial says which — every face here writes
+            <code>°M</code> next to the number for that reason.</li>
+          <li>Small-tile legibility: hit <strong>1×1</strong> above. That is the Freeboard plotter
+            tile, and it's where the full rose stops working.</li>
+          <li>Whether the LCD window earns its space, or the number belongs on the dial face.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="verdict">
+    <span class="lead">Selected for development</span>
+    <span id="verdict">B · Rotating Card <em>— built as the Steel Compass widget.</em></span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------------------------------------------------------- data */
+  // Plausible helm figures: a boat making 6.4 kn on 047°M, set a little to starboard,
+  // wind on the starboard bow, waypoint off the port quarter.
+  var DATA = { cog: 52, awa: 35, brg: 310, cts: 68, rudder: -4, sog: 6.4, xte: 0.04 };
+
+  var FD = "'Saira Condensed','Barlow Condensed','Arial Narrow',sans-serif";
+  var FM = "'IBM Plex Mono',Menlo,monospace";
+
+  /* ------------------------------------------------------------ palettes */
+  var PALETTES = {
+    anthracite: {
+      name: 'Black metal · anthracite', spec: 'blackMetal / darkGray',
+      bezel: ['#E9EDEF', '#98A0A4', '#2B2F31', '#0A0C0D', '#4E5457', '#BAC1C5', '#17191B'],
+      face: ['#5C6265', '#34393B', '#14171A'],
+      tick: '#F2F5F6', tickMinor: '#9BA3A7', label: '#FFFFFF', dim: '#98A1A5',
+      needle: '#D8232A', needleTail: '#6E7377',
+      lcdA: '#CBD0B4', lcdB: '#ADB598', lcdInk: '#20261F',
+      glass: 'rgba(255,255,255,.085)'
+    },
+    stainless: {
+      name: 'Brushed stainless · light', spec: 'brushedStainless / lightGray',
+      bezel: ['#FBFCFC', '#C6CDD1', '#7C8489', '#454B4F', '#A9B1B5', '#EDF1F2', '#6B7276'],
+      face: ['#F0F2EE', '#D6DAD4', '#A8AEA9'],
+      tick: '#1A1F22', tickMinor: '#5D666B', label: '#11161A', dim: '#4B5559',
+      needle: '#B01118', needleTail: '#7D868B',
+      lcdA: '#B9C1A4', lcdB: '#9AA488', lcdInk: '#1B211A',
+      glass: 'rgba(255,255,255,.22)'
+    },
+    carbon: {
+      name: 'Carbon · blackout', spec: 'blackMetal / carbon',
+      bezel: ['#7E868A', '#3B4145', '#15181A', '#000000', '#2E3438', '#767E82', '#0B0D0E'],
+      face: ['#22272A', '#14181A', '#050708'],
+      tick: '#E6EBED', tickMinor: '#79838A', label: '#FFFFFF', dim: '#8C969B',
+      needle: '#E8353C', needleTail: '#5A6166',
+      lcdA: '#8E9A7E', lcdB: '#727E63', lcdInk: '#14180F',
+      glass: 'rgba(255,255,255,.06)'
+    },
+    night: {
+      name: 'Night helm · red lit', spec: 'blackMetal / black + red ticks',
+      bezel: ['#6E7478', '#2E3437', '#101314', '#000000', '#272C2F', '#5F676B', '#0A0C0D'],
+      face: ['#241012', '#170A0C', '#080405'],
+      tick: '#FF6B66', tickMinor: '#9B3B3A', label: '#FF8A85', dim: '#A34744',
+      needle: '#FF5A52', needleTail: '#5A3A39',
+      lcdA: '#4A1E1D', lcdB: '#341413', lcdInk: '#FF9A93',
+      glass: 'rgba(255,120,110,.06)'
+    }
+  };
+
+  /* ------------------------------------------------------------- helpers */
+  var CX = 250, CY = 250, R_FACE = 206, R_BEZ = 246;
+
+  function pt(r, a) {
+    var t = (a - 90) * Math.PI / 180;
+    return [CX + r * Math.cos(t), CY + r * Math.sin(t)];
+  }
+  function n(v) { return Math.round(v * 100) / 100; }
+  function tick(r1, r2, a, stroke, w, cap) {
+    var p1 = pt(r1, a), p2 = pt(r2, a);
+    return '<line x1="' + n(p1[0]) + '" y1="' + n(p1[1]) + '" x2="' + n(p2[0]) + '" y2="' + n(p2[1]) +
+      '" stroke="' + stroke + '" stroke-width="' + w + '" stroke-linecap="' + (cap || 'butt') + '"/>';
+  }
+  function label(r, a, s, o) {
+    o = o || {};
+    var p = pt(r, a), x = n(p[0]), y = n(p[1]);
+    var rot = o.upright ? '' : ' transform="rotate(' + n(a) + ' ' + x + ' ' + y + ')"';
+    return '<text x="' + x + '" y="' + y + '" fill="' + (o.fill || '#fff') + '" font-size="' + (o.size || 26) +
+      '" font-weight="' + (o.weight || 600) + '" font-family="' + (o.font || FD) +
+      '" letter-spacing="' + (o.tracking || 0) + '" text-anchor="middle" dominant-baseline="central"' + rot + '>' + s + '</text>';
+  }
+
+  function defs(id, pal) {
+    var b = pal.bezel, f = pal.face;
+    return '<defs>' +
+      '<linearGradient id="bz' + id + '" x1="0.12" y1="0" x2="0.72" y2="1">' +
+        '<stop offset="0" stop-color="' + b[0] + '"/><stop offset=".13" stop-color="' + b[1] + '"/>' +
+        '<stop offset=".33" stop-color="' + b[2] + '"/><stop offset=".55" stop-color="' + b[3] + '"/>' +
+        '<stop offset=".74" stop-color="' + b[4] + '"/><stop offset=".89" stop-color="' + b[5] + '"/>' +
+        '<stop offset="1" stop-color="' + b[6] + '"/></linearGradient>' +
+      '<radialGradient id="fc' + id + '" cx="50%" cy="36%" r="74%">' +
+        '<stop offset="0" stop-color="' + f[0] + '"/><stop offset=".56" stop-color="' + f[1] + '"/>' +
+        '<stop offset="1" stop-color="' + f[2] + '"/></radialGradient>' +
+      '<radialGradient id="hb' + id + '" cx="34%" cy="28%" r="78%">' +
+        '<stop offset="0" stop-color="#F4F6F7"/><stop offset=".5" stop-color="#AEB5B9"/>' +
+        '<stop offset="1" stop-color="#565C60"/></radialGradient>' +
+      '<linearGradient id="lc' + id + '" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="' + pal.lcdA + '"/><stop offset="1" stop-color="' + pal.lcdB + '"/></linearGradient>' +
+      '<radialGradient id="gl' + id + '" cx="34%" cy="16%" r="66%">' +
+        '<stop offset="0" stop-color="' + pal.glass + '"/><stop offset="1" stop-color="rgba(255,255,255,0)"/></radialGradient>' +
+      '<filter id="sh' + id + '" x="-30%" y="-30%" width="160%" height="160%">' +
+        '<feDropShadow dx="3" dy="6" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/></filter>' +
+      '<filter id="et' + id + '" x="-30%" y="-30%" width="160%" height="160%">' +
+        '<feDropShadow dx="1" dy="1.5" stdDeviation="0.8" flood-color="#000" flood-opacity="0.55"/></filter>' +
+      '</defs>';
+  }
+
+  function shell(id, pal) {
+    return '<circle cx="250" cy="250" r="' + R_BEZ + '" fill="url(#bz' + id + ')"/>' +
+      '<circle cx="250" cy="250" r="' + (R_FACE + 9) + '" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="3"/>' +
+      '<circle cx="250" cy="250" r="' + R_FACE + '" fill="url(#fc' + id + ')"/>';
+  }
+  function glassAndScrews(id, pal, screws) {
+    var s = '';
+    if (screws !== false) {
+      [219, 321].forEach(function (a) {
+        var p = pt(226, a);
+        s += '<circle cx="' + n(p[0]) + '" cy="' + n(p[1]) + '" r="10" fill="url(#hb' + id + ')" stroke="rgba(0,0,0,.45)"/>' +
+          '<line x1="' + n(p[0] - 6) + '" y1="' + n(p[1]) + '" x2="' + n(p[0] + 6) + '" y2="' + n(p[1]) +
+          '" stroke="rgba(0,0,0,.4)" stroke-width="2"/>';
+      });
+    }
+    s += '<ellipse cx="205" cy="160" rx="172" ry="132" fill="url(#gl' + id + ')" pointer-events="none"/>';
+    return s;
+  }
+
+  /** Marine card: cardinal letters, tens numbers between, minor ticks every 5°. */
+  function rose(pal, o) {
+    o = o || {};
+    var rOut = o.r || 196, s = '', a;
+    for (a = 0; a < 360; a += 5) {
+      var major = a % 30 === 0, mid = a % 10 === 0;
+      s += tick(rOut - (major ? 24 : mid ? 15 : 8), rOut, a,
+        major ? pal.tick : pal.tickMinor, major ? 5 : mid ? 3 : 2);
+    }
+    var cardinals = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' };
+    var inter = { 45: 'NE', 135: 'SE', 225: 'SW', 315: 'NW' };
+    for (a = 0; a < 360; a += 30) {
+      var c = cardinals[a];
+      if (c) {
+        s += label(rOut - 48, a, c, {
+          fill: a === 0 ? pal.needle : pal.label, size: 40, weight: 700, font: FD, tracking: 1
+        });
+      } else {
+        s += label(rOut - 45, a, String(a / 10), { fill: pal.label, size: 30, weight: 600, font: FD });
+      }
+    }
+    if (o.intercardinals) {
+      for (a = 45; a < 360; a += 90) {
+        s += label(rOut - 88, a, inter[a], { fill: pal.dim, size: 19, weight: 600, font: FD, tracking: .6 });
+      }
+    }
+    return s;
+  }
+
+  function lcdBox(id, pal, x, y, w, h, o) {
+    o = o || {};
+    var s = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4" fill="url(#lc' + id + ')"/>' +
+      '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4" fill="none" stroke="rgba(0,0,0,.42)" stroke-width="2"/>';
+    if (o.label) {
+      s += '<text x="' + (x + 9) + '" y="' + (y + h / 2) + '" fill="' + pal.lcdInk + '" opacity=".7" font-size="' +
+        (o.labelSize || 16) + '" font-family="' + FM + '" font-weight="500" letter-spacing="1" dominant-baseline="central">' + o.label + '</text>';
+    }
+    s += '<text data-txt="' + o.key + '" x="' + (x + w - 10) + '" y="' + (y + h / 2 + 1) + '" fill="' + pal.lcdInk +
+      '" font-size="' + (o.size || 44) + '" font-family="' + FM + '" font-weight="600" text-anchor="end" dominant-baseline="central">---</text>';
+    return s;
+  }
+
+  function needle(id, pal, rTip, rTail) {
+    return '<g data-rot="hdg" filter="url(#sh' + id + ')">' +
+      '<path d="M 250 ' + (250 - rTip) + ' L 257 250 L 250 ' + (250 + rTail) + ' L 243 250 Z" fill="' + pal.needle + '"/>' +
+      '</g>';
+  }
+  function hub(id) {
+    return '<circle cx="250" cy="250" r="27" fill="url(#hb' + id + ')" stroke="rgba(0,0,0,.4)" stroke-width="2"/>' +
+      '<circle cx="250" cy="250" r="9" fill="rgba(0,0,0,.22)"/>';
+  }
+  function lubber(pal) {
+    return '<path d="M 250 ' + (250 - 202) + ' L 262 ' + (250 - 226) + ' L 238 ' + (250 - 226) + ' Z" fill="' + pal.needle + '"/>' +
+      '<line x1="250" y1="46" x2="250" y2="126" stroke="' + pal.needle + '" stroke-width="4"/>';
+  }
+  function faceText(pal, y, s, o) {
+    o = o || {};
+    return '<text x="250" y="' + y + '" fill="' + (o.fill || pal.dim) + '" font-size="' + (o.size || 24) +
+      '" font-weight="' + (o.weight || 600) + '" font-family="' + (o.font || FD) +
+      '" letter-spacing="' + (o.tracking || 2) + '" text-anchor="middle" dominant-baseline="central"' +
+      (o.key ? ' data-txt="' + o.key + '"' : '') + '>' + s + '</text>';
+  }
+
+  /* ------------------------------------------------------------ variants */
+  var VARIANTS = [
+    {
+      key: 'A', name: 'Rose & Pointer',
+      blurb: 'Fixed rose, north locked at the top, red pointer swings to the heading — the RPM gauge with a compass card printed on it.',
+      spec: [['Reads', 'navigation.headingMagnetic'],
+             ['Renders with', 'steelseries Compass, pointer mode'],
+             ['Best at', '2×2 and up']],
+      draw: function (id, pal) {
+        return defs(id, pal) + shell(id, pal) +
+          '<g>' + rose(pal, { intercardinals: true }) + '</g>' +
+          faceText(pal, 152, 'HDG', { size: 34, weight: 700, fill: pal.label, tracking: 4 }) +
+          faceText(pal, 196, 'magnetic', { size: 19, tracking: 3 }) +
+          lcdBox(id, pal, 152, 288, 196, 60, { key: 'hdg3', label: '°M', size: 44 }) +
+          needle(id, pal, 172, 62) + hub(id) + glassAndScrews(id, pal);
+      }
+    },
+    {
+      key: 'B', name: 'Rotating Card', built: true,
+      blurb: 'The card turns under a fixed lubber line, exactly like the binnacle compass — your heading is always the number at twelve o\'clock.',
+      spec: [['Reads', 'navigation.headingMagnetic'],
+             ['Renders with', 'steelseries Compass, rotate mode'],
+             ['Shipped as', 'widget-gauge-steel-compass']],
+      draw: function (id, pal) {
+        return defs(id, pal) + shell(id, pal) +
+          '<circle cx="250" cy="250" r="199" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="2"/>' +
+          '<g data-rot="card">' + rose(pal, { r: 190, intercardinals: true }) +
+            '<circle cx="250" cy="250" r="12" fill="none" stroke="' + pal.tickMinor + '" stroke-width="2"/>' +
+          '</g>' +
+          lcdBox(id, pal, 155, 286, 190, 58, { key: 'hdg3', label: '°M', size: 42 }) +
+          lubber(pal) + glassAndScrews(id, pal);
+      }
+    },
+    {
+      key: 'C', name: 'Navigator',
+      blurb: 'Rotating card plus the three bearings you actually steer against — course over ground, apparent wind, and the leg to the next waypoint.',
+      spec: [['Reads', 'heading + COG + AWA + bearingTrue'],
+             ['Renders with', 'custom SVG overlay'],
+             ['Best at', '2×2 and up']],
+      draw: function (id, pal) {
+        var s = defs(id, pal) + shell(id, pal) +
+          '<g data-rot="card">' + rose(pal, { r: 190 }) + '</g>';
+        // COG chevron
+        s += '<g data-rot="cog"><path d="M 250 68 L 266 100 L 250 92 L 234 100 Z" fill="#E8A33D" stroke="rgba(0,0,0,.4)"/></g>';
+        // Apparent wind barb
+        s += '<g data-rot="awa"><path d="M 250 96 L 250 172 M 250 96 L 236 118 M 250 96 L 264 118" ' +
+          'stroke="#54C4DC" stroke-width="7" stroke-linecap="round" fill="none"/></g>';
+        // Waypoint diamond
+        s += '<g data-rot="brg"><path d="M 250 82 L 262 100 L 250 118 L 238 100 Z" fill="none" stroke="#F2F5F6" stroke-width="5"/></g>';
+        s += lcdBox(id, pal, 106, 290, 132, 52, { key: 'hdg3', label: 'HDG', size: 34, labelSize: 14 }) +
+          lcdBox(id, pal, 262, 290, 132, 52, { key: 'cog3', label: 'COG', size: 34, labelSize: 14 }) +
+          '<g font-family="' + FM + '" font-size="15" text-anchor="middle">' +
+            '<text x="250" y="366" fill="#54C4DC" data-txt="awaTxt">AWA --</text>' +
+          '</g>' +
+          lubber(pal) + glassAndScrews(id, pal);
+        return s;
+      }
+    },
+    {
+      key: 'D', name: 'Helm / Autopilot',
+      blurb: 'The steering face: a course bug on the card, the error arc between heading and course to steer, and rudder angle along the bottom.',
+      spec: [['Reads', 'heading + autopilot target + rudderAngle'],
+             ['Renders with', 'custom SVG overlay'],
+             ['Best at', 'Helm, 3×2 or larger']],
+      draw: function (id, pal) {
+        var s = defs(id, pal) + shell(id, pal) +
+          '<g data-rot="card">' + rose(pal, { r: 190 }) + '</g>';
+        // error band between the lubber line and the course to steer, on the outer ring
+        s += '<path data-arc="err" fill="none" stroke="#E8A33D" stroke-width="9" stroke-linecap="round" opacity=".9"/>';
+        // course bug, riding the card
+        s += '<g data-rot="cts"><path d="M 250 60 L 268 60 L 268 86 L 250 100 L 232 86 L 232 60 Z" ' +
+          'fill="none" stroke="#E8A33D" stroke-width="6" stroke-linejoin="round"/></g>';
+        // autopilot state
+        s += '<rect x="196" y="190" width="108" height="34" rx="17" fill="rgba(232,163,61,.17)" stroke="#E8A33D" stroke-width="2"/>' +
+          '<text x="250" y="208" fill="#E8A33D" font-family="' + FD + '" font-size="21" font-weight="700" letter-spacing="3" ' +
+          'text-anchor="middle" dominant-baseline="central">AUTO</text>';
+        s += lcdBox(id, pal, 112, 268, 122, 50, { key: 'hdg3', label: 'HDG', size: 32, labelSize: 13 }) +
+          lcdBox(id, pal, 266, 268, 122, 50, { key: 'cts3', label: 'CTS', size: 32, labelSize: 13 });
+        // rudder plate — opaque, so the card never reads through it
+        s += '<rect x="120" y="344" width="260" height="40" rx="5" fill="#0D1113" stroke="rgba(255,255,255,.16)" stroke-width="2"/>' +
+          '<text x="132" y="364" fill="' + pal.dim + '" font-family="' + FM + '" font-size="13" letter-spacing="1" ' +
+          'dominant-baseline="central">RUD</text>' +
+          '<text data-txt="rudTxt" x="368" y="364" fill="' + pal.needle + '" font-family="' + FM + '" font-size="14" ' +
+          'text-anchor="end" dominant-baseline="central">--</text>' +
+          '<line x1="250" y1="350" x2="250" y2="378" stroke="' + pal.tickMinor + '" stroke-width="3"/>';
+        [-30, -20, -10, 10, 20, 30].forEach(function (d) {
+          var x = 250 + d * 2.1;
+          s += '<line x1="' + x + '" y1="370" x2="' + x + '" y2="378" stroke="' + pal.tickMinor + '" stroke-width="2"/>';
+        });
+        s += '<rect data-rudder="1" x="250" y="350" width="6" height="22" rx="2" fill="' + pal.needle + '"/>';
+        s += lubber(pal) + glassAndScrews(id, pal);
+        return s;
+      }
+    },
+    {
+      key: 'E', name: 'Compact Tile',
+      blurb: 'Built for the 1×1 plotter tile: number first, a thin tick ring, one red pip running round for north. Nothing on it stops working at 90 pixels.',
+      spec: [['Reads', 'navigation.headingMagnetic'],
+             ['Renders with', 'custom SVG, no canvas'],
+             ['Best at', '1×1 and 2×2']],
+      draw: function (id, pal) {
+        var s = defs(id, pal) + shell(id, pal), a;
+        for (a = 0; a < 360; a += 10) {
+          var major = a % 90 === 0;
+          s += tick(major ? 170 : 180, 196, a, major ? pal.tick : pal.tickMinor, major ? 6 : 3, 'round');
+        }
+        s += '<g data-rot="card">' +
+          '<circle cx="250" cy="72" r="13" fill="' + pal.needle + '"/>' +
+          label(146, 90, 'E', { fill: pal.dim, size: 22, upright: false }) +
+          label(146, 180, 'S', { fill: pal.dim, size: 22, upright: false }) +
+          label(146, 270, 'W', { fill: pal.dim, size: 22, upright: false }) +
+          '</g>';
+        s += '<text data-txt="hdg3" x="250" y="252" fill="' + pal.label + '" font-family="' + FM +
+          '" font-size="122" font-weight="600" text-anchor="middle" dominant-baseline="central" filter="url(#et' + id + ')">---</text>';
+        s += faceText(pal, 336, '°M', { size: 30, font: FM, tracking: 1 });
+        s += faceText(pal, 162, 'HDG', { size: 22, tracking: 5 });
+        s += glassAndScrews(id, pal, false);
+        return s;
+      }
+    }
+  ];
+
+  /* ---------------------------------------------------------- rendering */
+  var uid = 0;
+  var instances = [];
+
+  function mount(host, variant, pal, size) {
+    var id = 'g' + (++uid);
+    host.innerHTML = '<svg viewBox="0 0 500 500" role="img" aria-label="' + variant.name +
+      ' marine compass sketch">' + variant.draw(id, pal) + '</svg>';
+    var svg = host.firstChild;
+    var inst = {
+      svg: svg,
+      rots: svg.querySelectorAll('[data-rot]'),
+      txts: svg.querySelectorAll('[data-txt]'),
+      arc: svg.querySelector('[data-arc]'),
+      rudder: svg.querySelector('[data-rudder]')
+    };
+    if (size) { svg.style.width = size + 'px'; svg.style.height = size + 'px'; }
+    instances.push(inst);
+    return inst;
+  }
+
+  function pad3(v) { return ('00' + (((Math.round(v) % 360) + 360) % 360)).slice(-3); }
+
+  function angleFor(mode, h) {
+    switch (mode) {
+      case 'hdg': return h;
+      case 'card': return -h;
+      case 'cog': return DATA.cog - h;
+      case 'awa': return DATA.awa;
+      case 'brg': return DATA.brg - h;
+      case 'cts': return DATA.cts - h;
+      default: return 0;
+    }
+  }
+
+  function arcPath(from, to) {
+    // arc drawn on the card, i.e. relative to the lubber line at the top
+    var r = 200, sweep = ((to - from) + 540) % 360 - 180;
+    var p1 = pt(r, from), p2 = pt(r, from + sweep);
+    return 'M ' + n(p1[0]) + ' ' + n(p1[1]) + ' A ' + r + ' ' + r + ' 0 0 ' +
+      (sweep >= 0 ? 1 : 0) + ' ' + n(p2[0]) + ' ' + n(p2[1]);
+  }
+
+  function update(h) {
+    var texts = {
+      hdg3: pad3(h),
+      cog3: pad3(DATA.cog),
+      cts3: pad3(DATA.cts),
+      awaTxt: 'AWA ' + Math.abs(DATA.awa) + '° ' + (DATA.awa >= 0 ? 'STBD' : 'PORT'),
+      rudTxt: Math.abs(DATA.rudder) + '° ' + (DATA.rudder >= 0 ? 'STBD' : 'PORT')
+    };
+    instances.forEach(function (inst) {
+      var i;
+      for (i = 0; i < inst.rots.length; i++) {
+        var el = inst.rots[i];
+        el.setAttribute('transform', 'rotate(' + n(angleFor(el.getAttribute('data-rot'), h)) + ' 250 250)');
+      }
+      for (i = 0; i < inst.txts.length; i++) {
+        var t = inst.txts[i], key = t.getAttribute('data-txt');
+        if (texts[key] !== undefined) t.textContent = texts[key];
+      }
+      if (inst.arc) inst.arc.setAttribute('d', arcPath(0, DATA.cts - h));
+      if (inst.rudder) inst.rudder.setAttribute('x', n(247 + DATA.rudder * 2.1));
+    });
+  }
+
+  /* ------------------------------------------------------------ the page */
+  var grid = document.getElementById('grid');
+  var pal = PALETTES.anthracite;
+
+  VARIANTS.forEach(function (v) {
+    var card = document.createElement('article');
+    card.className = 'card';
+    card.dataset.key = v.key;
+    var specs = v.spec.map(function (row) {
+      return '<dt>' + row[0] + '</dt><dd>' + (row[0] === 'Reads' || row[0] === 'Shipped as' ? '<code>' + row[1] + '</code>' : row[1]) + '</dd>';
+    }).join('');
+    card.innerHTML =
+      '<div class="stage"></div>' +
+      '<div class="card-body">' +
+        '<div class="card-head"><span class="tag">' + v.key + '</span><h2>' + v.name + '</h2>' +
+        (v.built ? '<span class="built-flag">Built</span>' : '') + '</div>' +
+        '<p>' + v.blurb + '</p>' +
+        '<dl class="spec">' + specs + '</dl>' +
+        '<button class="pick" type="button">Choose this</button>' +
+      '</div>';
+    if (v.built) card.classList.add('built');
+    grid.appendChild(card);
+    mount(card.querySelector('.stage'), v, pal);
+    card.querySelector('.pick').addEventListener('click', function () { choose(v.key); });
+  });
+
+  var swatchHost = document.getElementById('swatches');
+  Object.keys(PALETTES).forEach(function (k) {
+    var p = PALETTES[k];
+    var el = document.createElement('div');
+    el.className = 'swatch';
+    el.innerHTML = '<div class="stage"></div><h3>' + p.name.split(' · ')[0] + '</h3><span>' + p.spec + '</span>';
+    swatchHost.appendChild(el);
+    mount(el.querySelector('.stage'), VARIANTS[1], p, 142);
+  });
+
+  /* selection */
+  var verdict = document.getElementById('verdict');
+  var picked = null;
+  try { picked = localStorage.getItem('skip.compass.pick'); } catch (e) { /* storage blocked */ }
+
+  function choose(key) {
+    picked = key;
+    try { localStorage.setItem('skip.compass.pick', key); } catch (e) { /* storage blocked */ }
+    paint();
+  }
+  function paint() {
+    var v = null;
+    Array.prototype.forEach.call(grid.children, function (c) {
+      var on = c.dataset.key === picked;
+      c.classList.toggle('chosen', on);
+      c.querySelector('.pick').textContent = on ? 'Selected' : 'Choose this';
+      if (on) v = VARIANTS.filter(function (x) { return x.key === picked; })[0];
+    });
+    verdict.innerHTML = v
+      ? v.key + ' · ' + v.name + ' <em>— say “build ' + v.key + '” and I\'ll take it from here.</em>'
+      : 'B · Rotating Card <em>— built as the Steel Compass widget. Pick another card to change direction.</em>';
+  }
+  paint();
+
+  /* controls */
+  var slider = document.getElementById('hdg');
+  var out = document.getElementById('hdgOut');
+  var base = Number(slider.value);
+
+  function render(h) {
+    out.textContent = pad3(h) + '°';
+    update(h);
+  }
+  slider.addEventListener('input', function () {
+    base = Number(slider.value);
+    if (!swinging) render(base);
+  });
+
+  var swinging = false, raf = null, t0 = 0;
+  var swingBtn = document.getElementById('swing');
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function frame(ts) {
+    if (!t0) t0 = ts;
+    var s = (ts - t0) / 1000;
+    // a yaw that reads like a boat in a seaway, not a metronome
+    var h = base + 12 * Math.sin(s * 0.62) + 4 * Math.sin(s * 1.9 + 1.1);
+    slider.value = String(((Math.round(h) % 360) + 360) % 360);
+    render(h);
+    raf = requestAnimationFrame(frame);
+  }
+  swingBtn.addEventListener('click', function () {
+    swinging = !swinging;
+    swingBtn.setAttribute('aria-pressed', String(swinging));
+    if (swinging) { t0 = 0; raf = requestAnimationFrame(frame); }
+    else { cancelAnimationFrame(raf); base = Number(slider.value); render(base); }
+  });
+  if (reduced) swingBtn.disabled = true;
+
+  document.querySelectorAll('.seg button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.seg button').forEach(function (o) { o.setAttribute('aria-pressed', 'false'); });
+      b.setAttribute('aria-pressed', 'true');
+      document.documentElement.style.setProperty('--gauge', b.dataset.size + 'px');
+    });
+  });
+
+  render(base);
+})();
+</script>

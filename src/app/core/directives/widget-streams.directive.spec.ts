@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Subject, BehaviorSubject, Observable } from 'rxjs';
-import { WidgetStreamsDirective, widgetPathSignature, normalizeWidgetPath } from './widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature, normalizeWidgetPath, WidgetRepointTracker } from './widget-streams.directive';
 import { DataService, IPathUpdate } from '../services/data.service';
 import { UnitsService } from '../services/units.service';
 import { IWidgetSvcConfig, IWidgetPath } from '../interfaces/widgets-interface';
@@ -947,5 +947,37 @@ describe('widgetPathSignature', () => {
         expect(normalizeWidgetPath('   ')).toBeUndefined();
         expect(normalizeWidgetPath(null)).toBeUndefined();
         expect(normalizeWidgetPath(42)).toBeUndefined();
+    });
+});
+
+describe('WidgetRepointTracker', () => {
+    const sigA = widgetPathSignature({ path: 'self.navigation.headingMagnetic', pathType: 'number' });
+    const sigB = widgetPathSignature({ path: 'self.navigation.courseOverGroundTrue', pathType: 'number' });
+
+    it('never reports on the first call: nothing has been shown, so there is nothing to clear', () => {
+        expect(new WidgetRepointTracker().repointed(sigA)).toBe(false);
+        expect(new WidgetRepointTracker().repointed(null)).toBe(false);
+    });
+
+    it('stays quiet across a rerun on the same path, so a theme change cannot blink the reading', () => {
+        const tracker = new WidgetRepointTracker();
+        tracker.repointed(sigA);
+        expect(tracker.repointed(sigA)).toBe(false);
+    });
+
+    it('reports a re-point to another path', () => {
+        const tracker = new WidgetRepointTracker();
+        tracker.repointed(sigA);
+        expect(tracker.repointed(sigB)).toBe(true);
+    });
+
+    it('treats no-usable-path as a real identity, in both directions', () => {
+        // Clearing the path drops the reading, and a path that follows the cleared state must be
+        // told apart from it — null is not a second "not yet".
+        const tracker = new WidgetRepointTracker();
+        tracker.repointed(sigA);
+        expect(tracker.repointed(null)).toBe(true);
+        expect(tracker.repointed(null)).toBe(false);
+        expect(tracker.repointed(sigB)).toBe(true);
     });
 });

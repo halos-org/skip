@@ -334,6 +334,9 @@ export interface IWidgetSvcConfig {
     radialSize?: string;
     /** Optional. Used by GaugeSteel to set faceplate rotation */
     rotateFace?: boolean;
+    /** Optional. Used by the steel compass to print the degree scale on the card */
+    degreeScale?: boolean;
+
     /** Optional. GaugeSteel digital or bar */
     digitalMeter?: boolean;
     /** Optional. Width of gauge highlights */
@@ -350,6 +353,12 @@ export interface IWidgetSvcConfig {
     invertAngle?: boolean;
     /** Optional. Show the side label on the gauge */
     sideLabel?: boolean;
+    /** Optional. Used by Sea Horizon: heel angle (deg) where the scale turns from nominal to caution */
+    heelCautionAngle?: number;
+    /** Optional. Used by Sea Horizon: heel angle (deg) where the scale turns to alarm, and where the red limit index sits */
+    heelAlarmAngle?: number;
+    /** Optional. Used by Sea Horizon: smoothing time constant in seconds applied to attitude samples. 0 disables it */
+    damping?: number;
   }
   /** Used by numeric data Widget: Display minimum registered value since started */
   showMin?: boolean;

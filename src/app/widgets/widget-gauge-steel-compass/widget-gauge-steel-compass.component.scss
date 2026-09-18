@@ -1,0 +1,82 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+// The observed box. The 20px inset is what the Classic Steel gauge ends up with, so the two dials
+// come out the same diameter in the same tile: that widget nests two `.wrapper` divs — its own and
+// the shared gauge's — and the unscoped `::ng-deep .wrapper { padding: 10px }` rule in its
+// stylesheet applies to both. Measured: 300px tile gives 260px there and, with this, here.
+.wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+// The dial: a square of the side the component measured, centred in whatever shape the tile is.
+// Sized in the template rather than stretched to 100%, because the library paints the case into a
+// canvas of exactly that many CSS pixels and the card has to land on the painted face.
+.compass {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.case,
+.card-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.card {
+  // The card carries momentum on a real compass; this is the same swing, taken the short way round
+  // because the component feeds it an unbounded angle rather than a value that wraps at north.
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+text {
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+}
+
+.face-title {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.lcd-unit,
+.lcd-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.lcd-unit {
+  font-size: 22px;
+  font-weight: 500;
+  opacity: 0.72;
+}
+
+.lcd-value {
+  font-size: 46px;
+  font-weight: 700;
+}
+
+// No reading yet, or the path was re-pointed at one that reports nothing: the card sits on 000,
+// which is a heading of north to anyone glancing at it. Dimming says the number under the index is
+// not a measurement, and the LCD reads `---` beside it.
+.compass.stale .card {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

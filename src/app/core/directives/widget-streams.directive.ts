@@ -40,6 +40,42 @@ export function widgetPathSignature(pathCfg: IPathIdentity | undefined | null): 
   return [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0'].join('|');
 }
 
+/**
+ * Tracks which path a widget's stream-derived presentation state describes across runs of the
+ * widget's data effect, and reports when that state has gone stale.
+ *
+ * Every run rebuilds the subscription — a theme change included — and `suppressBootstrapNull` gives
+ * each rebuild a fresh suppression closure. Against a path that reports nothing the replayed
+ * leading null is therefore filtered and the stream callback never runs, leaving the previous
+ * path's needle and value on screen, presented as a live reading of the new one (#585). Clearing
+ * on every run is wrong for the same reason: it would blink the reading off at every theme switch.
+ * Comparing signatures tells the two apart.
+ *
+ * Three states: nothing recorded before the first call (nothing has been shown, so there is nothing
+ * to clear), `null` for a config with no usable path, and the signature otherwise. `null` is a real
+ * identity rather than a second "not yet" — a cleared path must still compare unequal to the path
+ * that follows it.
+ *
+ * The reading comes back only because the widget passes `observe()` a new closure on every effect
+ * run: the directive compares callback identity as well as the signature, so it rebuilds and
+ * replays the new path's value. A stable callback reference would early-return instead and leave
+ * the gauge blank on a live path until the next delta.
+ */
+export class WidgetRepointTracker {
+  private last: string | null | undefined = undefined;
+
+  /**
+   * Record the path the reading now describes. True when it differs from the one recorded before:
+   * the widget was re-pointed, and whatever it shows belongs to the old path. Never true on the
+   * first call.
+   */
+  repointed(signature: string | null): boolean {
+    const changed = this.last !== undefined && this.last !== signature;
+    this.last = signature;
+    return changed;
+  }
+}
+
 @Directive({
   selector: '[widget-streams]',
   exportAs: 'widgetStreams'
