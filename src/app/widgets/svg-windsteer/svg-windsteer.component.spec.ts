@@ -212,6 +212,46 @@ describe('SvgWindsteerComponent', () => {
         expect(firstPointAngle(pathOf('PortTackRunLine'))).toBeCloseTo(150, 0);
     });
 
+    describe('wind sector easing', () => {
+        afterEach(() => vi.restoreAllMocks());
+        const sectorInputs = {
+            compassHeading: 0, windSectorEnabled: true, closeHauledLineAngle: 45, trueWindFresh: true,
+            trueWindMinHistoric: 355, trueWindMidHistoric: 0, trueWindMaxHistoric: 5
+        };
+        const shiftSector = (): void => {
+            setInput('trueWindMinHistoric', 20);
+            setInput('trueWindMidHistoric', 25);
+            setInput('trueWindMaxHistoric', 30);
+            fixture.detectChanges();
+        };
+
+        it('keeps a heading redraw when a sector ease was running, instead of the ease\'s next frame', () => {
+            const frames = frameQueue();
+            setRequiredInputs(sectorInputs);
+            fixture.detectChanges();
+            shiftSector();
+            frames.run(500);
+
+            setInput('compassHeading', 10);
+            fixture.detectChanges();
+            const redrawn = pathOf('PortTackSector');
+            frames.run(700);
+            expect(pathOf('PortTackSector')).toBe(redrawn);
+        });
+
+        it('stops a running sector ease on destroy, after its first frame', () => {
+            const frames = frameQueue();
+            setRequiredInputs(sectorInputs);
+            fixture.detectChanges();
+            shiftSector();
+            frames.run(500);
+            expect(frames.size).toBeGreaterThan(0);
+
+            fixture.destroy();
+            expect(frames.size).toBe(0);
+        });
+    });
+
     describe('tack line easing', () => {
         afterEach(() => vi.restoreAllMocks());
         const lineInputs = { compassHeading: 0, trueWindAngle: 20, closeHauledLineEnabled: true, closeHauledLineAngle: 45, trueWindFresh: true };

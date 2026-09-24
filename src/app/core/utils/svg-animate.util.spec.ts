@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { animateProgress, animateRotation, effectiveAnimationDuration } from './svg-animate.util';
+import { animateAngleTransition, animateProgress, animateRotation, animateSectorTransition, effectiveAnimationDuration } from './svg-animate.util';
 import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interface';
 
 describe('effectiveAnimationDuration', () => {
@@ -112,6 +112,61 @@ describe('animateProgress', () => {
     cancel();
     frames.run(1500);
     expect(seen).toEqual([0.25]);
+    expect(frames.size).toBe(0);
+  });
+});
+
+describe('angle and sector transitions', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const frameQueue = () => {
+    const pending = new Map<number, FrameRequestCallback>();
+    let nextId = 1;
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(cb => { pending.set(nextId, cb); return nextId++; });
+    vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(id => { pending.delete(id); });
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    return {
+      run(now: number) {
+        const callbacks = [...pending.values()];
+        pending.clear();
+        callbacks.forEach(cb => cb(now));
+      },
+      get size() { return pending.size; }
+    };
+  };
+
+  it('eases an angle along the shorter arc and stops once cancelled, after any number of frames', () => {
+    const frames = frameQueue();
+    const seen: number[] = [];
+    const done = vi.fn();
+    const cancel = animateAngleTransition(350, 10, 1000, angle => seen.push(angle), done);
+
+    frames.run(1250);
+    frames.run(1500);
+    cancel();
+    frames.run(1750);
+    expect(seen).toEqual([355, 0]);
+    expect(frames.size).toBe(0);
+    expect(done).not.toHaveBeenCalled();
+  });
+
+  it('calls onDone when an angle transition completes', () => {
+    const frames = frameQueue();
+    const done = vi.fn();
+    animateAngleTransition(0, 90, 1000, () => undefined, done);
+    frames.run(2500);
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it('interpolates a sector and stops once cancelled after its first frame', () => {
+    const frames = frameQueue();
+    const seen: number[] = [];
+    const cancel = animateSectorTransition({ min: 0, mid: 10, max: 20 }, { min: 40, mid: 50, max: 60 }, 1000, sector => seen.push(sector.mid));
+
+    frames.run(1500);
+    cancel();
+    frames.run(2000);
+    expect(seen).toEqual([30]);
     expect(frames.size).toBe(0);
   });
 });

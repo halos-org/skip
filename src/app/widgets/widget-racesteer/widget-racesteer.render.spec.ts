@@ -138,6 +138,22 @@ describe('WidgetRacesteerComponent rendering from SI inputs', () => {
     });
   });
 
+  it('leaves no layline or sector frame running after destroy, even past an ease\'s first frame', () => {
+    render(makeConfig());
+    feedAngle('headingPath', 350);
+    feedAngle('trueWindAngle', 40);
+    feedAngle('targetAngle', 84);
+    settle();
+    const idle = vi.getTimerCount();
+
+    feedAngle('targetAngle', 60);
+    feedAngle('trueWindAngle', 70);
+    fixture.detectChanges();
+    vi.advanceTimersByTime(100);
+    fixture.destroy();
+    expect(vi.getTimerCount()).toBe(idle);
+  });
+
   it('shows the same VMG difference and ratio colour for VMG 5 kn and target 6 kn', () => {
     render(makeConfig());
     feedSpeed('VMG', 5);
