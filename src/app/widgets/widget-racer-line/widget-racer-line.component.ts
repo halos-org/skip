@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   Component,
+  computed,
   DestroyRef,
   effect,
   ElementRef,
@@ -32,6 +33,10 @@ const DTS_ALERT_M = 20;
 @Component({
   selector: 'widget-racer-line',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // Any interaction anywhere in the widget restarts the idle countdown back to mode 0.
+  // Bound on the host so no press can be missed as modes are added, and so no plain
+  // container has to be made an interaction target.
+  host: { '(click)': 'touchMode()' },
   templateUrl: './widget-racer-line.component.html',
   styleUrls: ['./widget-racer-line.component.scss'],
   imports: [MatButtonModule, MatTooltipModule]
@@ -60,8 +65,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     numDecimal: 0,
     ignoreZones: true,
     color: 'contrast',
-    enableTimeout: true,
-    dataTimeout: 5,
+    modeTimeout: 10,
     updateInterval: 500,
     paths: {
       dtsPath: {
@@ -73,7 +77,10 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: 'm',
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: 'm'
+        pathSkUnitsFilter: 'm',
+        // Published continuously while the plugin is computing it, so it takes the
+        // stale-data TTL: a frozen number here reads as a live one.
+        enableTimeout: true
       },
       lineLengthPath: {
         description: 'Length of the start line',
@@ -84,7 +91,8 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: 'm',
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: 'm'
+        pathSkUnitsFilter: 'm',
+        enableTimeout: false
       },
       lineBiasPath: {
         description: 'Bias of the start line to starboard end',
@@ -95,27 +103,32 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         isPathConfigurable: false,
         convertUnitTo: 'm',
         showPathSkUnitsFilter: true,
-        pathSkUnitsFilter: 'm'
+        pathSkUnitsFilter: 'm',
+        enableTimeout: false
       },
+      // One object at navigation.racing.lines carries both the current line's name and
+      // the list of known lines, so both keys point at it and pick their field out with
+      // observe()'s RFC 6901 pointer ('/lines'). It is published when the lines change and
+      // not again, so it also opts out of the stale-data timeout.
       startLineNamePath: {
         description: 'The current named start line',
-        path: 'self.navigation.racing.lines.startLineName',
+        path: 'self.navigation.racing.lines',
         source: 'default',
-        pathType: 'string',
+        pathType: 'object',
         pathRequired: false,
         isPathConfigurable: false,
-        convertUnitTo: null,
+        enableTimeout: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null
       },
       linesPath: {
         description: 'The known named lines',
-        path: 'self.navigation.racing.lines.lines',
+        path: 'self.navigation.racing.lines',
         source: 'default',
-        pathType: null,
+        pathType: 'object',
         pathRequired: false,
         isPathConfigurable: false,
-        convertUnitTo: null,
+        enableTimeout: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null
       },
@@ -129,7 +142,10 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         convertUnitTo: 's',
         showConvertUnitTo: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 's'
+        pathSkUnitsFilter: 's',
+        // Published continuously while the plugin is computing it, so it takes the
+        // stale-data TTL: a frozen number here reads as a live one.
+        enableTimeout: true
       },
       ttbPath: {
         description: 'Time to delay before sailing to the start line in seconds',
@@ -141,7 +157,10 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         convertUnitTo: 's',
         showConvertUnitTo: false,
         showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 's'
+        pathSkUnitsFilter: 's',
+        // Published continuously while the plugin is computing it, so it takes the
+        // stale-data TTL: a frozen number here reads as a live one.
+        enableTimeout: true
       },
     }
   };
@@ -236,7 +255,6 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       const pathCfg = (cfg.paths as IPathArray | undefined)?.['startLineNamePath'];
       if (!pathCfg?.path) return;
       untracked(() => this.streams.observe('startLineNamePath', pkt => {
-        console.log('startLineName: ' + JSON.stringify(pkt ?? 'no data'));
         this.startLineName = pkt?.data?.value ?? null;
         this.displayLineIndex = 0;
         for (let i = 0; i < this.lines.length; i++) {
@@ -246,7 +264,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
           }
         }
         this.draw();
-      }));
+      }, '/startLineName'));
     });
 
     // Observe lines
@@ -255,7 +273,6 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       const pathCfg = (cfg.paths as IPathArray | undefined)?.['linesPath'];
       if (!pathCfg?.path) return;
       untracked(() => this.streams.observe('linesPath', pkt => {
-        console.log('lines: ' + JSON.stringify(pkt ?? 'no data'));
         this.lines = ['Default'];
         this.displayLineIndex = 0;
         if (pkt?.data?.value && Array.isArray(pkt.data.value)) {
@@ -267,7 +284,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
             }
           }
         }
-      }));
+      }, '/lines'));
     });
 
     // Stream: TTL
@@ -332,9 +349,37 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     this.draw();
   }
 
+  protected readonly modeTimeout = computed<number>(() =>
+    (this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG).modeTimeout ?? 10);
+
+  /** Pending revert to the default display, if a control mode is showing. */
+  private modeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Restart the idle countdown after a button press.
+   *
+   * The control modes are meant to be used and left, and a widget parked on one is a
+   * widget not showing its numbers - easily done on a boat, where the last press before
+   * a start is rarely followed by a deliberate press back.
+   */
+  protected touchMode(): void {
+    if (this.modeTimer) {
+      clearTimeout(this.modeTimer);
+      this.modeTimer = null;
+    }
+    const seconds = this.modeTimeout();
+    if (this.mode() === 0 || !(seconds > 0)) return;
+    this.modeTimer = setTimeout(() => {
+      this.modeTimer = null;
+      this.mode.set(0);
+      this.draw();
+    }, seconds * 1000);
+  }
+
   // Interaction methods
   public toggleMode(): void {
     this.mode.update(v => (v + 1) % 5);
+    this.touchMode();
     this.draw();
   }
 
@@ -567,6 +612,10 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.modeTimer) {
+      clearTimeout(this.modeTimer);
+      this.modeTimer = null;
+    }
     try {
       if (this.canvasElement) this.canvas.unregisterCanvas(this.canvasElement);
     } catch { /* ignore */ }

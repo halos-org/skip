@@ -8,12 +8,21 @@ import { SignalkRequestsService } from '../../core/services/signalk-requests.ser
 import { DashboardService } from '../../core/services/dashboard.service';
 import { CanvasService } from '../../core/services/canvas.service';
 import { UnitsService } from '../../core/services/units.service';
+import { parsePointer } from '../../core/utils/pointer-path.util';
 
 describe('WidgetRacerLineComponent', () => {
   let fixture: ComponentFixture<WidgetRacerLineComponent>;
 
   const runtimeMock = { options: () => WidgetRacerLineComponent.DEFAULT_CONFIG };
-  const streamsMock = { observe: vi.fn() };
+  // The real directive throws on a pointer that is not RFC 6901 ('lines' instead of
+  // '/lines'); a mock that takes anything hides the widget's effect dying on it.
+  const streamsMock = {
+    observe: vi.fn((_key: string, _cb: (pkt: unknown) => void, pointer?: string) => {
+      if (pointer !== undefined && !parsePointer(pointer)) {
+        throw new Error(`observe() pointer '${pointer}' is not an RFC 6901 pointer`);
+      }
+    })
+  };
   const requestsMock = { subscribeRequest: () => EMPTY, putRequest: vi.fn() };
   const dashboardMock = { isDashboardStatic: () => true };
   // Typed so a member the widget does not have is a compile error under `npm run snc`. A member it

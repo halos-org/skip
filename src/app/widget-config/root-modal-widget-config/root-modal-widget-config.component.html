@@ -214,6 +214,51 @@
                   />
                 </mat-form-field>
               }
+              @if ((widgetConfig?.modeTimeout !== undefined)) {
+                <mat-form-field>
+                  <mat-label>Mode Timeout</mat-label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="300"
+                    matInput
+                    placeholder="Enter seconds..."
+                    name="modeTimeout"
+                    formControlName="modeTimeout"
+                  />
+                  <mat-hint>Seconds before a control mode reverts; 0 to stay put</mat-hint>
+                </mat-form-field>
+              }
+              @if ((widgetConfig?.viewSmoothing !== undefined)) {
+                <mat-form-field>
+                  <mat-label>View Smoothing</mat-label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    matInput
+                    placeholder="Enter percentage..."
+                    name="viewSmoothing"
+                    formControlName="viewSmoothing"
+                  />
+                  <mat-hint>% the view may drift before re-scaling</mat-hint>
+                </mat-form-field>
+              }
+              @if ((widgetConfig?.showLineLabel !== undefined)) {
+                <mat-checkbox name="showLineLabel" formControlName="showLineLabel">
+                  Show Line Length and Heading
+                </mat-checkbox>
+              }
+              @if ((widgetConfig?.showTimeToLine !== undefined)) {
+                <mat-checkbox name="showTimeToLine" formControlName="showTimeToLine">
+                  Show Time To Line
+                </mat-checkbox>
+              }
+              @if ((widgetConfig?.showTimeToBurn !== undefined)) {
+                <mat-checkbox name="showTimeToBurn" formControlName="showTimeToBurn">
+                  Show Time To Burn
+                </mat-checkbox>
+              }
               @if ((widgetConfig?.showMin !== undefined)) {
                 <mat-checkbox name="showMin" formControlName="showMin">
                   Show Min recorded value

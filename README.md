@@ -193,7 +193,8 @@ Every widget is a visual presentation control with configuration options of its 
 **Racing** — start-line and performance tools.
 
 - **Racesteer** – Fuses polar performance data with live conditions to guide steering, tacking, and gybing angles. Needs the `signalk-polar-performance-plugin` plugin for its polar data. Skip lists it as **Racesteer (BETA)** in the Add Widget dialog.
-- **Racer - Start Line Insight** – Set and adjust the start line ends, and see distance to the line, the favored end, and the bias. Integrates with Freeboard-SK. Needs the `signalk-racer` plugin.
+- **Racer - Start Line Setup** – Set and adjust the start line ends, and see distance to the line, the favored end, and the bias. Integrates with Freeboard-SK. Needs the `signalk-racer` plugin.
+- **Racer - Start Line Visualization** – A full-frame drawing of the start line with your boat against it at true scale, the start zone it sits in, and the approach the time to line is computed over. A ⋮ mode button selects the control mode: watching the line, setting its ends and switching between named lines, adjusting those ends, and adjusting the best VMGs. Needs the `signalk-racer` plugin.
 - **Racer - Start Timer** – Racing countdown with OCS status and automatic switching to a target page at the start. Needs the `signalk-racer` plugin.
 - **Countdown Timer** – Simple start countdown with start, pause, sync, and reset.
 - **Wind Trends** – Live true wind trends on dual axes for direction and speed, with live values and moving averages.

@@ -1,0 +1,28 @@
+<div class="view-wrapper" [class.editing]="mode() !== 0">
+
+  <racer-line-view
+    [data]="viewData()"
+    [mode]="mode()"
+    [title]="title()"
+    [palette]="palette()"
+    [lengthUnit]="lengthUnit()"
+    [vmgUnit]="vmgUnit()"
+    [viewSmoothing]="viewSmoothing()"
+    [lines]="lineNames()"
+    [currentLine]="currentLineName()"
+    [browsedLine]="browsedLine()"
+    [timeToLine]="timeToLine()"
+    [timeToBurn]="timeToBurn()"
+    [showLineLabel]="showLineLabel()"
+    [showTimeToLine]="showTimeToLine()"
+    [showTimeToBurn]="showTimeToBurn()"
+    [selectedVmg]="selectedVmg()"
+    (endPressed)="setLineEnd($event)"
+    (action)="onAction($event)" />
+
+  <!-- While the dashboard is unlocked the widget is something to drag, not something to
+       press: the overlay keeps a stray tap on a control from being taken as one. -->
+  @if (!dashboard.isDashboardStatic()) {
+    <div class="widgetOverlay"></div>
+  }
+</div>

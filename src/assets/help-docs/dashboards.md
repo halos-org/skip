@@ -85,7 +85,8 @@ Skip widgets turn Signal K data into readable visuals and controls. Available wi
 - **AIS Radar**: Display AIS targets with range rings, interactive target details, and quick zoom and filtering controls. See [AIS Radar Widget](#/help/ais-radar.md).
 - **Embed Webpage Viewer** – Embeds external web apps (Grafana, Node-RED, etc.) into your dashboard.
 - **Racesteer** – Race steering display fusing polar performance data with live conditions for optimal tactics.
-- **Racer - Start Line Insight** – Set and adjust start line ends, see distance, favored end, and line bias; integrates with Freeboard SK.
+- **Racer - Start Line Setup** – Set and adjust start line ends, see distance, favored end, and line bias; integrates with Freeboard SK.
+- **Racer - Start Line Visualization** – A full-frame drawing of the start line with your boat against it at true scale, the start zone it sits in, and the approach the time to line is computed over. A ⋮ mode button selects the control mode: watching the line, setting its ends and switching between named lines, adjusting those ends, and adjusting the best VMGs. Needs the `signalk-racer` plugin.
 - **Racer - Start Timer** – Advanced racing countdown timer with OCS status and auto page switching.
 - **Countdown Timer** – Simple race start countdown timer with start, pause, sync, and reset options.
 

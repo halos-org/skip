@@ -259,6 +259,74 @@ describe('WidgetRacerTimerComponent', () => {
     expect(edit()).toBe('20:40:00');
   });
 
+  /**
+   * The idle revert draws, so it has to be dead before the host takes the canvas back —
+   * a widget removed from a dashboard while parked on a control mode left a timeout
+   * holding the component for up to modeTimeout seconds and then drawing into it.
+   */
+  it('drops the pending idle revert when the widget is destroyed', () => {
+    vi.useFakeTimers();
+    try {
+      setMode(1);
+      // The host click is what arms it: every press restarts the idle countdown.
+      host().dispatchEvent(new MouseEvent('click'));
+      fixture.destroy();
+      vi.advanceTimersByTime(60_000);
+      const mode = (fixture.componentInstance as unknown as { mode: () => number }).mode;
+      expect(mode()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * The countdown sits still on screen between a reset and the start, the plugin having
+   * published it once; a stale-data TTL over it blanked that 5:00 five seconds later.
+   * The distance, which the plugin recomputes on every position, does take the TTL.
+   */
+  it('keeps the countdown out of the stale-data timeout, but not the distance', () => {
+    const paths = WidgetRacerTimerComponent.DEFAULT_CONFIG.paths ?? {};
+    expect(paths['ttsPath']?.enableTimeout,
+      'a reset countdown would blank five seconds later').toBe(false);
+    expect(paths['startTimePath']?.enableTimeout).toBe(false);
+    expect(paths['dtsPath']?.enableTimeout, 'a frozen distance would read as live').toBe(true);
+  });
+
+  describe('the idle revert to the countdown', () => {
+    const modeOf = () => (fixture.componentInstance as unknown as { mode: () => number }).mode();
+    /** The host click handler is what arms it: every press restarts the idle countdown. */
+    const press = () => host().dispatchEvent(new MouseEvent('click'));
+
+    it('takes a control mode back to the countdown once the widget is left alone', () => {
+      vi.useFakeTimers();
+      try {
+        setMode(1);
+        press();
+        vi.advanceTimersByTime(WidgetRacerTimerComponent.DEFAULT_CONFIG.modeTimeout! * 1000 + 1);
+        expect(modeOf()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /**
+     * Except from the start-time form, which holds a time part-typed: reverting out from
+     * under it throws the entry away, and the time on a race start is exactly when a
+     * fumbled entry costs most.
+     */
+    it('leaves the start-time form open', () => {
+      vi.useFakeTimers();
+      try {
+        setMode(4);
+        press();
+        vi.advanceTimersByTime(60_000);
+        expect(modeOf()).toBe(4);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   it('does not let a data timeout blank the field being edited', () => {
     // enableTimeout is on with a 5s window, so an unset start time emits null repeatedly.
     setMode(4);

@@ -1,0 +1,202 @@
+<div class="line-wrapper"
+  [style.--racer-color]="palette().color"
+  [style.--racer-dim]="palette().dim">
+  <div class="filler" #vizRef>
+    <svg
+      class="line-svg"
+      [attr.viewBox]="'0 0 ' + vbWidth() + ' ' + VB_HEIGHT"
+      preserveAspectRatio="xMidYMid meet">
+
+      <text class="viz-title" x="8" y="8" dominant-baseline="hanging">{{ title() }}</text>
+
+      @if (scene(); as s) {
+        <!-- The wind, against the line's own orientation: with the line drawn flat, the
+             arrow's angle is its angle to the line. Faint, being context. -->
+        @if (s.wind; as w) {
+          <polygon class="wind-arrow" [attr.points]="w.points">
+            <title>{{ w.title }}</title>
+          </polygon>
+        }
+
+        <!-- Drawn back to front. The length and heading label goes first of all: it is
+             context for the line, not part of the approach, so anything that overlaps it
+             wins. -->
+        @if (s.labelVisible) {
+          <text class="line-label" [class.undefined]="s.portUndefined && s.stbUndefined"
+            [attr.font-size]="s.labelFont"
+            [attr.x]="s.labelX" [attr.y]="s.labelY">{{ s.label }}</text>
+        }
+
+        <!-- Then the zone guides, the boat, and the start line itself, which stays
+             legible over everything that closes on it. -->
+
+        <!-- The start zone: line extensions and the 45 degree wedge off each end. They
+             explain where the approach turns, so they sit under it. -->
+        @for (g of s.guides; track $index) {
+          <line class="zone-guide" [attr.x1]="g.x1" [attr.y1]="g.y1"
+            [attr.x2]="g.x2" [attr.y2]="g.y2" />
+        }
+
+        @for (p of s.projections; track $index) {
+          <line class="projection"
+            [attr.x1]="p.x1" [attr.y1]="p.y1" [attr.x2]="p.x2" [attr.y2]="p.y2"
+            [attr.stroke-width]="p.width" [attr.stroke-opacity]="p.opacity">
+            <title>{{ p.title }}</title>
+          </line>
+        }
+
+        <!-- The hull outline: its inner edge is the vessel at true scale, so it can be
+             measured against the line, while the band keeps it visible when small. -->
+        @if (s.boat; as b) {
+          <path class="boat" [class.ocs]="b.ocs" [attr.d]="b.path">
+            <title>{{ b.title }}</title>
+          </path>
+        }
+
+        <!-- Drawn "line up": port (pin) end left, starboard (committee boat) end
+             right, so the course side is always the upper half. Last, so a boat
+             sitting on it does not break it up. -->
+        <line class="start-line" [class.undefined]="s.portUndefined && s.stbUndefined"
+          [class.ocs]="s.lineStatus === 'ocs'" [class.started]="s.lineStatus === 'started'"
+          [attr.x1]="s.portX" [attr.y1]="s.lineY"
+          [attr.x2]="s.stbX" [attr.y2]="s.lineY" />
+
+        <!-- Both ends stand for a 10m object, drawn exaggerated so they stay legible.
+             An end with no position behind it is greyed: it marks where to press, not
+             where anything is. -->
+        <circle class="port-mark" [class.undefined]="s.portUndefined"
+          [attr.cx]="s.portX" [attr.cy]="s.lineY" [attr.r]="s.ends.pinRadius" />
+        <!-- A rough committee boat: hull with a raked bow, plus a cabin. -->
+        <polygon class="stb-mark" [class.undefined]="s.stbUndefined"
+          [attr.points]="s.ends.hull" />
+        <rect class="stb-mark" [class.undefined]="s.stbUndefined"
+          [attr.x]="s.ends.cabin.x" [attr.y]="s.ends.cabin.y"
+          [attr.width]="s.ends.cabin.width" [attr.height]="s.ends.cabin.height" />
+
+        <!-- The approach the time to line is computed over, as dimension lines: along
+             the line into the start zone, then across to the line. Drawn last of the
+             data layers so the distances stay readable over the boat, which is exactly
+             where they run as it closes on the line. The gun mark rides with them for
+             the same reason. -->
+        @for (leg of s.legs; track $index) {
+          <g class="dimension" [class.leading]="leg.leading">
+            <line [attr.x1]="leg.x1" [attr.y1]="leg.y1" [attr.x2]="leg.x2" [attr.y2]="leg.y2" />
+            <path class="dimension-ticks" [attr.d]="leg.ticks" />
+            <text [attr.x]="leg.labelX" [attr.y]="leg.labelY"
+              [attr.font-size]="LEG_FONT" [attr.text-anchor]="leg.anchor">{{ leg.label }}</text>
+            <title>{{ leg.title }}</title>
+          </g>
+        }
+        @if (s.gun; as g) {
+          <g class="gun-mark">
+            <circle [attr.cx]="g.x" [attr.cy]="g.y" r="5" />
+            <title>{{ g.title }}</title>
+          </g>
+        }
+
+        <!-- The current line's name, under the line, while its ends are being worked on. -->
+        @if (s.nameLabel; as n) {
+          <text class="name-label" [attr.x]="n.x" [attr.y]="n.y"
+            [attr.font-size]="n.fontSize">{{ n.text }}</text>
+        }
+
+        <!-- The best VMGs, laid out to match the drawing above them. -->
+        @if (s.vmgPad; as pad) {
+          <path class="vmg-compass" [attr.d]="pad.compass.path"
+            [attr.transform]="'translate(' + pad.compass.x + ',' + pad.compass.y + ')'" />
+          @for (v of pad.values; track $index) {
+            <g class="vmg-value" [class.selected]="v.selected">
+              <text [attr.x]="v.x" [attr.y]="v.y"
+                [attr.font-size]="v.fontSize">{{ v.text }}</text>
+              <title>{{ v.title }}</title>
+            </g>
+          }
+          <text class="vmg-caption" [attr.x]="pad.caption.x" [attr.y]="pad.caption.y"
+            [attr.font-size]="pad.caption.fontSize">{{ pad.caption.text }}</text>
+        }
+
+        <!-- Every control this screen offers, drawn last so nothing can cover a target.
+             Each is a rounded rect with a glyph or a word in it, sized in viewBox units
+             so the controls scale with the widget. -->
+        @for (b of s.controls; track $index) {
+          <g class="control" [class.accent]="b.accent" role="button" tabindex="0"
+            [attr.aria-label]="b.title"
+            (click)="action.emit(b.action)"
+            (keydown.enter)="action.emit(b.action)"
+            (keydown.space)="action.emit(b.action)">
+            <rect [attr.x]="b.x - b.w / 2" [attr.y]="b.y - b.h / 2"
+              [attr.width]="b.w" [attr.height]="b.h"
+              [attr.rx]="b.rx" />
+            @if (b.glyph) {
+              <path class="control-glyph" [attr.d]="b.glyph"
+                [attr.transform]="'translate(' + b.x + ',' + b.y + ')'" />
+            }
+            @if (b.text) {
+              <text [attr.x]="b.x" [attr.y]="b.y + b.fontSize * 0.35"
+                [attr.font-size]="b.fontSize">{{ b.text }}</text>
+            }
+            <title>{{ b.title }}</title>
+          </g>
+        }
+
+        <!-- Setting an end: a target over each, larger than the mark it covers, so the
+             end can be hit even when the drawn mark is small. -->
+        @if (s.editEnds; as ends) {
+          <rect class="end-target port"
+            [attr.x]="ends.port.x - ends.port.size / 2" [attr.y]="ends.port.y - ends.port.size / 2"
+            [attr.width]="ends.port.size" [attr.height]="ends.port.size" [attr.rx]="ends.port.rx"
+            role="button" tabindex="0" [attr.aria-label]="ends.port.title"
+            (click)="endPressed.emit('port')"
+            (keydown.enter)="endPressed.emit('port')"
+            (keydown.space)="endPressed.emit('port')">
+            <title>{{ ends.port.title }}</title>
+          </rect>
+          <rect class="end-target stb"
+            [attr.x]="ends.stb.x - ends.stb.size / 2" [attr.y]="ends.stb.y - ends.stb.size / 2"
+            [attr.width]="ends.stb.size" [attr.height]="ends.stb.size" [attr.rx]="ends.stb.rx"
+            role="button" tabindex="0" [attr.aria-label]="ends.stb.title"
+            (click)="endPressed.emit('stb')"
+            (keydown.enter)="endPressed.emit('stb')"
+            (keydown.space)="endPressed.emit('stb')">
+            <title>{{ ends.stb.title }}</title>
+          </rect>
+        }
+
+      } @else {
+        <text class="no-line" [attr.x]="vbWidth() / 2" [attr.y]="VB_HEIGHT / 2">No start line set</text>
+      }
+
+      <!-- The screen button and the countdowns. Outside the scene because they have to be
+           there when there is no line to draw: a screen you cannot leave is a trap. The
+           countdowns are drawn before the controls and sit under the drawing's own
+           corner, where the boat crosses often enough to matter. -->
+      @for (r of chrome().readouts; track $index) {
+        <g class="readout">
+          <text [attr.x]="r.x" [attr.y]="r.y - r.valueSize * 0.55"
+            [attr.font-size]="r.captionSize">{{ r.caption }}</text>
+          <text class="readout-value" [attr.x]="r.valueX" [attr.y]="r.y"
+            [attr.font-size]="r.valueSize">{{ r.value }}</text>
+        </g>
+      }
+      @for (b of chrome().controls; track $index) {
+        <g class="control" [class.accent]="b.accent" role="button" tabindex="0"
+          [attr.aria-label]="b.title"
+          (click)="action.emit(b.action)"
+          (keydown.enter)="action.emit(b.action)"
+          (keydown.space)="action.emit(b.action)">
+          <rect [attr.x]="b.x - b.w / 2" [attr.y]="b.y - b.h / 2"
+            [attr.width]="b.w" [attr.height]="b.h" [attr.rx]="b.rx" />
+          @if (b.glyph) {
+            <path class="control-glyph" [attr.d]="b.glyph"
+              [attr.transform]="'translate(' + b.x + ',' + b.y + ')'" />
+          }
+          @if (b.text) {
+            <text [attr.x]="b.x" [attr.y]="b.y + b.fontSize * 0.35"
+              [attr.font-size]="b.fontSize">{{ b.text }}</text>
+          }
+          <title>{{ b.title }}</title>
+        </g>
+      }
+    </svg>
+  </div>
+</div>

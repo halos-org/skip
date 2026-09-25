@@ -72,6 +72,8 @@ const WIDGET_SETTING_UNITS: Record<string, string> = {
   numDecimal: 'count of decimals',
   'gauge.highlightsWidth': "width in the gauge's own drawing units",
   nextDashboard: 'dashboard index',
+  modeTimeout: 's',
+  viewSmoothing: 'percent of the drawing height the view may drift before it re-fits',
 };
 
 const OPTION_UNITS_RULE =

@@ -18,6 +18,7 @@ interface IPathIdentity {
   convertUnitTo?: string | null;
   source?: string | null;
   suppressBootstrapNull?: boolean;
+  enableTimeout?: boolean;
 }
 
 /**
@@ -46,7 +47,12 @@ export function widgetPathSignature(pathCfg: IPathIdentity | undefined | null): 
   const normalizedPath = normalizeWidgetPath(pathCfg?.path);
   if (!pathCfg || !normalizedPath) return null;
   const src = (pathCfg.source?.trim() || 'default');
-  return [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0'].join('|');
+  // All three timeout settings differ: an omitted one defers to the widget-level flag, so
+  // omitted and `true` are not the same subscription. Omitted stays '' so the signature of
+  // every path that does not set it is unchanged.
+  const timeout = pathCfg.enableTimeout === false ? 'nott' : pathCfg.enableTimeout === true ? 'tt' : '';
+  return [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0',
+    timeout].join('|');
 }
 
 /**
@@ -154,7 +160,7 @@ export class WidgetStreamsDirective implements OnDestroy {
     };
   }
 
-  private computePathSignature(pathCfg: { path: string; pathType: string; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean }): string {
+  private computePathSignature(pathCfg: { path: string; pathType: string; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean; enableTimeout?: boolean }): string {
     return widgetPathSignature(pathCfg) ?? '';
   }
 
@@ -200,7 +206,7 @@ export class WidgetStreamsDirective implements OnDestroy {
   }
 
   /** Create (or reuse) base observable, assemble pipeline, and subscribe with diff-aware replacement. */
-  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; convertUnitTo?: string; showConvertUnitTo?: boolean; source?: string; suppressBootstrapNull?: boolean }, observePointer?: string): void {
+  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; convertUnitTo?: string; showConvertUnitTo?: boolean; source?: string; suppressBootstrapNull?: boolean; enableTimeout?: boolean }, observePointer?: string): void {
     // The same test normalizeWidgetPath applies, kept as a split for its base path and pointer.
     const split = splitPointerPath(pathCfg.path);
     if (!split.valid || !split.basePath) {
@@ -236,7 +242,18 @@ export class WidgetStreamsDirective implements OnDestroy {
     }
     const base$ = this.streams!.get(pathName)!;
 
-    const enableTimeout = !!cfg.enableTimeout;
+    // A path may opt in or out of the stale-data TTL on its own, over whatever the widget
+    // says. The TTL assumes a path is fed continuously and nulls it when it goes quiet,
+    // which is right for a live reading and wrong for state: a start line is published when
+    // it changes and then not again, so the TTL erases a perfectly good line five seconds
+    // after it arrives.
+    //
+    // The per-path `true` is what a widget with no widget-level flag uses to keep its live
+    // readings honest - `enableTimeout` is not offered in the options dialog, so a widget
+    // that does not declare one has none, and a frozen reading would otherwise sit there
+    // looking live. Per-path `false` still wins over a widget-level `true`.
+    const enableTimeout = pathCfg.enableTimeout !== false
+      && (pathCfg.enableTimeout === true || !!cfg.enableTimeout);
     const dataTimeout = FIXED_DATA_TIMEOUT_MS;
     const retryDelay = 5000;
     const timeoutErrorMsg = `[Widget] ${cfg.displayName} - ${dataTimeout / 1000} second data update timeout reached for `;

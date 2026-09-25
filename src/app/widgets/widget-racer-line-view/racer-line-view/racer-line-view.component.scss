@@ -1,0 +1,303 @@
+:host {
+  overflow: clip;
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.line-wrapper {
+  width: 100%;
+  height: 100%;
+  min-height: 1px;
+  // Halo behind the labels so the dashed line does not show through them.
+  --racer-halo: var(--skip-widget-card-background-color);
+  // The along-the-line leg. Purple against the pink of the leg across to the line:
+  // neighbouring hues, so the two still read as one measurement in two parts, but far
+  // enough apart in tone that a glance pairs each label with its own rule.
+  --racer-zone-leg: var(--skip-purple-color);
+}
+
+// The drawing takes the whole component; the host widget floats its own controls over
+// the lower edge.
+.filler {
+  width: 100%;
+  height: 100%;
+}
+
+.line-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  font-family: Roboto, sans-serif;
+}
+
+.viz-title {
+  fill: var(--racer-dim);
+  font-size: 16px;
+}
+
+.start-line {
+  stroke: var(--racer-dim);
+  stroke-width: 4;
+  stroke-dasharray: 10 8;
+}
+
+// The line's length and the heading to cross it: context, not a reading to steer by, so
+// it takes the dim tone the title and the empty state use rather than the widget's full
+// contrast colour. It is the largest text on the drawing and was shouting over the
+// numbers that do have to be read.
+.line-label {
+  fill: var(--racer-dim);
+  stroke: var(--racer-halo);
+  stroke-width: 8;
+  paint-order: stroke;
+}
+
+.line-label {
+  // Sized by the scene, which shrinks it to fit a narrow widget.
+  text-anchor: middle;
+}
+
+
+.port-mark {
+  fill: var(--skip-port-color);
+  stroke: var(--racer-halo);
+  stroke-width: 1;
+}
+
+.stb-mark {
+  fill: var(--skip-starboard-color);
+  stroke: var(--racer-halo);
+  stroke-width: 1;
+}
+
+// An end with no position behind it: still drawn, so there is something to aim at, but
+// plainly not a mark on the water.
+.port-mark.undefined,
+.stb-mark.undefined {
+  fill: var(--skip-grey-color);
+  fill-opacity: 0.5;
+}
+
+.start-line.undefined {
+  stroke-opacity: 0.35;
+}
+
+// Over the line with the countdown still running: the one state worth interrupting for.
+// Alarm red rather than the port colour, which belongs to the pin at one end of it.
+.start-line.ocs {
+  stroke: var(--skip-zone-alarm-color);
+}
+
+// A start made from behind the line, held until the timer is reset. Plain green, not the
+// starboard colour - that marks the committee-boat end.
+.start-line.started {
+  stroke: var(--skip-green-color);
+}
+
+.line-label.undefined {
+  fill: var(--racer-dim);
+  fill-opacity: 0.7;
+}
+
+.projection {
+  stroke: var(--skip-blue-color);
+  stroke-linecap: round;
+}
+
+.wind-arrow {
+  fill: var(--racer-color);
+  fill-opacity: 0.65;
+}
+
+// The start zone boundary: the line's extensions and the 45 degree wedges. Kept well
+// back so the start line itself stays the dominant object.
+.zone-guide {
+  stroke: var(--racer-dim);
+  stroke-width: 1.2;
+  stroke-opacity: 0.6;
+  stroke-dasharray: 4 5;
+}
+
+// The distance vectors, drawn the way a drawing dimensions a distance - a thin rule with a
+// tick at each end and its value set into a break in it - so they read as a measurement
+// rather than as a course to steer.
+.dimension {
+  line {
+    stroke: var(--skip-pink-color);
+    stroke-width: 1.5;
+    stroke-opacity: 0.9;
+  }
+
+  text {
+    fill: var(--skip-pink-color);
+    // Size comes from LEG_FONT on the element - a font-size here would override it,
+    // CSS beating a presentation attribute.
+    font-weight: bold;
+    stroke: var(--racer-halo);
+    stroke-width: 4;
+    paint-order: stroke;
+  }
+
+  // The leg sailed first - along the line, into the start zone - in its own shade: a
+  // darker pink, carried by the rule, its end ticks and its label alike, so that when
+  // the two legs meet at a corner it is obvious which distance belongs to which.
+  &.leading {
+    line,
+    .dimension-ticks {
+      stroke: var(--racer-zone-leg);
+    }
+
+    text {
+      fill: var(--racer-zone-leg);
+    }
+  }
+}
+
+.dimension-ticks {
+  stroke: var(--skip-pink-color);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+// Where the boat reaches at the gun along those legs.
+.gun-mark circle {
+  fill: var(--racer-halo);
+  stroke: var(--skip-pink-color);
+  stroke-width: 2.5;
+}
+
+.boat {
+  // One hull outline, filled: the vessel at true scale and nothing added to it.
+  fill: var(--skip-blue-color);
+
+  &.ocs {
+    fill: var(--skip-orange-color);
+  }
+}
+
+.no-line {
+  fill: var(--racer-dim);
+  font-size: 16px;
+  text-anchor: middle;
+}
+
+// Edit mode: a target over each end, bigger than the mark under it so the end stays
+// reachable when the line is drawn small. Tinted rather than invisible, because an
+// invisible control is one nobody presses.
+.end-target {
+  cursor: pointer;
+  outline: none;
+  // Filled like every other control rather than outlined, and saturated enough to read
+  // as a button - but still a tint, because the mark it covers has to show through it.
+  fill: var(--skip-contrast-color);
+  fill-opacity: 0.45;
+  stroke: none;
+
+  &.port {
+    fill: var(--skip-port-color);
+  }
+
+  &.stb {
+    fill: var(--skip-starboard-color);
+  }
+
+  // As with the controls: reachable and operable from the keyboard, but with no ring
+  // left behind on the one last pressed.
+  &:focus,
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// Controls drawn into the SVG, so they sit beside the marks they act on and scale with
+// the drawing rather than with the browser's idea of a button.
+.control {
+  cursor: pointer;
+
+  rect {
+    fill: var(--skip-grey-color);
+  }
+
+  &.accent rect {
+    fill: var(--skip-blue-color);
+  }
+
+  text {
+    fill: var(--skip-on-grey-color);
+    font-weight: bold;
+    text-anchor: middle;
+  }
+
+  &.accent text {
+    fill: var(--skip-on-blue-color);
+  }
+
+  .control-glyph {
+    fill: none;
+    stroke: var(--skip-on-grey-color);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &.accent .control-glyph {
+    fill: var(--skip-on-blue-color);
+    stroke: none;
+  }
+
+  // No focus ring. These are drawn controls in a glanceable instrument, and a ring left
+  // behind on the last one pressed reads as state the widget does not have. They stay
+  // keyboard-reachable and keyboard-operable; only the indicator is gone.
+  &:focus,
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// The line in use, named under the line it names.
+.name-label {
+  fill: var(--racer-color);
+  font-weight: bold;
+  text-anchor: middle;
+}
+
+// Countdowns in the corner: a small caption and the time beside it.
+.readout {
+  // The caption carries the same weight and colour as the widget's own title: it names
+  // the reading rather than being one, and at this size bold made it compete with it.
+  text {
+    fill: var(--racer-dim);
+    font-weight: normal;
+  }
+
+  .readout-value {
+    fill: var(--racer-color);
+    font-weight: bold;
+  }
+}
+
+// The best-VMG pad: the numbers read as readings, the caption as the label it needs to
+// say what unit they are in.
+.vmg-value text {
+  fill: var(--racer-color);
+  font-weight: bold;
+  text-anchor: middle;
+}
+
+// The one the adjust buttons are pointed at.
+.vmg-value.selected text {
+  fill: var(--skip-orange-color);
+}
+
+// The four-way arrow the values are arranged around: it is what says which value is
+// which, so it is drawn quietly and read as a diagram, not as a control.
+.vmg-compass {
+  fill: var(--racer-dim);
+  fill-opacity: 0.55;
+}
+
+.vmg-caption {
+  fill: var(--racer-dim);
+  text-anchor: middle;
+}
