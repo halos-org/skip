@@ -987,6 +987,16 @@ describe('SvgWindsteerComponent', () => {
             expect(dot().getAttribute('cy')).toBe('300');
         });
 
+        it('marks the dot as the VMC dot only in VMC mode, so it takes the colour of the curve it compares against', () => {
+            setRequiredInputs({ polarOverlayMode: 'polar', polarCurve: CURVE, overlayDotRadius: 150 });
+            fixture.detectChanges();
+            expect(dot().classList.contains('vmc-dot')).toBe(false);
+
+            fixture.componentRef.setInput('polarOverlayMode', 'vmc');
+            fixture.detectChanges();
+            expect(dot().classList.contains('vmc-dot')).toBe(true);
+        });
+
         describe('easing between updates', () => {
             const LOBE_A: OverlayPoint[] = [{ angle: 0, r: 100 }, { angle: Math.PI / 2, r: 0 }, { angle: Math.PI, r: 0 }, { angle: -Math.PI / 2, r: 100 }];
             const LOBE_B: OverlayPoint[] = [{ angle: 0, r: 200 }, { angle: Math.PI / 2, r: 0 }, { angle: Math.PI, r: 0 }, { angle: -Math.PI / 2, r: 200 }];

@@ -170,12 +170,21 @@ svg {
 // Polar overlay. Widths are viewBox units sized for the smallest tile (~215 px, 1 px ≈ 4.65 units):
 // the edge stays ≥ 1.5 px and the dot ≥ 6 px across. Polar and VMC modes differ by treatment
 // (bare line vs filled lobe), not only colour, so they stay apart in the single-hue night theme.
+// Polar is blue and VMC purple, and the dot takes its mode's colour, so the dot reads as STW
+// against the polar curve and as VMC against the lobe.
 .polar-curve,
 .vmc-edge {
-  stroke: var(--skip-purple-color);
   stroke-width: 8;
   stroke-linejoin: round;
   fill: none;
+}
+
+.polar-curve {
+  stroke: var(--skip-blue-color);
+}
+
+.vmc-edge {
+  stroke: var(--skip-purple-color);
 }
 
 .vmc-fill {
@@ -197,7 +206,11 @@ svg {
 }
 
 .polar-dot {
-  fill: var(--skip-purple-color);
+  fill: var(--skip-blue-color);
   stroke: var(--skip-contrast-color);
   stroke-width: 4;
+}
+
+.polar-dot.vmc-dot {
+  fill: var(--skip-purple-color);
 }
