@@ -1,4 +1,4 @@
-import { Component, OnDestroy, inject, ChangeDetectionStrategy, input, effect, untracked, signal, computed, linkedSignal, WritableSignal } from '@angular/core';
+import { Component, OnDestroy, inject, ChangeDetectionStrategy, input, effect, untracked, signal, computed, WritableSignal } from '@angular/core';
 import { Subscription, interval } from 'rxjs';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { POLAR_OVERLAY_DIAL_RADIUS, POLAR_OVERLAY_PEAK_RADIUS, PolarOverlayMode, SvgWindsteerComponent, WindTraceSample } from '../svg-windsteer/svg-windsteer.component';
@@ -8,7 +8,7 @@ import { IPathUpdate } from '../../core/services/data.service';
 import { ITheme } from '../../core/services/app-service';
 import { UnitsService } from '../../core/services/units.service';
 import { ActivePolarService } from '../../core/services/active-polar.service';
-import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, PolarSpeedProfile, VmcOptimum, normalizeRadians, polarCurve, polarSpeedProfile, speedToRadius, vmcCurve, vmcDotRadius, vmcOptimum } from '../../core/utils/polar-overlay.util';
+import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, normalizeRadians, polarCurve, polarSpeedProfile, speedToRadius, vmcCurve, vmcDotRadius } from '../../core/utils/polar-overlay.util';
 import { presentationValue } from '../../core/utils/si-presentation.util';
 import { PolarResult, PolarTargets } from '../../core/utils/polar-engine.util';
 
@@ -400,27 +400,6 @@ export class WidgetWindComponent implements OnDestroy {
     const bearing = this.waypointAngle();
     if (!profile || !scale || bearing == null) return null;
     return vmcCurve(profile, this.overlayTwd(), bearing, scale);
-  });
-  /**
-   * The best VMC heading on each tack, null for a tack with no positive VMC; null outside VMC mode.
-   * Each tack's previous marker is passed on, so it holds its peak until another clearly beats it.
-   */
-  protected vmcOptima = linkedSignal<
-    { profile: PolarSpeedProfile; scale: OverlayScale; twd: number; btw: number } | null,
-    { port: VmcOptimum | null; starboard: VmcOptimum | null } | null
-  >({
-    source: () => {
-      const profile = this.vmcSpeedProfile();
-      const scale = this.overlayScale();
-      const btw = this.waypointAngle();
-      return profile && scale && btw != null ? { profile, scale, twd: this.overlayTwd(), btw } : null;
-    },
-    computation: (inputs, previous) => {
-      if (!inputs) return null;
-      const optimum = (tack: 'port' | 'starboard'): VmcOptimum | null =>
-        vmcOptimum(inputs.profile, inputs.twd, inputs.btw, inputs.scale, tack, previous?.value?.[tack]?.twa ?? null);
-      return { port: optimum('port'), starboard: optimum('starboard') };
-    }
   });
   /** Radius of the dot on the bow axis; null hides it. */
   protected overlayDotRadius = computed<number | null>(() => {

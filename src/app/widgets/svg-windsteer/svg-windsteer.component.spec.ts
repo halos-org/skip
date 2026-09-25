@@ -904,31 +904,6 @@ describe('SvgWindsteerComponent', () => {
             expect(vmcEdge().getAttribute('d')).toBe('M 570.7,429.3 L 600.0,500.0 M 400.0,500.0 L 429.3,429.3');
         });
 
-        it('marks each tack\'s best VMC heading with a ring inside the rotating dial', () => {
-            setRequiredInputs({
-                polarOverlayMode: 'vmc', vmcCurve: CURVE,
-                vmcOptima: { port: { angle: Math.PI / 2, r: 100, twa: 1 }, starboard: { angle: -Math.PI / 2, r: 200, twa: 1 } }
-            });
-            fixture.detectChanges();
-            const port = fixture.nativeElement.querySelector('#PortTackVmcOptimum') as SVGCircleElement;
-            const stbd = fixture.nativeElement.querySelector('#StbdTackVmcOptimum') as SVGCircleElement;
-            expect([port.getAttribute('cx'), port.getAttribute('cy')]).toEqual(['600.0', '500.0']);
-            expect([stbd.getAttribute('cx'), stbd.getAttribute('cy')]).toEqual(['300.0', '500.0']);
-            expect(port.getAttribute('class')).toBe('vmc-optimum');
-            expect(component['rotatingDial']().nativeElement.contains(port)).toBe(true);
-        });
-
-        it('leaves a tack without a best heading unmarked, and marks nothing outside VMC mode', () => {
-            setRequiredInputs({ polarOverlayMode: 'vmc', vmcCurve: CURVE, vmcOptima: { port: null, starboard: { angle: 0, r: 100, twa: 1 } } });
-            fixture.detectChanges();
-            expect(fixture.nativeElement.querySelector('#PortTackVmcOptimum')).toBeNull();
-            expect(fixture.nativeElement.querySelector('#StbdTackVmcOptimum')).not.toBeNull();
-
-            setInput('polarOverlayMode', 'polar');
-            fixture.detectChanges();
-            expect(fixture.nativeElement.querySelector('#StbdTackVmcOptimum')).toBeNull();
-        });
-
         it('stacks the groups per the layer order: VMC after the tack lines, polar after the compass, dot after the crosshair', () => {
             setRequiredInputs();
             fixture.detectChanges();
@@ -1042,18 +1017,6 @@ describe('SvgWindsteerComponent', () => {
                 expect(vmcFill().getAttribute('d')).toContain('500.0,350.0');
                 frames.run(1000);
                 expect(vmcEdge().getAttribute('d')).toBe('M 300.0,500.0 L 500.0,300.0');
-            });
-
-            it('eases the VMC markers to a new optimum', () => {
-                const frames = frameQueue();
-                setRequiredInputs({ polarOverlayMode: 'vmc', vmcCurve: LOBE_A, vmcOptima: { port: null, starboard: { angle: 0, r: 100, twa: 1 } } });
-                fixture.detectChanges();
-                setInput('vmcOptima', { port: null, starboard: { angle: 0, r: 200, twa: 1 } });
-                fixture.detectChanges();
-                frames.run(500);
-                expect(fixture.nativeElement.querySelector('#StbdTackVmcOptimum').getAttribute('cy')).toBe('350.0');
-                frames.run(1000);
-                expect(fixture.nativeElement.querySelector('#StbdTackVmcOptimum').getAttribute('cy')).toBe('300.0');
             });
 
             it('draws the lobe without easing when the overlay switches to VMC mode', () => {

@@ -175,8 +175,6 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly polarCurve = input<OverlayPoint[] | null>(null);
   protected readonly polarCurveRotation = input<number>(0);
   protected readonly vmcCurve = input<OverlayPoint[] | null>(null);
-  /** Each tack's best VMC heading on the VMC curve, in its compass frame; null for a tack without one. */
-  protected readonly vmcOptima = input<{ port: OverlayPoint | null; starboard: OverlayPoint | null } | null>(null);
   protected readonly overlayDotRadius = input<number | null>(null);
 
   // Angle inputs arrive in rad; the rotation attributes and dial geometry below work in degrees.
@@ -219,15 +217,11 @@ export class SvgWindsteerComponent implements OnDestroy {
   private readonly polarCurveTween = new OverlayTween<OverlayPoint[]>(interpolateOverlay);
   private readonly vmcCurveTween = new OverlayTween<OverlayPoint[]>(interpolateOverlay);
   private readonly overlayDotTween = new OverlayTween<number>((from, to, t) => t >= 1 ? to : from + (to - from) * t);
-  private readonly portOptimumTween = new OverlayTween<OverlayPoint>((from, to, t) => interpolateOverlay([from], [to], t)[0]);
-  private readonly stbdOptimumTween = new OverlayTween<OverlayPoint>((from, to, t) => interpolateOverlay([from], [to], t)[0]);
 
   protected readonly polarCurvePath = computed(() => this.overlayPath(this.polarCurveTween.shown(), false));
   protected readonly vmcFillPath = computed(() => this.overlayPath(this.vmcCurveTween.shown(), true));
   protected readonly vmcEdgePath = computed(() =>
     vmcEdgeRuns(this.vmcCurveTween.shown() ?? []).map(run => this.overlayPath(run, false)).join(' '));
-  protected readonly portOptimumCenter = computed(() => this.overlayCenter(this.portOptimumTween.shown()));
-  protected readonly stbdOptimumCenter = computed(() => this.overlayCenter(this.stbdOptimumTween.shown()));
   /** Y of the dot's center on the bow axis, or null when it is hidden. */
   protected readonly overlayDotY = computed(() => {
     const r = this.overlayDotTween.shown();
@@ -483,14 +477,6 @@ export class SvgWindsteerComponent implements OnDestroy {
     });
     effect(() => {
       const mode = this.polarOverlayMode();
-      const optima = mode === 'vmc' ? this.vmcOptima() : null;
-      untracked(() => {
-        this.portOptimumTween.to(optima?.port ?? null, mode, this.animationDuration(), this.ngZone);
-        this.stbdOptimumTween.to(optima?.starboard ?? null, mode, this.animationDuration(), this.ngZone);
-      });
-    });
-    effect(() => {
-      const mode = this.polarOverlayMode();
       const r = this.overlayDotRadius();
       const shown = mode !== 'hidden' && r != null && Number.isFinite(r) ? r : null;
       untracked(() => this.overlayDotTween.to(shown, mode, this.animationDuration(), this.ngZone));
@@ -594,17 +580,9 @@ export class SvgWindsteerComponent implements OnDestroy {
   /** A `d` path through overlay points: angle clockwise from up, r from the dial center. */
   private overlayPath(points: OverlayPoint[] | null, closed: boolean): string {
     if (!points?.length) return '';
-    const coords = points.map(point => { const { x, y } = this.overlayXY(point); return `${x},${y}`; });
+    const coords = points.map(({ angle, r }) =>
+      `${(this.CENTER + r * Math.sin(angle)).toFixed(1)},${(this.CENTER - r * Math.cos(angle)).toFixed(1)}`);
     return `M ${coords.join(' L ')}${closed ? ' Z' : ''}`;
-  }
-
-  /** An overlay point's SVG coordinates, to one decimal; null for no point. */
-  private overlayCenter(point: OverlayPoint | null): { x: string; y: string } | null {
-    return point ? this.overlayXY(point) : null;
-  }
-
-  private overlayXY({ angle, r }: OverlayPoint): { x: string; y: string } {
-    return { x: (this.CENTER + r * Math.sin(angle)).toFixed(1), y: (this.CENTER - r * Math.cos(angle)).toFixed(1) };
   }
 
   /** A wedge from the dial center across the rim, clockwise from one dial angle to another (degrees). */
@@ -629,8 +607,6 @@ export class SvgWindsteerComponent implements OnDestroy {
     this.polarCurveTween.stop();
     this.vmcCurveTween.stop();
     this.overlayDotTween.stop();
-    this.portOptimumTween.stop();
-    this.stbdOptimumTween.stop();
 
     this.traceGrowthCancel?.();
     for (const line of [this.portTackCloseHauledLine, this.stbdTackCloseHauledLine, this.portTackRunLine, this.stbdTackRunLine]) line.stop();

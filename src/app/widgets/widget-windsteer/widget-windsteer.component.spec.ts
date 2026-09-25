@@ -9,7 +9,7 @@ import { IPathUpdate } from '../../core/services/data.service';
 import { IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ActivePolarService, ActivePolarStatus } from '../../core/services/active-polar.service';
 import { Polar, PolarResult, PolarTargets, toCanonicalPolarTable } from '../../core/utils/polar-engine.util';
-import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, VMC_HEADING_STEP, VmcOptimum, polarCurve, polarSpeedProfile, speedToRadius, vmcOptimum } from '../../core/utils/polar-overlay.util';
+import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, VMC_HEADING_STEP, polarCurve, speedToRadius } from '../../core/utils/polar-overlay.util';
 import { PolarOverlayMode, WindTraceSample } from '../svg-windsteer/svg-windsteer.component';
 import { SI_VERSION_KEY, V20_MIGRATION_OUTPUT_VERSION } from '../../core/utils/config-migration.util';
 import hurmaPolar from '../../core/utils/polar-engine.hurma-polar.fixture.json';
@@ -786,7 +786,6 @@ describe('WidgetWindComponent polar overlay', () => {
     overlayMode: () => PolarOverlayMode;
     polarCurvePoints: () => OverlayPoint[] | null;
     vmcCurvePoints: () => OverlayPoint[] | null;
-    vmcOptima: () => { port: VmcOptimum | null; starboard: VmcOptimum | null } | null;
     overlayTwa: () => number;
     overlayDotRadius: () => number | null;
   }
@@ -1170,37 +1169,6 @@ describe('WidgetWindComponent polar overlay', () => {
       const points = view.vmcCurvePoints();
       expect(points).not.toBeNull();
       expect(Math.abs(angleDiff(longestSpoke(points ?? []).angle, best.heading))).toBeLessThanOrEqual(VMC_HEADING_STEP + 1e-9);
-    });
-
-    it('marks the best VMC heading on each tack for a waypoint dead upwind', () => {
-      create(makeConfig());
-      feedWind(TWS_MS, 45);
-      feedWaypoint(30, 75);
-
-      const profile = polarSpeedProfile(hurma, TWS_MS, 1);
-      const optima = view.vmcOptima();
-      for (const tack of ['port', 'starboard'] as const) {
-        const expected = vmcOptimum(profile, 75 * DEG, 75 * DEG, scaleOf(hurma), tack, null);
-        expect(expected).not.toBeNull();
-        expect(angleDiff(optima?.[tack]?.angle ?? NaN, expected!.angle)).toBeCloseTo(0, 6);
-        expect(optima?.[tack]?.r).toBeCloseTo(expected!.r, 6);
-      }
-      expect(angleDiff(75 * DEG, optima?.port?.angle ?? NaN)).toBeLessThan(0);
-    });
-
-    it('leaves the tack with no positive VMC unmarked', () => {
-      create(makeConfig());
-      feedWind(TWS_MS, 45);
-      feedWaypoint(30, 10);
-      expect(view.vmcOptima()?.port).toBeNull();
-      expect(view.vmcOptima()?.starboard).not.toBeNull();
-    });
-
-    it('marks nothing in polar mode', () => {
-      create(makeConfig());
-      feedWind();
-      expect(view.overlayMode()).toBe('polar');
-      expect(view.vmcOptima()).toBeNull();
     });
 
     it('scales every VMC spoke by the performance factor', () => {

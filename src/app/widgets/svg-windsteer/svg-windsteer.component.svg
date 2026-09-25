@@ -554,12 +554,6 @@
       <g id="layerVmcCurve" [style.display]="vmcFillPath() ? 'inline' : 'none'">
         <path class="vmc-fill" [attr.d]="vmcFillPath() || null" />
         <path class="vmc-edge" [attr.d]="vmcEdgePath() || null" />
-        @if (portOptimumCenter(); as center) {
-          <circle id="PortTackVmcOptimum" class="vmc-optimum" [attr.cx]="center.x" [attr.cy]="center.y" r="14" />
-        }
-        @if (stbdOptimumCenter(); as center) {
-          <circle id="StbdTackVmcOptimum" class="vmc-optimum" [attr.cx]="center.x" [attr.cy]="center.y" r="14" />
-        }
       </g>
       <g #wptIndicator
         [attr.display]="waypointActive() && compassModeEnabled() ? 'inline' : 'none'">

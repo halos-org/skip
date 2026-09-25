@@ -192,13 +192,6 @@ svg {
   fill-opacity: 0.3;
 }
 
-// A ring, not a filled dot, so the best-heading markers read apart from the present-VMC dot.
-.vmc-optimum {
-  fill: var(--skip-widget-card-background-color);
-  stroke: var(--skip-purple-color);
-  stroke-width: 6;
-}
-
 // The halo cuts a gap into the curve under the dot, so the dot stays apart from a same-colour line
 // (the night theme maps both to one red).
 .polar-dot-halo {

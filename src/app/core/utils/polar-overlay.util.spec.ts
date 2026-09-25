@@ -12,8 +12,7 @@ import {
   speedToRadius,
   vmcCurve,
   vmcDotRadius,
-  vmcEdgeRuns,
-  vmcOptimum
+  vmcEdgeRuns
 } from './polar-overlay.util';
 import hurmaPolar from './polar-engine.hurma-polar.fixture.json';
 
@@ -368,78 +367,6 @@ describe('polar-overlay.util', () => {
       const runs = vmcEdgeRuns(vmcCurve(polarSpeedProfile(synthetic, 6, 1), 0, 0, scaleFor(synthetic)));
       expect(runs.length).toBe(2);
       expect(runs.flat().every(point => point.r > 0)).toBe(true);
-    });
-  });
-
-  describe('vmcOptimum', () => {
-    /** The heading with the best VMC on one tack (TWA sign +1 starboard, −1 port), at 0.01° resolution. */
-    function analyticTackBest(polar: Polar, tws: number, twd: number, btw: number, sign: 1 | -1): { heading: number; vmc: number } {
-      let best = { heading: 0, vmc: -Infinity };
-      for (let twa = FINE_STEP; twa <= Math.PI; twa += FINE_STEP) {
-        const heading = twd - sign * twa;
-        const vmc = (polar.speedAt({ tws, twa }).value ?? 0) * Math.cos(heading - btw);
-        if (vmc > best.vmc) best = { heading, vmc };
-      }
-      return best;
-    }
-
-    const beatCases: { label: string; polar: Polar; tws: number; twd: number; btw: number }[] = [
-      { label: 'synthetic, waypoint dead upwind', polar: synthetic, tws: 6, twd: 0, btw: 0 },
-      { label: 'synthetic, waypoint 15° off the wind', polar: synthetic, tws: 6, twd: 0, btw: 15 * DEG },
-      { label: 'test-server polar, waypoint 10° off the wind', polar: hurma, tws: 5, twd: 1.0, btw: 1.0 + 10 * DEG }
-    ];
-    for (const { label, polar, tws, twd, btw } of beatCases) {
-      it(`marks each tack's best VMC heading between the samples (${label})`, () => {
-        const profile = polarSpeedProfile(polar, tws, 1);
-        const scale = scaleFor(polar);
-        for (const [tack, sign] of [['starboard', 1], ['port', -1]] as const) {
-          const optimum = vmcOptimum(profile, twd, btw, scale, tack, null);
-          const best = analyticTackBest(polar, tws, twd, btw, sign);
-          expect(optimum).not.toBeNull();
-          expect(Math.abs(angleDiff(optimum!.angle, best.heading))).toBeLessThan(VMC_HEADING_STEP / 2);
-          expect(Math.abs(optimum!.r - speedToRadius(best.vmc, scale))).toBeLessThan(1);
-          expect(Math.sign(angleDiff(twd, optimum!.angle))).toBe(sign);
-        }
-      });
-    }
-
-    it('refines the peak off the sample grid', () => {
-      const optimum = vmcOptimum(polarSpeedProfile(synthetic, 6, 1), 0, 15 * DEG, scaleFor(synthetic), 'starboard', null);
-      const steps = optimum!.twa / VMC_HEADING_STEP;
-      expect(Math.abs(steps - Math.round(steps))).toBeGreaterThan(0.01);
-    });
-
-    it('marks nothing on a tack whose VMC is never positive', () => {
-      // Waypoint 60° left of the wind with a 40° beat: every port-tack heading points away from it.
-      const profile = polarSpeedProfile(synthetic, 6, 1);
-      expect(vmcOptimum(profile, 0, -60 * DEG, scaleFor(synthetic), 'port', null)).toBeNull();
-      expect(vmcOptimum(profile, 0, -60 * DEG, scaleFor(synthetic), 'starboard', null)).not.toBeNull();
-    });
-
-    describe('with two peaks on one tack', () => {
-      const scale: OverlayScale = { peakSpeed: 1, peakRadius: PEAK_RADIUS, dialRadius: DIAL_RADIUS };
-      const lastIndex = Math.round(Math.PI / VMC_HEADING_STEP);
-      /** A profile whose starboard-tack VMC toward a dead-downwind waypoint has bumps at TWA 140° and 170°. */
-      const twoPeaks = (second: number): number[] => Array.from({ length: lastIndex + 1 }, (_unused, index) => {
-        const twaDeg = index * VMC_HEADING_STEP / DEG;
-        const vmc = Math.exp(-(((twaDeg - 140) / 6) ** 2)) + second * Math.exp(-(((twaDeg - 170) / 6) ** 2));
-        const cosine = -Math.cos(index * VMC_HEADING_STEP);
-        return cosine > 0 ? vmc / cosine : 0;
-      });
-      const twaDegOf = (profile: number[], previousTwa: number | null): number =>
-        vmcOptimum(profile, 0, Math.PI, scale, 'starboard', previousTwa)!.twa / DEG;
-
-      it('without a previous marker, takes the higher peak', () => {
-        expect(twaDegOf(twoPeaks(1.01), null)).toBeCloseTo(170, 0);
-      });
-
-      it('keeps the previous peak while the other beats it by less than the margin', () => {
-        expect(twaDegOf(twoPeaks(1.01), 141 * DEG)).toBeCloseTo(140, 0);
-      });
-
-      it('moves to the other peak once it beats the previous one by more than the margin', () => {
-        expect(twaDegOf(twoPeaks(1.05), 141 * DEG)).toBeCloseTo(170, 0);
-      });
     });
   });
 
