@@ -700,3 +700,44 @@ describe('v22 -> v23: dotted compound sub-field paths to pointer form', () => {
     expect(sink.errors).toHaveLength(1);
   });
 });
+
+describe('v23 -> v24: the heel gauge reads any angle path', () => {
+  // The heel gauge slot as the v16 step left it: the whole attitude leaf, fixed and hidden.
+  const fixedSlot = (): Record<string, unknown> => ({
+    description: 'Heel / Roll Angle', path: 'self.navigation.attitude', source: 'default', pathType: 'number',
+    isPathConfigurable: false, convertUnitTo: 'deg', showConvertUnitTo: false, pathRequired: true
+  });
+  const angleSlot = (config: Record<string, unknown>) => (config['paths'] as Record<string, Record<string, unknown>>)['angle'];
+  const migrate = (widgets: { type: string; config: Record<string, unknown> }[]) =>
+    migrateOneAppVersion(configWith(23, widgets), 23, recordingSink()) as IConfig;
+
+  it('makes a heel gauge\'s fixed attitude slot a configurable roll pointer path, and stamps v24', () => {
+    const migrated = migrate([{ type: 'widget-heel-gauge', config: { paths: { angle: fixedSlot() } } }]);
+    expect(migrated.app?.configVersion).toBe(24);
+    expect(angleSlot(widgetConfigs(migrated)[0])).toEqual({
+      ...fixedSlot(),
+      description: 'Angle',
+      path: 'self.navigation.attitude#/roll',
+      isPathConfigurable: true,
+      showPathSkUnitsFilter: false,
+      pathSkUnitsFilter: 'rad'
+    });
+  });
+
+  it('keeps the data source a user chose', () => {
+    const migrated = migrate([{ type: 'widget-heel-gauge', config: { paths: { angle: { ...fixedSlot(), source: 'n2k.1' } } } }]);
+    expect(angleSlot(widgetConfigs(migrated)[0])['source']).toBe('n2k.1');
+  });
+
+  it('leaves the Pitch & Roll horizon on its fixed attitude path', () => {
+    const migrated = migrate([{ type: 'widget-horizon', config: { paths: { gaugePath: fixedSlot() } } }]);
+    expect(widgetConfigs(migrated)[0]).toEqual({ paths: { gaugePath: fixedSlot() } });
+  });
+
+  it('is idempotent', () => {
+    const once = migrate([{ type: 'widget-heel-gauge', config: { paths: { angle: fixedSlot() } } }]);
+    const expected = { ...angleSlot(widgetConfigs(once)[0]) };
+    const twice = migrateOneAppVersion({ ...once, app: { ...once.app, configVersion: 23 } } as IConfig, 23, recordingSink()) as IConfig;
+    expect(angleSlot(widgetConfigs(twice)[0])).toEqual(expected);
+  });
+});

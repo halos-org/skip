@@ -32,6 +32,7 @@ export const V20_MIGRATION_OUTPUT_VERSION = 20;
 export const V21_MIGRATION_OUTPUT_VERSION = 21;
 export const V22_MIGRATION_OUTPUT_VERSION = 22;
 export const V23_MIGRATION_OUTPUT_VERSION = 23;
+export const V24_MIGRATION_OUTPUT_VERSION = 24;
 
 /**
  * The per-widget SI marker: the version of the last SI step whose shape a widget config is in.
@@ -558,6 +559,7 @@ export function migrateOneAppVersion(config: IConfig, fromVersion: number, sink:
     case 20: return upgradeConfigV20toV21(config, sink);
     case 21: return upgradeConfigV21toV22(config, sink);
     case 22: return upgradeConfigV22toV23(config, sink);
+    case 23: return upgradeConfigV23toV24(config, sink);
     default: return null;
   }
 }
@@ -1175,6 +1177,48 @@ function upgradeConfigV22toV23(config: IConfig, sink: MigrationMessageSink): ICo
     return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
   } catch (error) {
     sink.error(`[Upgrade Service] Error upgrading v22->v23: ${(error as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * v23 -> v24: the heel gauge reads any angle path, not only the roll. Its slot, which the v16 step
+ * fixed and hid on the whole attitude leaf, becomes a configurable number path on the roll field
+ * (`self.navigation.attitude#/roll`) filtered to angles, so the options dialog offers a path
+ * picker. The data source stays as stored. Idempotent: a pointer path is left as it is.
+ */
+function upgradeConfigV23toV24(config: IConfig, sink: MigrationMessageSink): IConfig | null {
+  try {
+    const appConfig = config.app;
+    if (!appConfig || appConfig.configVersion !== 23) {
+      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v23 config. Skipping...`);
+      return null;
+    }
+
+    let opened = 0;
+    if (Array.isArray(config.dashboards)) {
+      for (const dash of config.dashboards) {
+        if (!dash || !Array.isArray(dash.configuration)) continue;
+        for (const widget of dash.configuration) {
+          const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
+          if (wp?.type !== 'widget-heel-gauge') continue;
+          const paths = wp.config?.['paths'] as Record<string, WidgetConfigRecord> | undefined;
+          const slot = paths?.['angle'];
+          if (!slot || typeof slot !== 'object') continue;
+          if (slot['path'] === 'self.navigation.attitude') slot['path'] = 'self.navigation.attitude#/roll';
+          if (slot['isPathConfigurable'] !== true) opened++;
+          Object.assign(slot, { description: 'Angle', isPathConfigurable: true, showPathSkUnitsFilter: false, pathSkUnitsFilter: 'rad' });
+        }
+      }
+    }
+    if (opened) {
+      sink.info(`[Upgrade] Made ${opened} heel gauge path(s) configurable, reading the roll by default.`);
+    }
+
+    appConfig.configVersion = V24_MIGRATION_OUTPUT_VERSION;
+    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
+  } catch (error) {
+    sink.error(`[Upgrade Service] Error upgrading v23->v24: ${(error as Error).message}`);
     return null;
   }
 }
