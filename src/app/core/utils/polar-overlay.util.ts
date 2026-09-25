@@ -124,62 +124,6 @@ export function interpolateOverlay(from: readonly OverlayPoint[], to: OverlayPoi
   });
 }
 
-/** A tack's best VMC heading: `twa` unsigned in rad, `angle` the true heading in rad, `r` its scaled VMC. */
-export interface VmcOptimum extends OverlayPoint { readonly twa: number }
-
-/**
- * How much (as a fraction) another VMC peak on the same tack must beat the marked one before the
- * marker moves to it, so it does not flip between two nearly equal peaks.
- */
-export const VMC_OPTIMUM_SWITCH_MARGIN = 0.02;
-
-/**
- * The best VMC heading on one tack toward BTW, or null when no heading on that tack has a positive
- * VMC. The best sample is refined with a parabola through its neighbours, so the marker moves
- * smoothly between the 2° samples. With the previous marker's TWA given, the marker stays on the
- * peak nearest it unless another peak beats that one by VMC_OPTIMUM_SWITCH_MARGIN. TWD and BTW in rad.
- */
-export function vmcOptimum(
-  profile: PolarSpeedProfile, twd: number, btw: number, scale: OverlayScale,
-  tack: 'port' | 'starboard', previousTwa: number | null
-): VmcOptimum | null {
-  const lastIndex = profile.length - 1;
-  // TWA = TWD − heading is positive with the wind over starboard.
-  const sign = tack === 'starboard' ? 1 : -1;
-  // Past dead downwind the samples continue on the other tack, mirrored in the profile.
-  const vmcAt = (index: number): number =>
-    profile[index > lastIndex ? 2 * lastIndex - index : index] * Math.cos(twd - sign * index * VMC_HEADING_STEP - btw);
-
-  let best = -1;
-  for (let index = 1; index <= lastIndex; index += 1) {
-    const vmc = vmcAt(index);
-    if (vmc > 0 && (best < 0 || vmc > vmcAt(best))) best = index;
-  }
-  if (best < 0) return null;
-
-  let peak = best;
-  if (previousTwa !== null) {
-    let local = Math.min(lastIndex, Math.max(1, Math.round(previousTwa / VMC_HEADING_STEP)));
-    for (;;) {
-      const up = local < lastIndex && vmcAt(local + 1) > vmcAt(local) ? local + 1 : local;
-      const next = local > 1 && vmcAt(local - 1) > vmcAt(up) ? local - 1 : up;
-      if (next === local) break;
-      local = next;
-    }
-    if (vmcAt(local) > 0 && vmcAt(best) <= vmcAt(local) * (1 + VMC_OPTIMUM_SWITCH_MARGIN)) peak = local;
-  }
-
-  const [before, at, after] = [vmcAt(peak - 1), vmcAt(peak), vmcAt(peak + 1)];
-  const curvature = before - 2 * at + after;
-  // A peak on the edge of the in-irons wedge, where the polar speed drops to 0, is not a smooth
-  // maximum; a parabola through the edge would overshoot it.
-  const smooth = before > 0 && after > 0 && curvature < 0;
-  const offset = smooth ? Math.min(0.5, Math.max(-0.5, (before - after) / (2 * curvature))) : 0;
-  const vmc = at - (before - after) * offset / 4;
-  const twa = Math.min(Math.PI, (peak + offset) * VMC_HEADING_STEP);
-  return { twa, angle: normalizeRadians(twd - sign * twa), r: speedToRadius(vmc, scale) };
-}
-
 /** Radius of the VMC dot on the bow axis from STW · cos(HDG − BTW); null when that is zero or less. */
 export function vmcDotRadius(stw: number, hdg: number, btw: number, scale: OverlayScale): number | null {
   const vmc = stw * Math.cos(hdg - btw);

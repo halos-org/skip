@@ -258,17 +258,13 @@ describe('WidgetWindComponent rendering from SI inputs', () => {
       polarDot,
       vmc: pathSummary(attr('path.vmc-fill', 'd')),
       vmcEdge: pathSummary(attr('path.vmc-edge', 'd')),
-      vmcDot: Number(attr('circle.polar-dot', 'cy')).toFixed(3),
-      portOptimum: attr('#PortTackVmcOptimum', 'cx'),
-      stbdOptimum: `${attr('#StbdTackVmcOptimum', 'cx')},${attr('#StbdTackVmcOptimum', 'cy')}`
+      vmcDot: Number(attr('circle.polar-dot', 'cy')).toFixed(3)
     }).toEqual({
       polarRotation: 'rotate(45 500 500)',
       polarDot: '249.234',
       vmc: '180 points, Σx 88685.4, Σy 79998.0',
       vmcEdge: '59 points, Σx 28185.4, Σy 19498.0',
-      vmcDot: '264.357',
-      portOptimum: null,
-      stbdOptimum: '523.4,224.9'
+      vmcDot: '264.357'
     });
     expect(attr('path.vmc-edge', 'd')).not.toContain('500.0,500.0');
   });
