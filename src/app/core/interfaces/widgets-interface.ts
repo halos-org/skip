@@ -383,9 +383,9 @@ export interface IWidgetSvcConfig {
 
   /** Used by wind Widget: when true the compass dial rotates in relation to the vessel heading and all widget data is adjusted accordingly. If false the compass dial remains fixed and data is not adjusted */
   compassModeEnabled?: boolean;
-  /** Used by wind Widget: enable/disable wind sector UI feature */
+  /** Used by wind Widgets: show the wind shifts (fading traces on the Wind Steer, sectors on the Race Steer) */
   windSectorEnable?: boolean;
-  /** Used by wind Widget: duration to track wind shift in the sector UI feature */
+  /** Used by wind Widgets: how long the wind shifts are kept, s (the traces fade out over it) */
   windSectorWindowSeconds?: number;
   /** Used by wind Widget: show the close-hauled lines, the headings at the close-hauled angle either side of the true wind */
   closeHauledLineEnable?: boolean;

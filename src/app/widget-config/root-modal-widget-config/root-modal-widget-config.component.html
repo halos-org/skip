@@ -323,12 +323,12 @@
                   name="windSectorEnable"
                   formControlName="windSectorEnable"
                 >
-                  Wind Sectors
+                  Wind Shifts
                 </mat-checkbox>
               }
               @if ((widgetConfig?.windSectorEnable !== undefined)) {
                 <mat-form-field>
-                  <mat-label>Sector Duration (sec)</mat-label>
+                  <mat-label>Wind Shift Window (sec)</mat-label>
                   <input
                     type="number"
                     min="1"
