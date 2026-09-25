@@ -96,12 +96,27 @@ svg {
   stroke-dasharray: 8, 16;
 }
 
-.wind-sector-port {
+// Each wind sample paints a wedge that fades out over the trace window; overlapping wedges build up,
+// so where the wind has sat most shows strongest.
+.wind-trace {
+  stroke: none;
+  opacity: var(--wind-trace-peak);
+  animation-name: wind-trace-fade;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.wind-trace-port {
   fill: var(--skip-port-color);
 }
 
-.wind-sector-stbd {
+.wind-trace-stbd {
   fill: var(--skip-starboard-color);
+}
+
+@keyframes wind-trace-fade {
+  from { opacity: var(--wind-trace-peak); }
+  to { opacity: 0; }
 }
 
 .drift {

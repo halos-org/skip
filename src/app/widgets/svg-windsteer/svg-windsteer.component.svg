@@ -536,6 +536,12 @@
         }
       </g>
       <!-- Moved inside rotating dial so they rotate passively with the boat -->
+      <g id="LayerWindShift" [style.display]="windTraceEnabled() ? 'inline' : 'none'" [style.--wind-trace-peak]="tracePeakOpacity()">
+        @for (trace of traceWedges(); track trace.id) {
+          <path class="wind-trace wind-trace-port" [attr.d]="trace.port" [style.animation-duration.s]="windTraceSeconds()" />
+          <path class="wind-trace wind-trace-stbd" [attr.d]="trace.stbd" [style.animation-duration.s]="windTraceSeconds()" />
+        }
+      </g>
       <g id="LayerCloseHauledLines" [style.display]="closeHauledLineEnabled() && trueWindFresh() ? 'inline' : 'none'">
         <path id="StbdTackCloseHauledLine" class="close-hauled-line" [attr.d]="stbdTackCloseHauledLine.path() || null" />
         <path id="PortTackCloseHauledLine" class="close-hauled-line" [attr.d]="portTackCloseHauledLine.path() || null" />
@@ -544,18 +550,6 @@
         <path id="StbdTackRunLine" class="run-line" [attr.d]="stbdTackRunLine.path() || null" />
         <path id="PortTackRunLine" class="run-line" [attr.d]="portTackRunLine.path() || null" />
       </g>
-      <g id="LayerWindShift" [style.display]="windSectorEnabled() ? 'inline' : 'none'">
-        <path id="PortTackSector"
-          [style.display]="portTackSectorPath() ? 'inline' : 'none'"
-          [attr.d]="portTackSectorPath() || null"
-          class="wind-sector-port"
-          style="fill-opacity:0.5;stroke:none" />
-        <path id="StbdTackSector"
-          [style.display]="stbdTackSectorPath() ? 'inline' : 'none'"
-          [attr.d]="stbdTackSectorPath() || null"
-          class="wind-sector-stbd"
-          style="fill-opacity:0.5;stroke:none" />
-     </g>
       <!-- VMC curve: compass frame (angle = true heading), so it turns with the dial like the waypoint marker -->
       <g id="layerVmcCurve" [style.display]="vmcFillPath() ? 'inline' : 'none'">
         <path class="vmc-fill" [attr.d]="vmcFillPath() || null" />

@@ -1,8 +1,9 @@
 import { Component, ElementRef, input, viewChild, signal, computed, effect, untracked, ChangeDetectionStrategy, OnDestroy, NgZone, inject } from '@angular/core';
-import { animateProgress, animateRotation, animateSectorTransition, effectiveAnimationDuration, SectorAngles } from '../../core/utils/svg-animate.util';
+import { animateProgress, animateRotation, effectiveAnimationDuration } from '../../core/utils/svg-animate.util';
 import { DecimalPipe } from '@angular/common';
 import { OverlayPoint, interpolateOverlay, vmcEdgeRuns } from '../../core/utils/polar-overlay.util';
 import { toDegrees } from '../../core/utils/si-presentation.util';
+import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../../core/interfaces/widgets-interface';
 
 /** Polar overlay state the parent resolves: hidden, the polar curve, or the VMC curve. */
 export type PolarOverlayMode = 'hidden' | 'polar' | 'vmc';
@@ -11,7 +12,18 @@ export const POLAR_OVERLAY_PEAK_RADIUS = 300;
 /** The dial radius, in viewBox units, and so the outer limit of the overlay. */
 export const POLAR_OVERLAY_DIAL_RADIUS = 350;
 
-const angle = ([a, b], [c, d], [e, f]) => (Math.atan2(f - d, e - c) - Math.atan2(b - d, a - c) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+/** One true-wind sample of the wind shift traces: the direction swept from `from` to `to`, rad. */
+export interface WindTraceSample { readonly id: number; readonly from: number; readonly to: number }
+
+/** Narrowest wind shift trace, degrees, so a sample in a steady wind still shows. */
+const MIN_TRACE_WIDTH_DEG = 2;
+/** Opacity a lone trace starts at; also the most any one trace starts at. */
+const MAX_TRACE_PEAK_OPACITY = 0.35;
+/**
+ * The summed starting opacity of a window's traces. Each trace starts at this over the samples in
+ * the window, so a steady wind builds to the same strength at any update rate.
+ */
+const TRACE_WINDOW_OPACITY = 3;
 
 /**
  * An overlay element's drawn state. It eases from what is drawn to each new target over one update
@@ -133,7 +145,7 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly runLineAngle = input<number | null>(null);
   protected readonly closeHauledLineEnabled = input.required<boolean>();
   protected readonly sailSetupEnabled = input.required<boolean>();
-  protected readonly windSectorEnabled = input.required<boolean>();
+  protected readonly windTraceEnabled = input.required<boolean>();
   protected readonly driftEnabled = input.required<boolean>();
   protected readonly setArrowActive = input<boolean>(false);
   protected readonly driftSet = input<number | undefined>(undefined);
@@ -141,9 +153,9 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly driftUnit = input<string>('');
   protected readonly waypointAngle = input<number | undefined>(undefined);
   protected readonly waypointEnabled = input.required<boolean>();
-  protected readonly trueWindMinHistoric = input<number | undefined>(undefined);
-  protected readonly trueWindMidHistoric = input<number | undefined>(undefined);
-  protected readonly trueWindMaxHistoric = input<number | undefined>(undefined);
+  /** The true wind samples of the last `windTraceSeconds`, oldest first. */
+  protected readonly windTrace = input<readonly WindTraceSample[]>([]);
+  protected readonly windTraceSeconds = input.required<number>();
   // Rudder-angle bar: signed rad, +ve = starboard (right). null hides the bar.
   protected readonly rudderAngle = input<number | null>(null);
   protected readonly rudderEnabled = input<boolean>(false);
@@ -176,9 +188,6 @@ export class SvgWindsteerComponent implements OnDestroy {
   private readonly runLineAngleDeg = computed(() => { const a = this.runLineAngle(); return a == null ? null : toDegrees(a); });
   private readonly driftSetDeg = computed(() => toDegrees(this.driftSet()));
   private readonly waypointAngleDeg = computed(() => toDegrees(this.waypointAngle()));
-  private readonly trueWindMinHistoricDeg = computed(() => toDegrees(this.trueWindMinHistoric()));
-  private readonly trueWindMidHistoricDeg = computed(() => toDegrees(this.trueWindMidHistoric()));
-  private readonly trueWindMaxHistoricDeg = computed(() => toDegrees(this.trueWindMaxHistoric()));
   private readonly rudderAngleDeg = computed(() => { const a = this.rudderAngle(); return a == null ? null : toDegrees(a); });
   private readonly polarCurveRotationDeg = computed(() => toDegrees(this.polarCurveRotation()));
 
@@ -225,19 +234,43 @@ export class SvgWindsteerComponent implements OnDestroy {
     return r === null ? null : this.CENTER - r;
   });
 
+  /** How far the newest trace has grown toward its sample, in step with the close-hauled line's ease. */
+  private readonly traceGrowth = signal<{ id: number; progress: number } | null>(null);
+  private traceGrowthCancel: (() => void) | null = null;
+  private newestTraceId: number | null = null;
+  protected readonly tracePeakOpacity = computed(() => {
+    const interval = this.updateInterval();
+    const samples = this.windTraceSeconds() * 1000 / (interval && interval > 0 ? interval : DEFAULT_WIDGET_UPDATE_INTERVAL_MS);
+    return Number(Math.min(MAX_TRACE_PEAK_OPACITY, TRACE_WINDOW_OPACITY / samples).toFixed(3));
+  });
+
   // Close-hauled and run lines, named by the tack whose course they mark: a heading clockwise of the
   // true wind has the wind on the port side.
   protected readonly portTackCloseHauledLine = new DialLine(angle => this.dialLinePath(angle));
   protected readonly stbdTackCloseHauledLine = new DialLine(angle => this.dialLinePath(angle));
   protected readonly portTackRunLine = new DialLine(angle => this.dialLinePath(angle));
   protected readonly stbdTackRunLine = new DialLine(angle => this.dialLinePath(angle));
-  // Wind sectors, named by tack like the lines
-  private portSectorPrev = { min: 0, mid: 0, max: 0 };
-  private stbdSectorPrev = { min: 0, mid: 0, max: 0 };
-  private portSectorCancel: (() => void) | null = null;
-  private stbdSectorCancel: (() => void) | null = null;
-  protected portTackSectorPath = signal<string>("");
-  protected stbdTackSectorPath = signal<string>("");
+  /**
+   * The wind shift traces: each sample's swept wedge, offset by the close-hauled angle to either tack
+   * like the close-hauled lines. The samples are true wind directions, so they are placed in the dial
+   * frame as they are in compass mode and less the heading in simple mode.
+   */
+  protected readonly traceWedges = computed(() => {
+    const closeHauled = Number(this.closeHauledLineAngleDeg()) || 0;
+    const headingOffset = this.compassModeEnabled() ? 0 : Number(this.compassHeadingDeg()) || 0;
+    const growth = this.traceGrowth();
+    return this.windTrace().map(({ id, from, to }) => {
+      const fromDeg = toDegrees(from) - headingOffset;
+      // The newest trace is painted as the close-hauled line eases across it.
+      const progress = growth?.id === id ? growth.progress : 1;
+      const [start, end] = traceSpan(fromDeg, fromDeg + dialTurn(fromDeg, toDegrees(to) - headingOffset) * progress);
+      return {
+        id,
+        port: this.wedgePath(start + closeHauled, end + closeHauled),
+        stbd: this.wedgePath(start - closeHauled, end - closeHauled)
+      };
+    });
+  });
   // Rotation Animation
   private animationFrameIds = new WeakMap<SVGGElement, number>();
 
@@ -297,12 +330,11 @@ export class SvgWindsteerComponent implements OnDestroy {
             animateRotation(this.rotatingDial().nativeElement, -this.compass.oldValue, -this.compass.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
           // The COG and true-wind pointers sit in the boat frame, so a heading change turns them
-          // (with the dial); the tack lines and sectors are in the dial frame and redraw in place.
+          // (with the dial); the tack lines are in the dial frame and redraw in place.
           const animate = !isFirstCompass && this.compass.oldValue !== this.compass.newValue;
           if (this.cogInitialized) this.placeCogPointer(animate);
           if (this.twaInitialized) this.placeTrueWindPointer(animate);
           this.updateTackLines(false);
-          this.updateWindSectors(false);
         }
       });
     });
@@ -390,6 +422,19 @@ export class SvgWindsteerComponent implements OnDestroy {
       });
     });
 
+    // A new trace grows with the close-hauled line's ease; the traces present at first draw do not.
+    effect(() => {
+      const newest = this.windTrace().at(-1)?.id ?? null;
+      untracked(() => {
+        const previous = this.newestTraceId;
+        this.newestTraceId = newest;
+        if (newest === null || previous === null || newest === previous) return;
+        this.traceGrowthCancel?.();
+        this.traceGrowth.set({ id: newest, progress: 0 });
+        this.traceGrowthCancel = animateProgress(this.animationDuration(), progress => this.traceGrowth.set({ id: newest, progress }), this.ngZone);
+      });
+    });
+
     // Recompute the tack lines when their angles change or a set is switched on or off
     effect(() => {
       void this.closeHauledLineAngleDeg();
@@ -472,26 +517,6 @@ export class SvgWindsteerComponent implements OnDestroy {
       });
     });
 
-    // Ensure wind sectors update on min/mid/max or close-hauled angle changes, and clear when disabled
-    effect(() => {
-      const enabled = this.windSectorEnabled();
-      // establish dependencies without unused vars warnings
-      void this.trueWindMinHistoricDeg();
-      void this.trueWindMidHistoricDeg();
-      void this.trueWindMaxHistoricDeg();
-      void this.closeHauledLineAngleDeg();
-
-      untracked(() => {
-        if (!enabled) {
-          // stop any ongoing sector animations and hide paths
-          this.stopSectorAnimations();
-          this.portTackSectorPath.set('');
-          this.stbdTackSectorPath.set('');
-          return;
-        }
-        this.updateWindSectors(true);
-      });
-    });
   }
 
   // Dial-local placement: convert a boat-relative angle into the rotating dial's local frame
@@ -582,103 +607,16 @@ export class SvgWindsteerComponent implements OnDestroy {
     return { x: (this.CENTER + r * Math.sin(angle)).toFixed(1), y: (this.CENTER - r * Math.cos(angle)).toFixed(1) };
   }
 
+  /** A wedge from the dial center across the rim, clockwise from one dial angle to another (degrees). */
+  private wedgePath(fromDeg: number, toDeg: number): string {
+    const [x1, y1] = this.dialPoint(fromDeg);
+    const [x2, y2] = this.dialPoint(toDeg);
+    return `M ${this.CENTER},${this.CENTER} L ${x1.toFixed(1)},${y1.toFixed(1)} A ${this.RADIUS},${this.RADIUS} 0 0 1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`;
+  }
+
   private dialLinePath(angleDeg: number): string {
     const [x, y] = this.dialPoint(angleDeg);
     return `M ${this.CENTER},${this.CENTER} L ${Math.floor(x)},${Math.floor(y)}`;
-  }
-
-  private windSectorsInitialized = false;
-
-  private updateWindSectors(animate = true) {
-    const min = this.trueWindMinHistoricDeg();
-    const mid = this.trueWindMidHistoricDeg();
-    const max = this.trueWindMaxHistoricDeg();
-    if (
-      !this.windSectorEnabled() ||
-      min == null ||
-      mid == null ||
-      max == null
-    ) {
-      // No sector data (e.g. true wind absent): cancel any in-flight sector animation and clear
-      // the paths, mirroring the disable branch, so a running frame can't overwrite the cleared
-      // path and leave a stale sector on screen.
-      this.stopSectorAnimations();
-      this.windSectorsInitialized = false;
-      this.portTackSectorPath.set('');
-      this.stbdTackSectorPath.set('');
-      return;
-    }
-
-    const portNew = { min, mid, max };
-    const stbdNew = { min, mid, max };
-
-    if (!this.windSectorsInitialized) {
-      this.windSectorsInitialized = true;
-      if (animate) {
-        this.animateWindSector(portNew, portNew, true);
-        this.animateWindSector(stbdNew, stbdNew, false);
-      } else {
-        this.stopSectorAnimations();
-        this.portTackSectorPath.set(this.computeSectorPath(portNew, true));
-        this.stbdTackSectorPath.set(this.computeSectorPath(stbdNew, false));
-      }
-      this.portSectorPrev = portNew;
-      this.stbdSectorPrev = stbdNew;
-      return;
-    }
-
-    if (animate) {
-      // Gate tiny sector animations
-      const smallMove =
-        Math.abs(dialTurn(this.portSectorPrev.min, portNew.min)) < DIAL_EPSILON_DEG &&
-        Math.abs(dialTurn(this.portSectorPrev.mid, portNew.mid)) < DIAL_EPSILON_DEG &&
-        Math.abs(dialTurn(this.portSectorPrev.max, portNew.max)) < DIAL_EPSILON_DEG;
-      if (smallMove) {
-        this.stopSectorAnimations();
-        this.portTackSectorPath.set(this.computeSectorPath(portNew, true));
-        this.stbdTackSectorPath.set(this.computeSectorPath(stbdNew, false));
-      } else {
-        this.animateWindSector(this.portSectorPrev, portNew, true);
-        this.animateWindSector(this.stbdSectorPrev, stbdNew, false);
-      }
-    } else {
-      // No animation requested (e.g., heading-only updates)
-      this.stopSectorAnimations();
-      this.portTackSectorPath.set(this.computeSectorPath(portNew, true));
-      this.stbdTackSectorPath.set(this.computeSectorPath(stbdNew, false));
-    }
-
-    this.portSectorPrev = portNew;
-    this.stbdSectorPrev = stbdNew;
-  }
-
-  private animateWindSector(from: SectorAngles, to: SectorAngles, isPortTack: boolean) {
-    (isPortTack ? this.portSectorCancel : this.stbdSectorCancel)?.();
-    const setCancel = (cancel: (() => void) | null) => {
-      if (isPortTack) this.portSectorCancel = cancel; else this.stbdSectorCancel = cancel;
-    };
-    const setPath = (sector: SectorAngles) => {
-      const path = this.computeSectorPath(sector, isPortTack);
-      if (isPortTack) this.portTackSectorPath.set(path); else this.stbdTackSectorPath.set(path);
-    };
-
-    const smallMove =
-      Math.abs(dialTurn(from.min, to.min)) < DIAL_EPSILON_DEG &&
-      Math.abs(dialTurn(from.mid, to.mid)) < DIAL_EPSILON_DEG &&
-      Math.abs(dialTurn(from.max, to.max)) < DIAL_EPSILON_DEG;
-    if (smallMove) {
-      setCancel(null);
-      setPath(to);
-      return;
-    }
-    setCancel(animateSectorTransition(from, to, this.animationDuration(), setPath, () => setCancel(null), this.ngZone));
-  }
-
-  private stopSectorAnimations(): void {
-    this.portSectorCancel?.();
-    this.stbdSectorCancel?.();
-    this.portSectorCancel = null;
-    this.stbdSectorCancel = null;
   }
 
   private addHeading(h1 = 0, h2 = 0) {
@@ -694,9 +632,8 @@ export class SvgWindsteerComponent implements OnDestroy {
     this.portOptimumTween.stop();
     this.stbdOptimumTween.stop();
 
+    this.traceGrowthCancel?.();
     for (const line of [this.portTackCloseHauledLine, this.stbdTackCloseHauledLine, this.portTackRunLine, this.stbdTackRunLine]) line.stop();
-
-    this.stopSectorAnimations();
 
     // Cancel any animateRotation frames tracked in WeakMap for known elements
     const els: (ElementRef<SVGGElement> | undefined)[] = [
@@ -717,24 +654,14 @@ export class SvgWindsteerComponent implements OnDestroy {
     }
   }
 
-  private computeSectorPath(state: { min: number, mid: number, max: number }, isPortTack: boolean): string {
-    const lay = Number(this.closeHauledLineAngleDeg()) || 0;
-    const offset = lay * (isPortTack ? 1 : -1);
-    // Sector min/mid/max are the true wind DIRECTION (absolute compass). Convert to boat-relative
-    // using the actual boat heading -- not compass.newValue, which the dial forces to 0 in simple
-    // mode -- then place in the dial's local frame via toDialLocal.
-    const heading = Number(this.compassHeadingDeg()) || 0;
-    const minAngle = this.toDialLocal(this.addHeading(this.addHeading(state.min, -heading), offset));
-    const midAngle = this.toDialLocal(this.addHeading(this.addHeading(state.mid, -heading), offset));
-    const maxAngle = this.toDialLocal(this.addHeading(this.addHeading(state.max, -heading), offset));
+}
 
-    const [minX, minY] = this.dialPoint(minAngle);
-    const [midX, midY] = this.dialPoint(midAngle);
-    const [maxX, maxY] = this.dialPoint(maxAngle);
-
-    const largeArcFlag = Math.abs(angle([minX, minY], [midX, midY], [maxX, maxY])) > Math.PI / 2 ? 0 : 1;
-    const sweepFlag = angle([maxX, maxY], [minX, minY], [midX, midY]) > 0 ? 0 : 1;
-
-    return `M ${this.CENTER},${this.CENTER} L ${minX},${minY} A ${this.RADIUS},${this.RADIUS} 0 ${largeArcFlag} ${sweepFlag} ${maxX},${maxY} z`;
+/** A sample's swept span as [start, end] dial degrees, clockwise, at least MIN_TRACE_WIDTH_DEG wide. */
+function traceSpan(fromDeg: number, toDeg: number): [number, number] {
+  const turn = dialTurn(fromDeg, toDeg);
+  if (Math.abs(turn) < MIN_TRACE_WIDTH_DEG) {
+    const center = fromDeg + turn / 2;
+    return [center - MIN_TRACE_WIDTH_DEG / 2, center + MIN_TRACE_WIDTH_DEG / 2];
   }
+  return turn > 0 ? [fromDeg, fromDeg + turn] : [toDeg, toDeg - turn];
 }

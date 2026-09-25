@@ -74,7 +74,7 @@ Skip widgets turn Signal K data into readable visuals and controls. Available wi
 - **Sea Horizon** – Marine attitude indicator in a steel case: heel scale with caution and alarm bands, trim ladder, LCD readouts, and optional damping.
 - **Classic Steel** – Traditional steel-look linear & radial gauges with range sizes and zone highlights.
 - **Steel Compass** – Classic steel binnacle compass: the card turns under a fixed pointer, heading on an LCD window.
-- **Windsteer** – Combines wind, wind sectors, heading, COG, and waypoint info for wind steering. Its optional polar overlay needs a polars resource provider, such as `signalk-polar-management`, with an active polar; the curve follows the water-referenced true wind, so it can sit offset from the pointer when the Ground wind angle is shown.
+- **Windsteer** – Combines wind, fading wind shift traces, heading, COG, and waypoint info for wind steering. Its optional polar overlay needs a polars resource provider, such as `signalk-polar-management`, with an active polar; the curve follows the water-referenced true wind, so it can sit offset from the pointer when the Ground wind angle is shown.
 - **Wind Trends** – Real-time True Wind trends with dual axes for direction and speed, live values, and averages.
 - **Battery Monitor** - Display batteries or whole banks state State of Charge, remaining capacity, remaining time, voltage, current, power flow, and temperature.
 - **Solar Charger**- Track solar generation and charging performance at a glance with live panel output, battery-side metrics, and clear charger and relay status indicators.

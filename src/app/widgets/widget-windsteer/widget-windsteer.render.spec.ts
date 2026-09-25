@@ -41,7 +41,7 @@ const readyPolar = {
 
 /**
  * What the widget draws for a set of SI inputs, read from the rendered SVG: rotation attributes,
- * close-hauled line and wind-sector paths, and the text readouts. Pins the rendering so a change of
+ * close-hauled line and wind shift trace paths, and the text readouts. Pins the rendering so a change of
  * the unit the widget computes in cannot move anything on screen.
  */
 describe('WidgetWindComponent rendering from SI inputs', () => {
@@ -175,7 +175,7 @@ describe('WidgetWindComponent rendering from SI inputs', () => {
     expect(text('driftUnit')).toBe('kn');
   });
 
-  it('places the close-hauled lines and the wind sectors at the polar beat angle, and the run lines at its run angle', () => {
+  it('places the close-hauled lines and the wind shift traces at the polar beat angle, and the run lines at its run angle', () => {
     render(makeConfig({ runLineEnable: true }));
     feedAngle('headingPath', 0);
     feed('polarTrueWindSpeed', 5, 'm/s');
@@ -193,38 +193,40 @@ describe('WidgetWindComponent rendering from SI inputs', () => {
     expect({
       portTackLine: angleOf('#PortTackCloseHauledLine'),
       stbdTackLine: angleOf('#StbdTackCloseHauledLine'),
-      portTackSector: angleOf('#PortTackSector'),
-      stbdTackSector: angleOf('#StbdTackSector'),
+      portTackTrace: angleOf('path.wind-trace-port'),
+      stbdTackTrace: angleOf('path.wind-trace-stbd'),
       portTackRun: angleOf('#PortTackRunLine'),
       stbdTackRun: angleOf('#StbdTackRunLine')
     }).toEqual({
       portTackLine: beatDeg,
       stbdTackLine: 360 - beatDeg,
-      portTackSector: beatDeg,
-      stbdTackSector: 360 - beatDeg,
+      // A steady wind's trace is 2° wide, centred on the line; its path starts at the lower edge.
+      portTackTrace: beatDeg - 1,
+      stbdTackTrace: 360 - beatDeg - 1,
       portTackRun: runDeg,
       stbdTackRun: 360 - runDeg
     });
     expect(beatDeg).not.toBe(45);
   });
 
-  it('spans the wind sector across north without a 358° swing', () => {
+  it('sweeps the wind shift traces across north without a 358° swing', () => {
     render(makeConfig());
     feedAngle('headingPath', 0);
     feedAngle('trueWindAngle', 358);
     vi.advanceTimersByTime(200);
     feedAngle('trueWindAngle', 2);
-    vi.advanceTimersByTime(1000);
     settle();
 
-    const sectors = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('path'))
-      .map(path => path.getAttribute('d') ?? '')
-      .filter(d => d.includes(' A 350,350 '))
-      .map(d => d.replace(/\d+\.\d+/g, n => Number(n).toFixed(1)));
-    expect(sectors).toEqual([
-      'M 500,500 L 738.7,244.0 A 350,350 0 0 1 756.0,261.3 z',
-      'M 500,500 L 244.0,261.3 A 350,350 0 0 1 261.3,244.0 z'
-    ]);
+    // Rim edges of each trace wedge, dial degrees: the steady first sample, then the 358°→2° sweep.
+    const edges = (selector: string): number[][] =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll(selector)).map(path => {
+        const pairs = [...(path.getAttribute('d') ?? '').matchAll(/(-?[\d.]+),(-?[\d.]+)/g)];
+        return [pairs[1], pairs[3]].map(([, x, y]) => Math.round(((Math.atan2(+x - 500, 500 - +y) / DEG) + 360) % 360));
+      });
+    expect({ port: edges('path.wind-trace-port'), stbd: edges('path.wind-trace-stbd') }).toEqual({
+      port: [[42, 44], [43, 47]],
+      stbd: [[312, 314], [313, 317]]
+    });
   });
 
   it('draws the rudder bar from a signed rudder angle', () => {

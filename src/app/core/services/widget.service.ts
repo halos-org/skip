@@ -489,7 +489,7 @@ export class WidgetService {
     },
     {
       name: 'Windsteer',
-      description: 'A wind steering display that combines wind, wind sectors, heading, course over ground and next waypoint information.',
+      description: 'A wind steering display that combines wind, wind shift traces, heading, course over ground and next waypoint information.',
       icon: 'windsteeringWidget',
       minWidth: 1,
       minHeight: 2,

@@ -10,7 +10,7 @@ import { IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-int
 import { ActivePolarService, ActivePolarStatus } from '../../core/services/active-polar.service';
 import { Polar, PolarResult, PolarTargets, toCanonicalPolarTable } from '../../core/utils/polar-engine.util';
 import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, VMC_HEADING_STEP, VmcOptimum, polarCurve, polarSpeedProfile, speedToRadius, vmcOptimum } from '../../core/utils/polar-overlay.util';
-import { PolarOverlayMode } from '../svg-windsteer/svg-windsteer.component';
+import { PolarOverlayMode, WindTraceSample } from '../svg-windsteer/svg-windsteer.component';
 import { SI_VERSION_KEY, V20_MIGRATION_OUTPUT_VERSION } from '../../core/utils/config-migration.util';
 import hurmaPolar from '../../core/utils/polar-engine.hurma-polar.fixture.json';
 
@@ -113,11 +113,11 @@ describe('WidgetWindComponent live compass-mode toggle (#73)', () => {
 });
 
 /**
- * Wind sectors and close-hauled line gating are driven by TRUE wind, not apparent wind.
- * The sector history must be fed only from the true-wind stream, and trueWindFresh
- * must track whether the configured true-wind path is currently delivering a value.
+ * The wind shift traces and the close-hauled line gating are driven by TRUE wind, not apparent
+ * wind. The traces must be fed only from the true-wind stream, and trueWindFresh must track
+ * whether the configured true-wind path is currently delivering a value.
  */
-describe('WidgetWindComponent true-wind sector source', () => {
+describe('WidgetWindComponent wind shift traces', () => {
   let component: WidgetWindComponent;
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
   let callbacks: Map<string, (u: IPathUpdate) => void>;
@@ -128,7 +128,8 @@ describe('WidgetWindComponent true-wind sector source', () => {
     windSectorEnable: true
   });
   const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' });
-  const sampleCount = (): number => (component as unknown as { windSamples: unknown[] }).windSamples.length;
+  const trace = (): readonly WindTraceSample[] => (component as unknown as { windTrace: () => readonly WindTraceSample[] }).windTrace();
+  const sampleCount = (): number => trace().length;
   const active = (): boolean => (component as unknown as { trueWindFresh: () => boolean }).trueWindFresh();
 
   beforeEach(() => {
@@ -148,12 +149,79 @@ describe('WidgetWindComponent true-wind sector source', () => {
     TestBed.tick();
   });
 
-  it('feeds the sector history from true wind and not from apparent wind', () => {
+  it('feeds the wind shift traces from true wind and not from apparent wind', () => {
+    callbacks.get('headingPath')!(update(0));
     callbacks.get('appWindAngle')!(update(30));
-    expect(sampleCount()).toBe(0); // apparent wind no longer feeds the sector history
+    expect(sampleCount()).toBe(0); // apparent wind does not feed the traces
 
     callbacks.get('trueWindAngle')!(update(40));
     expect(sampleCount()).toBe(1); // true wind does
+  });
+
+  describe('sample FIFO', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => { component.ngOnDestroy(); vi.useRealTimers(); });
+    const start = (config: Partial<IWidgetSvcConfig> = {}): void => {
+      options.set({ ...makeConfig(), ...config });
+      component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+      TestBed.tick();
+      callbacks.get('headingPath')!(update(0));
+    };
+    const sweeps = (): number[][] => trace().map(({ from, to }) => [from, to].map(angle => Number(angle.toFixed(6))));
+
+    it('sweeps each sample from the one before, and drops samples older than the window', () => {
+      start();
+      callbacks.get('trueWindAngle')!(update(0.1));
+      vi.advanceTimersByTime(3000);
+      callbacks.get('trueWindAngle')!(update(0.2));
+      expect(sweeps()).toEqual([[0.1, 0.1], [0.1, 0.2]]);
+
+      vi.advanceTimersByTime(3000); // the first sample is now 6 s old, past the 5 s window
+      expect(sweeps()).toEqual([[0.1, 0.2]]);
+      vi.advanceTimersByTime(3000);
+      expect(trace()).toEqual([]);
+    });
+
+    it('follows a configured window length', () => {
+      start({ windSectorWindowSeconds: 2 });
+      callbacks.get('trueWindAngle')!(update(0.1));
+      vi.advanceTimersByTime(3000);
+      expect(trace()).toEqual([]);
+    });
+
+    it('starts a sample after a gap longer than the window from its own direction', () => {
+      start();
+      callbacks.get('trueWindAngle')!(update(0.1));
+      vi.advanceTimersByTime(5500); // past the window, before the next cleanup tick drops it
+      callbacks.get('trueWindAngle')!(update(0.3));
+      expect(sweeps()).toEqual([[0.3, 0.3]]);
+    });
+
+    it('records nothing until the heading is known, so a boat-relative angle is not taken for a direction', () => {
+      options.set(makeConfig());
+      component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+      TestBed.tick();
+      callbacks.get('trueWindAngle')!(update(0.1));
+      expect(trace()).toEqual([]);
+      callbacks.get('headingPath')!(update(1.0));
+      callbacks.get('trueWindAngle')!(update(0.1));
+      expect(sweeps()).toEqual([[1.1, 1.1]]);
+    });
+
+    it('clears the traces and stops sampling with the option off, and starts afresh when it is back on', () => {
+      start();
+      callbacks.get('trueWindAngle')!(update(0.1));
+      options.set({ ...makeConfig(), windSectorEnable: false });
+      TestBed.tick();
+      expect(trace()).toEqual([]);
+      callbacks.get('trueWindAngle')!(update(0.2));
+      expect(trace()).toEqual([]);
+
+      options.set(makeConfig());
+      TestBed.tick();
+      callbacks.get('trueWindAngle')!(update(0.3));
+      expect(sweeps()).toEqual([[0.3, 0.3]]);
+    });
   });
 
   it('freezes true wind on a null sample and clears trueWindFresh only after the data TTL', () => {
@@ -937,7 +1005,7 @@ describe('WidgetWindComponent polar overlay', () => {
       expect(view.closeHauledAngle()).toBeCloseTo(beatAt(TWS_MS), 9);
     });
 
-    it('keeps the wind sectors on the polar angle with the close-hauled lines off', () => {
+    it('keeps the wind shift traces on the polar angle with the close-hauled lines off', () => {
       create(makeConfig({ polarOverlayEnable: false, closeHauledLineEnable: false, windSectorEnable: true }));
       expect(polarService.starts).toBeGreaterThan(0);
       feed('polarTrueWindSpeed', 5);
@@ -968,7 +1036,7 @@ describe('WidgetWindComponent polar overlay', () => {
       expect([...callbacks.keys()].filter(key => key.startsWith('polar'))).toEqual(['polarTrueWindSpeed']);
     });
 
-    it('with the close-hauled lines and the wind sectors off, the angle switch alone does not load the polar', () => {
+    it('with the close-hauled lines and the wind shift traces off, the angle switch alone does not load the polar', () => {
       create(makeConfig({ polarOverlayEnable: false, closeHauledLineEnable: false, windSectorEnable: false }));
       expect(polarService.starts).toBe(0);
       expect(callbacks.has('polarTrueWindSpeed')).toBe(false);

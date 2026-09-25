@@ -1,7 +1,7 @@
 import { Component, OnDestroy, inject, ChangeDetectionStrategy, input, effect, untracked, signal, computed, linkedSignal, WritableSignal } from '@angular/core';
 import { Subscription, interval } from 'rxjs';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
-import { POLAR_OVERLAY_DIAL_RADIUS, POLAR_OVERLAY_PEAK_RADIUS, PolarOverlayMode, SvgWindsteerComponent } from '../svg-windsteer/svg-windsteer.component';
+import { POLAR_OVERLAY_DIAL_RADIUS, POLAR_OVERLAY_PEAK_RADIUS, PolarOverlayMode, SvgWindsteerComponent, WindTraceSample } from '../svg-windsteer/svg-windsteer.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
@@ -12,7 +12,7 @@ import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, PolarSpeedProfile, VmcOpti
 import { presentationValue } from '../../core/utils/si-presentation.util';
 import { PolarResult, PolarTargets } from '../../core/utils/polar-engine.util';
 
-// Default rolling window (seconds) for the wind-sector history; the single
+// Default rolling window (seconds) for the wind shift traces; the single
 // source of truth for both the default config and the missing-value fallback.
 const DEFAULT_WIND_SECTOR_WINDOW_SECONDS = 5;
 
@@ -352,7 +352,7 @@ export class WidgetWindComponent implements OnDestroy {
       targets: this.polarTargets()
     });
   });
-  /** The close-hauled angle the lines and the wind sectors use, rad. */
+  /** The close-hauled angle the lines and the wind shift traces use, rad. */
   protected closeHauledAngle = computed(() => this.polarLineAngles().closeHauled);
   /** The run angle off the true wind, rad; null hides the run lines. */
   protected runLineAngle = computed(() => this.polarLineAngles().run);
@@ -433,19 +433,13 @@ export class WidgetWindComponent implements OnDestroy {
     return bearing == null ? null : vmcDotRadius(stw, this.currentHeading(), bearing, scale);
   });
 
-  protected historicalWindDirection: { timestamp: number; windDirection: number; }[] = [];
-  protected trueWindMinHistoric = signal<number | undefined>(undefined);
-  protected trueWindMidHistoric = signal<number | undefined>(undefined);
-  protected trueWindMaxHistoric = signal<number | undefined>(undefined);
+  /** The wind shift traces: true wind directions of the last windSectorWindowSeconds, each swept from the one before. */
+  protected windTrace = signal<readonly WindTraceSample[]>([]);
+  protected windTraceSeconds = computed(() => this.runtime.options()?.windSectorWindowSeconds ?? DEFAULT_WIND_SECTOR_WINDOW_SECONDS);
+  private windSamples: { t: number; sample: WindTraceSample }[] = [];
+  private windSampleId = 0;
 
-  private windSectorObservableSub: Subscription | null = null;
-
-  private windSamples: { t: number; u: number; i: number }[] = [];
-  private windMinDeque: { i: number; u: number }[] = [];
-  private windMaxDeque: { i: number; u: number }[] = [];
-  private windSampleIndex = 0;
-  private lastUnwrapped: number | null = null;
-  private lastSector: { min?: number; mid?: number; max?: number } = {};
+  private windTraceCleanupSub: Subscription | null = null;
 
   // On each valid sample a path's active flag is set true and its hide-timer re-armed; when the
   // timer fires (no valid sample within the TTL) the flag goes false and the indicator hides.
@@ -475,8 +469,8 @@ export class WidgetWindComponent implements OnDestroy {
       untracked(() => {
         if (usesPolar(cfg)) this.activePolar.ensureStarted();
         this.registerStreams();
-        this.stopWindSectors();
-        this.startWindSectors();
+        this.stopWindTrace();
+        this.startWindTrace();
         // A live compass-mode or TWA-path change does not re-fire the wind stream, so recompute
         // the displayed base from the cached sample here; otherwise the dial keeps a stale heading
         // offset until the next sample arrives (#73). currentHeading is read untracked to avoid
@@ -625,7 +619,8 @@ export class WidgetWindComponent implements OnDestroy {
     if (!this.hasTWA || radianDelta(this.trueWindAngle(), next) >= ANGLE_DEDUP_RAD) {
       this.trueWindAngle.set(next); this.hasTWA = true;
     }
-    if (this.runtime.options()?.windSectorEnable) {
+    // A boat-relative angle only becomes a direction once the heading is known.
+    if (this.runtime.options()?.windSectorEnable && this.hasHeading) {
       this.addHistoricalWindDirection(normalizeRadians(this.computeTrueWindDirection(raw)));
     }
   };
@@ -639,8 +634,8 @@ export class WidgetWindComponent implements OnDestroy {
     return computeTrueWindBaseAngle(this.trueWindPath(), rawAngle, this.currentHeading(), compassMode);
   }
 
-  // Wind sectors track the true wind DIRECTION (compass frame) so heading and boat-speed
-  // changes don't smear the oscillation range; only real wind shifts move it.
+  // The wind shift traces record the true wind DIRECTION (compass frame), so heading and
+  // boat-speed changes don't paint traces; only real wind shifts do.
   private computeTrueWindDirection(rawAngle: number): number {
     return computeTrueWindBaseAngle(this.trueWindPath(), rawAngle, this.currentHeading(), true);
   }
@@ -704,99 +699,37 @@ export class WidgetWindComponent implements OnDestroy {
   }
 
   ngOnDestroy() {
-    this.stopWindSectors();
+    this.stopWindTrace();
     this.freshnessTimers.forEach(clearTimeout);
     this.freshnessTimers.clear();
   }
 
-  private startWindSectors() {
+  private startWindTrace() {
     this.windSamples = [];
-    this.windMinDeque = [];
-    this.windMaxDeque = [];
-    this.windSampleIndex = 0;
-    this.lastUnwrapped = null;
-    this.lastSector = {};
-
-    if (!this.runtime.options()?.windSectorEnable) {
-      this.trueWindMinHistoric.set(undefined);
-      this.trueWindMidHistoric.set(undefined);
-      this.trueWindMaxHistoric.set(undefined);
-      this.lastSector = {};
-      return;
-    }
-
-    this.windSectorObservableSub = interval(1000).subscribe(() => {
-      this.historicalCleanup();
-    });
+    this.windTrace.set([]);
+    if (!this.runtime.options()?.windSectorEnable) return;
+    this.windTraceCleanupSub = interval(1000).subscribe(() => this.historicalCleanup());
   }
 
-  private addHistoricalWindDirection(absAngle: number) {
-    const now = Date.now();
-    const u = this.unwrapAngle(absAngle);
-    const i = this.windSampleIndex++;
-    this.windSamples.push({ t: now, u, i });
-    while (this.windMinDeque.length && this.windMinDeque[this.windMinDeque.length - 1].u >= u) {
-      this.windMinDeque.pop();
-    }
-    this.windMinDeque.push({ i, u });
-    while (this.windMaxDeque.length && this.windMaxDeque[this.windMaxDeque.length - 1].u <= u) {
-      this.windMaxDeque.pop();
-    }
-    this.windMaxDeque.push({ i, u });
+  private addHistoricalWindDirection(direction: number) {
+    // A sample sweeps from the one before it, as the close-hauled line moved between them, unless
+    // that one is already past the window.
+    this.historicalCleanup();
+    const from = this.windSamples.at(-1)?.sample.to ?? direction;
+    this.windSamples.push({ t: Date.now(), sample: { id: ++this.windSampleId, from, to: direction } });
+    this.windTrace.set(this.windSamples.map(entry => entry.sample));
   }
 
   private historicalCleanup() {
-    if (!this.runtime.options()?.windSectorEnable) return;
-    const cutoff = Date.now() - (this.runtime.options()?.windSectorWindowSeconds ?? DEFAULT_WIND_SECTOR_WINDOW_SECONDS) * 1000;
-    while (this.windSamples.length && this.windSamples[0].t < cutoff) {
-      const removed = this.windSamples.shift();
-      if (!removed) break;
-      if (this.windMinDeque.length && this.windMinDeque[0].i === removed.i) this.windMinDeque.shift();
-      if (this.windMaxDeque.length && this.windMaxDeque[0].i === removed.i) this.windMaxDeque.shift();
-    }
-
-    if (!this.windSamples.length || !this.windMinDeque.length || !this.windMaxDeque.length) {
-      if (this.trueWindMinHistoric() !== undefined || this.trueWindMidHistoric() !== undefined || this.trueWindMaxHistoric() !== undefined) {
-        this.trueWindMinHistoric.set(undefined);
-        this.trueWindMidHistoric.set(undefined);
-        this.trueWindMaxHistoric.set(undefined);
-        this.lastSector = {};
-      }
-      return;
-    }
-
-    const minU = this.windMinDeque[0].u;
-    const maxU = this.windMaxDeque[0].u;
-    const midU = (minU + maxU) / 2;
-    const nextMin = normalizeRadians(minU);
-    const nextMid = normalizeRadians(midU);
-    const nextMax = normalizeRadians(maxU);
-    const changed =
-      this.lastSector.min === undefined || radianDelta(this.lastSector.min!, nextMin) >= ANGLE_DEDUP_RAD ||
-      this.lastSector.mid === undefined || radianDelta(this.lastSector.mid!, nextMid) >= ANGLE_DEDUP_RAD ||
-      this.lastSector.max === undefined || radianDelta(this.lastSector.max!, nextMax) >= ANGLE_DEDUP_RAD;
-    if (changed) {
-      this.trueWindMinHistoric.set(nextMin);
-      this.trueWindMidHistoric.set(nextMid);
-      this.trueWindMaxHistoric.set(nextMax);
-      this.lastSector = { min: nextMin, mid: nextMid, max: nextMax };
-    }
+    // The samples form a FIFO: oldest first, dropped from the front once past the window.
+    const cutoff = Date.now() - this.windTraceSeconds() * 1000;
+    const before = this.windSamples.length;
+    while (this.windSamples.length && this.windSamples[0].t < cutoff) this.windSamples.shift();
+    if (this.windSamples.length !== before) this.windTrace.set(this.windSamples.map(entry => entry.sample));
   }
 
-  private stopWindSectors() {
-    this.windSectorObservableSub?.unsubscribe();
-  }
-
-  private unwrapAngle(a: number): number {
-    if (this.lastUnwrapped == null) {
-      this.lastUnwrapped = a;
-      return a;
-    }
-    const last = this.lastUnwrapped;
-    const diff = normalizeRadians(a - last + Math.PI) - Math.PI;
-    const u = last + diff;
-    this.lastUnwrapped = u;
-    return u;
+  private stopWindTrace() {
+    this.windTraceCleanupSub?.unsubscribe();
   }
 
   // The speed readouts derive their unit symbol from the measure the streams directive tagged the
@@ -830,7 +763,7 @@ export function resolvePolarOverlayMode(inputs: PolarOverlayModeInputs): PolarOv
 
 /**
  * Whether any option that reads the active polar is on: the overlay, the run lines, or the polar
- * close-hauled angle while something draws at it (the close-hauled lines or the wind sectors).
+ * close-hauled angle while something draws at it (the close-hauled lines or the wind shift traces).
  */
 function usesPolar(cfg: IWidgetSvcConfig): boolean {
   const closeHauledShown = !!cfg.closeHauledLineEnable || !!cfg.windSectorEnable;

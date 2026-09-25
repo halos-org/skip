@@ -10,7 +10,7 @@ describe('SvgWindsteerComponent', () => {
     // The tests speak degrees; the component takes its angle inputs in rad.
     const ANGLE_INPUTS = new Set([
         'compassHeading', 'courseOverGroundAngle', 'trueWindAngle', 'appWindAngle', 'closeHauledLineAngle', 'driftSet',
-        'waypointAngle', 'trueWindMinHistoric', 'trueWindMidHistoric', 'trueWindMaxHistoric', 'rudderAngle', 'polarCurveRotation',
+        'waypointAngle', 'rudderAngle', 'polarCurveRotation',
         'runLineAngle'
     ]);
     const setInput = (key: string, value: unknown): void => {
@@ -34,7 +34,7 @@ describe('SvgWindsteerComponent', () => {
             appWindSpeedUnit: 'knots',
             closeHauledLineEnabled: false,
             sailSetupEnabled: false,
-            windSectorEnabled: false,
+            windTraceEnabled: false,
             driftEnabled: true,
             setArrowActive: true,
             waypointEnabled: true,
@@ -43,7 +43,8 @@ describe('SvgWindsteerComponent', () => {
             driftUnit: 'kn',
             waypointAngle: 30,
             courseOverGroundAngle: 16,
-            sogActive: true
+            sogActive: true,
+            windTraceSeconds: 5
         };
 
         Object.entries({ ...defaults, ...overrides }).forEach(([key, value]) => setInput(key, value));
@@ -132,7 +133,7 @@ describe('SvgWindsteerComponent', () => {
     });
 
     // Geometry helpers: recover the dial-local angle (degrees, 0 = up, clockwise) from a
-    // drawn SVG path. drawCloseHauledLine/computeSectorPath place points at (R*sinθ+C, -R*cosθ+C).
+    // drawn SVG path. The dial lines place points at (R*sinθ+C, -R*cosθ+C).
     const CENTER = 500;
     const norm = (a: number): number => ((a % 360) + 360) % 360;
     const angleOf = (x: number, y: number): number => norm((Math.atan2(x - CENTER, CENTER - y) * 180) / Math.PI);
@@ -172,18 +173,100 @@ describe('SvgWindsteerComponent', () => {
         expect(firstPointAngle(pathOf('StbdTackCloseHauledLine'))).toBeCloseTo(315, 0);
     });
 
-    it('puts the red port-tack wind sector on the right with the wind ahead', () => {
-        setRequiredInputs({
-            compassHeading: 0, windSectorEnabled: true, closeHauledLineAngle: 45, trueWindFresh: true,
-            trueWindMinHistoric: 355, trueWindMidHistoric: 0, trueWindMaxHistoric: 5
+    describe('wind shift traces', () => {
+        const DEG = Math.PI / 180;
+        const traces = (cls: string): SVGPathElement[] => Array.from(fixture.nativeElement.querySelectorAll(`#LayerWindShift path.${cls}`));
+        /** The two rim edges of a wedge path `M c L start A … end Z`, as dial angles in degrees. */
+        const edges = (path: SVGPathElement): [number, number] => {
+            const pairs = [...(path.getAttribute('d') ?? '').matchAll(/(-?[\d.]+),(-?[\d.]+)/g)];
+            return [pairs[1], pairs[3]].map(([, x, y]) => Math.round(angleOf(+x, +y))) as [number, number];
+        };
+        /** Samples swept between consecutive directions (degrees), the first from its own direction. */
+        const sweep = (...directionsDeg: number[]) => directionsDeg.map((deg, index) =>
+            ({ id: index + 1, from: (directionsDeg[index - 1] ?? deg) * DEG, to: deg * DEG }));
+
+        it('paints each sample as a wedge from the previous direction, ± the close-hauled angle, the red port tack on the right', () => {
+            setRequiredInputs({ compassHeading: 0, windTraceEnabled: true, closeHauledLineAngle: 45, windTrace: sweep(355, 0, 5) });
+            fixture.detectChanges();
+            expect(traces('wind-trace-port').map(edges)).toEqual([[39, 41], [40, 45], [45, 50]]);
+            expect(traces('wind-trace-stbd').map(edges)).toEqual([[309, 311], [310, 315], [315, 320]]);
         });
-        fixture.detectChanges();
-        const port = fixture.nativeElement.querySelector('#PortTackSector') as SVGPathElement;
-        const stbd = fixture.nativeElement.querySelector('#StbdTackSector') as SVGPathElement;
-        expect(firstPointAngle(port.getAttribute('d') ?? '')).toBeCloseTo(40, 0);
-        expect(port.getAttribute('class')).toBe('wind-sector-port');
-        expect(firstPointAngle(stbd.getAttribute('d') ?? '')).toBeCloseTo(310, 0);
-        expect(stbd.getAttribute('class')).toBe('wind-sector-stbd');
+
+        it('spans a backing shift the same way as a veering one', () => {
+            setRequiredInputs({ compassHeading: 0, windTraceEnabled: true, closeHauledLineAngle: 45, windTrace: sweep(10, 4) });
+            fixture.detectChanges();
+            expect(traces('wind-trace-port').map(edges)[1]).toEqual([49, 55]);
+        });
+
+        it('places the traces in the compass frame in compass mode and boat-relative in simple mode', () => {
+            setRequiredInputs({ compassHeading: 30, windTraceEnabled: true, closeHauledLineAngle: 45, windTrace: sweep(100) });
+            fixture.detectChanges();
+            // Inside the dial, which turns by the heading: dial-local 145 shows at 115 off the bow.
+            expect(traces('wind-trace-port').map(edges)).toEqual([[144, 146]]);
+
+            setInput('compassModeEnabled', false);
+            fixture.detectChanges();
+            expect(traces('wind-trace-port').map(edges)).toEqual([[114, 116]]);
+        });
+
+        it('fades each trace out over the window', () => {
+            setRequiredInputs({ windTraceEnabled: true, closeHauledLineAngle: 45, windTrace: sweep(0), windTraceSeconds: 8 });
+            fixture.detectChanges();
+            for (const trace of [...traces('wind-trace-port'), ...traces('wind-trace-stbd')]) {
+                expect(trace.classList).toContain('wind-trace');
+                expect(trace.style.animationDuration).toBe('8s');
+            }
+        });
+
+        it('keeps each drawn trace as newer samples arrive, so its fade is not restarted, and drops expired ones', () => {
+            setRequiredInputs({ windTraceEnabled: true, closeHauledLineAngle: 45, windTrace: sweep(0) });
+            fixture.detectChanges();
+            const first = traces('wind-trace-port')[0];
+            setInput('windTrace', sweep(0, 10));
+            fixture.detectChanges();
+            expect(traces('wind-trace-port')[0]).toBe(first);
+            expect(traces('wind-trace-port')).toHaveLength(2);
+
+            setInput('windTrace', []);
+            fixture.detectChanges();
+            expect(traces('wind-trace-port')).toHaveLength(0);
+        });
+
+        it('grows the newest trace with the close-hauled line as it eases to the new wind', () => {
+            const frames = frameQueue();
+            setRequiredInputs({ compassHeading: 0, windTraceEnabled: true, closeHauledLineAngle: 45, windTrace: sweep(0) });
+            fixture.detectChanges();
+            setInput('windTrace', sweep(0, 20));
+            fixture.detectChanges();
+            expect(traces('wind-trace-port').map(edges)).toEqual([[44, 46], [44, 46]]);
+            frames.run(500);
+            expect(traces('wind-trace-port').map(edges)[1]).toEqual([45, 55]);
+            frames.run(1000);
+            expect(traces('wind-trace-port').map(edges)[1]).toEqual([45, 65]);
+            vi.restoreAllMocks();
+        });
+
+        it('scales each trace\'s opacity to the samples in the window, so a steady wind builds up alike at any rate', () => {
+            const peak = (): string => fixture.nativeElement.querySelector('#LayerWindShift').style.getPropertyValue('--wind-trace-peak');
+            setRequiredInputs({ windTraceEnabled: true, windTraceSeconds: 5, updateInterval: 1000, windTrace: sweep(0) });
+            fixture.detectChanges();
+            expect(peak()).toBe('0.35');
+            setInput('updateInterval', 100);
+            fixture.detectChanges();
+            expect(peak()).toBe('0.06');
+        });
+
+        it('draws the traces under the close-hauled and run lines', () => {
+            setRequiredInputs();
+            fixture.detectChanges();
+            expect(fixture.nativeElement.querySelector('#LayerWindShift').nextElementSibling?.id).toBe('LayerCloseHauledLines');
+        });
+
+        it('draws no traces with the option off', () => {
+            setRequiredInputs({ windTraceEnabled: false, closeHauledLineAngle: 45, windTrace: sweep(0) });
+            fixture.detectChanges();
+            expect(fixture.nativeElement.querySelector('#LayerWindShift').style.display).toBe('none');
+        });
     });
 
     it('draws the run lines at the run angle off the true wind, named by tack', () => {
@@ -290,46 +373,6 @@ describe('SvgWindsteerComponent', () => {
         });
     });
 
-    describe('wind sector easing', () => {
-        afterEach(() => vi.restoreAllMocks());
-        const sectorInputs = {
-            compassHeading: 0, windSectorEnabled: true, closeHauledLineAngle: 45, trueWindFresh: true,
-            trueWindMinHistoric: 355, trueWindMidHistoric: 0, trueWindMaxHistoric: 5
-        };
-        const shiftSector = (): void => {
-            setInput('trueWindMinHistoric', 20);
-            setInput('trueWindMidHistoric', 25);
-            setInput('trueWindMaxHistoric', 30);
-            fixture.detectChanges();
-        };
-
-        it('keeps a heading redraw when a sector ease was running, instead of the ease\'s next frame', () => {
-            const frames = frameQueue();
-            setRequiredInputs(sectorInputs);
-            fixture.detectChanges();
-            shiftSector();
-            frames.run(500);
-
-            setInput('compassHeading', 10);
-            fixture.detectChanges();
-            const redrawn = pathOf('PortTackSector');
-            frames.run(700);
-            expect(pathOf('PortTackSector')).toBe(redrawn);
-        });
-
-        it('stops a running sector ease on destroy, after its first frame', () => {
-            const frames = frameQueue();
-            setRequiredInputs(sectorInputs);
-            fixture.detectChanges();
-            shiftSector();
-            frames.run(500);
-            expect(frames.size).toBeGreaterThan(0);
-
-            fixture.destroy();
-            expect(frames.size).toBe(0);
-        });
-    });
-
     describe('tack line easing', () => {
         afterEach(() => vi.restoreAllMocks());
         const lineInputs = { compassHeading: 0, trueWindAngle: 20, closeHauledLineEnabled: true, closeHauledLineAngle: 45, trueWindFresh: true };
@@ -395,47 +438,6 @@ describe('SvgWindsteerComponent', () => {
         expect(layer.style.display).toBe('inline');
     });
 
-    it('positions wind sectors from the true wind DIRECTION (compass), not boat-relative', () => {
-        // Stored min/mid/max are compass true-wind directions; with heading 30 the min at
-        // TWD 100 must render at dial-local 100 (screen 70 = boat-relative). A boat-relative
-        // reading of the same value would land at 130.
-        setRequiredInputs({
-            compassHeading: 30,
-            windSectorEnabled: true,
-            closeHauledLineEnabled: false,
-            closeHauledLineAngle: 0,
-            trueWindMinHistoric: 100,
-            trueWindMidHistoric: 110,
-            trueWindMaxHistoric: 120,
-            trueWindFresh: true
-        });
-        fixture.detectChanges();
-
-        const sectorMin = firstPointAngle(pathOf('PortTackSector'));
-        expect(sectorMin).toBeCloseTo(100, 0);
-    });
-
-    it('converts wind sectors to boat-relative in simple mode using the real heading', () => {
-        // Simple/bow-fixed mode forces compass.newValue to 0, so the conversion must read the
-        // compassHeading input. Stored TWD 100 at heading 30 renders boat-relative at 70, not the
-        // absolute 100 (the pre-fix bug displaced the sector by the heading).
-        setRequiredInputs({
-            compassModeEnabled: false,
-            compassHeading: 30,
-            windSectorEnabled: true,
-            closeHauledLineEnabled: false,
-            closeHauledLineAngle: 0,
-            trueWindMinHistoric: 100,
-            trueWindMidHistoric: 110,
-            trueWindMaxHistoric: 120,
-            trueWindFresh: true
-        });
-        fixture.detectChanges();
-
-        const sectorMin = firstPointAngle(pathOf('PortTackSector'));
-        expect(sectorMin).toBeCloseTo(70, 0);
-    });
-
     it('centers the close-hauled lines on the true wind in simple mode', () => {
         setRequiredInputs({
             compassModeEnabled: false,
@@ -453,29 +455,6 @@ describe('SvgWindsteerComponent', () => {
         ].sort((a, b) => a - b);
         expect(angles[0]).toBeCloseTo(10, 0);
         expect(angles[1]).toBeCloseTo(70, 0);
-    });
-
-    it('clears the wind sector when true wind data drops out', () => {
-        setRequiredInputs({
-            compassHeading: 0,
-            windSectorEnabled: true,
-            closeHauledLineEnabled: false,
-            closeHauledLineAngle: 0,
-            trueWindMinHistoric: 100,
-            trueWindMidHistoric: 110,
-            trueWindMaxHistoric: 120,
-            trueWindFresh: true
-        });
-        fixture.detectChanges();
-        expect(pathOf('PortTackSector')).not.toBe('');
-
-        setInput('trueWindMinHistoric', undefined);
-        setInput('trueWindMidHistoric', undefined);
-        setInput('trueWindMaxHistoric', undefined);
-        fixture.detectChanges();
-
-        expect(pathOf('PortTackSector')).toBe('');
-        expect(pathOf('StbdTackSector')).toBe('');
     });
 
     it('hides the COG, waypoint, drift and current indicators when compass mode is off', () => {
@@ -950,10 +929,10 @@ describe('SvgWindsteerComponent', () => {
             expect(fixture.nativeElement.querySelector('#StbdTackVmcOptimum')).toBeNull();
         });
 
-        it('stacks the groups per the layer order: VMC after the wind sectors, polar after the compass, dot after the crosshair', () => {
+        it('stacks the groups per the layer order: VMC after the tack lines, polar after the compass, dot after the crosshair', () => {
             setRequiredInputs();
             fixture.detectChanges();
-            expect(layer('layerVmcCurve').previousElementSibling?.id).toBe('LayerWindShift');
+            expect(layer('layerVmcCurve').previousElementSibling?.id).toBe('LayerRunLines');
             expect(layer('layerPolarCurve').previousElementSibling?.id).toBe('layerCompass');
             expect(layer('layerPolarDot').previousElementSibling?.id).toBe('layerCrosshair');
         });

@@ -180,7 +180,7 @@ Every widget is a visual presentation control with configuration options of its 
 
 **Component** — larger, composite displays.
 
-- **Windsteer** – Combines wind, wind sectors, heading, course over ground, and next waypoint into one steering display.
+- **Windsteer** – Combines wind, fading wind shift traces, heading, course over ground, and next waypoint into one steering display.
 - **Freeboard-SK** – Adds the Freeboard-SK chart plotter as a widget, with automatic sign-in. Needs Freeboard-SK itself plus the `tracks`, `resources-provider`, and `course-provider` plugins; Signal K server ships all four.
 - **Autopilot Head** – Autopilot controls for Signal K v1 and v2 Autopilot API devices.
 - **Data Graph** – Graphs any numeric path over a configurable window, with actuals, moving and period averages, and min/max.
