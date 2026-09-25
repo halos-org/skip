@@ -69,13 +69,13 @@ Skip widgets turn Signal K data into readable visuals and controls. Available wi
 - **Linear** – Horizontal or vertical linear gauge with zone highlighting.
 - **Radial** – Radial gauge with configurable dials and zone highlighting.
 - **Compass** – Rotating compass gauge with multiple cardinal indicator options.
-- **Level Gauge** – Dual-scale heel angle indicator for trim tuning and sea-state monitoring.
+- **Level Gauge** – Dual-scale angle indicator for trim tuning and sea-state monitoring. Shows heel by default; pick any angle path, such as pitch or rudder angle, on its Paths tab.
 - **Pitch & Roll** – Horizon-style attitude indicator showing live pitch and roll degrees.
 - **Sea Horizon** – Marine attitude indicator in a steel case: heel scale with caution and alarm bands, trim ladder, LCD readouts, and optional damping.
 - **Classic Steel** – Traditional steel-look linear & radial gauges with range sizes and zone highlights.
 - **Steel Compass** – Classic steel binnacle compass: the card turns under a fixed pointer, heading on an LCD window.
-- **Windsteer** – Combines wind, fading wind shift traces, heading, COG, and waypoint info for wind steering. Its optional polar overlay needs a polars resource provider, such as `signalk-polar-management`, with an active polar; the curve follows the water-referenced true wind, so it can sit offset from the pointer when the Ground wind angle is shown.
-- **Wind Trends** – Real-time True Wind trends with dual axes for direction and speed, live values, and averages.
+- **Windsteer** – Combines wind, fading wind shift traces, heading, COG, and waypoint info for wind steering. Its polar overlay needs a polars resource provider, such as `signalk-polar-management`, with an active polar. The overlay has two modes. Normally it draws the polar curve for the present true wind speed in blue, with a blue dot at your speed through water. With a next waypoint and **Enable Advanced Compass Mode** on, it draws a purple lobe of velocity made good toward the waypoint on every heading, with a purple dot at your present VMC. The overlay follows the water-referenced true wind, so it can sit offset from the pointer when the Ground wind angle is shown. The same polar sets the close-hauled lines (with **Angle from Polar**) and the optional **Run Lines** at its best upwind and downwind VMG angles; those are the headings to sail when the waypoint lies too close to the wind, or too far downwind, to sail straight at.
+- **Wind Trends** – Real-time true or apparent wind trends with dual axes for direction and speed, live values, and averages. Choose the wind under **Wind** on its Display tab.
 - **Battery Monitor** - Display batteries or whole banks state State of Charge, remaining capacity, remaining time, voltage, current, power flow, and temperature.
 - **Solar Charger**- Track solar generation and charging performance at a glance with live panel output, battery-side metrics, and clear charger and relay status indicators.
 - **AC/DC Charger**- Monitor charging performance at a glance with a compact AC/DC Charger Widget. View single or multiple chargers with charge mode, voltage, current, power and temperature. Chargers are discovered automatically.
