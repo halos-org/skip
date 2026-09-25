@@ -25,7 +25,7 @@ Skip is designed for sailors and boaters who want:
 
 With Skip, you get the **clarity of a purpose-built marine instrument panel** combined with the flexibility of Signal K. It's simple, reliable, and highly usable — a modern instrument panel for [Signal K](https://signalk.org) vessels, whatever you drive it with.
 
-![A Skip dashboard on a wide screen, with speed, depth, course, engine, wind, heel, battery and barometer widgets](./images/dashboard-landscape.png)
+![A Skip dashboard on a wide screen under way, with speed, depth, course, engine, fuel, coolant, battery, wind steering with its VMC overlay toward the next waypoint, heel, barometer and position widgets](./images/dashboard-landscape.jpg)
 
 ## Table of Contents
 - [Where Skip Runs](#where-skip-runs)
@@ -51,9 +51,7 @@ The same instance serves every one of them. Each page reflows to the screen it i
 
 | Portrait display | Phone |
 | --- | --- |
-| ![A portrait Skip page with depth, speed, VMG, waypoint bearing and distance, heel, wind steering, and wind trend graphs](./images/dashboard-sailing.png) | ![The same dashboard on a phone-width screen](./images/dashboard-narrow.png) |
-
-In the phone screenshot, the barometer graph draws its title over its value. That is a defect, not the intended layout — see [issue #595](https://github.com/halos-org/skip/issues/595).
+| ![A portrait Skip page on a beat, with depth, speed, VMG, waypoint bearing and distance, heel, wind steering with its VMC overlay, and wind trend graphs](./images/dashboard-sailing.jpg) | ![An engine and navigation page on a phone-width screen, with engine gauges, speed, course, depth, position, autopilot controls and electrical widgets](./images/dashboard-narrow.jpg) |
 
 # Design Goals
 
@@ -74,6 +72,8 @@ Skip has no permanent chrome by default. The toolbar appears when the app loads,
 - **Touch:** swipe down from the top edge. Swipe up to send it away.
 - **Mouse or trackpad:** scroll up, click the peek strip at the top edge, or rest the pointer there. Scroll down to hide it.
 - **Anywhere:** a tap or click on the dashboard dismisses it, and it hides on its own after a few idle seconds.
+
+A page filled by a chart plotter or an embedded webpage takes every tap and swipe, which leaves no gesture to call the toolbar back. For such pages, turn on **Keep the toolbar on screen** in **Settings > Display > Toolbar**: the toolbar stays visible in a row of its own, and the page below is made shorter to fit.
 
 ![The Skip toolbar revealed over a dashboard, showing the menu, fullscreen and night-mode buttons on the left, page icons and the page manager in the middle, and notifications and the edit lock on the right](./images/toolbar.png)
 
@@ -138,6 +138,8 @@ Skip displays every value in the units set by your Signal K server's **unit pref
 
 **Categories** are how one preset reaches hundreds of paths. Every numeric path belongs to a category — `speed`, `distance`, `depth`, `temperature`, `pressure`, `angle`, `volume`, `volumeRate`, `frequency`, `time`, `percentage`, the electrical group, and the rest — and the preset picks one unit per category. Set `speed` to knots and boat speed, wind speed, and every other speed path follow at once.
 
+**Durations** can show as a clock. Pick one of Signal K's clock formats for the `time` category, or for a single path: `HH:MM:SS`, `DD:HH:MM:SS`, `MM:SS`, their `.mmm` variants, `duration-compact` or `duration-verbose`. A countdown such as `navigation.racing.timeToStart` then reads `30:00` instead of `0.5` hours in a Numeric widget; other widgets show such a path in seconds.
+
 **Per-path overrides** handle the exceptions: boat speed in knots but wind speed in m/s, or fuel rate in litres per minute rather than litres per hour. Override a single path in the admin UI's Data Browser — open the path's meta editor and pick a unit under the `custom` category, or select `base` to see the raw Signal K value. Overrides win over the preset.
 
 **Custom presets and units** cover the rest. The server accepts uploaded presets and custom unit definitions through its `/signalk/v1/unitpreferences/*` API, so a unit combination that no built-in preset offers can still drive every client. Signal K's own [Unit Preferences guide](https://github.com/SignalK/signalk-server/blob/master/docs/guides/unitpreferences.md) documents the full API and the standard category list.
@@ -166,7 +168,7 @@ Every widget is a visual presentation control with configuration options of its 
 - **Linear** – Horizontal or vertical linear gauge with zone highlighting.
 - **Radial** – Radial gauge with configurable capacity and measurement dials, plus zone highlighting.
 - **Compass** – Faceplate or card-style rotating compass with several cardinal indicator options.
-- **Level Gauge** – Dual-scale heel indicator: a ±5° fine level for trim tuning and a ±40° arc for sea state.
+- **Level Gauge** – Dual-scale angle indicator: a ±5° fine level for trim tuning and a ±40° arc for sea state. Shows heel by default, and takes any angle path, such as pitch or rudder angle.
 - **Pitch & Roll** – Horizon-style attitude indicator with live pitch and roll degrees.
 - **Sea Horizon** – Marine attitude indicator in a steel case: heel scale with caution and alarm bands, trim ladder, LCD readouts, and optional damping.
 - **Classic Steel** – Traditional steel-look linear and radial gauges with range sizes and zone highlights.
@@ -180,7 +182,7 @@ Every widget is a visual presentation control with configuration options of its 
 
 **Component** — larger, composite displays.
 
-- **Windsteer** – Combines wind, fading wind shift traces, heading, course over ground, and next waypoint into one steering display.
+- **Windsteer** – Combines wind, fading wind shift traces, heading, course over ground, and next waypoint into one steering display. With a polar active on the server, it draws the close-hauled lines at the polar's best upwind VMG angle, optional run lines at its best downwind one, and a polar overlay. The overlay shows the polar curve for the present true wind speed, with a blue dot at your speed through water. With a next waypoint and **Enable Advanced Compass Mode** on, it shows instead a purple lobe of velocity made good toward the waypoint on every heading, with a purple dot at your present VMC. The polar needs a polars resource provider, such as `signalk-polar-management`.
 - **Freeboard-SK** – Adds the Freeboard-SK chart plotter as a widget, with automatic sign-in. Needs Freeboard-SK itself plus the `tracks`, `resources-provider`, and `course-provider` plugins; Signal K server ships all four.
 - **Autopilot Head** – Autopilot controls for Signal K v1 and v2 Autopilot API devices.
 - **Data Graph** – Graphs any numeric path over a configurable window, with actuals, moving and period averages, and min/max.
@@ -197,7 +199,7 @@ Every widget is a visual presentation control with configuration options of its 
 - **Racer - Start Line Visualization** – A full-frame drawing of the start line with your boat against it at true scale, the start zone it sits in, and the approach the time to line is computed over. A ⋮ mode button selects the control mode: watching the line, setting its ends and switching between named lines, adjusting those ends, and adjusting the best VMGs. Needs the `signalk-racer` plugin.
 - **Racer - Start Timer** – Racing countdown with OCS status and automatic switching to a target page at the start. Needs the `signalk-racer` plugin.
 - **Countdown Timer** – Simple start countdown with start, pause, sync, and reset.
-- **Wind Trends** – Live true wind trends on dual axes for direction and speed, with live values and moving averages.
+- **Wind Trends** – Live true or apparent wind trends on dual axes for direction and speed, with live values and moving averages.
 
 Get the latest version of Skip to see what's new!
 

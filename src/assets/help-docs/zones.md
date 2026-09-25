@@ -80,6 +80,6 @@ You can **Silence** or **Resolve** notifications.
 
 ## Skip Notification Configuration Override
 
-In **Settings > Notifications**, you can customize which notification states are displayed and enable or disable audio prompts to suit your preferences.
+In **Settings > Notifications & Audio**, you can customize which notification states are displayed and enable or disable audio prompts to suit your preferences. A lost or failing Signal K connection is silent by default; turn on **Play a sound on Signal K connection problems** there to hear it. That checkbox is available only while **Disable audio** is off.
 
-> **Note:** Muting all notifications will also mute other Skip system sounds, such as those played when Skip connects to or disconnects from Signal K, not just zone-related alerts.
+> **Note:** **Disable audio** silences every Skip sound, not just zone-related alerts, including the connection-problem sound when it is turned on.
