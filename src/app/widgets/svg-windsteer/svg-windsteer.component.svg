@@ -594,7 +594,7 @@
   <!-- Overlay dot: always on the bow axis, in the fixed boat frame so it never lags a rotating parent -->
   <g id="layerPolarDot" [style.display]="overlayDotY() !== null ? 'inline' : 'none'">
     <circle class="polar-dot-halo" cx="500" [attr.cy]="overlayDotY()" r="23" />
-    <circle class="polar-dot" cx="500" [attr.cy]="overlayDotY()" r="16" />
+    <circle class="polar-dot" [class.vmc-dot]="polarOverlayMode() === 'vmc'" cx="500" [attr.cy]="overlayDotY()" r="16" />
   </g>
   <g id="layerRudder"
      [style.display]="rudderEnabled() ? 'inline' : 'none'">
