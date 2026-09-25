@@ -212,6 +212,84 @@ describe('SvgWindsteerComponent', () => {
         expect(firstPointAngle(pathOf('PortTackRunLine'))).toBeCloseTo(150, 0);
     });
 
+    describe('turning in a steady wind', () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        it('turns the true wind pointer with the heading, and keeps the tack lines on the wind', () => {
+            const frames = frameQueue();
+            setRequiredInputs({ compassHeading: 0, trueWindAngle: 40, closeHauledLineEnabled: true, closeHauledLineAngle: 45, trueWindFresh: true });
+            fixture.detectChanges();
+            setInput('compassHeading', 20);
+            fixture.detectChanges();
+            frames.run(500);
+            // Midway the pointer and the dial have both turned half of the 20° change.
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(30 500 500)');
+            expect(component['rotatingDial']().nativeElement.getAttribute('transform')).toBe('rotate(-10 500 500)');
+            frames.run(2000);
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(20 500 500)');
+            expect(firstPointAngle(pathOf('PortTackCloseHauledLine'))).toBeCloseTo(85, 0);
+            expect(firstPointAngle(pathOf('StbdTackCloseHauledLine'))).toBeCloseTo(355, 0);
+        });
+
+        it('turns the COG arrow with the heading on a steady course', () => {
+            const frames = frameQueue();
+            setRequiredInputs({ compassHeading: 15, courseOverGroundAngle: 16 });
+            fixture.detectChanges();
+            setInput('compassHeading', 30);
+            fixture.detectChanges();
+            frames.run(2000);
+            expect(component['cogIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(346 500 500)');
+        });
+
+        it('keeps the true wind pointer where the first heading places it, even with a wind ease running', () => {
+            const frames = frameQueue();
+            setRequiredInputs({ compassHeading: undefined, trueWindAngle: 40, trueWindFresh: true, closeHauledLineEnabled: true, closeHauledLineAngle: 45 });
+            fixture.detectChanges();
+            setInput('trueWindAngle', 50);
+            fixture.detectChanges();
+            frames.run(500);
+
+            setInput('compassHeading', 20);
+            fixture.detectChanges();
+            frames.run(2000);
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(30 500 500)');
+            expect(firstPointAngle(pathOf('PortTackCloseHauledLine'))).toBeCloseTo(95, 0);
+        });
+
+        it('puts the pointers in the right frame when compass mode is toggled', () => {
+            const frames = frameQueue();
+            setRequiredInputs({ compassHeading: 20, trueWindAngle: 60, courseOverGroundAngle: 30, trueWindFresh: true });
+            fixture.detectChanges();
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(40 500 500)');
+
+            // In simple mode the parent passes the boat-relative angles; here the inputs stay as they are.
+            setInput('compassModeEnabled', false);
+            fixture.detectChanges();
+            frames.run(500);
+            // Eases with the dial rather than snapping, although two effects place the same target.
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(50 500 500)');
+            frames.run(2000);
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(60 500 500)');
+            expect(component['cogIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(30 500 500)');
+
+            setInput('compassModeEnabled', true);
+            fixture.detectChanges();
+            frames.run(4000);
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(40 500 500)');
+            expect(component['cogIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(10 500 500)');
+        });
+
+        it('leaves the pointers boat-relative in simple mode, where heading does not turn them', () => {
+            const frames = frameQueue();
+            setRequiredInputs({ compassModeEnabled: false, compassHeading: 0, trueWindAngle: 40, trueWindFresh: true });
+            fixture.detectChanges();
+            setInput('compassHeading', 20);
+            fixture.detectChanges();
+            frames.run(2000);
+            expect(component['twaIndicator']().nativeElement.getAttribute('transform')).toBe('rotate(40 500 500)');
+        });
+    });
+
     describe('wind sector easing', () => {
         afterEach(() => vi.restoreAllMocks());
         const sectorInputs = {

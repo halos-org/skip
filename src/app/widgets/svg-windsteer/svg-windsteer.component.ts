@@ -199,6 +199,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
   protected headingValue = signal<string>("--");
   private trueWindHeading = 0;
+  private courseOverGround = 0;
   // The bearing circle is meaningful only with an active waypoint. The set-arrow/COG visibility gates
   // (setArrowActive/sogActive) are physical-speed thresholds resolved by the parent and passed in.
   protected waypointActive = computed(() => {
@@ -295,7 +296,11 @@ export class SvgWindsteerComponent implements OnDestroy {
           } else {
             animateRotation(this.rotatingDial().nativeElement, -this.compass.oldValue, -this.compass.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
           }
-          // Heading affects dial-local geometry for the tack lines and sectors; refresh without animation
+          // The COG and true-wind pointers sit in the boat frame, so a heading change turns them
+          // (with the dial); the tack lines and sectors are in the dial frame and redraw in place.
+          const animate = !isFirstCompass && this.compass.oldValue !== this.compass.newValue;
+          if (this.cogInitialized) this.placeCogPointer(animate);
+          if (this.twaInitialized) this.placeTrueWindPointer(animate);
           this.updateTackLines(false);
           this.updateWindSectors(false);
         }
@@ -305,28 +310,15 @@ export class SvgWindsteerComponent implements OnDestroy {
     effect(() => {
       const raw = this.courseOverGroundDeg();
       const cogAngle = Number.isFinite(raw as number) ? Math.round(raw as number) : null;
-      const modeEnabled = this.compassModeEnabled();
+      // The heading effect re-places the arrow on a mode toggle, but only while a heading is present.
+      void this.compassModeEnabled();
       if (cogAngle == null) return;
 
       untracked(() => {
-        const headingOffset = modeEnabled ? this.compass.newValue : 0;
-        const nextCog = cogAngle - headingOffset;
+        this.courseOverGround = cogAngle;
         const isFirstCog = !this.cogInitialized;
-        if (isFirstCog) {
-          this.cog.oldValue = nextCog;
-          this.cog.newValue = nextCog;
-          this.cogInitialized = true;
-        } else {
-          this.cog.oldValue = this.cog.newValue;
-          this.cog.newValue = nextCog;
-        }
-        if (this.cogIndicator()?.nativeElement) {
-          if (isFirstCog || this.cog.oldValue === this.cog.newValue) {
-            this.setRotationImmediate(this.cogIndicator().nativeElement, this.cog.newValue);
-          } else {
-            animateRotation(this.cogIndicator().nativeElement, this.cog.oldValue, this.cog.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
-          }
-        }
+        this.cogInitialized = true;
+        this.placeCogPointer(!isFirstCog);
       });
     });
 
@@ -384,29 +376,15 @@ export class SvgWindsteerComponent implements OnDestroy {
     effect(() => {
       const raw = this.trueWindAngleDeg();
       const trueWindAngle = Number.isFinite(raw as number) ? Math.round(raw as number) : null;
-      const modeEnabled = this.compassModeEnabled();
+      // The heading effect re-places the pointer on a mode toggle, but only while a heading is present.
+      void this.compassModeEnabled();
       if (trueWindAngle == null) return;
 
       untracked(() => {
-        const isFirstTwa = !this.twaInitialized;
         this.trueWindHeading = trueWindAngle;
-        const headingOffset = modeEnabled ? (this.compass.newValue * -1) : 0;
-        const nextTwa = this.addHeading(this.trueWindHeading, headingOffset);
-        if (isFirstTwa) {
-          this.twa.oldValue = nextTwa;
-          this.twa.newValue = nextTwa;
-          this.twaInitialized = true;
-        } else {
-          this.twa.oldValue = this.twa.newValue;
-          this.twa.newValue = nextTwa;
-        }
-        if (this.twaIndicator()?.nativeElement) {
-          if (isFirstTwa || this.twa.oldValue === this.twa.newValue) {
-            this.setRotationImmediate(this.twaIndicator().nativeElement, this.twa.newValue);
-          } else {
-            animateRotation(this.twaIndicator().nativeElement, this.twa.oldValue, this.twa.newValue, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
-          }
-        }
+        const isFirstTwa = !this.twaInitialized;
+        this.twaInitialized = true;
+        this.placeTrueWindPointer(!isFirstTwa);
         // The tack lines are centered on the true wind; recompute whenever TWA changes
         this.updateTackLines(!isFirstTwa);
       });
@@ -521,6 +499,36 @@ export class SvgWindsteerComponent implements OnDestroy {
   private toDialLocal(boatRelative: number): number {
     const heading = this.compassModeEnabled() ? (Number(this.compass.newValue) || 0) : 0;
     return this.addHeading(heading, boatRelative);
+  }
+
+  /** Turns the COG arrow to the course relative to the bow: in compass mode COG less the heading. */
+  private placeCogPointer(animate: boolean): void {
+    const headingOffset = this.compassModeEnabled() ? this.compass.newValue : 0;
+    this.rotateIndicator(this.cog, this.courseOverGround - headingOffset, this.cogIndicator()?.nativeElement, animate);
+  }
+
+  /** Turns the true-wind pointer to the wind relative to the bow: in compass mode TWD less the heading. */
+  private placeTrueWindPointer(animate: boolean): void {
+    const headingOffset = this.compassModeEnabled() ? this.compass.newValue * -1 : 0;
+    this.rotateIndicator(this.twa, this.addHeading(this.trueWindHeading, headingOffset), this.twaIndicator()?.nativeElement, animate);
+  }
+
+  /** Rotates an indicator to `next`, easing from its last target or, with animate false, at once. */
+  private rotateIndicator(rotation: ISVGRotationObject, next: number, element: SVGGElement | undefined, animate: boolean): void {
+    // An ease already heading to this target is left to finish.
+    if (element && next === rotation.newValue && this.animationFrameIds.has(element)) return;
+    rotation.oldValue = animate ? rotation.newValue : next;
+    rotation.newValue = next;
+    if (!element) return;
+    if (!animate || rotation.oldValue === rotation.newValue) {
+      // A running ease would otherwise finish at its own, older target.
+      const pending = this.animationFrameIds.get(element);
+      if (pending) cancelAnimationFrame(pending);
+      this.animationFrameIds.delete(element);
+      this.setRotationImmediate(element, next);
+    } else {
+      animateRotation(element, rotation.oldValue, next, this.animationDuration(), undefined, this.animationFrameIds, undefined, this.ngZone);
+    }
   }
 
   private updateTackLines(animate = true): void {
