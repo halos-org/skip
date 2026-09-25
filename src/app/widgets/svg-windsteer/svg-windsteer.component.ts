@@ -233,8 +233,8 @@ export class SvgWindsteerComponent implements OnDestroy {
   // Wind sectors, named by tack like the lines
   private portSectorPrev = { min: 0, mid: 0, max: 0 };
   private stbdSectorPrev = { min: 0, mid: 0, max: 0 };
-  private portSectorAnimId: number | null = null;
-  private stbdSectorAnimId: number | null = null;
+  private portSectorCancel: (() => void) | null = null;
+  private stbdSectorCancel: (() => void) | null = null;
   protected portTackSectorPath = signal<string>("");
   protected stbdTackSectorPath = signal<string>("");
   // Rotation Animation
@@ -506,10 +506,7 @@ export class SvgWindsteerComponent implements OnDestroy {
       untracked(() => {
         if (!enabled) {
           // stop any ongoing sector animations and hide paths
-          if (this.portSectorAnimId) cancelAnimationFrame(this.portSectorAnimId);
-          if (this.stbdSectorAnimId) cancelAnimationFrame(this.stbdSectorAnimId);
-          this.portSectorAnimId = null;
-          this.stbdSectorAnimId = null;
+          this.stopSectorAnimations();
           this.portTackSectorPath.set('');
           this.stbdTackSectorPath.set('');
           return;
@@ -597,10 +594,7 @@ export class SvgWindsteerComponent implements OnDestroy {
       // No sector data (e.g. true wind absent): cancel any in-flight sector animation and clear
       // the paths, mirroring the disable branch, so a running frame can't overwrite the cleared
       // path and leave a stale sector on screen.
-      if (this.portSectorAnimId) cancelAnimationFrame(this.portSectorAnimId);
-      if (this.stbdSectorAnimId) cancelAnimationFrame(this.stbdSectorAnimId);
-      this.portSectorAnimId = null;
-      this.stbdSectorAnimId = null;
+      this.stopSectorAnimations();
       this.windSectorsInitialized = false;
       this.portTackSectorPath.set('');
       this.stbdTackSectorPath.set('');
@@ -616,6 +610,7 @@ export class SvgWindsteerComponent implements OnDestroy {
         this.animateWindSector(portNew, portNew, true);
         this.animateWindSector(stbdNew, stbdNew, false);
       } else {
+        this.stopSectorAnimations();
         this.portTackSectorPath.set(this.computeSectorPath(portNew, true));
         this.stbdTackSectorPath.set(this.computeSectorPath(stbdNew, false));
       }
@@ -631,6 +626,7 @@ export class SvgWindsteerComponent implements OnDestroy {
         Math.abs(dialTurn(this.portSectorPrev.mid, portNew.mid)) < DIAL_EPSILON_DEG &&
         Math.abs(dialTurn(this.portSectorPrev.max, portNew.max)) < DIAL_EPSILON_DEG;
       if (smallMove) {
+        this.stopSectorAnimations();
         this.portTackSectorPath.set(this.computeSectorPath(portNew, true));
         this.stbdTackSectorPath.set(this.computeSectorPath(stbdNew, false));
       } else {
@@ -639,6 +635,7 @@ export class SvgWindsteerComponent implements OnDestroy {
       }
     } else {
       // No animation requested (e.g., heading-only updates)
+      this.stopSectorAnimations();
       this.portTackSectorPath.set(this.computeSectorPath(portNew, true));
       this.stbdTackSectorPath.set(this.computeSectorPath(stbdNew, false));
     }
@@ -647,38 +644,33 @@ export class SvgWindsteerComponent implements OnDestroy {
     this.stbdSectorPrev = stbdNew;
   }
 
-  private animateWindSector(from: { min: number, mid: number, max: number }, to: { min: number, mid: number, max: number }, isPortTack: boolean) {
-    if (isPortTack && this.portSectorAnimId) cancelAnimationFrame(this.portSectorAnimId);
-    if (!isPortTack && this.stbdSectorAnimId) cancelAnimationFrame(this.stbdSectorAnimId);
+  private animateWindSector(from: SectorAngles, to: SectorAngles, isPortTack: boolean) {
+    (isPortTack ? this.portSectorCancel : this.stbdSectorCancel)?.();
+    const setCancel = (cancel: (() => void) | null) => {
+      if (isPortTack) this.portSectorCancel = cancel; else this.stbdSectorCancel = cancel;
+    };
+    const setPath = (sector: SectorAngles) => {
+      const path = this.computeSectorPath(sector, isPortTack);
+      if (isPortTack) this.portTackSectorPath.set(path); else this.stbdTackSectorPath.set(path);
+    };
 
     const smallMove =
       Math.abs(dialTurn(from.min, to.min)) < DIAL_EPSILON_DEG &&
       Math.abs(dialTurn(from.mid, to.mid)) < DIAL_EPSILON_DEG &&
       Math.abs(dialTurn(from.max, to.max)) < DIAL_EPSILON_DEG;
     if (smallMove) {
-      const path = this.computeSectorPath(to, isPortTack);
-
-      if (isPortTack) this.portTackSectorPath.set(path);
-      else this.stbdTackSectorPath.set(path);
-
-      if (isPortTack) this.portSectorAnimId = null;
-      else this.stbdSectorAnimId = null;
-
+      setCancel(null);
+      setPath(to);
       return;
     }
+    setCancel(animateSectorTransition(from, to, this.animationDuration(), setPath, () => setCancel(null), this.ngZone));
+  }
 
-    const id = animateSectorTransition(
-      from as SectorAngles,
-      to as SectorAngles,
-      this.animationDuration(),
-      (current) => {
-        const path = this.computeSectorPath(current, isPortTack);
-        if (isPortTack) this.portTackSectorPath.set(path); else this.stbdTackSectorPath.set(path);
-      },
-      () => { if (isPortTack) this.portSectorAnimId = null; else this.stbdSectorAnimId = null; },
-      this.ngZone
-    );
-    if (isPortTack) this.portSectorAnimId = id; else this.stbdSectorAnimId = id;
+  private stopSectorAnimations(): void {
+    this.portSectorCancel?.();
+    this.stbdSectorCancel?.();
+    this.portSectorCancel = null;
+    this.stbdSectorCancel = null;
   }
 
   private addHeading(h1 = 0, h2 = 0) {
@@ -696,11 +688,7 @@ export class SvgWindsteerComponent implements OnDestroy {
 
     for (const line of [this.portTackCloseHauledLine, this.stbdTackCloseHauledLine, this.portTackRunLine, this.stbdTackRunLine]) line.stop();
 
-    // Cancel wind sector animations
-    if (this.portSectorAnimId) cancelAnimationFrame(this.portSectorAnimId);
-    if (this.stbdSectorAnimId) cancelAnimationFrame(this.stbdSectorAnimId);
-    this.portSectorAnimId = null;
-    this.stbdSectorAnimId = null;
+    this.stopSectorAnimations();
 
     // Cancel any animateRotation frames tracked in WeakMap for known elements
     const els: (ElementRef<SVGGElement> | undefined)[] = [

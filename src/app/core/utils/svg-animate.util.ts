@@ -12,14 +12,15 @@ import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interfa
  * Available helpers:
  *  - animateRotation: Smoothly rotate a <g> element (or any element) via transform rotate().
  *  - animateRudderWidth: Smoothly animate an <rect> width attribute.
+ *  - animateProgress: Report linear progress (0, 1] per frame to a callback.
  *  - animateAngleTransition: Interpolate a scalar angle value (degrees) with wrap handling.
  *  - animateSectorTransition: Interpolate a set of three angles (min/mid/max) simultaneously.
  *
  * Cancellation patterns:
- *  - All functions return (or internally store) a requestAnimationFrame id. Use cancelAnimationFrame(id) to stop early.
- *  - For animateRotation / animateRudderWidth you may supply a WeakMap<Element, number> (frameMap); if a new
- *    animation starts for the same element, the previous id is auto‑cancelled.
- *  - For custom callers of animateAngleTransition / animateSectorTransition keep and cancel the returned id manually.
+ *  - animateProgress, animateAngleTransition and animateSectorTransition return a cancel function that
+ *    stops whichever frame is pending; keep it and call it before starting a replacement.
+ *  - For animateRotation / animateRudderWidth you may supply a WeakMap<Element, number> (frameMap); it holds
+ *    the pending frame id, and a new animation for the same element cancels the previous one.
  *
  * Performance notes:
  *  - Interpolation is linear: consumers track a continuously-updating value, and an ease that
@@ -243,55 +244,6 @@ const _angleDeltaSigned = (from: number, to: number) => {
 };
 
 /**
- * Animates an angle value (degrees) from "from" to "to" over duration using linear interpolation.
- * Calls apply(currentAngle) each frame (angle already normalized to [0,360)).
- * If ngZone is provided, the loop runs outside Angular and onDone re-enters the zone.
- * Returns the requestAnimationFrame id.
- *
- * @example
- * // Layline angle inside component (outside zone):
- * this.portLaylineAnimId = animateAngleTransition(
- *   prevAngle,
- *   nextAngle,
- *   900,
- *   a => this.drawLayline(a, true),
- *   () => { this.portLaylineAnimId = null; },
- *   inject(NgZone)
- * );
- * // Cancel mid-animation:
- * cancelAnimationFrame(this.portLaylineAnimId!);
- */
-export function animateAngleTransition(
-  from: number,
-  to: number,
-  duration: number,
-  apply: (currentAngle: number) => void,
-  onDone?: () => void,
-  ngZone?: NgZone
-): number {
-  const runOutside = (fn: () => void) => ngZone ? ngZone.runOutsideAngular(fn) : fn();
-  const runInside = (fn: () => void) => ngZone ? ngZone.run(fn) : fn();
-  let frameId = 0;
-  runOutside(() => {
-    const start = performance.now();
-    const delta = _angleDeltaSigned(from, to);
-    const base = _norm(from);
-    const step = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const current = base + delta * progress;
-      apply(_norm(current));
-      if (progress < 1) {
-        frameId = requestAnimationFrame(step);
-      } else if (onDone) {
-        runInside(onDone);
-      }
-    };
-    frameId = requestAnimationFrame(step);
-  });
-  return frameId;
-}
-
-/**
  * Calls apply(progress) each frame with linear progress in (0, 1] over duration, ending at 1.
  * Runs outside Angular when ngZone is given. Returns a function that cancels the pending frame.
  */
@@ -309,7 +261,28 @@ export function animateProgress(duration: number, apply: (progress: number) => v
 
 export interface SectorAngles { min: number; mid: number; max: number; }
 
-/** Linear interpolate sector angles */
+/**
+ * Animates an angle (degrees) from "from" to "to" along the shorter arc over duration, calling
+ * apply(currentAngle) each frame with the angle normalized to [0, 360). If ngZone is provided, the
+ * loop runs outside Angular and onDone re-enters the zone. Returns a function that cancels the
+ * transition, whichever frame is pending; a cancelled transition does not call onDone.
+ */
+export function animateAngleTransition(
+  from: number,
+  to: number,
+  duration: number,
+  apply: (currentAngle: number) => void,
+  onDone?: () => void,
+  ngZone?: NgZone
+): () => void {
+  const delta = _angleDeltaSigned(from, to);
+  const base = _norm(from);
+  return animateProgress(duration, progress => {
+    apply(_norm(base + delta * progress));
+    if (progress >= 1 && onDone) runInZone(onDone, ngZone);
+  }, ngZone);
+}
+
 const _lerpSector = (a: SectorAngles, b: SectorAngles, t: number): SectorAngles => ({
   min: a.min + (b.min - a.min) * t,
   mid: a.mid + (b.mid - a.mid) * t,
@@ -317,21 +290,10 @@ const _lerpSector = (a: SectorAngles, b: SectorAngles, t: number): SectorAngles 
 });
 
 /**
- * Animates sector angles (min/mid/max) with linear interpolation.
- * Each frame apply(current) receives interpolated angles (not normalized for wrapping; supply original domain if needed).
- * If ngZone supplied, runs outside Angular.
- *
- * @example
- * this.portSectorAnimId = animateSectorTransition(
- *   prevState,
- *   nextState,
- *   900,
- *   s => this.portWindSectorPath = this.computeSectorPath(s, true),
- *   () => { this.portSectorAnimId = null; },
- *   inject(NgZone)
- * );
- * // Cancel:
- * cancelAnimationFrame(this.portSectorAnimId!);
+ * Animates sector angles (min/mid/max) with linear interpolation, calling apply(current) each frame
+ * (not normalized for wrapping; supply the original domain if needed). If ngZone is provided, the
+ * loop runs outside Angular and onDone re-enters the zone. Returns a function that cancels the
+ * transition, whichever frame is pending; a cancelled transition does not call onDone.
  */
 export function animateSectorTransition(
   from: SectorAngles,
@@ -340,22 +302,13 @@ export function animateSectorTransition(
   apply: (current: SectorAngles) => void,
   onDone?: () => void,
   ngZone?: NgZone
-): number {
-  const runOutside = (fn: () => void) => ngZone ? ngZone.runOutsideAngular(fn) : fn();
-  const runInside = (fn: () => void) => ngZone ? ngZone.run(fn) : fn();
-  let frameId = 0;
-  runOutside(() => {
-    const start = performance.now();
-    const step = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      apply(_lerpSector(from, to, progress));
-      if (progress < 1) {
-        frameId = requestAnimationFrame(step);
-      } else if (onDone) {
-        runInside(onDone);
-      }
-    };
-    frameId = requestAnimationFrame(step);
-  });
-  return frameId;
+): () => void {
+  return animateProgress(duration, progress => {
+    apply(_lerpSector(from, to, progress));
+    if (progress >= 1 && onDone) runInZone(onDone, ngZone);
+  }, ngZone);
+}
+
+function runInZone(fn: () => void, ngZone?: NgZone): void {
+  if (ngZone) ngZone.run(fn); else fn();
 }

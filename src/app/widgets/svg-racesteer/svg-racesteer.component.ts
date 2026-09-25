@@ -112,8 +112,8 @@ export class SvgRacesteerComponent implements OnDestroy {
   //laylines
   private portLaylinePrev = 0;
   private stbdLaylinePrev = 0;
-  private portLaylineAnimId: number | null = null;
-  private stbdLaylineAnimId: number | null = null;
+  private portLaylineCancel: (() => void) | null = null;
+  private stbdLaylineCancel: (() => void) | null = null;
   private readonly CENTER_X = 600;
   private readonly CENTER_Y = 620;
   private readonly RADIUS = 540;
@@ -123,8 +123,8 @@ export class SvgRacesteerComponent implements OnDestroy {
   //Wind Sectors
   private portSectorPrev: SectorAngles = { min: 0, mid: 0, max: 0 };
   private stbdSectorPrev: SectorAngles = { min: 0, mid: 0, max: 0 };
-  private portSectorAnimId: number | null = null;
-  private stbdSectorAnimId: number | null = null;
+  private portSectorCancel: (() => void) | null = null;
+  private stbdSectorCancel: (() => void) | null = null;
   protected portWindSectorPath = signal<string>('');
   protected stbdWindSectorPath = signal<string>('');
   // Speed Line
@@ -350,15 +350,14 @@ export class SvgRacesteerComponent implements OnDestroy {
   }
 
   private animateLayline(from: number, to: number, isPort: boolean) {
-    if (isPort && this.portLaylineAnimId) cancelAnimationFrame(this.portLaylineAnimId);
-    if (!isPort && this.stbdLaylineAnimId) cancelAnimationFrame(this.stbdLaylineAnimId);
+    (isPort ? this.portLaylineCancel : this.stbdLaylineCancel)?.();
 
     const onDone = () => {
-      if (isPort) this.portLaylineAnimId = null;
-      else this.stbdLaylineAnimId = null;
+      if (isPort) this.portLaylineCancel = null;
+      else this.stbdLaylineCancel = null;
     };
 
-    const id = animateAngleTransition(
+    const cancel = animateAngleTransition(
       from,
       to,
       this.animationDuration(),
@@ -367,8 +366,8 @@ export class SvgRacesteerComponent implements OnDestroy {
       this.ngZone
     );
 
-    if (isPort) this.portLaylineAnimId = id;
-    else this.stbdLaylineAnimId = id;
+    if (isPort) this.portLaylineCancel = cancel;
+    else this.stbdLaylineCancel = cancel;
   }
 
   private updateWindSectors() {
@@ -401,14 +400,13 @@ export class SvgRacesteerComponent implements OnDestroy {
   }
 
   private animateWindSector(from: SectorAngles, to: SectorAngles, isPort: boolean) {
-    if (isPort && this.portSectorAnimId) cancelAnimationFrame(this.portSectorAnimId);
-    if (!isPort && this.stbdSectorAnimId) cancelAnimationFrame(this.stbdSectorAnimId);
+    (isPort ? this.portSectorCancel : this.stbdSectorCancel)?.();
     const onDone = () => {
-      if (isPort) this.portSectorAnimId = null;
-      else this.stbdSectorAnimId = null;
+      if (isPort) this.portSectorCancel = null;
+      else this.stbdSectorCancel = null;
     };
 
-    const id = animateSectorTransition(
+    const cancel = animateSectorTransition(
       from,
       to,
       this.animationDuration(),
@@ -417,8 +415,8 @@ export class SvgRacesteerComponent implements OnDestroy {
       this.ngZone
     );
 
-    if (isPort) this.portSectorAnimId = id;
-    else this.stbdSectorAnimId = id;
+    if (isPort) this.portSectorCancel = cancel;
+    else this.stbdSectorCancel = cancel;
   }
 
   private animateSpeedLine(from: number, to: number): void {
@@ -538,16 +536,16 @@ export class SvgRacesteerComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     // Cancel layline animations
-    if (this.portLaylineAnimId) cancelAnimationFrame(this.portLaylineAnimId);
-    if (this.stbdLaylineAnimId) cancelAnimationFrame(this.stbdLaylineAnimId);
-    this.portLaylineAnimId = null;
-    this.stbdLaylineAnimId = null;
+    this.portLaylineCancel?.();
+    this.stbdLaylineCancel?.();
+    this.portLaylineCancel = null;
+    this.stbdLaylineCancel = null;
 
     // Cancel wind sector animations
-    if (this.portSectorAnimId) cancelAnimationFrame(this.portSectorAnimId);
-    if (this.stbdSectorAnimId) cancelAnimationFrame(this.stbdSectorAnimId);
-    this.portSectorAnimId = null;
-    this.stbdSectorAnimId = null;
+    this.portSectorCancel?.();
+    this.stbdSectorCancel?.();
+    this.portSectorCancel = null;
+    this.stbdSectorCancel = null;
 
     // Cancel any animateRotation frames tracked in WeakMap for known elements
     const els: (ElementRef<SVGGElement> | undefined)[] = [
