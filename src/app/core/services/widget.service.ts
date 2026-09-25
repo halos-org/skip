@@ -347,7 +347,7 @@ export class WidgetService {
     },
     {
       name: 'Level Gauge',
-      description: 'Dual-scale heel angle indicator combining a high‑precision ±5° fine level with a wide ±40° coarse arc for fast trim tuning and broader heel / sea‑state monitoring.',
+      description: 'Dual-scale angle indicator combining a high‑precision ±5° fine level with a wide ±40° coarse arc. Shows the heel by default, or any other angle such as pitch or rudder angle.',
       icon: 'level',
       minWidth: 1,
       minHeight: 2,

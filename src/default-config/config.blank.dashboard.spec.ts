@@ -39,32 +39,20 @@ describe('DefaultDashboard seed', () => {
     }
   });
 
-  // Attitude widgets read a sub-field off navigation.attitude; their path must stay hidden
-  // (isPathConfigurable:false) — else the settings show a dead 'number' picker on an object leaf and
-  // no Paths tab is suppressed (#416) — and their data timeout defaults on. Each type is asserted
-  // separately so dropping one on a future re-export can't hide behind the other's presence.
-  // The seed carries heel gauges and no horizon; the horizon shape is guarded against its
-  // DEFAULT_CONFIG below instead, so dropping a type from the seed can never drop its guard.
-  for (const type of ['widget-heel-gauge']) {
-    it(`seeds ${type} with a hidden fixed attitude path and the timeout enabled`, () => {
-      const widgets = seededWidgetsOfType(type);
-      expect(widgets.length).toBeGreaterThan(0);
-
-      for (const widget of widgets) {
-        const cfg = widget.input?.widgetProperties?.config;
-        const paths = Object.values(cfg?.paths ?? {}) as { path?: string; isPathConfigurable?: boolean }[];
-        expect(paths.length).toBeGreaterThan(0);
-        for (const pathCfg of paths) {
-          expect(pathCfg.path).toBe('self.navigation.attitude');
-          expect(pathCfg.isPathConfigurable).toBe(false);
-        }
-        expect(cfg?.enableTimeout).toBe(true);
-        expect(cfg?.dataTimeout).toBe(5);
-        expect(typeof cfg?.updateInterval).toBe('number');
-        expect(cfg?.updateInterval).toBeGreaterThan(0);
-      }
-    });
-  }
+  // The heel gauge reads any angle; the seed must agree with its DEFAULT_CONFIG (the seed is stamped
+  // at LATEST, so the v24 migration never reaches it) and keep its data timeout on.
+  it('seeds widget-heel-gauge with a configurable roll pointer path and the timeout enabled', () => {
+    const widgets = seededWidgetsOfType('widget-heel-gauge');
+    expect(widgets.length).toBeGreaterThan(0);
+    for (const widget of widgets) {
+      const cfg = widget.input?.widgetProperties?.config;
+      expect(cfg?.paths).toEqual(WidgetHeelGaugeComponent.DEFAULT_CONFIG.paths);
+      expect(cfg?.enableTimeout).toBe(true);
+      expect(cfg?.dataTimeout).toBe(5);
+      expect(typeof cfg?.updateInterval).toBe('number');
+      expect(cfg?.updateInterval).toBeGreaterThan(0);
+    }
+  });
 
   // The seed is stamped at LATEST, so migrations never touch it; the wind-steer seed must agree with
   // its DEFAULT_CONFIG or a fresh install ships a value migrated users don't get. The seed had already
@@ -126,28 +114,21 @@ describe('DefaultDashboard seed', () => {
   });
 });
 
-// The seed carries no horizon widget, so the seed-level attitude guard above cannot cover it.
-// The #416 invariant is a property of the widget, not of the seed, so assert it where it lives —
-// a future re-export that places a horizon widget then inherits a shape that is already guarded.
-// widget-heel-gauge is included so both attitude widgets are checked from one place.
+// The Pitch & Roll horizon reads its fields off the whole navigation.attitude leaf, so its path must
+// stay hidden (isPathConfigurable:false) — else the settings show a dead 'number' picker on an object
+// leaf (#416). The seed carries no horizon widget, so the invariant is asserted on the widget itself.
 describe('attitude widget path config shape', () => {
-  const ATTITUDE = [
-    { type: 'widget-horizon', config: WidgetHorizonComponent.DEFAULT_CONFIG },
-    { type: 'widget-heel-gauge', config: WidgetHeelGaugeComponent.DEFAULT_CONFIG },
-  ];
-
-  for (const { type, config } of ATTITUDE) {
-    it(`${type}: reads a hidden fixed navigation.attitude path with the timeout enabled`, () => {
-      const paths = Object.values(config.paths ?? {}) as { path?: string; isPathConfigurable?: boolean }[];
-      expect(paths.length).toBeGreaterThan(0);
-      for (const pathConfig of paths) {
-        expect(pathConfig.path).toBe('self.navigation.attitude');
-        expect(pathConfig.isPathConfigurable).toBe(false);
-      }
-      expect(config.enableTimeout).toBe(true);
-      expect(config.dataTimeout).toBe(5);
-    });
-  }
+  it('widget-horizon: reads a hidden fixed navigation.attitude path with the timeout enabled', () => {
+    const config = WidgetHorizonComponent.DEFAULT_CONFIG;
+    const paths = Object.values(config.paths ?? {}) as { path?: string; isPathConfigurable?: boolean }[];
+    expect(paths.length).toBeGreaterThan(0);
+    for (const pathConfig of paths) {
+      expect(pathConfig.path).toBe('self.navigation.attitude');
+      expect(pathConfig.isPathConfigurable).toBe(false);
+    }
+    expect(config.enableTimeout).toBe(true);
+    expect(config.dataTimeout).toBe(5);
+  });
 });
 
 // A re-export captures one boat's per-widget choices, and two widgets reading one path can come

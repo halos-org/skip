@@ -1115,6 +1115,30 @@ describe('ConfigurationUpgradeService', () => {
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
     });
 
+    it('v23 upgrade makes a stored heel gauge path a configurable roll pointer path and stamps v24', async () => {
+        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
+        mockStorage.getConfig.mockResolvedValue({
+            app: { configVersion: 23 },
+            theme: { themeName: '' },
+            dashboards: [{ id: 'd0', configuration: [
+                { input: { widgetProperties: { type: 'widget-heel-gauge', config: {
+                    paths: { angle: { path: 'self.navigation.attitude', isPathConfigurable: false, convertUnitTo: 'deg', showConvertUnitTo: false } }
+                } } } }
+            ] }]
+        });
+
+        await service.runUpgrade(23);
+
+        expect(mockStorage.setConfig).toHaveBeenCalledTimes(1);
+        const written = mockStorage.setConfig.mock.calls[0][2];
+        expect(written.app.configVersion).toBe(24);
+        expect(written.dashboards[0].configuration[0].input.widgetProperties.config.paths.angle).toMatchObject({
+            path: 'self.navigation.attitude#/roll', isPathConfigurable: true, pathSkUnitsFilter: 'rad'
+        });
+        expect(service.messages()).toContain('[Upgrade] Made 1 heel gauge path(s) configurable, reading the roll by default.');
+        expect(service.error()).toBeNull();
+    });
+
     it('startFresh retires BOTH global and user legacy configs via an awaited write before resetting', async () => {
         mockStorage.initConfig = null; // remote (Signal K) path
         mockStorage.listConfigs.mockResolvedValueOnce([

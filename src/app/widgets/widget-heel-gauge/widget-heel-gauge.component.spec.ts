@@ -1,9 +1,11 @@
+import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WidgetHeelGaugeComponent } from './widget-heel-gauge.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
+import { IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 
 const DEG = Math.PI / 180;
 
@@ -86,10 +88,22 @@ describe('WidgetHeelGaugeComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Heel');
   });
 
-  it('observes the whole navigation.attitude leaf and reads its /roll field', () => {
+  it('observes its configured angle path as it is, the pointer path carrying any field', () => {
     fixture.detectChanges();
 
-    expect(observeCalls).toContainEqual({ pathName: 'angle', pointer: '/roll' });
+    expect(observeCalls).toContainEqual({ pathName: 'angle', pointer: undefined });
+  });
+
+  it('defaults to the roll and lets the user choose any angle path', () => {
+    const angle = (WidgetHeelGaugeComponent.DEFAULT_CONFIG.paths as Record<string, object>)['angle'];
+    expect(angle).toMatchObject({
+      path: 'self.navigation.attitude#/roll',
+      pathType: 'number',
+      isPathConfigurable: true,
+      pathSkUnitsFilter: 'rad',
+      convertUnitTo: 'deg',
+      showConvertUnitTo: false
+    });
   });
 });
 
@@ -101,6 +115,7 @@ describe('WidgetHeelGaugeComponent', () => {
 describe('WidgetHeelGaugeComponent output from SI inputs', () => {
   let fixture: ComponentFixture<WidgetHeelGaugeComponent>;
   let next: ((u: IPathUpdate) => void) | undefined;
+  let options: WritableSignal<IWidgetSvcConfig>;
   let originalGetTotalLength: ((this: SVGElement) => number) | undefined;
   let originalGetPointAtLength: ((this: SVGElement, distance: number) => DOMPoint) | undefined;
 
@@ -129,19 +144,15 @@ describe('WidgetHeelGaugeComponent output from SI inputs', () => {
   };
 
   const render = (invertAngle = false): void => {
+    options = signal<IWidgetSvcConfig>({
+      ...WidgetHeelGaugeComponent.DEFAULT_CONFIG,
+      gauge: { ...WidgetHeelGaugeComponent.DEFAULT_CONFIG.gauge, type: 'angle', invertAngle },
+      numDecimal: 1
+    });
     TestBed.configureTestingModule({
       imports: [WidgetHeelGaugeComponent],
       providers: [
-        {
-          provide: WidgetRuntimeDirective,
-          useValue: {
-            options: () => ({
-              ...WidgetHeelGaugeComponent.DEFAULT_CONFIG,
-              gauge: { ...WidgetHeelGaugeComponent.DEFAULT_CONFIG.gauge, type: 'angle', invertAngle },
-              numDecimal: 1
-            })
-          }
-        },
+        { provide: WidgetRuntimeDirective, useValue: { options } },
         {
           provide: WidgetStreamsDirective,
           useValue: { observe: (_p: string, n: (u: IPathUpdate) => void) => { next = n; } }
@@ -202,6 +213,17 @@ describe('WidgetHeelGaugeComponent output from SI inputs', () => {
       fine: 'translate(0.995037px, 10.049628px) rotate(5.710593deg)',
       coarse: 'translate(42.245037px, 14.174628px) rotate(5.710593deg)'
     });
+  });
+
+  it('drops the reading when re-pointed at another angle path, until that path reports', () => {
+    render();
+    feedDegrees(10);
+    expect(shown().text).toBe('10.0');
+
+    const angle = (options().paths as Record<string, IWidgetPath>)['angle'];
+    options.set({ ...options(), paths: { angle: { ...angle, path: 'self.steering.rudderAngle' } } });
+    fixture.detectChanges();
+    expect(shown().text).toBe('--');
   });
 
   it('shows the placeholder on a null', () => {

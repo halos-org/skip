@@ -547,11 +547,13 @@ export const DefaultDashboard: Dashboard[] = [
               "filterSelfPaths": true,
               "paths": {
                 "angle": {
-                  "description": "Heel / Roll Angle",
-                  "path": "self.navigation.attitude",
+                  "description": "Angle",
+                  "path": "self.navigation.attitude#/roll",
                   "source": "default",
                   "pathType": "number",
-                  "isPathConfigurable": false,
+                  "isPathConfigurable": true,
+                  "showPathSkUnitsFilter": false,
+                  "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
                   "showConvertUnitTo": false,
                   "pathRequired": true
@@ -2339,11 +2341,13 @@ export const DefaultDashboard: Dashboard[] = [
               "filterSelfPaths": true,
               "paths": {
                 "angle": {
-                  "description": "Heel / Roll Angle",
-                  "path": "self.navigation.attitude",
+                  "description": "Angle",
+                  "path": "self.navigation.attitude#/roll",
                   "source": "default",
                   "pathType": "number",
-                  "isPathConfigurable": false,
+                  "isPathConfigurable": true,
+                  "showPathSkUnitsFilter": false,
+                  "pathSkUnitsFilter": "rad",
                   "convertUnitTo": "deg",
                   "showConvertUnitTo": false,
                   "pathRequired": true
