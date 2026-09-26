@@ -24,11 +24,15 @@ const ACTIVE_POLAR_REST_PATH = 'vessels/self/polars/activePolar';
 const PERFORMANCE_FACTOR_PATH = 'self.polars.performanceFactor';
 const DEFAULT_PERFORMANCE_FACTOR = 1;
 /**
- * The only href shape accepted. The id charset has no `/`, `%` or `?`, and {@link parsePolarId}
- * rejects a dot-only id and any `..`, so an id can never climb out of the polars collection or reach
- * another host. Single dots are allowed because some providers use dotted ids.
+ * The only href shape accepted: one path segment under the polars collection, with no query or
+ * fragment. The segment may be raw or percent-encoded, so ids with spaces, `+` or non-ASCII letters
+ * pass. {@link parsePolarId} decodes it and rejects a decoded id with a slash, a backslash, a lone dot
+ * or any `..`, and {@link ActivePolarService} re-encodes it as a single segment, so an id can never
+ * climb out of the polars collection or reach another host. Single dots are allowed because some
+ * providers use dotted ids.
  */
-const ACTIVE_POLAR_HREF = /^\/resources\/polars\/([A-Za-z0-9_.-]+)$/;
+const ACTIVE_POLAR_HREF = /^\/resources\/polars\/([^/?#\\]+)$/;
+const PERCENT_ESCAPE_RUN = /(?:%[0-9A-Fa-f]{2})+/g;
 /**
  * Bound on each request, so one that never answers counts as failed instead of leaving the status
  * at loading. The same bound as History API reads, the other GET served by a provider plugin.
@@ -311,9 +315,25 @@ function parsePolarId(value: unknown): string | null {
   if (typeof value !== 'object' || value === null) return null;
   const href = (value as { href?: unknown }).href;
   if (typeof href !== 'string') return null;
-  const id = ACTIVE_POLAR_HREF.exec(href)?.[1];
-  if (id === undefined || id === '.' || id.includes('..')) return null;
+  const segment = ACTIVE_POLAR_HREF.exec(href)?.[1];
+  if (segment === undefined) return null;
+  const id = decodeSegment(segment);
+  if (id === '.' || id.includes('..') || id.includes('/') || id.includes('\\')) return null;
   return id;
+}
+
+/**
+ * Decodes each run of escapes on its own, so a stray `%` or a run that is not UTF-8 stays literal
+ * without keeping the valid escapes around it encoded.
+ */
+function decodeSegment(segment: string): string {
+  return segment.replace(PERCENT_ESCAPE_RUN, run => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      return run;
+    }
+  });
 }
 
 function toPerformanceFactor(value: unknown): number {
