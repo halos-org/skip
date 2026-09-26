@@ -397,7 +397,10 @@ describe('ActivePolarService', () => {
       ['an id that is a single dot', { href: '/resources/polars/.' }],
       ['an id with an encoded slash', { href: '/resources/polars/a%2Fb' }],
       ['an id with a query string', { href: '/resources/polars/abc?x=1' }],
-      ['an id with spaces', { href: '/resources/polars/a b' }],
+      ['an id with an encoded dot-dot', { href: '/resources/polars/%2E%2E' }],
+      ['an id with a backslash', { href: '/resources/polars/a\\b' }],
+      ['an id with an encoded backslash', { href: '/resources/polars/a%5Cb' }],
+      ['an id with a fragment', { href: '/resources/polars/abc#x' }],
       ['a trailing slash', { href: '/resources/polars/abc/' }],
       ['an empty id', { href: '/resources/polars/' }],
       ['a bare string instead of an object', HURMA_HREF],
@@ -407,6 +410,20 @@ describe('ActivePolarService', () => {
       data.emit(ACTIVE_POLAR_PATH, value);
       http.expectNone(() => true);
       expect(service.status()).toEqual({ kind: 'no-active-polar' });
+    });
+
+    it.each([
+      ['spaces', '/resources/polars/My Polar', 'My%20Polar'],
+      ['a plus sign', '/resources/polars/First 36.7+', 'First%2036.7%2B'],
+      ['accented letters', '/resources/polars/Polar été', 'Polar%20%C3%A9t%C3%A9'],
+      ['a percent-encoded id', '/resources/polars/Polaire%20%C3%89vasion', 'Polaire%20%C3%89vasion'],
+      ['a percent sign that is not an escape', '/resources/polars/100%', '100%25'],
+      ['valid escapes next to a stray percent sign', '/resources/polars/My%20Polar%', 'My%20Polar%25']
+    ])('fetches an id with %s as one encoded segment', (_label, href, segment) => {
+      start();
+      data.emit(ACTIVE_POLAR_PATH, { href });
+      http.expectOne(`http://sk.test:3000/signalk/v2/api/resources/polars/${segment}`).flush(hurmaPolar);
+      expect(service.status()).toEqual({ kind: 'ready' });
     });
 
     it('keeps its state when the path is reset to a value-less update', () => {
