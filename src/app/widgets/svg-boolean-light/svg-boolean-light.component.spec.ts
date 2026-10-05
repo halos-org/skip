@@ -27,7 +27,7 @@ function control(color: string): IDynamicControl {
   return { ctrlLabel: 'Nav', type: '3', pathID: 'p', value: false, color, isNumeric: false };
 }
 
-describe('SvgBooleanLightComponent OFF-state', () => {
+describe('SvgBooleanLightComponent ON/OFF state', () => {
   let fixture: ComponentFixture<SvgBooleanLightComponent>;
   let component: SvgBooleanLightComponent;
 
@@ -55,5 +55,22 @@ describe('SvgBooleanLightComponent OFF-state', () => {
     setup('bogus');
 
     expect(component.offColor).toBe('contrastDimmer');
+  });
+
+  it('marks the ON label by full opacity and value color, without a text-shadow', () => {
+    setup('blue');
+    fixture.componentRef.setInput('theme', { ...makeTheme(), blue: 'rgb(0, 0, 255)', blueDim: 'rgb(0, 0, 128)' });
+    fixture.detectChanges();
+    const label = fixture.nativeElement.querySelector('foreignObject div') as HTMLElement;
+
+    expect(label.style.opacity).toBe('0.6');
+    expect(label.style.color).toBe('rgb(0, 0, 128)');
+
+    fixture.componentRef.setInput('controlData', { ...control('blue'), value: true });
+    fixture.detectChanges();
+
+    expect(label.style.opacity).toBe('1');
+    expect(label.style.color).toBe('rgb(0, 0, 255)');
+    expect(label.style.textShadow).toBe('');
   });
 });
