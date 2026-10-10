@@ -112,6 +112,19 @@ describe('WidgetNumericComponent output from SI inputs', () => {
       .toEqual({ value: '21.6', minMax: 'Min: 18.0 Max: 28.8' });
   });
 
+  it('re-expresses the extremes after a live switch from Celsius to Fahrenheit (#575)', () => {
+    render(makeConfig({ showMin: true, showMax: true, showMiniChart: true }, 'celsius'));
+    feed(284.95, 'celsius');
+    feed(286.35, 'celsius');
+    expect(internals.getMinMaxText()).toBe('Min: 11.8 Max: 13.2');
+    feed(285.5, 'fahrenheit');
+    expect({
+      value: internals.getValueText(),
+      minMax: internals.getMinMaxText(),
+      graphUnit: miniGraphInputs().convertUnitTo
+    }).toEqual({ value: '54.2', minMax: 'Min: 53.2 Max: 55.8', graphUnit: 'fahrenheit' });
+  });
+
   it('renders the placeholder before any value arrives', () => {
     render(makeConfig());
     expect(internals.getValueText()).toBe('--');
