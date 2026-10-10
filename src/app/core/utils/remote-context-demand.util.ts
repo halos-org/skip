@@ -1,4 +1,5 @@
 import type { Dashboard } from '../services/dashboard.service';
+import { allWidgets } from './dashboard-widgets.util';
 
 /**
  * Widget types that consume remote (non-self) Signal K contexts irrespective of their configured
@@ -13,9 +14,9 @@ export const REMOTE_CONTEXT_WIDGET_TYPES: ReadonlySet<string> = new Set(['widget
 const REMOTE_CONTEXT_PREFIXES = ['vessels.', 'atons.'];
 
 /**
- * True when any saved dashboard hosts a widget that needs remote (non-self) SK contexts — either a
- * known remote-context widget type, or any widget whose configuration references a remote context
- * path (a string beginning `vessels.`/`atons.`, across every path-storage shape: `paths` objects,
+ * True when any saved dashboard hosts a widget, grouped widgets included, that needs remote
+ * (non-self) SK contexts — either a known remote-context widget type, or any widget whose
+ * configuration references a remote context path (a string beginning `vessels.`/`atons.`, across every path-storage shape: `paths` objects,
  * `paths` arrays, `datachartPath`, etc.).
  *
  * Fail-safe by construction: it scans every string in a widget's config, so an over-match only ever
@@ -24,30 +25,20 @@ const REMOTE_CONTEXT_PREFIXES = ['vessels.', 'atons.'];
  */
 export function dashboardsRequireRemoteContexts(dashboards: Dashboard[] | null | undefined): boolean {
   if (!Array.isArray(dashboards)) return false;
-  return dashboards.some(dashboard =>
-    Array.isArray(dashboard?.configuration) &&
-    dashboard.configuration.some(widgetHostNeedsRemoteContext)
-  );
-}
-
-function widgetHostNeedsRemoteContext(entry: unknown): boolean {
-  const node = entry as {
-    input?: { widgetProperties?: { type?: string; config?: unknown } };
-    subGridOpts?: { children?: unknown[] };
-  };
-  const props = node?.input?.widgetProperties;
-  if (props) {
-    if (props.type && REMOTE_CONTEXT_WIDGET_TYPES.has(props.type)) return true;
-    if (valueReferencesRemoteContext(props.config)) return true;
-  }
-  // A group-widget hosts a nested gridstack; its child widgets serialize into subGridOpts.children
-  // as the same node shape (not into the flat top-level configuration), so descend or a remote
-  // widget nested inside a group would be missed and silently narrow the subscription.
-  const children = node?.subGridOpts?.children;
-  if (Array.isArray(children)) {
-    return children.some(widgetHostNeedsRemoteContext);
+  for (const dashboard of dashboards) {
+    if (!Array.isArray(dashboard?.configuration)) continue;
+    for (const entry of allWidgets(dashboard.configuration)) {
+      if (widgetNeedsRemoteContext(entry)) return true;
+    }
   }
   return false;
+}
+
+function widgetNeedsRemoteContext(entry: unknown): boolean {
+  const props = (entry as { input?: { widgetProperties?: { type?: string; config?: unknown } } })?.input?.widgetProperties;
+  if (!props) return false;
+  if (props.type && REMOTE_CONTEXT_WIDGET_TYPES.has(props.type)) return true;
+  return valueReferencesRemoteContext(props.config);
 }
 
 function valueReferencesRemoteContext(value: unknown): boolean {
