@@ -806,6 +806,19 @@ export interface IWidgetPath {
    */
   suppressBootstrapNull?: boolean;
   /**
+   * Optional: drop every null, undefined or non-finite numeric sample before sampling, so the
+   * widget only ever receives real values and the last one holds, through a stale-data timeout too.
+   * For a path that more than one source fills while one of them sends empty values, such as an RMC
+   * sentence with blank variation fields: the per-tick sampling would otherwise keep whichever
+   * sample came last and could hide every real one.
+   *
+   * This makes the stale-data timeout silent for the widget: the timeout's reset null is dropped
+   * too, so the last valid value holds and the timeout only logs and resets the shared
+   * registration. A live reading that opts in should run with `enableTimeout: false` or track its
+   * own freshness.
+   */
+  dropInvalidSamples?: boolean;
+  /**
    * Optional: key of another slot in the same `paths` record whose Data Source this slot reads with,
    * in place of its own `source`. For a hidden slot that must read the same sensor as a visible one,
    * such as an SI copy of a displayed value.

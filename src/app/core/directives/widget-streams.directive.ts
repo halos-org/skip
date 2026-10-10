@@ -18,6 +18,7 @@ interface IPathIdentity {
   convertUnitTo?: string | null;
   source?: string | null;
   suppressBootstrapNull?: boolean;
+  dropInvalidSamples?: boolean;
   enableTimeout?: boolean;
 }
 
@@ -31,6 +32,10 @@ export function normalizeWidgetPath(path: unknown): string | undefined {
   const split = splitPointerPath(path);
   if (!split.valid || !split.basePath) return undefined;
   return split.pointer ? split.basePath + path.slice(path.indexOf('#')) : split.basePath;
+}
+
+function isValidSample(value: unknown): boolean {
+  return value != null && (typeof value !== 'number' || Number.isFinite(value));
 }
 
 /**
@@ -51,8 +56,10 @@ export function widgetPathSignature(pathCfg: IPathIdentity | undefined | null): 
   // omitted and `true` are not the same subscription. Omitted stays '' so the signature of
   // every path that does not set it is unchanged.
   const timeout = pathCfg.enableTimeout === false ? 'nott' : pathCfg.enableTimeout === true ? 'tt' : '';
-  return [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0',
-    timeout].join('|');
+  const parts = [normalizedPath, pathCfg.pathType, pathCfg.convertUnitTo, src, pathCfg.suppressBootstrapNull ? '1' : '0', timeout];
+  // Appended only when set, so the signature of every path that does not use it is unchanged.
+  if (pathCfg.dropInvalidSamples) parts.push('drop');
+  return parts.join('|');
 }
 
 /**
@@ -124,7 +131,7 @@ export class WidgetRepointTracker {
  * - Optional stale-data timeout (gated by the enableTimeout flag; fixed 5s TTL) + retry handling
  * - Path validation: null/undefined/empty paths, and paths with a malformed `#` pointer, trigger cleanup
  * - Pointer paths (`path#/field`) acquire and time out on the Signal K path and deliver the field
- * - Signature tracking: per-path (path + pathType + convertUnitTo + source + bootstrap null policy); the widget-level update cadence lives in the root signature
+ * - Signature tracking: per-path (path + pathType + convertUnitTo + source + bootstrap null and invalid-sample policies); the widget-level update cadence lives in the root signature
  *
  * Usage Pattern:
  * - Call observe(pathKey, callback) once per required path
@@ -160,11 +167,11 @@ export class WidgetStreamsDirective implements OnDestroy {
     };
   }
 
-  private computePathSignature(pathCfg: { path: string; pathType: string; convertUnitTo?: string; source?: string; suppressBootstrapNull?: boolean; enableTimeout?: boolean }): string {
+  private computePathSignature(pathCfg: IPathIdentity): string {
     return widgetPathSignature(pathCfg) ?? '';
   }
 
-  private computeBaseKey(path: string, source?: string): string {
+  private computeBaseKey(path: string, source?: string | null): string {
     const normalizedPath = this.normalizePath(path) ?? '';
     const src = (source?.trim() || 'default');
     return `${normalizedPath}|${src}`;
@@ -206,7 +213,7 @@ export class WidgetStreamsDirective implements OnDestroy {
   }
 
   /** Create (or reuse) base observable, assemble pipeline, and subscribe with diff-aware replacement. */
-  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: { path: string; pathType: string; convertUnitTo?: string; showConvertUnitTo?: boolean; source?: string; suppressBootstrapNull?: boolean; enableTimeout?: boolean }, observePointer?: string): void {
+  private buildAndSubscribe(pathName: string, next: (value: IPathUpdate) => void, cfg: IWidgetSvcConfig, pathCfg: IPathIdentity & { path: string; pathType: string; showConvertUnitTo?: boolean }, observePointer?: string): void {
     // The same test normalizeWidgetPath applies, kept as a split for its base path and pointer.
     const split = splitPointerPath(pathCfg.path);
     if (!split.valid || !split.basePath) {
@@ -273,6 +280,11 @@ export class WidgetStreamsDirective implements OnDestroy {
       // Resolve the field first, so bootstrap-null suppression and sampling operate on the field's
       // value.
       data$ = data$.pipe(map(x => this.resolveField(x, pointer)));
+    }
+    if (pathCfg.dropInvalidSamples) {
+      // Before sampling: sampleTime keeps the latest sample per tick, which may be an invalid one.
+      // Upstream of the timeout too, so the TTL's reset null is dropped and the last real value holds.
+      data$ = data$.pipe(filter(x => isValidSample(x?.data?.value)));
     }
     if (suppressBootstrapNull) {
       // Drop only the LEADING (bootstrap) null values. Once a real value has been seen, let
@@ -403,7 +415,7 @@ export class WidgetStreamsDirective implements OnDestroy {
    * Called automatically by Host2 when widget config updates.
    *
    * Behavior:
-  * - Compares path signatures (path + pathType + convertUnitTo + source + bootstrap null policy)
+  * - Compares path signatures (path + pathType + convertUnitTo + source + bootstrap null and invalid-sample policies)
    * - Compares root signature (widget-level settings: enableTimeout + updateInterval)
    * - Only rebuilds subscriptions for paths with changed signatures
    * - Removes subscriptions for deleted paths
@@ -490,7 +502,7 @@ export class WidgetStreamsDirective implements OnDestroy {
    * - Subsequent calls with same callback are no-op (idempotent)
    * - Different callback for same path replaces the previous registration
    * - Invalid paths (null/empty) clear any existing subscription
-  * - Pipeline rebuilds automatically when the path signature changes (path, pathType, source, convertUnitTo, suppressBootstrapNull) or the widget-level update cadence changes
+  * - Pipeline rebuilds automatically when the path signature changes (path, pathType, source, convertUnitTo, suppressBootstrapNull, dropInvalidSamples) or the widget-level update cadence changes
    *
    * Lifecycle / Cleanup:
    * - Subscriptions auto-cleanup on directive destroy

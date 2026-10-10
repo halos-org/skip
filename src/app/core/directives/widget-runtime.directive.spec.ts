@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
 import { WidgetRuntimeDirective } from './widget-runtime.directive';
-import type { IWidgetSvcConfig } from '../interfaces/widgets-interface';
+import type { IWidgetPath, IWidgetSvcConfig } from '../interfaces/widgets-interface';
 
 /**
  * The merge is what a placed widget actually runs on: its defaults under the config that
@@ -37,6 +37,14 @@ describe('WidgetRuntimeDirective config merge', () => {
     expect(merged?.paths?.['p'].path).toBe('self.racing.lines');
     expect(merged?.paths?.['p'].pathType).toBe('object');
     expect(merged?.paths?.['p'].enableTimeout).toBe(false);
+  });
+
+  it('takes a fixed path\'s invalid-sample policy from the defaults, set or retired', () => {
+    const fixed: IWidgetPath = { description: 'P', path: 'self.navigation.magneticVariation', source: 'default', pathType: 'number', isPathConfigurable: false };
+    const kept = build({ paths: { p: { ...fixed, dropInvalidSamples: true } } }, { paths: { p: { ...fixed, dropInvalidSamples: false } } });
+    expect(kept?.paths?.['p'].dropInvalidSamples).toBe(true);
+    const retired = build({ paths: { p: fixed } }, { paths: { p: { ...fixed, dropInvalidSamples: true } } });
+    expect(retired?.paths?.['p'].dropInvalidSamples).toBeUndefined();
   });
 
   /**
