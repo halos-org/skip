@@ -83,4 +83,13 @@ describe('SvgAutopilotComponent', () => {
     set({ courseXte: -150 });
     expect(readout()).toEqual(['150', ' m', ' Port']);
   });
+
+  it('clears the route readout, its unit and side included, on standby', () => {
+    const readout = () => [internals().apModeValue(), internals().apModeValueAnnotation(), internals().apModeValueDirection()];
+    set({ apMode: 'route', courseXte: -150 });
+    expect(readout()).toEqual(['150', ' m', ' Port']);
+
+    set({ apMode: 'standby' });
+    expect(readout()).toEqual(['', '', '']);
+  });
 });
