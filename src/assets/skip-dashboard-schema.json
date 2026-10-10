@@ -3735,6 +3735,19 @@
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
+          "magneticVariation": {
+            "convertUnitTo": "deg",
+            "description": "Magnetic Variation",
+            "dropInvalidSamples": true,
+            "isPathConfigurable": false,
+            "path": "self.navigation.magneticVariation",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "rad",
+            "pathType": "number",
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
           "nextWaypointBearing": {
             "convertUnitTo": "deg",
             "description": "Next Waypoint True Bearing",
@@ -4037,6 +4050,19 @@
           "pathRequired": false,
           "pathType": "number",
           "slot": "drift",
+          "source": "default"
+        },
+        {
+          "defaultConvertUnitTo": "deg",
+          "defaultPath": "self.navigation.magneticVariation",
+          "description": "Magnetic Variation",
+          "expectedSkUnit": "rad",
+          "hideFromConfig": false,
+          "isPathConfigurable": false,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "number",
+          "slot": "magneticVariation",
           "source": "default"
         },
         {

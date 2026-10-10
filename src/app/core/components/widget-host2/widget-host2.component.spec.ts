@@ -11,7 +11,9 @@ import { AppService } from '../../services/app-service';
 import { DashboardHistorySeriesSyncService } from '../../services/dashboard-history-series-sync.service';
 import { uiEventService } from '../../services/uiEvent.service';
 import { UnitsService } from '../../services/units.service';
-import { IWidget } from '../../interfaces/widgets-interface';
+import { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
+import { WidgetRuntimeDirective } from '../../directives/widget-runtime.directive';
+import { WidgetStreamsDirective } from '../../directives/widget-streams.directive';
 
 class DashboardServiceStub {
     public readonly isDashboardStatic = signal<boolean>(true);
@@ -355,5 +357,26 @@ describe('WidgetHost2Component', () => {
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
         expect(testWidget.config).toEqual(configSnapshot);
+    });
+
+    // A re-pointed widget reads the configured path from the runtime options while the streams
+    // diff replays the new path's sample, so the runtime must hold the new config first.
+    it('updates the runtime options before re-diffing the streams on reconfigure', () => {
+        const runtime = fixture.debugElement.injector.get(WidgetRuntimeDirective);
+        const streams = fixture.debugElement.injector.get(WidgetStreamsDirective);
+        const applyDiff = streams.applyStreamsConfigDiff.bind(streams);
+        let pathDuringDiff: string | undefined;
+        vi.spyOn(streams, 'applyStreamsConfigDiff').mockImplementation((cfg: IWidgetSvcConfig | undefined) => {
+            pathDuringDiff = runtime.options()?.paths?.['numericPath']?.path;
+            applyDiff(cfg);
+        });
+        const repointed = structuredClone(testWidget.config) as IWidgetSvcConfig;
+        const paths = repointed.paths as Record<string, { path: string }>;
+        paths['numericPath'].path = 'navigation.speedOverGround';
+
+        component.reconfigure(repointed);
+
+        expect(streams.applyStreamsConfigDiff).toHaveBeenCalledTimes(1);
+        expect(pathDuringDiff).toBe('navigation.speedOverGround');
     });
 });

@@ -688,7 +688,7 @@ describe('WidgetWindComponent default config', () => {
 describe('resolvePolarOverlayMode', () => {
   const all: PolarOverlayModeInputs = {
     enabled: true, polarReady: true, twsFresh: true, twaFresh: true,
-    compassMode: true, headingFresh: true, waypointActive: true
+    compassMode: true, headingShown: true, waypointActive: true
   };
 
   it.each([
@@ -698,7 +698,7 @@ describe('resolvePolarOverlayMode', () => {
     ['stale water TWA', { twaFresh: false }, 'hidden'],
     ['everything for VMC', {}, 'vmc'],
     ['compass mode off', { compassMode: false }, 'polar'],
-    ['stale heading', { headingFresh: false }, 'polar'],
+    ['heading not shown', { headingShown: false }, 'polar'],
     ['no active waypoint', { waypointActive: false }, 'polar']
   ] as [string, Partial<PolarOverlayModeInputs>, PolarOverlayMode][])('%s gives %s', (_label, change, mode) => {
     expect(resolvePolarOverlayMode({ ...all, ...change })).toBe(mode);
@@ -1253,5 +1253,430 @@ describe('WidgetWindComponent polar overlay', () => {
       feed('polarTrueWindAngle', 47 * DEG);
       expect(view.vmcCurvePoints()).not.toBe(first);
     });
+
+    // #634: the overlay's TWD is HDG + TWA on the dial's north, so the bearing must be on it too.
+    describe('on a magnetic dial', () => {
+      const magneticConfig = (): IWidgetSvcConfig => {
+        const paths = WidgetWindComponent.DEFAULT_CONFIG.paths as Record<string, IWidgetPath>;
+        return makeConfig({ paths: { ...paths, headingPath: { ...paths['headingPath'], path: 'self.navigation.headingMagnetic' } } });
+      };
+
+      it('draws the VMC curve and dot toward the magnetic bearing', () => {
+        create(makeConfig());
+        feedWind();
+        feedWaypoint(30, 10);
+        feed('polarSpeedThroughWater', 3);
+        const trueCurve = view.vmcCurvePoints() ?? [];
+        const trueDot = view.overlayDotRadius() ?? NaN;
+        component.ngOnDestroy();
+
+        create(magneticConfig());
+        feed('magneticVariation', 10 * DEG);
+        feedWind();
+        feedWaypoint(30, 20);
+        feed('polarSpeedThroughWater', 3);
+        expect(view.overlayMode()).toBe('vmc');
+        const magneticCurve = view.vmcCurvePoints() ?? [];
+        expect(trueCurve.length).toBeGreaterThan(0);
+        expect(magneticCurve.length).toBe(trueCurve.length);
+        magneticCurve.forEach((point, index) => {
+          expect(point.angle).toBeCloseTo(trueCurve[index].angle, 9);
+          expect(point.r).toBeCloseTo(trueCurve[index].r, 6);
+        });
+        expect(view.overlayDotRadius()).toBeCloseTo(trueDot, 9);
+      });
+
+      it('stays in VMC mode while null variation samples interleave with real ones', () => {
+        create(magneticConfig());
+        feed('magneticVariation', 10 * DEG);
+        feedWind();
+        feedWaypoint(30, 20);
+        for (const value of [null, 10 * DEG, null, Number.NaN, 10 * DEG, null]) {
+          feed('magneticVariation', value);
+          expect(view.overlayMode()).toBe('vmc');
+        }
+      });
+
+      it('falls back to polar mode without a variation', () => {
+        create(magneticConfig());
+        feedWind();
+        feedWaypoint(30, 20);
+        expect(view.overlayMode()).toBe('polar');
+      });
+    });
+  });
+});
+
+/**
+ * #634: the waypoint bearing and the current set are true-referenced, and COG has its own True or
+ * Magnetic path, while the dial turns by the heading path the user picked. Each is drawn on the
+ * dial's north, converted with magnetic variation (east positive) when the references differ, and
+ * hidden rather than drawn on the wrong north when that variation is unknown.
+ */
+describe('WidgetWindComponent north reference (#634)', () => {
+  const TRUE_HEADING = 'self.navigation.headingTrue';
+  const MAGNETIC_HEADING = 'self.navigation.headingMagnetic';
+  const TRUE_COG = 'self.navigation.courseOverGroundTrue';
+  const MAGNETIC_COG = 'self.navigation.courseOverGroundMagnetic';
+
+  interface NorthView {
+    waypointOnDial: () => number | undefined;
+    setOnDial: () => number | undefined;
+    setShown: () => boolean;
+    cogOnDial: () => number | undefined;
+    cogShown: () => boolean;
+  }
+
+  let component: WidgetWindComponent;
+  let view: NorthView;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+
+  const makeConfig = (headingPath: string, cogPath: string): IWidgetSvcConfig => {
+    const paths = WidgetWindComponent.DEFAULT_CONFIG.paths as Record<string, IWidgetPath>;
+    return {
+      ...WidgetWindComponent.DEFAULT_CONFIG,
+      paths: {
+        ...paths,
+        headingPath: { ...paths['headingPath'], path: headingPath },
+        courseOverGround: { ...paths['courseOverGround'], path: cogPath }
+      }
+    };
+  };
+  const feed = (pathKey: string, value: number | null): void => {
+    const callback = callbacks.get(pathKey);
+    if (!callback) throw new Error(`${pathKey} is not observed`);
+    callback({ data: { value, timestamp: null }, state: 'normal' });
+  };
+  /** Waypoint 120°, set 80° and COG 20°, each on its own path's north. */
+  const feedMarkers = (): void => {
+    feed('headingPath', 30 * DEG);
+    feed('nextWaypointBearing', 120 * DEG);
+    feed('set', 80 * DEG);
+    feed('courseOverGround', 20 * DEG);
+  };
+  const create = (headingPath: string, cogPath: string): void => {
+    options.set(makeConfig(headingPath, cogPath));
+    component = TestBed.runInInjectionContext(() => new WidgetWindComponent());
+    view = component as unknown as NorthView;
+    TestBed.tick();
+  };
+  const headingShown = (): boolean => (component as unknown as { headingShown: () => boolean }).headingShown();
+  const degreesOrHidden = (shown: boolean, angle: number | undefined): number | 'hidden' =>
+    shown && angle != null ? Math.round(angle / DEG) : 'hidden';
+  const markers = () => {
+    const waypoint = view.waypointOnDial();
+    return {
+      waypoint: degreesOrHidden(waypoint != null, waypoint),
+      set: degreesOrHidden(view.setShown(), view.setOnDial()),
+      cog: degreesOrHidden(view.cogShown(), view.cogOnDial())
+    };
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    options = signal<IWidgetSvcConfig | undefined>(undefined);
+    callbacks = new Map<string, (u: IPathUpdate) => void>();
+    const streamsMock = {
+      observe: (pathName: string, next: (u: IPathUpdate) => void) => { callbacks.set(pathName, next); },
+      unobserve: (pathName: string) => { callbacks.delete(pathName); }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: streamsMock },
+        { provide: UnitsService, useValue: unitsServiceStub }
+      ]
+    });
+  });
+
+  afterEach(() => {
+    component?.ngOnDestroy();
+    vi.useRealTimers();
+  });
+
+  // An RMC with empty variation fields sends nulls on the path another source fills; the slot drops
+  // them before sampling so they cannot crowd out the real value.
+  it('declares magnetic variation as a fixed, optional rad path that drops invalid samples', () => {
+    const variation = (WidgetWindComponent.DEFAULT_CONFIG.paths as Record<string, IWidgetPath>)['magneticVariation'];
+    expect(variation).toMatchObject({
+      path: 'self.navigation.magneticVariation',
+      isPathConfigurable: false,
+      pathRequired: false,
+      pathSkUnitsFilter: 'rad',
+      dropInvalidSamples: true
+    });
+    expect(variation.pathOptions).toBeUndefined();
+  });
+
+  it('draws everything as is on a true dial with a true COG, with no variation on the server', () => {
+    create(TRUE_HEADING, TRUE_COG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+  });
+
+  it('keeps a true dial unchanged when a variation arrives', () => {
+    create(TRUE_HEADING, TRUE_COG);
+    feedMarkers();
+    feed('magneticVariation', 10 * DEG);
+    expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+  });
+
+  it('turns the waypoint, the set and a true COG onto magnetic north with an east variation', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feed('magneticVariation', 10 * DEG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+  });
+
+  it('draws a magnetic COG as is on a magnetic dial', () => {
+    create(MAGNETIC_HEADING, MAGNETIC_COG);
+    feed('magneticVariation', 10 * DEG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 20 });
+  });
+
+  it('adds a west (negative) variation going true to magnetic', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feed('magneticVariation', -5 * DEG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 125, set: 85, cog: 25 });
+  });
+
+  it('wraps a converted bearing across north', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feed('magneticVariation', 10 * DEG);
+    feed('headingPath', 0);
+    feed('nextWaypointBearing', 5 * DEG);
+    feed('set', 3 * DEG);
+    feed('courseOverGround', 8 * DEG);
+    expect(markers()).toEqual({ waypoint: 355, set: 353, cog: 358 });
+  });
+
+  it('hides the waypoint, the set and a true COG on a magnetic dial without a variation', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 'hidden', set: 'hidden', cog: 'hidden' });
+  });
+
+  it('keeps a magnetic COG on a magnetic dial without a variation', () => {
+    create(MAGNETIC_HEADING, MAGNETIC_COG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 'hidden', set: 'hidden', cog: 20 });
+  });
+
+  it('shows the converted markers once a variation arrives', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feedMarkers();
+    expect(markers().waypoint).toBe('hidden');
+    feed('magneticVariation', 10 * DEG);
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+  });
+
+  // RMC with empty variation fields arrives as a null on the same path another source fills, and
+  // the streams directive emits a null when the path goes silent; neither says the variation changed.
+  it('keeps the last known variation through interleaved null and invalid samples', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feed('magneticVariation', 10 * DEG);
+    feedMarkers();
+    feed('magneticVariation', null);
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+    feed('magneticVariation', 10 * DEG);
+    feed('magneticVariation', Number.NaN);
+    feed('magneticVariation', null);
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+  });
+
+  it('keeps a variation sent once for the session, well past the data timeout', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feed('magneticVariation', 10 * DEG);
+    for (let elapsed = 0; elapsed < 60_000; elapsed += 4000) {
+      feedMarkers();
+      vi.advanceTimersByTime(4000);
+    }
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+  });
+
+  it('moves the converted markers when a known variation changes, but not for under 0.1°', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feed('magneticVariation', 10 * DEG);
+    feedMarkers();
+    feed('magneticVariation', 12 * DEG);
+    expect(markers()).toEqual({ waypoint: 108, set: 68, cog: 8 });
+    const waypoint = view.waypointOnDial();
+    feed('magneticVariation', 12.05 * DEG);
+    expect(view.waypointOnDial()).toBe(waypoint);
+  });
+
+  it('converts a magnetic COG onto a true dial with a variation, and hides it without one', () => {
+    create(TRUE_HEADING, MAGNETIC_COG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 'hidden' });
+    feed('magneticVariation', 10 * DEG);
+    expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 30 });
+  });
+
+  // A stale heading leaves the dial turned at its last heading on the same north, so the converted
+  // markers stay where they belong on it.
+  it('keeps the converted markers at their angles while the heading is stale', () => {
+    create(MAGNETIC_HEADING, TRUE_COG);
+    feed('magneticVariation', 10 * DEG);
+    feedMarkers();
+    vi.advanceTimersByTime(4000);
+    feed('nextWaypointBearing', 120 * DEG);
+    feed('set', 80 * DEG);
+    feed('courseOverGround', 20 * DEG);
+    vi.advanceTimersByTime(1500);
+    expect(headingShown()).toBe(false);
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+  });
+
+  it('follows a live change of the heading path', () => {
+    create(TRUE_HEADING, TRUE_COG);
+    feed('magneticVariation', 10 * DEG);
+    feedMarkers();
+    expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+    options.set(makeConfig(MAGNETIC_HEADING, TRUE_COG));
+    TestBed.tick();
+    feed('headingPath', 20 * DEG);
+    expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+  });
+
+  // A boat with no heading sensor, or one that is down at mount: the dial is not turned, and its
+  // north is the configured heading path's, the north that path's first sample will carry.
+  describe('before any heading sample', () => {
+    const feedBearings = (): void => {
+      feed('nextWaypointBearing', 120 * DEG);
+      feed('set', 80 * DEG);
+      feed('courseOverGround', 20 * DEG);
+    };
+
+    it('draws everything as is on a true dial with a true COG', () => {
+      create(TRUE_HEADING, TRUE_COG);
+      feedBearings();
+      expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+      expect(headingShown()).toBe(false);
+    });
+
+    it('turns the true markers onto the configured magnetic north with a variation', () => {
+      create(MAGNETIC_HEADING, TRUE_COG);
+      feed('magneticVariation', 10 * DEG);
+      feedBearings();
+      expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+      expect(headingShown()).toBe(false);
+    });
+
+    it('hides on a magnetic dial what needs a variation it does not have', () => {
+      create(MAGNETIC_HEADING, MAGNETIC_COG);
+      feedBearings();
+      expect(markers()).toEqual({ waypoint: 'hidden', set: 'hidden', cog: 20 });
+    });
+
+    it('takes the north of a heading path re-pointed before any sample', () => {
+      create(TRUE_HEADING, TRUE_COG);
+      options.set(makeConfig(MAGNETIC_HEADING, TRUE_COG));
+      TestBed.tick();
+      feed('magneticVariation', 10 * DEG);
+      feedBearings();
+      expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+    });
+  });
+
+  // The dial keeps turning by the last heading sample, which belongs to the old path until the new
+  // one reports; every marker waits for that, whether or not it needs converting.
+  describe('after a re-point of the heading path', () => {
+
+    // Host2 reconfigures the streams before its effects run, so the new path's replayed sample
+    // reaches the callback before the options effect sees the new config.
+    it('shows the new heading delivered before the effects run', () => {
+      create(TRUE_HEADING, TRUE_COG);
+      feed('magneticVariation', 10 * DEG);
+      feedMarkers();
+      options.set(makeConfig(MAGNETIC_HEADING, TRUE_COG));
+      feed('headingPath', 20 * DEG);
+      TestBed.tick();
+      expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+      expect(headingShown()).toBe(true);
+    });
+
+    it('hides the converted markers at once when only the old true heading is published', () => {
+      create(TRUE_HEADING, TRUE_COG);
+      feed('magneticVariation', 10 * DEG);
+      feedMarkers();
+      options.set(makeConfig(MAGNETIC_HEADING, TRUE_COG));
+      TestBed.tick();
+      expect(markers()).toEqual({ waypoint: 'hidden', set: 'hidden', cog: 'hidden' });
+      expect(headingShown()).toBe(false);
+
+      feed('headingPath', 20 * DEG);
+      expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+      expect(headingShown()).toBe(true);
+    });
+
+    it('hides the true markers at once when only the old magnetic heading is published', () => {
+      create(MAGNETIC_HEADING, TRUE_COG);
+      feed('magneticVariation', 10 * DEG);
+      feedMarkers();
+      expect(markers()).toEqual({ waypoint: 110, set: 70, cog: 10 });
+      options.set(makeConfig(TRUE_HEADING, TRUE_COG));
+      TestBed.tick();
+      expect(markers()).toEqual({ waypoint: 'hidden', set: 'hidden', cog: 'hidden' });
+
+      feed('headingPath', 30 * DEG);
+      expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+    });
+
+    it('hides COG at once when its path is re-pointed, until the new path reports', () => {
+      create(TRUE_HEADING, TRUE_COG);
+      feed('magneticVariation', 10 * DEG);
+      feedMarkers();
+      expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+      options.set(makeConfig(TRUE_HEADING, MAGNETIC_COG));
+      TestBed.tick();
+      expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 'hidden' });
+
+      feed('courseOverGround', 10 * DEG);
+      expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+    });
+
+    it('draws the markers that need no conversion once the new heading reports, with no variation', () => {
+      create(MAGNETIC_HEADING, TRUE_COG);
+      feedMarkers();
+      options.set(makeConfig(TRUE_HEADING, TRUE_COG));
+      TestBed.tick();
+      feedMarkers();
+      expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+      vi.advanceTimersByTime(4000);
+      feed('nextWaypointBearing', 120 * DEG);
+      feed('set', 80 * DEG);
+      feed('courseOverGround', 20 * DEG);
+      vi.advanceTimersByTime(1500);
+      expect(markers()).toEqual({ waypoint: 120, set: 80, cog: 20 });
+    });
+  });
+});
+
+describe('WidgetWindComponent stored config without magnetic variation (#634)', () => {
+  it('gains the default variation path through the runtime merge, keeping the stored heading choice', () => {
+    const defaults = WidgetWindComponent.DEFAULT_CONFIG;
+    const defaultPaths = defaults.paths as Record<string, IWidgetPath>;
+    // As saved by a release before the variation path existed.
+    const { magneticVariation: omitted, ...storedPaths } = structuredClone(defaultPaths);
+    expect(omitted).toBeDefined();
+    const stored: IWidgetSvcConfig = {
+      ...structuredClone(defaults),
+      paths: { ...storedPaths, headingPath: { ...storedPaths['headingPath'], path: 'self.navigation.headingMagnetic' } }
+    };
+
+    const merged = TestBed.runInInjectionContext(() => {
+      const runtime = new WidgetRuntimeDirective();
+      runtime.initialize(defaults, stored);
+      return runtime.options();
+    });
+
+    const paths = merged?.paths as Record<string, IWidgetPath> | undefined;
+    expect(paths?.['magneticVariation']).toEqual(defaultPaths['magneticVariation']);
+    expect(paths?.['headingPath'].path).toBe('self.navigation.headingMagnetic');
   });
 });

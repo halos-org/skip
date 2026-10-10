@@ -83,6 +83,7 @@ function makeCfg(opts: {
     showConvertUnitTo?: boolean;
     source?: string | null;
     suppressBootstrapNull?: boolean;
+    dropInvalidSamples?: boolean;
     displayName?: string;
     enableTimeout?: boolean;
     /** The path's own TTL opt-in/opt-out, which overrides the widget-level flag. */
@@ -98,6 +99,7 @@ function makeCfg(opts: {
             source: (opts.source ?? null),
             pathType: opts.pathType ?? 'string',
             suppressBootstrapNull: opts.suppressBootstrapNull ?? false,
+            dropInvalidSamples: opts.dropInvalidSamples,
             isPathConfigurable: true,
             showPathSkUnitsFilter: false,
             pathSkUnitsFilter: null,
@@ -601,6 +603,56 @@ describe('WidgetStreamsDirective', () => {
         directive.applyStreamsConfigDiff(cfg2);
 
         expect(dataSvc.calls.length).toBe(1);
+    });
+
+    /**
+     * sampleTime keeps only the latest sample of each tick, so a source sending nulls between
+     * another source's real values (an RMC with empty variation fields) can hide every real value.
+     */
+    describe('dropInvalidSamples', () => {
+        const update = (value: number | null): IPathUpdate => ({ data: { value, timestamp: null }, state: 'normal' } as IPathUpdate);
+        /** Per 100 ms tick: a real 10, then a NaN and a null that arrive after it. */
+        const feedInterleaved = async (subj: Subject<IPathUpdate>, ticks: number): Promise<void> => {
+            subj.next(update(null));
+            for (let i = 0; i < ticks; i++) {
+                subj.next(update(10));
+                subj.next(update(Number.NaN));
+                subj.next(update(null));
+                await vi.advanceTimersByTimeAsync(100);
+            }
+        };
+
+        it('delivers the real value at every tick when invalid samples interleave with it', async () => {
+            vi.useFakeTimers();
+            directive.setStreamsConfig(makeCfg({ path: 'nav.var', pathType: 'number', updateInterval: 100, dropInvalidSamples: true }));
+            const hits: (number | null)[] = [];
+            directive.observe('p', u => hits.push(u.data.value as number | null));
+
+            await feedInterleaved(dataSvc.subjects.get('nav.var|default')!, 3);
+            expect(hits).toEqual([10, 10, 10, 10]);
+        });
+
+        it('leaves a path without the flag delivering the latest sample, invalid or not', async () => {
+            vi.useFakeTimers();
+            directive.setStreamsConfig(makeCfg({ path: 'nav.var', pathType: 'number', updateInterval: 100 }));
+            const hits: (number | null)[] = [];
+            directive.observe('p', u => hits.push(u.data.value as number | null));
+
+            await feedInterleaved(dataSvc.subjects.get('nav.var|default')!, 3);
+            expect(hits).toEqual([null, null, null, null]);
+        });
+
+        it('takes effect on a live config change, rebuilding the pipeline on the same base', async () => {
+            vi.useFakeTimers();
+            directive.setStreamsConfig(makeCfg({ path: 'nav.var', pathType: 'number', updateInterval: 100 }));
+            const hits: (number | null)[] = [];
+            directive.observe('p', u => hits.push(u.data.value as number | null));
+            directive.applyStreamsConfigDiff(makeCfg({ path: 'nav.var', pathType: 'number', updateInterval: 100, dropInvalidSamples: true }));
+
+            await feedInterleaved(dataSvc.subjects.get('nav.var|default')!, 2);
+            expect(hits).toEqual([10, 10, 10]);
+            expect(dataSvc.calls.length).toBe(1);
+        });
     });
 
     it('applies updateInterval: emits initial immediately and latest per interval', async () => {
@@ -1376,6 +1428,26 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
         expect(hits[hits.length - 1]).toBeNull();
     });
 
+    // A path that drops invalid samples holds its last real value: the timeout's reset null is an
+    // invalid sample like any other.
+    it('keeps the last real value through a TTL timeout on a path that drops invalid samples', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'nav.var-ttl', source: null, pathType: 'number', updateInterval: 50,
+            enableTimeout: true, dropInvalidSamples: true
+        }));
+        const hits: (number | null)[] = [];
+        directive.observe('p', u => hits.push(u.data.value as number | null));
+
+        dataSvc.subjects.get('nav.var-ttl|default')!.next({ data: { value: 7, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+        await vi.advanceTimersByTimeAsync(60);
+        await vi.advanceTimersByTimeAsync(10100);
+        expect(dataSvc.timeoutCalls.length).toBeGreaterThanOrEqual(1);
+        expect(hits.length).toBeGreaterThan(0);
+        expect(hits.every(v => v === 7)).toBe(true);
+    });
+
     it('resets a structural slot\'s SI value to null after a TTL timeout', async () => {
         vi.useFakeTimers();
         vi.spyOn(console, 'log');
@@ -1446,6 +1518,12 @@ describe('widgetPathSignature', () => {
         const off = widgetPathSignature({ ...base, enableTimeout: false });
         const omitted = widgetPathSignature(base);
         expect(new Set([on, off, omitted]).size).toBe(3);
+    });
+
+    it('separates a path that drops invalid samples, and leaves every other signature as it was', () => {
+        expect(widgetPathSignature({ ...base, dropInvalidSamples: true })).not.toBe(widgetPathSignature(base));
+        expect(widgetPathSignature({ ...base, dropInvalidSamples: false })).toBe(widgetPathSignature(base));
+        expect(widgetPathSignature(base)).toBe('navigation.speedOverGround|number|knots|default|1|');
     });
 
     it('normalizeWidgetPath yields undefined for anything that is not a usable path', () => {

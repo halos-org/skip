@@ -126,6 +126,7 @@ function restoreFixedPaths(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): vo
     mergedPath.path = basePath.path;
     mergedPath.pathType = basePath.pathType;
     mergedPath.enableTimeout = basePath.enableTimeout;
+    mergedPath.dropInvalidSamples = basePath.dropInvalidSamples;
     mergedPath.showConvertUnitTo = basePath.showConvertUnitTo;
     if (basePath.showConvertUnitTo === false) mergedPath.convertUnitTo = basePath.convertUnitTo;
   }
