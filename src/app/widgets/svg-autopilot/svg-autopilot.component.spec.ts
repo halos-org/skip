@@ -12,6 +12,8 @@ describe('SvgAutopilotComponent', () => {
   interface Internals {
     compassAngle: () => number | null;
     apModeValue: () => string;
+    apModeValueAnnotation: () => string;
+    apModeValueDirection: () => string;
   }
 
   // The tests speak degrees; the component takes its angle inputs in rad.
@@ -68,5 +70,26 @@ describe('SvgAutopilotComponent', () => {
 
     set({ appWindAngle: 35 });
     expect(internals().apModeValue()).toBe('35°');
+  });
+
+  it('shows a placeholder rather than an on-track 0 m for a missing cross-track error', () => {
+    const readout = () => [internals().apModeValue(), internals().apModeValueAnnotation(), internals().apModeValueDirection()];
+    set({ apMode: 'route', courseXte: null });
+    expect(readout()).toEqual(['--', '', '']);
+
+    set({ courseXte: Number.NaN });
+    expect(readout()).toEqual(['--', '', '']);
+
+    set({ courseXte: -150 });
+    expect(readout()).toEqual(['150', ' m', ' Port']);
+  });
+
+  it('clears the route readout, its unit and side included, on standby', () => {
+    const readout = () => [internals().apModeValue(), internals().apModeValueAnnotation(), internals().apModeValueDirection()];
+    set({ apMode: 'route', courseXte: -150 });
+    expect(readout()).toEqual(['150', ' m', ' Port']);
+
+    set({ apMode: 'standby' });
+    expect(readout()).toEqual(['', '', '']);
   });
 });

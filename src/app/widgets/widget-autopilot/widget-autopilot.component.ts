@@ -710,7 +710,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       }
     });
     this.streams.observe('autopilotV2Target', newValue => {
-      if (newValue.data?.value) {
+      if (newValue.data?.value != null) {
         this.autopilotTarget.set(newValue.data.value);
       } else {
         this.autopilotTarget.set(null);
@@ -752,7 +752,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
 
   private startDataSubscription(): void {
     if (!this.streams) return;
-    this.streams.observe('courseXte', newValue => this.crossTrackError.set(newValue.data.value != null ? newValue.data.value : 0));
+    this.streams.observe('courseXte', newValue => this.crossTrackError.set(newValue.data.value));
     this.streams.observe('rudderAngle', newValue => {
         if (newValue.data.value === null) {
           this.rudder.set(null);

@@ -172,6 +172,53 @@ describe('WidgetAutopilotComponent rendering from SI inputs', () => {
     expect(xte(0)).toEqual(['XTE', '0 m', '']);
   });
 
+  it('shows a lost XTE as -- with no unit or side, and its next reading in full', () => {
+    render(makeConfig());
+    engage('route');
+    feedDistance('courseXte', 150);
+    settle();
+    feedRaw('courseXte', null);
+    settle();
+    const lost = texts('counterAWA').slice(0, 3);
+
+    feedDistance('courseXte', 150);
+    settle();
+
+    expect({ lost, recovered: texts('counterAWA').slice(0, 3) }).toEqual({
+      lost: ['XTE', '--', ''],
+      recovered: ['XTE', '150 m', 'Stbd']
+    });
+  });
+
+  it('keeps a lost XTE absent in auto mode too', () => {
+    render(makeConfig());
+    engage('auto');
+    feedDistance('courseXte', -150);
+    settle();
+    feedRaw('courseXte', null);
+    settle();
+
+    expect(texts('counterAWA').slice(1, 3)).toEqual(['--', '']);
+  });
+
+  it('shows a heading target of 000° as a target', () => {
+    render(makeConfig());
+    engage('auto');
+    feedAngle('autopilotV2Target', 0);
+    settle();
+
+    expect(texts('displayArea')).toEqual(['0°', 'Mag', 'Heading Hold']);
+  });
+
+  it('shows a dead-ahead wind target as 0° with no side', () => {
+    render(makeConfig());
+    engage('wind');
+    feedAngle('autopilotV2Target', 0);
+    settle();
+
+    expect(texts('displayArea')).toEqual(['0°', '', 'Wind Hold']);
+  });
+
   it('points the AWA indicator and shows the wind-hold angle and side', () => {
     render(makeConfig());
     engage('wind');

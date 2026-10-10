@@ -15,7 +15,7 @@
       [updateInterval]="runtime.options()?.updateInterval"
       [targetPilotHeadingTrue]="runtime.options()?.autopilot?.courseDirectionTrue ?? false"
       [autopilotTarget]="autopilotTarget()"
-      [courseXte]="crossTrackError() ?? 0"
+      [courseXte]="crossTrackError()"
       [compassHeading]="heading()"
       [headingDirectionTrue]="runtime.options()?.autopilot?.headingDirectionTrue ?? false"
       [appWindAngle]="windAngleApparent()"
