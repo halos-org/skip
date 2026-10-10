@@ -9,6 +9,7 @@ import type { IAppConfig, IConfig, ISiScaleReset } from '../interfaces/app-setti
 import type { Dashboard } from '../services/dashboard.service';
 import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS, IWidgetSvcConfig } from '../interfaces/widgets-interface';
 import { LATEST_APP_CONFIG_VERSION } from '../constants/config-versions.const';
+import { allWidgets } from './dashboard-widgets.util';
 
 // The app-config schema version the legacy v10/v11 transforms produce. Pinned on purpose:
 // bumping LATEST_APP_CONFIG_VERSION must not change what these transforms stamp — a newer
@@ -480,7 +481,7 @@ export function applySiSteps(config: IConfig, sink: MigrationMessageSink, upToVe
   const resets: ISiScaleReset[] = [];
   config.dashboards.forEach((dash, index) => {
     if (!dash || !Array.isArray(dash.configuration)) return;
-    for (const widget of dash.configuration) {
+    for (const widget of allWidgets(dash.configuration)) {
       const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: unknown } } })?.input?.widgetProperties;
       if (!wp || typeof wp.type !== 'string' || !wp.config || typeof wp.config !== 'object') continue;
       const cfg = wp.config as WidgetConfigRecord;
@@ -583,7 +584,7 @@ function upgradeConfigV11toV12(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (dash && Array.isArray(dash.configuration)) {
-          for (const widget of dash.configuration) {
+          for (const widget of allWidgets(dash.configuration)) {
             if (widget && typeof widget === 'object') {
               if (widget.selector !== 'widget-host2') {
                 widget.selector = 'widget-host2';
@@ -658,7 +659,7 @@ function upgradeConfigV12toV13(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const cfg = (widget as { input?: { widgetProperties?: { config?: Record<string, unknown> } } })
             ?.input?.widgetProperties?.config;
           if (cfg && typeof cfg === 'object') {
@@ -699,7 +700,7 @@ function upgradeConfigV13toV14(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: {
             type?: unknown;
             config?: { paths?: unknown; supportAutomaticHistoricalSeries?: boolean };
@@ -759,7 +760,7 @@ function upgradeConfigV14toV15(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: {
             type?: unknown;
             config?: { paths?: unknown };
@@ -829,7 +830,7 @@ function upgradeConfigV15toV16(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: {
             type?: unknown;
             config?: { paths?: unknown; enableTimeout?: boolean; dataTimeout?: number };
@@ -885,7 +886,7 @@ function upgradeConfigV16toV17(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: {
             config?: { paths?: unknown; updateInterval?: number };
           } } })?.input?.widgetProperties;
@@ -933,7 +934,7 @@ function upgradeConfigV17toV18(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: {
             type?: unknown;
             config?: { paths?: unknown };
@@ -988,7 +989,7 @@ function upgradeConfigV18toV19(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: {
             type?: unknown;
             config?: { paths?: unknown };
@@ -1042,7 +1043,7 @@ function upgradeConfigV19toV20(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
           if (!wp || wp.type !== 'widget-racesteer' || !wp.config) continue;
           for (const key of ['laylineEnable', 'laylineAngle']) {
@@ -1140,7 +1141,7 @@ function upgradeConfigV22toV23(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
           if (!wp || typeof wp.type !== 'string' || SUBFIELD_WIDGET_TYPES.has(wp.type)) continue;
           const cfg = wp.config;
@@ -1203,7 +1204,7 @@ function upgradeConfigV23toV24(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
           if (wp?.type !== 'widget-heel-gauge') continue;
           const paths = wp.config?.['paths'] as Record<string, WidgetConfigRecord> | undefined;
@@ -1245,7 +1246,7 @@ function upgradeConfigV24toV25(config: IConfig, sink: MigrationMessageSink): ICo
     if (Array.isArray(config.dashboards)) {
       for (const dash of config.dashboards) {
         if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of dash.configuration) {
+        for (const widget of allWidgets(dash.configuration)) {
           const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
           if (wp?.type !== 'widget-wind-steer') continue;
           const paths = wp.config?.['paths'] as Record<string, WidgetConfigRecord> | undefined;
@@ -1279,7 +1280,7 @@ export function migrateUseNeedleToEnableNeedle(dashboards: Dashboard[], sink: Mi
   let updatedCount = 0;
   for (const dash of dashboards) {
     if (!dash || !Array.isArray(dash.configuration)) continue;
-    for (const w of dash.configuration) {
+    for (const w of allWidgets(dash.configuration)) {
       const widget = w as WidgetHost2;
       const config = widget.input?.widgetProperties?.config as { gauge?: GaugeCfg } | undefined;
       const gauge = config?.gauge;
