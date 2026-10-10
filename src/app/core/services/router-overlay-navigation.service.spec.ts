@@ -232,6 +232,28 @@ describe('RouterOverlayNavigationService', () => {
       expect(dialog.close).toHaveBeenCalledTimes(1);
     });
 
+    it('defers each link of the add-widget chain: sheet, Add Widget dialog, options dialog (#612)', () => {
+      const addWidget = closeSheetIntoDialog(create());
+      pop();
+      expect(pushSpy).toHaveBeenCalledTimes(2);
+
+      // Picking a widget closes the Add Widget dialog; the new widget opens its options dialog
+      // before that dialog's back() lands.
+      openDialogs.pop();
+      addWidget.closed.next(undefined);
+      const options = openDialog();
+      expect(backSpy).toHaveBeenCalledTimes(2);
+      expect(pushSpy).toHaveBeenCalledTimes(2);
+
+      pop();
+      expect(pushSpy).toHaveBeenCalledTimes(3);
+      expect(options.close).not.toHaveBeenCalled();
+
+      openDialogs.pop();
+      options.closed.next(undefined);
+      expect(backSpy).toHaveBeenCalledTimes(3);
+    });
+
     it('does not push a stale entry after a real navigation cleared the overlays', () => {
       const dialog = closeSheetIntoDialog(create());
 
