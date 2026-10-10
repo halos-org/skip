@@ -1,4 +1,4 @@
-import { Component, OnDestroy, AfterViewInit, inject, effect, viewChild, ElementRef, input, untracked, NgZone, ChangeDetectionStrategy, computed } from '@angular/core';
+import { Component, OnDestroy, AfterViewInit, inject, effect, viewChild, ElementRef, input, untracked, NgZone, ChangeDetectionStrategy, computed, signal } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
@@ -124,9 +124,18 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private gauge: any = null;
   // Structural options cache key removed – always rebuild on size / config change for simplicity
-  // Last readings in rad; the steelseries Horizon takes degrees.
+  // Last readings in rad; the steelseries Horizon takes degrees. A lost axis keeps its last
+  // reading so a dropout freezes the gauge instead of drawing a level horizon.
   private latestPitch = 0;
   private latestRoll = 0;
+  private readonly pitchLive = signal(false);
+  private readonly rollLive = signal(false);
+  // The gauge starts level, so an axis that has not reported yet is no data as well.
+  protected readonly noData = computed(() => {
+    const paths = this.runtime.options()?.paths;
+    return (!!paths?.['gaugePitchPath']?.path && !this.pitchLive())
+      || (!!paths?.['gaugeRollPath']?.path && !this.rollLive());
+  });
 
   constructor() {
     // Observe pitch path
@@ -135,7 +144,10 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
       const pitchCfg = cfg.paths?.['gaugePitchPath'];
       if (!pitchCfg?.path) return;
       untracked(() => this.streams.observe('gaugePitchPath', pkt => {
-        const v = (pkt?.data?.value as number) ?? 0;
+        const v = pkt?.data?.value;
+        const live = typeof v === 'number' && Number.isFinite(v);
+        this.pitchLive.set(live);
+        if (!live) return;
         this.latestPitch = v;
         if (this.gauge) {
           const inv = cfg.gauge?.invertPitch ? -v : v;
@@ -150,7 +162,10 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
       const rollCfg = cfg.paths?.['gaugeRollPath'];
       if (!rollCfg?.path) return;
       untracked(() => this.streams.observe('gaugeRollPath', pkt => {
-        const v = (pkt?.data?.value as number) ?? 0;
+        const v = pkt?.data?.value;
+        const live = typeof v === 'number' && Number.isFinite(v);
+        this.rollLive.set(live);
+        if (!live) return;
         this.latestRoll = v;
         if (this.gauge) {
           const inv = cfg.gauge?.invertRoll ? -v : v;

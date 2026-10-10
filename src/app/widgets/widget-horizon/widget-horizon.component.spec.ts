@@ -1,11 +1,11 @@
 import { WritableSignal, signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WidgetHorizonComponent } from './widget-horizon.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
-import type { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+import type { IPathArray, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 
 const DEG = Math.PI / 180;
 
@@ -98,6 +98,8 @@ describe('WidgetHorizonComponent output from SI inputs', () => {
   let callbacks: Map<string, (u: IPathUpdate) => void>;
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
   let drawn: { pitch?: number; roll?: number };
+  let calls: string[];
+  let component: { noData: () => boolean };
   let originalHorizon: unknown;
 
   const steel = (globalThis as unknown as { steelseries: { Horizon?: unknown } }).steelseries;
@@ -136,19 +138,22 @@ describe('WidgetHorizonComponent output from SI inputs', () => {
     fixture.componentRef.setInput('type', 'widget-horizon');
     fixture.componentRef.setInput('theme', null);
     fixture.detectChanges();
+    component = fixture.componentInstance as unknown as { noData: () => boolean };
     // The gauge is built on the first measured size, which jsdom never reports.
     (fixture.componentInstance as unknown as { rebuildGauge: () => void }).rebuildGauge();
   };
+  const noData = (): boolean => component.noData();
 
   beforeEach(() => {
     TestBed.resetTestingModule();
     callbacks = new Map();
     options = signal<IWidgetSvcConfig | undefined>(makeConfig());
     drawn = {};
+    calls = [];
     originalHorizon = steel.Horizon;
     steel.Horizon = class {
-      setPitchAnimated(value: number) { drawn.pitch = value; }
-      setRollAnimated(value: number) { drawn.roll = value; }
+      setPitchAnimated(value: number) { drawn.pitch = value; calls.push('pitch'); }
+      setRollAnimated(value: number) { drawn.roll = value; calls.push('roll'); }
     };
   });
 
@@ -174,10 +179,149 @@ describe('WidgetHorizonComponent output from SI inputs', () => {
     expect(shown()).toEqual({ pitch: -4.5, roll: -3 });
   });
 
-  it('levels an axis whose reading goes null', () => {
+  it('keeps an axis at its last reading when it goes null', () => {
     render();
     feedDegrees('gaugePitchPath', 4.5);
+    feedDegrees('gaugeRollPath', -12);
+    calls.length = 0;
     feed('gaugePitchPath', null);
-    expect(shown().pitch).toBe(0);
+    expect(calls).toEqual([]);
+    expect(shown()).toEqual({ pitch: 4.5, roll: -12 });
+  });
+
+  it('does not move an inverted axis on a null sample', () => {
+    options.set(makeConfig(true, false));
+    render();
+    feedDegrees('gaugePitchPath', 4.5);
+    calls.length = 0;
+    feed('gaugePitchPath', null);
+    expect(calls).toEqual([]);
+    expect(shown().pitch).toBe(-4.5);
+  });
+
+  it('ignores a non-finite sample', () => {
+    render();
+    feedDegrees('gaugeRollPath', -12);
+    calls.length = 0;
+    feed('gaugeRollPath', Number.NaN);
+    expect(calls).toEqual([]);
+    expect(noData()).toBe(true);
+  });
+});
+
+/** The NO DATA state: either configured attitude axis without a current reading. */
+describe('WidgetHorizonComponent no attitude data', () => {
+  let callbacks: Map<string, (u: IPathUpdate) => void>;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let fixture: ComponentFixture<WidgetHorizonComponent>;
+  let calls: { axis: 'pitch' | 'roll'; value: number }[];
+  let originalHorizon: unknown;
+
+  const steel = (globalThis as unknown as { steelseries: { Horizon?: unknown } }).steelseries;
+
+  const feed = (pathKey: string, rad: number | null): void => {
+    const callback = callbacks.get(pathKey);
+    if (!callback) throw new Error(`${pathKey} is not observed`);
+    callback({ data: { value: rad, timestamp: null, measure: 'deg' }, state: 'normal' } as IPathUpdate);
+    fixture.detectChanges();
+  };
+  const overlay = (): Element | null => fixture.nativeElement.querySelector('.no-data');
+
+  const render = (cfg: IWidgetSvcConfig = WidgetHorizonComponent.DEFAULT_CONFIG): void => {
+    options = signal<IWidgetSvcConfig | undefined>(cfg);
+    TestBed.configureTestingModule({
+      imports: [WidgetHorizonComponent],
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        {
+          provide: WidgetStreamsDirective,
+          useValue: { observe: (p: string, n: (u: IPathUpdate) => void) => { callbacks.set(p, n); } }
+        }
+      ]
+    });
+    fixture = TestBed.createComponent(WidgetHorizonComponent);
+    fixture.componentRef.setInput('id', 'horizon-nodata');
+    fixture.componentRef.setInput('type', 'widget-horizon');
+    fixture.componentRef.setInput('theme', null);
+    fixture.detectChanges();
+    (fixture.componentInstance as unknown as { rebuildGauge: () => void }).rebuildGauge();
+    calls.length = 0;
+  };
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    callbacks = new Map();
+    calls = [];
+    originalHorizon = steel.Horizon;
+    steel.Horizon = class {
+      setPitchAnimated(value: number) { calls.push({ axis: 'pitch', value }); }
+      setRollAnimated(value: number) { calls.push({ axis: 'roll', value }); }
+    };
+  });
+
+  afterEach(() => { steel.Horizon = originalHorizon; });
+
+  it('shows NO DATA before any attitude sample arrives', () => {
+    render();
+    expect(overlay()?.textContent).toContain('NO DATA');
+  });
+
+  it('keeps NO DATA while only one axis has reported', () => {
+    render();
+    feed('gaugePitchPath', 4.5 * DEG);
+    expect(overlay()).not.toBeNull();
+  });
+
+  it('clears NO DATA once both axes report', () => {
+    render();
+    feed('gaugePitchPath', 4.5 * DEG);
+    feed('gaugeRollPath', -12 * DEG);
+    expect(overlay()).toBeNull();
+  });
+
+  it('shows NO DATA when pitch goes null, without levelling the gauge', () => {
+    render();
+    feed('gaugePitchPath', 4.5 * DEG);
+    feed('gaugeRollPath', -12 * DEG);
+    calls.length = 0;
+    feed('gaugePitchPath', null);
+    expect(overlay()).not.toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it('shows NO DATA when roll alone goes null while pitch keeps updating', () => {
+    render();
+    feed('gaugePitchPath', 4.5 * DEG);
+    feed('gaugeRollPath', -12 * DEG);
+    feed('gaugeRollPath', null);
+    calls.length = 0;
+    feed('gaugePitchPath', 2 * DEG);
+    expect(overlay()).not.toBeNull();
+    expect(calls.map(c => ({ axis: c.axis, value: Number(c.value.toFixed(6)) }))).toEqual([{ axis: 'pitch', value: 2 }]);
+  });
+
+  it('clears NO DATA and moves the gauge when both axes recover', () => {
+    render();
+    feed('gaugePitchPath', 4.5 * DEG);
+    feed('gaugeRollPath', -12 * DEG);
+    feed('gaugePitchPath', null);
+    feed('gaugeRollPath', null);
+    calls.length = 0;
+    feed('gaugePitchPath', 1 * DEG);
+    feed('gaugeRollPath', 3 * DEG);
+    expect(overlay()).toBeNull();
+    expect(calls.map(c => ({ axis: c.axis, value: Number(c.value.toFixed(6)) }))).toEqual([
+      { axis: 'pitch', value: 1 },
+      { axis: 'roll', value: 3 }
+    ]);
+  });
+
+  it('does not count an unconfigured roll axis as lost', () => {
+    const paths = WidgetHorizonComponent.DEFAULT_CONFIG.paths as IPathArray;
+    render({ ...WidgetHorizonComponent.DEFAULT_CONFIG, paths: { gaugePitchPath: paths['gaugePitchPath'] } });
+    expect(callbacks.has('gaugeRollPath')).toBe(false);
+    expect(overlay()).not.toBeNull();
+    feed('gaugePitchPath', 4.5 * DEG);
+    expect(overlay()).toBeNull();
   });
 });

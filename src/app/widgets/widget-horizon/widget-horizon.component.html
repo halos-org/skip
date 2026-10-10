@@ -1,5 +1,14 @@
 <div #hWrapper class="canvas-wrap" [style.padding]="frameVisibleView() ? '10px' : '0px'">
-  <canvas [id]="id() + '-canvas'" style="z-index: inherit;">
-    Browser does not support canvas element.
-  </canvas>
+  <div class="face">
+    <canvas [id]="id() + '-canvas'" style="z-index: inherit;">
+      Browser does not support canvas element.
+    </canvas>
+    @if (noData()) {
+      <!-- Covers the steelseries face, whose radius is 0.831775 / 2 of the canvas. -->
+      <svg class="no-data" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="41.59" />
+        <text x="50" y="36" text-anchor="middle">NO DATA</text>
+      </svg>
+    }
+  </div>
 </div>

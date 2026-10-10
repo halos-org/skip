@@ -12,10 +12,35 @@
   width: 100%;
   height: 100%;
   padding: 0;
+}
+
+.face {
+  position: relative;
   > canvas {
     display: block;
     position: static;       // remove absolute
     transform: none;        // remove translate
 
+  }
+}
+
+// Sea Horizon's no-data treatment, scaled from its 300-unit face to this 100-unit one.
+.no-data {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+
+  circle {
+    fill: #05090b;
+    opacity: 0.66;
+  }
+
+  text {
+    fill: #9aa5a9;
+    font-size: 4.33px;
+    font-weight: 700;
+    letter-spacing: 0.53px;
   }
 }
