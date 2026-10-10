@@ -235,7 +235,8 @@ describe('WidgetHorizonComponent output from SI inputs', () => {
 
   it('ignores a non-finite sample', () => {
     h().render();
-    h().feedDegrees('gaugeRollPath', -12);
+    h().feedBoth(4.5, -12);
+    expect(h().noData()).toBe(false);
     h().calls.length = 0;
     h().feed('gaugeRollPath', Number.NaN);
     expect(h().calls).toEqual([]);
@@ -295,6 +296,30 @@ describe('WidgetHorizonComponent no attitude data', () => {
       { axis: 'pitch', value: 1 },
       { axis: 'roll', value: 3 }
     ]);
+  });
+
+  it('redraws the frozen reading, not a level horizon, when the gauge is rebuilt during a dropout', () => {
+    h().render();
+    h().feedBoth(4.5, -12);
+    h().feed('gaugePitchPath', null);
+    h().calls.length = 0;
+    h().rebuildGauge();
+    expect(h().rounded()).toEqual([
+      { axis: 'pitch', value: 4.5 },
+      { axis: 'roll', value: -12 }
+    ]);
+    expect(h().overlay()).not.toBeNull();
+  });
+
+  it('inverts the frozen reading when invertPitch is toggled during a dropout', () => {
+    h().render();
+    h().feedBoth(4.5, -12);
+    h().feed('gaugePitchPath', null);
+    h().calls.length = 0;
+    h().options.set(configWith(true, false));
+    h().fixture.detectChanges();
+    expect(h().shown()).toEqual({ pitch: -4.5, roll: -12 });
+    expect(h().overlay()).not.toBeNull();
   });
 
   it('does not count an unconfigured roll axis as lost', () => {
