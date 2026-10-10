@@ -8,6 +8,7 @@ import {
   MigrationMessageSink,
   migrateConfig,
   migrateOneAppVersion,
+  migrateUseNeedleToEnableNeedle,
   migrateWidgetConfig,
   removeSplitShellConfigKeys
 } from './config-migration.util';
@@ -774,5 +775,114 @@ describe('v24 -> v25: the wind steer rudder angle path is fixed', () => {
     const expected = { ...rudderSlot(widgetConfigs(once)[0]) };
     const twice = migrateOneAppVersion({ ...once, app: { ...once.app, configVersion: 24 } } as IConfig, 24, recordingSink()) as IConfig;
     expect(rudderSlot(widgetConfigs(twice)[0])).toEqual(expected);
+  });
+});
+
+describe('widgets nested in group widgets', () => {
+  type Entry = Record<string, unknown>;
+  // A widget entry as a dashboard stores it.
+  const leaf = (type: string, config: Record<string, unknown>, selector = 'widget-host2'): Entry =>
+    ({ id: 'w', selector, x: 1, y: 1, w: 2, h: 2, input: { widgetProperties: { type, uuid: 'w', config } } });
+  const groupConfig = (): Record<string, unknown> => ({ displayName: 'Group Widget', color: 'contrast' });
+  // A group widget, whose nested grid serializes its children under subGridOpts.children.
+  const group = (subGridOpts?: unknown): Entry => ({
+    id: 'g', selector: 'group-widget', x: 0, y: 0, w: 4, h: 4,
+    input: { widgetProperties: { type: 'group-widget', uuid: 'g', config: groupConfig() } },
+    ...(subGridOpts === undefined ? {} : { subGridOpts })
+  });
+  const grouped = (...children: Entry[]): Entry => group({ children });
+  const dashboardOf = (version: number, entries: Entry[]): IConfig =>
+    ({ app: { configVersion: version }, theme: { themeName: '' }, dashboards: [{ id: 'd1', configuration: entries }] } as unknown as IConfig);
+  const entries = (config: IConfig): Entry[] => (config.dashboards[0].configuration ?? []) as unknown as Entry[];
+  const childrenOf = (entry: Entry): Entry[] => (entry['subGridOpts'] as { children: Entry[] }).children;
+  const configOf = (entry: Entry): Record<string, unknown> =>
+    (entry['input'] as { widgetProperties: { config: Record<string, unknown> } }).widgetProperties.config;
+
+  // One widget per step that rewrites widget entries, as that step finds it.
+  const cases: { from: number; name: string; widget: () => Entry }[] = [
+    { from: 11, name: 'host2 selector, doubled grid metrics and enableNeedle', widget: () => leaf('widget-numeric', { gauge: { useNeedle: true } }, 'widget-numeric') },
+    { from: 12, name: 'recorder fields removed', widget: () => leaf('widget-numeric', { datasetUUID: 'ds', chartEngine: 'x', displayName: 'n' }) },
+    { from: 13, name: 'compound sub-field path collapsed', widget: () => leaf('widget-heel-gauge', { paths: { angle: { path: 'self.navigation.attitude.roll', isPathConfigurable: true } }, supportAutomaticHistoricalSeries: true }) },
+    { from: 14, name: 'position paths collapsed', widget: () => leaf('widget-position', { paths: { latPath: { path: 'self.navigation.position.latitude', source: 'n2k.1', sampleTime: 1000 } } }) },
+    { from: 15, name: 'attitude path fixed and timeout on', widget: () => leaf('widget-horizon', { paths: { gaugePath: { path: 'x', pathType: 'object' } }, enableTimeout: false }) },
+    { from: 16, name: 'sampleTime collapsed to updateInterval', widget: () => leaf('widget-numeric', { paths: { numericPath: { path: 'a', sampleTime: 300 } } }) },
+    { from: 17, name: 'wind-family path reset', widget: () => leaf('widget-windtrends-chart', { paths: { trueWindSpeed: { path: 'custom', isPathConfigurable: true, source: 'n2k.1' } } }) },
+    { from: 18, name: 'autopilot paths slimmed', widget: () => leaf('widget-autopilot', { paths: { headingTrue: { path: 'self.navigation.headingTrue', isPathConfigurable: true }, windAngleTrueWater: { path: 'x' } } }) },
+    { from: 19, name: 'Wind Steer close-hauled options in SI', widget: () => leaf('widget-wind-steer', { laylineEnable: false, laylineAngle: 40 }) },
+    { from: 19, name: 'racesteer layline options removed', widget: () => leaf('widget-racesteer', { laylineEnable: true, laylineAngle: 40, windSectorEnable: true }) },
+    { from: 20, name: 'Sea Horizon angles in SI', widget: () => leaf('widget-sea-horizon', { gauge: { heelCautionAngle: 10, heelAlarmAngle: 20 } }) },
+    { from: 20, name: 'AIS radar options in SI', widget: () => leaf('widget-ais-radar', { ais: { rangeRings: [1, 2], cogVectorsMinutes: 5 } }) },
+    { from: 21, name: 'numeric bounds in SI', widget: () => leaf('widget-numeric', { paths: { numericPath: { convertUnitTo: 'knots' } }, yScaleMin: 0, yScaleMax: 10 }) },
+    { from: 21, name: 'data-chart bounds reset', widget: () => leaf('widget-data-chart', { yScaleMin: 0, yScaleMax: 10 }) },
+    { from: 22, name: 'sub-field path to pointer form', widget: () => leaf('widget-numeric', { paths: { numericPath: { path: 'self.navigation.position.latitude', convertUnitTo: 'deg' } } }) },
+    { from: 23, name: 'heel gauge path opened', widget: () => leaf('widget-heel-gauge', { paths: { angle: { path: 'self.navigation.attitude', isPathConfigurable: false } } }) },
+    { from: 24, name: 'wind steer rudder path fixed', widget: () => leaf('widget-wind-steer', { paths: { rudderAngle: { path: 'self.steering.custom', source: 'n2k.1', isPathConfigurable: true } } }) },
+  ];
+
+  for (const { from, name, widget } of cases) {
+    it(`v${from} -> v${from + 1} (${name}) rewrites a grouped and a doubly grouped widget like a top-level one`, () => {
+      const top = entries(migrateOneAppVersion(dashboardOf(from, [widget()]), from, recordingSink()) as IConfig)[0];
+      expect(top).not.toEqual(widget());
+
+      const [outer] = entries(migrateOneAppVersion(dashboardOf(from, [grouped(widget())]), from, recordingSink()) as IConfig);
+      expect(childrenOf(outer)[0]).toEqual(top);
+      expect(configOf(outer)).toEqual(groupConfig());
+
+      const [outer2] = entries(migrateOneAppVersion(dashboardOf(from, [grouped(grouped(widget()))]), from, recordingSink()) as IConfig);
+      const inner = childrenOf(outer2)[0];
+      expect(childrenOf(inner)[0]).toEqual(top);
+      expect(configOf(outer2)).toEqual(groupConfig());
+      expect(configOf(inner)).toEqual(groupConfig());
+    });
+  }
+
+  it('applySiSteps converts and marks a grouped and a doubly grouped widget on every load', () => {
+    const windSteer = () => leaf('widget-wind-steer', { laylineEnable: true, laylineAngle: 30 });
+    const config = dashboardOf(LATEST_APP_CONFIG_VERSION, [grouped(windSteer(), grouped(windSteer()))]);
+    const sink = recordingSink();
+
+    expect(applySiSteps(config, sink)).toBe(true);
+    const [child, inner] = childrenOf(entries(config)[0]);
+    for (const converted of [configOf(child), configOf(childrenOf(inner)[0])]) {
+      expect(converted).toEqual({ closeHauledLineEnable: true, closeHauledLineAngle: expect.any(Number), [SI_VERSION_KEY]: 20 });
+      expect(converted['closeHauledLineAngle'] as number).toBeCloseTo(0.5236, 3);
+    }
+    expect(sink.infos).toContain('[Upgrade] Converted 2 widget config(s) to SI units.');
+  });
+
+  // The stored siVersion is trusted: a grouped widget an older build stamped without converting
+  // (it never reached grouped widgets) is not repaired, since its values cannot be told from SI ones.
+  it('applySiSteps trusts the stored marker: a stamped grouped widget holding pre-SI values is left as it is', () => {
+    const stamped = (): Record<string, unknown> =>
+      ({ paths: { numericPath: { convertUnitTo: 'knots' } }, yScaleMin: 0, yScaleMax: 10, [SI_VERSION_KEY]: 22 });
+    const config = dashboardOf(LATEST_APP_CONFIG_VERSION, [grouped(leaf('widget-numeric', stamped()))]);
+    const sink = recordingSink();
+
+    expect(applySiSteps(config, sink)).toBe(false);
+    expect(configOf(childrenOf(entries(config)[0])[0])).toEqual(stamped());
+    expect(sink.infos).toEqual([]);
+  });
+
+  it('migrateConfig carries a grouped widget of a current-stamp config through the SI steps', () => {
+    const result = migrateConfig(dashboardOf(LATEST_APP_CONFIG_VERSION, [grouped(leaf('widget-sea-horizon', { gauge: { heelAlarmAngle: 20 } }))]), recordingSink());
+    expect(result.migrated).toBe(true);
+    expect(configOf(childrenOf(entries(result.config)[0])[0])).toEqual({ gauge: { heelAlarmAngle: 20 * Math.PI / 180 }, [SI_VERSION_KEY]: 21 });
+  });
+
+  it('migrateUseNeedleToEnableNeedle renames the needle option of a grouped widget', () => {
+    const config = dashboardOf(11, [grouped(leaf('widget-gauge-ng-radial', { gauge: { useNeedle: false } }))]);
+    const sink = recordingSink();
+    migrateUseNeedleToEnableNeedle(config.dashboards, sink);
+    expect(configOf(childrenOf(entries(config)[0])[0])).toEqual({ gauge: { enableNeedle: false } });
+    expect(sink.infos).toEqual(['[Upgrade] Renamed gauge.useNeedle -> gauge.enableNeedle on 1 widget(s).']);
+  });
+
+  it('migrates past groups without subGridOpts, or with no, empty or non-array children', () => {
+    const odd = [group(), group({}), group({ children: [] }), group({ children: null }), group({ children: 'x' }), group({ children: { a: 1 } })];
+    const result = migrateConfig(dashboardOf(11, [...odd, leaf('widget-wind-steer', { laylineAngle: 40 })]), recordingSink());
+    const migrated = entries(result.config);
+    expect(migrated).toHaveLength(odd.length + 1);
+    expect(migrated.slice(0, odd.length).map(e => e['subGridOpts'])).toEqual(odd.map(e => e['subGridOpts']));
+    expect(configOf(migrated[odd.length])[SI_VERSION_KEY]).toBe(20);
   });
 });
