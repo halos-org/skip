@@ -25,22 +25,36 @@
 }
 
 // Sea Horizon's no-data treatment, scaled from its 300-unit face to this 100-unit one.
+// The overlay is a size container so the label can scale with the face (1cqmin = 1 viewBox
+// unit) yet stay readable on small tiles, where it may overflow the circle.
 .no-data {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  container-type: size;
   pointer-events: none;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
 
   circle {
     fill: #05090b;
     opacity: 0.66;
   }
 
-  text {
-    fill: #c9d1d4;
-    font-size: 4.33px;
+  .label {
+    position: absolute;
+    left: 50%;
+    // Centres the caps where Sea Horizon's text sits: baseline at 36, cap height about 3.1.
+    top: 34.4%;
+    transform: translate(-50%, -50%);
+    color: #c9d1d4;
+    font-size: max(10px, 4.33cqmin);
     font-weight: 700;
-    letter-spacing: 0.53px;
+    letter-spacing: 0.122em;
+    line-height: 1;
+    white-space: nowrap;
   }
 }

@@ -5,10 +5,10 @@
     </canvas>
     @if (showNoData()) {
       <!-- Covers the steelseries face, whose radius is 0.831775 / 2 of the canvas. -->
-      <svg class="no-data" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="41.59" />
-        <text x="50" y="36" text-anchor="middle">NO DATA</text>
-      </svg>
+      <div class="no-data" aria-hidden="true">
+        <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="41.59" /></svg>
+        <span class="label">NO DATA</span>
+      </div>
     }
   </div>
 </div>
