@@ -189,7 +189,7 @@ describe('wind-family path config shape', () => {
   const WIND_SHAPE = [
     { type: 'widget-wind-steer', config: WidgetWindComponent.DEFAULT_CONFIG,
       choice: ['headingPath', 'trueWindAngle', 'courseOverGround'],
-      fixed: ['appWindAngle', 'appWindSpeed', 'trueWindSpeed', 'set', 'drift'] },
+      fixed: ['appWindAngle', 'appWindSpeed', 'trueWindSpeed', 'set', 'drift', 'magneticVariation'] },
     { type: 'widget-racesteer', config: WidgetRacesteerComponent.DEFAULT_CONFIG,
       choice: ['headingPath', 'trueWindAngle', 'courseOverGround'],
       fixed: ['appWindAngle', 'appWindSpeed', 'trueWindSpeed', 'nextWaypointBearing', 'set', 'drift'] },

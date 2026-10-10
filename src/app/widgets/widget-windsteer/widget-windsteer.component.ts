@@ -3,13 +3,14 @@ import { Subscription, interval } from 'rxjs';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { POLAR_OVERLAY_DIAL_RADIUS, POLAR_OVERLAY_PEAK_RADIUS, PolarOverlayMode, SvgWindsteerComponent, WindTraceSample } from '../svg-windsteer/svg-windsteer.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
-import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
+import { WidgetStreamsDirective, widgetPathSignature } from '../../core/directives/widget-streams.directive';
 import { IPathUpdate } from '../../core/services/data.service';
 import { ITheme } from '../../core/services/app-service';
 import { UnitsService } from '../../core/services/units.service';
 import { ActivePolarService } from '../../core/services/active-polar.service';
 import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, normalizeRadians, polarCurve, polarSpeedProfile, speedToRadius, vmcCurve, vmcDotRadius } from '../../core/utils/polar-overlay.util';
 import { presentationValue } from '../../core/utils/si-presentation.util';
+import { NorthReference, northReferenceOfPath, toNorthReference } from '../../core/utils/north-reference.util';
 import { PolarResult, PolarTargets } from '../../core/utils/polar-engine.util';
 
 // Default rolling window (seconds) for the wind shift traces; the single
@@ -33,6 +34,12 @@ const SPEED_DEDUP_MS = 0.05;
 const DEG_TO_RAD = Math.PI / 180;
 // Angle dedup granularity: an angle signal only re-sets when it moves at least 1°.
 const ANGLE_DEDUP_RAD = DEG_TO_RAD;
+
+/** A sample's path, by signature, and the north that path reports in. */
+interface PathNorthSample { signature: string | null; reference: NorthReference }
+// Variation moves the waypoint, set and COG together, so it dedups finer than they do; at sea it
+// changes by this much only over many miles, so it rarely re-sets.
+const VARIATION_DEDUP_RAD = 0.1 * DEG_TO_RAD;
 
 @Component({
   selector: 'widget-wind-steer',
@@ -177,6 +184,19 @@ export class WidgetWindComponent implements OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         convertUnitTo: 'knots'
+      },
+      magneticVariation: {
+        description: 'Magnetic Variation',
+        path: 'self.navigation.magneticVariation',
+        source: 'default',
+        pathType: 'number',
+        isPathConfigurable: false,
+        dropInvalidSamples: true,
+        pathRequired: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad',
+        convertUnitTo: 'deg',
+        showConvertUnitTo: false
       },
       polarTrueWindSpeed: {
         description: 'Polar Overlay True Wind Speed',
@@ -324,6 +344,43 @@ export class WidgetWindComponent implements OnDestroy {
   // The bearing's own freshness gates only the overlay mode; the waypoint marker keeps its own rule.
   private waypointFresh = signal(false);
 
+  // The dial turns by the last heading sample, so its north is the reference of the path that sent
+  // it. After a re-point that sample still belongs to the old path until the new one reports, so
+  // the dial has no north for the markers until then. The sample's path is matched by signature:
+  // the streams directive replays the new path synchronously during the re-point, before the
+  // options effect runs, so clearing from that effect would drop a valid first sample. Before any
+  // sample since mount the dial is not turned at all, and the configured path's north is the one
+  // its first sample will carry.
+  private headingSample = signal<PathNorthSample | null>(null);
+  private headingPathSignature = computed(() => widgetPathSignature(this.runtime.options()?.paths?.['headingPath']));
+  private dialReference = computed<NorthReference | null>(() => {
+    const sample = this.headingSample();
+    if (sample == null) return northReferenceOfPath(this.runtime.options()?.paths?.['headingPath']?.path);
+    return sample.signature === this.headingPathSignature() ? sample.reference : null;
+  });
+  protected headingShown = computed(() => this.headingFresh() && this.dialReference() !== null);
+  // The waypoint bearing and the set are true; COG has its own choice. Each is put onto the dial's
+  // north, and an angle that needs an unknown variation is hidden rather than drawn on the wrong north.
+  // Variation changes only over many miles and is often sent once or rarely, so the last finite
+  // value holds for the session; it is unknown only until the first one arrives.
+  private knownVariation = signal<number | null>(null);  // rad, east positive
+  // COG has its own True/Magnetic choice, so its sample is matched to its path the same way. Unlike
+  // the heading there is no fallback before the first sample: COG is not drawn until one arrives.
+  private courseSample = signal<PathNorthSample | null>(null);
+  private coursePathSignature = computed(() => widgetPathSignature(this.runtime.options()?.paths?.['courseOverGround']));
+  private courseReference = computed<NorthReference | null>(() => {
+    const sample = this.courseSample();
+    return sample != null && sample.signature === this.coursePathSignature() ? sample.reference : null;
+  });
+  protected waypointOnDial = computed(() => this.onDial(this.waypointAngle(), 'true'));
+  protected setOnDial = computed(() => this.onDial(this.driftSet(), 'true'));
+  protected setShown = computed(() => this.setFresh() && this.setOnDial() !== undefined);
+  protected cogOnDial = computed(() => {
+    const from = this.courseReference();
+    return from === null ? undefined : this.onDial(this.courseOverGroundAngle(), from);
+  });
+  protected cogShown = computed(() => this.courseFresh() && this.cogOnDial() !== undefined);
+
   // Polar inputs, in SI from the hidden structural slots, never from the display paths. TWS feeds the
   // overlay and the polar lines; water TWA and STW only the overlay.
   private readonly registeredPolarSlots = new Set<(typeof POLAR_PATH_KEYS)[number]>();
@@ -359,14 +416,14 @@ export class WidgetWindComponent implements OnDestroy {
 
   protected overlayMode = computed<PolarOverlayMode>(() => {
     const cfg = this.runtime.options();
-    const bearing = this.waypointAngle();
+    const bearing = this.waypointOnDial();
     return resolvePolarOverlayMode({
       enabled: !!cfg?.polarOverlayEnable,
       polarReady: this.activePolar.status().kind === 'ready',
       twsFresh: this.polarTwsFresh(),
       twaFresh: this.overlayTwaFresh(),
       compassMode: !!cfg?.compassModeEnabled,
-      headingFresh: this.headingFresh(),
+      headingShown: this.headingShown(),
       waypointActive: !!cfg?.waypointEnable && bearing != null && Number.isFinite(bearing) && this.waypointFresh()
     });
   });
@@ -397,7 +454,7 @@ export class WidgetWindComponent implements OnDestroy {
   protected vmcCurvePoints = computed<OverlayPoint[] | null>(() => {
     const profile = this.vmcSpeedProfile();
     const scale = this.overlayScale();
-    const bearing = this.waypointAngle();
+    const bearing = this.waypointOnDial();
     if (!profile || !scale || bearing == null) return null;
     return vmcCurve(profile, this.overlayTwd(), bearing, scale);
   });
@@ -408,7 +465,7 @@ export class WidgetWindComponent implements OnDestroy {
     if (mode === 'hidden' || !scale || !this.overlayStwFresh()) return null;
     const stw = this.overlayStw();
     if (mode === 'polar') return speedToRadius(stw, scale);
-    const bearing = this.waypointAngle();
+    const bearing = this.waypointOnDial();
     return bearing == null ? null : vmcDotRadius(stw, this.currentHeading(), bearing, scale);
   });
 
@@ -432,6 +489,13 @@ export class WidgetWindComponent implements OnDestroy {
     // lapse between samples and flicker the indicator.
     const cadence = typeof cfg?.updateInterval === 'number' && cfg.updateInterval > 0 ? cfg.updateInterval : 0;
     return Math.max(base, cadence * 2);
+  }
+  // An angle is drawn whenever the dial's north is known. A stale heading leaves the dial turned at
+  // its last heading on that same north, so a converted marker stays consistent with it.
+  private onDial(angle: number | undefined, from: NorthReference): number | undefined {
+    const to = this.dialReference();
+    if (to === null) return undefined;
+    return toNorthReference(angle, from, to, this.knownVariation());
   }
   private markFresh(key: string, active: WritableSignal<boolean>): void {
     active.set(true);
@@ -467,6 +531,8 @@ export class WidgetWindComponent implements OnDestroy {
     if (raw == null || !Number.isFinite(raw)) return;   // freeze on absent/invalid
     const next = normalizeRadians(raw);
     this.markFresh('heading', this.headingFresh);
+    const headingPath = untracked(() => this.runtime.options()?.paths?.['headingPath']);
+    this.headingSample.set({ signature: widgetPathSignature(headingPath), reference: northReferenceOfPath(headingPath?.path) });
     if (!this.hasHeading || radianDelta(this.currentHeading(), next) >= ANGLE_DEDUP_RAD) {
       this.currentHeading.set(next); this.hasHeading = true;
     }
@@ -476,6 +542,8 @@ export class WidgetWindComponent implements OnDestroy {
     if (raw == null || !Number.isFinite(raw)) return;
     const next = normalizeRadians(raw);
     this.markFresh('cog', this.courseFresh);
+    const coursePath = untracked(() => this.runtime.options()?.paths?.['courseOverGround']);
+    this.courseSample.set({ signature: widgetPathSignature(coursePath), reference: northReferenceOfPath(coursePath?.path) });
     if (!this.hasCOG || radianDelta(this.courseOverGroundAngle(), next) >= ANGLE_DEDUP_RAD) {
       this.courseOverGroundAngle.set(next); this.hasCOG = true;
     }
@@ -525,6 +593,14 @@ export class WidgetWindComponent implements OnDestroy {
     if (!this.hasWPT || cur == null || radianDelta(cur, next) >= ANGLE_DEDUP_RAD) {
       this.waypointAngle.set(next); this.hasWPT = true;
     }
+  };
+  // A null (an RMC with empty variation fields, or the path going silent) says nothing about the
+  // variation, so it neither clears nor refreshes the last known value.
+  private onVariationUpdate = (u: IPathUpdate) => {
+    const raw = u.data.value;
+    if (raw == null || !Number.isFinite(raw)) return;
+    const cur = this.knownVariation();
+    if (cur == null || radianDelta(cur, raw) >= VARIATION_DEDUP_RAD) this.knownVariation.set(raw);
   };
   private onPolarTws = (u: IPathUpdate) => {
     const raw = u.data.value;
@@ -649,6 +725,7 @@ export class WidgetWindComponent implements OnDestroy {
     this.stream.observe('drift', this.onDriftUpdate);
     this.stream.observe('set', this.onSetUpdate);
     this.stream.observe('nextWaypointBearing', this.onWaypointUpdate);
+    this.stream.observe('magneticVariation', this.onVariationUpdate);
     this.stream.observe('appWindAngle', this.onAppWindAngle);
     this.stream.observe('appWindSpeed', this.onAppWindSpeed);
     this.stream.observe('trueWindSpeed', this.onTrueWindSpeed);
@@ -727,7 +804,7 @@ export interface PolarOverlayModeInputs {
   twsFresh: boolean;
   twaFresh: boolean;
   compassMode: boolean;
-  headingFresh: boolean;
+  headingShown: boolean;
   /** waypointEnable on, bearing finite and fresh. */
   waypointActive: boolean;
 }
@@ -736,7 +813,7 @@ export interface PolarOverlayModeInputs {
 export function resolvePolarOverlayMode(inputs: PolarOverlayModeInputs): PolarOverlayMode {
   if (!inputs.enabled || !inputs.polarReady) return 'hidden';
   if (!inputs.twsFresh || !inputs.twaFresh) return 'hidden';
-  if (inputs.compassMode && inputs.headingFresh && inputs.waypointActive) return 'vmc';
+  if (inputs.compassMode && inputs.headingShown && inputs.waypointActive) return 'vmc';
   return 'polar';
 }
 

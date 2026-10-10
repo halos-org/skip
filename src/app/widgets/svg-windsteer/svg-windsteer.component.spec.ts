@@ -652,8 +652,8 @@ describe('SvgWindsteerComponent', () => {
         expect(setArrowGroup().style.display).toBe('none');
     });
 
-    it('hides the corner readout when the drift value is stale, but the set arrow follows setFresh', () => {
-        setRequiredInputs({ driftFresh: false, setFresh: true });
+    it('hides the corner readout when the drift value is stale, but the set arrow follows setShown', () => {
+        setRequiredInputs({ driftFresh: false, setShown: true });
         fixture.detectChanges();
 
         expect(currentLayer().style.display).toBe('none');
@@ -795,15 +795,15 @@ describe('SvgWindsteerComponent', () => {
     });
 
     // Freeze-then-hide gating (#475): indicators hide / blank when their path is stale.
-    it('hides the compass labels and blanks the heading readout when heading is stale', () => {
-        setRequiredInputs({ compassModeEnabled: true, headingFresh: false });
+    it('hides the compass labels and blanks the heading readout when the heading is not shown', () => {
+        setRequiredInputs({ compassModeEnabled: true, headingShown: false });
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('#dialLabelsCompass')).toBeNull();
         expect(fixture.nativeElement.querySelector('#layerHeading text').textContent).toContain('--');
     });
 
-    it('shows the compass labels when heading is fresh', () => {
-        setRequiredInputs({ compassModeEnabled: true, headingFresh: true });
+    it('shows the compass labels when the heading is shown', () => {
+        setRequiredInputs({ compassModeEnabled: true, headingShown: true });
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('#dialLabelsCompass')).not.toBeNull();
     });
@@ -827,7 +827,7 @@ describe('SvgWindsteerComponent', () => {
     });
 
     it('hides the COG arrow when course data is stale', () => {
-        setRequiredInputs({ courseOverGroundEnabled: true, compassModeEnabled: true, sogActive: true, courseFresh: false });
+        setRequiredInputs({ courseOverGroundEnabled: true, compassModeEnabled: true, sogActive: true, courseShown: false });
         fixture.detectChanges();
         expect(component['cogIndicator']().nativeElement.getAttribute('display')).toBe('none');
     });
@@ -839,7 +839,7 @@ describe('SvgWindsteerComponent', () => {
     });
 
     it('hides the set arrow when set (direction) is stale but keeps the drift readout gate independent', () => {
-        setRequiredInputs({ driftEnabled: true, setArrowActive: true, compassModeEnabled: true, setFresh: false, driftFresh: true });
+        setRequiredInputs({ driftEnabled: true, setArrowActive: true, compassModeEnabled: true, setShown: false, driftFresh: true });
         fixture.detectChanges();
         expect(component['setIndicator']().nativeElement.style.display).toBe('none');
         expect(fixture.nativeElement.querySelector('#layerCurrent').style.display).toBe('inline');

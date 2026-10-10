@@ -240,7 +240,7 @@
           cy="500"
           r="404" />
         @if (compassModeEnabled()) {
-        @if (headingFresh()) {
+        @if (headingShown()) {
         <g id="dialLabelsCompass">
           <text
             xml:space="preserve"
@@ -550,7 +550,7 @@
         <path id="StbdTackRunLine" class="run-line" [attr.d]="stbdTackRunLine.path() || null" />
         <path id="PortTackRunLine" class="run-line" [attr.d]="portTackRunLine.path() || null" />
       </g>
-      <!-- VMC curve: compass frame (angle = true heading), so it turns with the dial like the waypoint marker -->
+      <!-- VMC curve: compass frame (angle = heading on the dial's north), so it turns with the dial like the waypoint marker -->
       <g id="layerVmcCurve" [style.display]="vmcFillPath() ? 'inline' : 'none'">
         <path class="vmc-fill" [attr.d]="vmcFillPath() || null" />
         <path class="vmc-edge" [attr.d]="vmcEdgePath() || null" />
@@ -652,7 +652,7 @@
     </g>
   </g>
   <g #setIndicator
-    [style.display]="setArrowActive() && setFresh() && driftEnabled() && compassModeEnabled() ? 'inline' : 'none'">
+    [style.display]="setArrowActive() && setShown() && driftEnabled() && compassModeEnabled() ? 'inline' : 'none'">
     <path id="setArrow"
       class="drift-set-arrow"
       [attr.transform]="setArrowTranslate"
@@ -684,7 +684,7 @@
   <g id="layerIndicators"
     style="display:inline">
     <g #cogIndicator
-      [attr.display]="sogActive() && courseFresh() && courseOverGroundEnabled() && compassModeEnabled() ? 'inline' : 'none'">
+      [attr.display]="sogActive() && courseShown() && courseOverGroundEnabled() && compassModeEnabled() ? 'inline' : 'none'">
       <path
         class="course-over-ground"
         style="stroke-width:14.7329;stroke-linecap:square"
@@ -734,7 +734,7 @@
       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:106.667px;font-family:Roboto;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-anchor:middle;stroke: none;stroke-width:5;stroke-linejoin:bevel;stroke-miterlimit:0;stroke-dasharray:none;stroke-opacity:1"
       x="511.29395"
       y="102.86786">
-      <tspan>{{ headingFresh() ? headingValue() : '--' }}@if (headingFresh()) {<tspan>°</tspan>}
+      <tspan>{{ headingShown() ? headingValue() : '--' }}@if (headingShown()) {<tspan>°</tspan>}
       </tspan>
     </text>
   </g>

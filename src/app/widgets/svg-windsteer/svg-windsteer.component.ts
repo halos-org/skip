@@ -161,13 +161,16 @@ export class SvgWindsteerComponent implements OnDestroy {
   protected readonly rudderEnabled = input<boolean>(false);
   // Per-path data freshness: false once a path has had no valid sample within the TTL, so the
   // matching indicator hides instead of showing a frozen/zero value. (trueWindFresh above is TWA.)
-  protected readonly headingFresh = input<boolean>(true);
-  protected readonly courseFresh = input<boolean>(true);
   protected readonly appWindFresh = input<boolean>(true);
   protected readonly appWindSpeedFresh = input<boolean>(true);
   protected readonly trueWindSpeedFresh = input<boolean>(true);
   protected readonly driftFresh = input<boolean>(true);
-  protected readonly setFresh = input<boolean>(true);
+  // Whether the heading may be drawn: false while it is stale or comes from a path other than the
+  // configured one.
+  protected readonly headingShown = input<boolean>(true);
+  // Whether the COG and set arrows may be drawn: fresh, and placeable on the dial's north.
+  protected readonly courseShown = input<boolean>(true);
+  protected readonly setShown = input<boolean>(true);
   // Polar overlay, resolved by the parent. The polar curve is in the wind frame and its group turns
   // by the water TWA; the VMC curve is in the compass frame inside the rotating dial; the dot is at
   // this radius on the bow axis in the boat frame.

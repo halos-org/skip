@@ -8,7 +8,7 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { UnitsService } from '../../core/services/units.service';
 import { IPathUpdate } from '../../core/services/data.service';
-import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
+import { IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ActivePolarService } from '../../core/services/active-polar.service';
 import { Polar, toCanonicalPolarTable } from '../../core/utils/polar-engine.util';
 import hurmaPolar from '../../core/utils/polar-engine.hurma-polar.fixture.json';
@@ -156,6 +156,59 @@ describe('WidgetWindComponent rendering from SI inputs', () => {
       set: 'rotate(100 904 912)',
       portTack: 'M 500,500 L 838,409',
       stbdTack: 'M 500,500 L 409,161'
+    });
+  });
+
+  describe('on a magnetic dial (#634)', () => {
+    const magneticHeading = (): IWidgetSvcConfig => {
+      const paths = WidgetWindComponent.DEFAULT_CONFIG.paths as Record<string, IWidgetPath>;
+      return makeConfig({ paths: { ...paths, headingPath: { ...paths['headingPath'], path: 'self.navigation.headingMagnetic' } } });
+    };
+    /** Whether an indicator group is drawn: its display attribute or style, whichever the template binds. */
+    const shown = (ref: string): boolean => {
+      const element = (svg() as unknown as Record<string, () => { nativeElement: SVGGElement }>)[ref]().nativeElement;
+      return element.getAttribute('display') !== 'none' && element.style.display !== 'none';
+    };
+    const feedMarkers = (): void => {
+      feedAngle('headingPath', 350);
+      feedAngle('courseOverGround', 355);
+      feedAngle('nextWaypointBearing', 20);
+      feedAngle('set', 90);
+      feedSpeed('speedOverGround', 3);
+      feedSpeed('drift', 0.5);
+    };
+
+    it('draws the waypoint, the set and a true COG on magnetic north with a 10° E variation', () => {
+      render(magneticHeading());
+      feedAngle('magneticVariation', 10);
+      feedMarkers();
+      settle();
+
+      expect({
+        dial: rotation('rotatingDial'),
+        cog: rotation('cogIndicator'),
+        wpt: rotation('wptIndicator'),
+        set: rotation('setIndicator'),
+        shown: ['cogIndicator', 'wptIndicator', 'setIndicator'].map(shown)
+      }).toEqual({
+        dial: 'rotate(10 500 500)',
+        cog: 'rotate(-5 500 500)',
+        wpt: 'rotate(10 500 500)',
+        set: 'rotate(90 904 912)',
+        shown: [true, true, true]
+      });
+    });
+
+    it('hides the waypoint, the set and a true COG without a variation, and shows them when it arrives', () => {
+      render(magneticHeading());
+      feedMarkers();
+      settle();
+      expect(['cogIndicator', 'wptIndicator', 'setIndicator'].map(shown)).toEqual([false, false, false]);
+
+      feedAngle('magneticVariation', 10);
+      settle();
+      expect(['cogIndicator', 'wptIndicator', 'setIndicator'].map(shown)).toEqual([true, true, true]);
+      expect(rotation('wptIndicator')).toBe('rotate(10 500 500)');
     });
   });
 
