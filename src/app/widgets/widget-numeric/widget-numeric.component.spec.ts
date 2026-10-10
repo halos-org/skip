@@ -1,7 +1,8 @@
 import { WritableSignal, signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { Subject } from 'rxjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WidgetNumericComponent } from './widget-numeric.component';
 import { MinigraphComponent } from '../minigraph/minigraph.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
@@ -496,6 +497,7 @@ describe('WidgetNumericComponent label row layout', () => {
 describe('WidgetNumericComponent reconfigured in place', () => {
   const themeStub = new Proxy({}, { get: () => '#000000' }) as unknown as ITheme;
   let options: WritableSignal<IWidgetSvcConfig | undefined>;
+  let deliver: ((u: IPathUpdate) => void) | undefined;
 
   const config = (showMiniChart: boolean): IWidgetSvcConfig => {
     const defaults = structuredClone(WidgetNumericComponent.DEFAULT_CONFIG);
@@ -509,10 +511,14 @@ describe('WidgetNumericComponent reconfigured in place', () => {
 
   beforeEach(() => {
     options = signal<IWidgetSvcConfig | undefined>(config(false));
+    deliver = undefined;
     TestBed.configureTestingModule({
       providers: [
         { provide: WidgetRuntimeDirective, useValue: { options } },
-        { provide: WidgetStreamsDirective, useValue: { observe: () => undefined } },
+        {
+          provide: WidgetStreamsDirective,
+          useValue: { observe: (_pathName: string, cb: (u: IPathUpdate) => void) => { deliver = cb; } }
+        },
         { provide: WidgetMetadataDirective, useValue: { displayScale: () => undefined, observe: () => undefined } },
         { provide: HistoryGraphStreamService, useValue: { getBackfillThenLive: () => new Subject() } },
         { provide: DataService, useValue: {} },
@@ -536,6 +542,68 @@ describe('WidgetNumericComponent reconfigured in place', () => {
     expect(await graphShown()).toBe(true);
     options.set(config(false));
     expect(await graphShown()).toBe(false);
+    fixture.destroy();
+  });
+
+  const renderWithGraph = async (): Promise<{ fixture: ComponentFixture<WidgetNumericComponent>; graph: MinigraphComponent }> => {
+    options.set(config(true));
+    const fixture = TestBed.createComponent(WidgetNumericComponent);
+    fixture.componentRef.setInput('id', 'w1');
+    fixture.componentRef.setInput('type', 'widget-numeric');
+    fixture.componentRef.setInput('theme', themeStub);
+    await fixture.whenStable();
+    const graph = fixture.debugElement.query(By.directive(MinigraphComponent)).componentInstance as MinigraphComponent;
+    return { fixture, graph };
+  };
+
+  const sample = (si: number, measure: string): void => {
+    if (!deliver) throw new Error('the widget never subscribed to numericPath');
+    deliver({ data: { value: si, timestamp: null, measure }, state: 'normal' } as IPathUpdate);
+  };
+
+  it('restarts the graph with the new scale when a graph option changes in place', async () => {
+    const { fixture, graph } = await renderWithGraph();
+    expect(graph.inverseYAxis).toBe(false);
+    const startGraph = vi.spyOn(graph, 'startGraph');
+
+    options.set({ ...config(true), yScaleMax: 42, inverseYAxis: true });
+    await fixture.whenStable();
+
+    expect(graph.yScaleMax).toBe(42);
+    expect(graph.inverseYAxis).toBe(true);
+    expect(startGraph).toHaveBeenCalled();
+    fixture.destroy();
+  });
+
+  it('restarts the graph in the new unit when the effective unit changes', async () => {
+    const { fixture, graph } = await renderWithGraph();
+    sample(293.15, 'celsius');
+    await fixture.whenStable();
+    expect(graph.convertUnitTo).toBe('celsius');
+    const startGraph = vi.spyOn(graph, 'startGraph');
+
+    sample(293.15, 'fahrenheit');
+    await fixture.whenStable();
+
+    expect(graph.convertUnitTo).toBe('fahrenheit');
+    expect(startGraph).toHaveBeenCalled();
+    fixture.destroy();
+  });
+
+  it('keeps the running chart, and its history, when only an unrelated option changes', async () => {
+    const { fixture, graph } = await renderWithGraph();
+    // The effect re-runs on any options change; the minigraph's chart signature is what turns that
+    // into a no-op, so the chart object itself must survive.
+    const chartOf = (): unknown => (graph as unknown as { chart: unknown }).chart;
+    const chartBefore = chartOf();
+    expect(chartBefore).toBeTruthy();
+    const before = { yScaleMax: graph.yScaleMax, inverseYAxis: graph.inverseYAxis, convertUnitTo: graph.convertUnitTo };
+
+    options.set({ ...config(true), displayName: 'Renamed' });
+    await fixture.whenStable();
+
+    expect(chartOf()).toBe(chartBefore);
+    expect({ yScaleMax: graph.yScaleMax, inverseYAxis: graph.inverseYAxis, convertUnitTo: graph.convertUnitTo }).toEqual(before);
     fixture.destroy();
   });
 });
