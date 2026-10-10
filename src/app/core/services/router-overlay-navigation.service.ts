@@ -64,6 +64,11 @@ export class RouterOverlayNavigationService {
   private _consumingPop = false;
   /** Set while unwinding our own entry, so the pop it causes is not read as a Back press. */
   private _unwinding = false;
+  /**
+   * Guarded while an unwind was pending, their entries not yet pushed: the unwind's back() lands
+   * asynchronously, and a push made before it would be the entry it pops.
+   */
+  private readonly _deferred: IGuardedOverlay[] = [];
 
   constructor() {
     this._router.events
@@ -82,6 +87,7 @@ export class RouterOverlayNavigationService {
         // committing, and an entry still on the stack when its overlay reports closed would unwind
         // into a history.back() that takes them off that route again.
         this._stack.length = 0;
+        this._deferred.length = 0;
         if (this._dialog.openDialogs.length > 0) {
           this._dialog.closeAll();
         }
@@ -108,8 +114,11 @@ export class RouterOverlayNavigationService {
     if (this._embed.embed()) return;
     const entry: IGuardedOverlay = { close };
     this._stack.push(entry);
-    // Same URL, so popping it is a same-URL navigation the router ignores.
-    window.history.pushState(window.history.state, '', window.location.href);
+    if (this._unwinding) {
+      this._deferred.push(entry);
+    } else {
+      this.pushEntry();
+    }
 
     closed$
       .pipe(take(1), takeUntilDestroyed(this._destroyRef))
@@ -119,6 +128,7 @@ export class RouterOverlayNavigationService {
   private onPopState(): void {
     if (this._unwinding) {
       this._unwinding = false;
+      this._deferred.splice(0).forEach(() => this.pushEntry());
       return;
     }
     const entry = this._stack.pop();
@@ -137,10 +147,21 @@ export class RouterOverlayNavigationService {
     const index = this._stack.lastIndexOf(entry);
     if (index === -1) return; // A pop already removed it, which is what closed the overlay.
     this._stack.splice(index, 1);
+    const deferredIndex = this._deferred.indexOf(entry);
+    if (deferredIndex !== -1) {
+      // Its entry was never pushed, so there is nothing to take back down.
+      this._deferred.splice(deferredIndex, 1);
+      return;
+    }
     // Only the topmost entry is ours to pop. A lower one is left behind rather than popping past a
     // still-open overlay above it; the stale entry costs one dead Back press at most.
     if (index !== this._stack.length) return;
     this._unwinding = true;
     window.history.back();
+  }
+
+  private pushEntry(): void {
+    // Same URL, so popping it is a same-URL navigation the router ignores.
+    window.history.pushState(window.history.state, '', window.location.href);
   }
 }

@@ -179,6 +179,94 @@ describe('RouterOverlayNavigationService', () => {
     expect(backSpy).not.toHaveBeenCalled();
   });
 
+  describe('an overlay opened while its predecessor is unwinding (#705)', () => {
+    // Choosing Settings from the phone action sheet releases the sheet, whose history.back() lands
+    // asynchronously, and opens the dialog in the same task. history.back is mocked to record
+    // without popping; pop() then delivers the unwind's popstate when the browser would.
+    let pushSpy: ReturnType<typeof vi.spyOn>;
+    let backSpy: ReturnType<typeof vi.spyOn>;
+
+    const closeSheetIntoDialog = (service: RouterOverlayNavigationService): ReturnType<typeof openDialog> => {
+      const sheetClosed = new Subject<unknown>();
+      service.guardOverlay(() => sheetClosed.next(undefined), sheetClosed);
+      sheetClosed.next(undefined);
+      return openDialog();
+    };
+
+    beforeEach(() => {
+      pushSpy = vi.spyOn(window.history, 'pushState');
+      backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    });
+
+    it('pushes its entry only after the unwind lands, so closing it leaves the page alone', () => {
+      const dialog = closeSheetIntoDialog(create());
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+      expect(backSpy).toHaveBeenCalledTimes(1);
+
+      pop();
+      expect(pushSpy).toHaveBeenCalledTimes(2);
+      expect(dialog.close).not.toHaveBeenCalled();
+
+      openDialogs.pop();
+      dialog.closed.next(undefined);
+      expect(backSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('takes nothing off the history when it closes before the unwind lands', () => {
+      const dialog = closeSheetIntoDialog(create());
+
+      openDialogs.pop();
+      dialog.closed.next(undefined);
+      expect(backSpy).toHaveBeenCalledTimes(1);
+
+      pop();
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes on the next Back once its entry is pushed', () => {
+      const dialog = closeSheetIntoDialog(create());
+      pop();
+
+      pop();
+
+      expect(dialog.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers each link of the add-widget chain: sheet, Add Widget dialog, options dialog (#612)', () => {
+      const addWidget = closeSheetIntoDialog(create());
+      pop();
+      expect(pushSpy).toHaveBeenCalledTimes(2);
+
+      // Picking a widget closes the Add Widget dialog; the new widget opens its options dialog
+      // before that dialog's back() lands.
+      openDialogs.pop();
+      addWidget.closed.next(undefined);
+      const options = openDialog();
+      expect(backSpy).toHaveBeenCalledTimes(2);
+      expect(pushSpy).toHaveBeenCalledTimes(2);
+
+      pop();
+      expect(pushSpy).toHaveBeenCalledTimes(3);
+      expect(options.close).not.toHaveBeenCalled();
+
+      openDialogs.pop();
+      options.closed.next(undefined);
+      expect(backSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not push a stale entry after a real navigation cleared the overlays', () => {
+      const dialog = closeSheetIntoDialog(create());
+
+      routerEvents.next(new NavigationStart(1, '/page/2', 'imperative'));
+      openDialogs.pop();
+      dialog.closed.next(undefined);
+      pop();
+
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+      expect(backSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('dismisses a guarded bottom sheet on Back (#393)', () => {
     const service = create();
     const dismissed = new Subject<unknown>();
