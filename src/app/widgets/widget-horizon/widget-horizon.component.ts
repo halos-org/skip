@@ -1,4 +1,4 @@
-import { Component, OnDestroy, AfterViewInit, inject, effect, viewChild, ElementRef, input, untracked, NgZone, ChangeDetectionStrategy, computed, signal } from '@angular/core';
+import { Component, OnDestroy, AfterViewInit, inject, effect, viewChild, ElementRef, input, untracked, NgZone, ChangeDetectionStrategy, computed, signal, WritableSignal } from '@angular/core';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
@@ -138,41 +138,10 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
   });
 
   constructor() {
-    // Observe pitch path
-    effect(() => {
-      const cfg = this.runtime.options(); if (!cfg) return;
-      const pitchCfg = cfg.paths?.['gaugePitchPath'];
-      if (!pitchCfg?.path) return;
-      untracked(() => this.streams.observe('gaugePitchPath', pkt => {
-        const v = pkt?.data?.value;
-        const live = typeof v === 'number' && Number.isFinite(v);
-        this.pitchLive.set(live);
-        if (!live) return;
-        this.latestPitch = v;
-        if (this.gauge) {
-          const inv = cfg.gauge?.invertPitch ? -v : v;
-          try { this.gauge.setPitchAnimated(inv * RAD_TO_DEG); } catch { /* ignore */ }
-        }
-      }, '/pitch'));
-    });
-
-    // Observe roll path
-    effect(() => {
-      const cfg = this.runtime.options(); if (!cfg) return;
-      const rollCfg = cfg.paths?.['gaugeRollPath'];
-      if (!rollCfg?.path) return;
-      untracked(() => this.streams.observe('gaugeRollPath', pkt => {
-        const v = pkt?.data?.value;
-        const live = typeof v === 'number' && Number.isFinite(v);
-        this.rollLive.set(live);
-        if (!live) return;
-        this.latestRoll = v;
-        if (this.gauge) {
-          const inv = cfg.gauge?.invertRoll ? -v : v;
-          try { this.gauge.setRollAnimated(inv * RAD_TO_DEG); } catch { /* ignore */ }
-        }
-      }, '/roll'));
-    });
+    this.observeAxis('gaugePitchPath', '/pitch', this.pitchLive, 'invertPitch',
+      v => { this.latestPitch = v; }, deg => this.gauge.setPitchAnimated(deg));
+    this.observeAxis('gaugeRollPath', '/roll', this.rollLive, 'invertRoll',
+      v => { this.latestRoll = v; }, deg => this.gauge.setRollAnimated(deg));
 
     // Config structural effect (independent from size changes)
     effect(() => {
@@ -190,6 +159,31 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
         this.rebuildGauge();
       }
       // If size not yet known, first ResizeObserver pass will build with current config
+    });
+  }
+
+  private observeAxis(
+    pathKey: string,
+    pointer: string,
+    live: WritableSignal<boolean>,
+    invertFlag: 'invertPitch' | 'invertRoll',
+    remember: (rad: number) => void,
+    draw: (deg: number) => void
+  ): void {
+    effect(() => {
+      const cfg = this.runtime.options(); if (!cfg) return;
+      if (!cfg.paths?.[pathKey]?.path) return;
+      untracked(() => this.streams.observe(pathKey, pkt => {
+        const v = pkt?.data?.value;
+        const isLive = typeof v === 'number' && Number.isFinite(v);
+        live.set(isLive);
+        if (!isLive) return;
+        remember(v);
+        if (this.gauge) {
+          const inv = cfg.gauge?.[invertFlag] ? -v : v;
+          try { draw(inv * RAD_TO_DEG); } catch { /* ignore */ }
+        }
+      }, pointer));
     });
   }
 
