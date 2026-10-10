@@ -268,6 +268,13 @@ describe('UnitsService', () => {
       expect(service.getUnitDisplaySymbol('l/h')).toBe('l/h');
     });
 
+    it('converts energy distance from the m/J that Signal K delivers', () => {
+      const service = setup();
+      // Neighbouring units are a factor of 1000 away; three decimals catch a wrong scale, not rounding.
+      expect(service.convertToUnit('km/J', 1500) as number).toBeCloseTo(1.5, 3);
+      expect(service.convertToUnit('nm/J', 1852) as number).toBeCloseTo(1, 3);
+    });
+
     it('converts and labels the imperial gallon, imperial gallons per hour and BTU targets', () => {
       const service = setup();
       // Tolerances are physical, not library-exact: they catch a wrong unit (the nearest neighbour

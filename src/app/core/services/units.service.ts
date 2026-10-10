@@ -639,7 +639,7 @@ export class UnitsService {
 //  energy consumption
     'm/J': function(v) { return v; },
     'nm/J': Qty.swiftConverter('m/J', 'naut-mile/J'),
-    'km/J': Qty.swiftConverter('km/J', 'km/J'),
+    'km/J': Qty.swiftConverter('m/J', 'km/J'),
     'nm/kWh': Qty.swiftConverter('m/J', 'naut-mile/kWh'),
     'km/kWh': Qty.swiftConverter('m/J', 'km/kWh'),
 //  temp
