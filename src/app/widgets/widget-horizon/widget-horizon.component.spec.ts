@@ -253,6 +253,12 @@ describe('WidgetHorizonComponent no attitude data', () => {
     expect(h().overlay()?.textContent).toContain('NO DATA');
   });
 
+  it('shows no overlay while the gauge is never built, as on a tile too small for one', () => {
+    h().render(WidgetHorizonComponent.DEFAULT_CONFIG, false);
+    expect(h().noData()).toBe(true);
+    expect(h().overlay()).toBeNull();
+  });
+
   it('keeps NO DATA while only one axis has reported', () => {
     h().render();
     h().feedDegrees('gaugePitchPath', 4.5);

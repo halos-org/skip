@@ -3,7 +3,7 @@
     <canvas [id]="id() + '-canvas'" style="z-index: inherit;">
       Browser does not support canvas element.
     </canvas>
-    @if (noData()) {
+    @if (showNoData()) {
       <!-- Covers the steelseries face, whose radius is 0.831775 / 2 of the canvas. -->
       <svg class="no-data" viewBox="0 0 100 100" aria-hidden="true">
         <circle cx="50" cy="50" r="41.59" />

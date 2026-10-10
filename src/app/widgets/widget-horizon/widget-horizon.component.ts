@@ -130,12 +130,16 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
   private latestRoll = 0;
   private readonly pitchLive = signal(false);
   private readonly rollLive = signal(false);
+  // A wrapper under 50 px never builds the gauge and leaves the canvas at its default size,
+  // which the overlay would follow out of the tile.
+  private readonly built = signal(false);
   // The gauge starts level, so an axis that has not reported yet is no data as well.
   protected readonly noData = computed(() => {
     const paths = this.runtime.options()?.paths;
     return (!!paths?.['gaugePitchPath']?.path && !this.pitchLive())
       || (!!paths?.['gaugeRollPath']?.path && !this.rollLive());
   });
+  protected readonly showNoData = computed(() => this.built() && this.noData());
 
   constructor() {
     this.observeAxis('gaugePitchPath', '/pitch', this.pitchLive, 'invertPitch',
@@ -291,6 +295,7 @@ export class WidgetHorizonComponent implements AfterViewInit, OnDestroy {
     // No live scale to clear in simplified mode
     try {
       this.gauge = new steelseries.Horizon(canvasId, this.gaugeOptions);
+      this.built.set(true);
       // Apply last known values
       const cfg = this.runtime.options();
       if (cfg && this.gauge) {
