@@ -73,7 +73,7 @@ export class SvgAutopilotComponent implements OnDestroy {
       return this.targetPilotHeadingTrue() ? 'True' : 'Mag';
     }
     if (["wind", "true wind"].includes(state)) {
-      const hdg = this.lockedHdg() ?? null;
+      const hdg = this.lockedHdg();
       if (hdg === null || hdg === 0) return '';
       return hdg > 0 ? 'Stbd' : 'Port';
     }
@@ -181,9 +181,7 @@ export class SvgAutopilotComponent implements OnDestroy {
           case "route": {
             // A lost XTE reads '--', not an on-track 0 m.
             if (xteValue == null || !Number.isFinite(xteValue)) {
-              this.apModeValueAnnotation.set('');
-              this.apModeValue.set('--');
-              this.apModeValueDirection.set('');
+              this.setReadout('--');
               break;
             }
             let xte: string;
@@ -207,30 +205,26 @@ export class SvgAutopilotComponent implements OnDestroy {
               xteAnnotation = ' m';
             }
 
-            this.apModeValueAnnotation.set(xteAnnotation);
-            this.apModeValue.set(xte);
-            this.apModeValueDirection.set(xteDirection);
+            this.setReadout(xte, xteAnnotation, xteDirection);
             break;
           }
-          case "standby":
-            this.apModeValueAnnotation.set('');
-            this.apModeValue.set('');
-            this.apModeValueDirection.set('');
-            break;
           case "wind":
             // A dead vane reads '--', not a dead-ahead 0 the helm would take for a real target.
-            this.apModeValueAnnotation.set(awa ? awa > 0 ? 'S' : 'P' : '');
-            this.apModeValue.set(awa === null ? '--' : Math.abs(awa) + '°');
-            this.apModeValueDirection.set('');
+            this.setReadout(awa === null ? '--' : Math.abs(awa) + '°', awa ? awa > 0 ? 'S' : 'P' : '');
             break;
           default:
-            this.apModeValueAnnotation.set('');
-            this.apModeValue.set('');
-            this.apModeValueDirection.set('');
+            this.setReadout('');
             break;
         }
       });
     });
+  }
+
+  /** Value, unit and side change together, so a branch cannot leave a stale unit or side behind. */
+  private setReadout(value: string, annotation = '', direction = ''): void {
+    this.apModeValue.set(value);
+    this.apModeValueAnnotation.set(annotation);
+    this.apModeValueDirection.set(direction);
   }
 
   private updateRudderAngle(newAngle: number): void {
