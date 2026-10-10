@@ -1,5 +1,6 @@
 import { WritableSignal, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Subject } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WidgetNumericComponent } from './widget-numeric.component';
 import { MinigraphComponent } from '../minigraph/minigraph.component';
@@ -11,6 +12,8 @@ import { CanvasService } from '../../core/services/canvas.service';
 import { DataService, IPathUpdate } from '../../core/services/data.service';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ISkDisplayScale } from '../../core/interfaces/signalk-interfaces';
+import { HistoryGraphStreamService } from '../../core/services/history-graph-stream.service';
+import type { ITheme } from '../../core/services/app-service';
 
 const unitsServiceStub = {
   getUnitDisplaySymbol: (measure: string | null | undefined) => measure ?? '',
@@ -470,5 +473,56 @@ describe('WidgetNumericComponent label row layout', () => {
       .toBe(internals.cssHeight);
     const value = canvasFake.drawn.find(d => d.align === undefined || d.align === 'center');
     expect(value?.y).toBe(105); // recentred above the min/max row
+  });
+});
+
+/**
+ * The options dialog reconfigures a placed widget in place (WidgetHost2Component.applyRuntimeConfig
+ * sets the runtime options) rather than recreating it, so every option has to take effect live.
+ */
+describe('WidgetNumericComponent reconfigured in place', () => {
+  const themeStub = new Proxy({}, { get: () => '#000000' }) as unknown as ITheme;
+  let options: WritableSignal<IWidgetSvcConfig | undefined>;
+
+  const config = (showMiniChart: boolean): IWidgetSvcConfig => {
+    const defaults = structuredClone(WidgetNumericComponent.DEFAULT_CONFIG);
+    return {
+      ...defaults,
+      paths: { numericPath: { ...defaults.paths!['numericPath'], path: 'self.environment.test' } },
+      ignoreZones: true,
+      showMiniChart
+    } as IWidgetSvcConfig;
+  };
+
+  beforeEach(() => {
+    options = signal<IWidgetSvcConfig | undefined>(config(false));
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WidgetRuntimeDirective, useValue: { options } },
+        { provide: WidgetStreamsDirective, useValue: { observe: () => undefined } },
+        { provide: WidgetMetadataDirective, useValue: { displayScale: () => undefined, observe: () => undefined } },
+        { provide: HistoryGraphStreamService, useValue: { getBackfillThenLive: () => new Subject() } },
+        { provide: DataService, useValue: {} },
+        UnitsService
+      ]
+    });
+  });
+
+  it('shows and hides the background graph as Show Background Graph is toggled (#594)', async () => {
+    const fixture = TestBed.createComponent(WidgetNumericComponent);
+    fixture.componentRef.setInput('id', 'w1');
+    fixture.componentRef.setInput('type', 'widget-numeric');
+    fixture.componentRef.setInput('theme', themeStub);
+    const graphShown = async (): Promise<boolean> => {
+      await fixture.whenStable();
+      return fixture.nativeElement.querySelector('minigraph') !== null;
+    };
+
+    expect(await graphShown()).toBe(false);
+    options.set(config(true));
+    expect(await graphShown()).toBe(true);
+    options.set(config(false));
+    expect(await graphShown()).toBe(false);
+    fixture.destroy();
   });
 });
