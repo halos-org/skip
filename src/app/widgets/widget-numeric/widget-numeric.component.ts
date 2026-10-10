@@ -81,7 +81,6 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   protected miniGraph = viewChild(MinigraphComponent);
   private canvasMainRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
 
-  protected showMiniChart = signal<boolean>(false);
   protected labelColor = signal<string>('');
   private canvasElement: HTMLCanvasElement;
   private canvasCtx: CanvasRenderingContext2D | null;
@@ -118,6 +117,9 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
       { lower: 0, upper: 10 }
     );
   });
+
+  /** Derived, not set: the options dialog reconfigures a placed widget in place. */
+  protected showMiniChart = computed(() => !!this.runtime.options()?.showMiniChart);
 
   private subscriptionSignature = computed(() => {
     const cfg = this.runtime?.options();
@@ -167,7 +169,6 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
   };
 
   constructor() {
-    this.showMiniChart.set(this.runtime.options()?.showMiniChart ?? false);
     effect(() => {
       const theme = this.theme();
       const color = this.runtime?.options()?.color;
@@ -203,33 +204,15 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
           this.stream?.observe('numericPath', this.onNumericValue);
           this.metadata.observe('numericPath');
           this.streamRegistered = true;
-          this.updateMiniGraphVisibility();
         }
       });
     });
 
     effect(() => {
-      const show = this.showMiniChart();
       const graph = this.miniGraph();
-      const cfg = this.runtime?.options();
-      const pathInfo = cfg?.paths?.['numericPath'];
-      const effUnit = this.effectiveUnit();
-      const range = this.miniGraphRange();
-      const miniGraphSignature = [
-        cfg?.showMiniChart ? '1' : '0',
-        pathInfo?.path ?? '',
-        pathInfo?.source ?? 'default',
-        effUnit,
-        cfg?.numDecimal ?? '',
-        range.lower,
-        range.upper,
-        cfg?.inverseYAxis ? '1' : '0',
-        cfg?.verticalChart ? '1' : '0',
-        cfg?.color ?? ''
-      ].join('|');
-      if (!miniGraphSignature) return;
-      if (!show) return;
-      if (!graph) return; // will re-run when present
+      if (!this.showMiniChart() || !graph) return; // re-runs once the graph is rendered
+      // setMiniGraph reads the options, the effective unit and the range, so a change to any of
+      // them re-runs this and restarts the graph.
       this.setMiniGraph(graph);
       graph.startGraph();
     });
@@ -265,7 +248,6 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
       this.stream?.observe('numericPath', this.onNumericValue);
       this.metadata.observe('numericPath');
       this.streamRegistered = true;
-      this.updateMiniGraphVisibility();
     }
   }
 
@@ -294,10 +276,6 @@ export class WidgetNumericComponent implements OnInit, AfterViewInit, OnDestroy 
     // glyphs fill about 70% of it, so the fitted text keeps clear of both.
     this.maxValueTextWidth = Math.floor(this.cssWidth * 0.90);
     this.maxValueTextHeight = Math.max(1, Math.floor(this.valueBoxBottom() - this.labelBaselineY()));
-  }
-
-  private updateMiniGraphVisibility(): void {
-    this.showMiniChart.set(!!this.runtime.options()?.showMiniChart);
   }
 
   private setMiniGraph(graph: MinigraphComponent): void {
