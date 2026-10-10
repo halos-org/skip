@@ -21,7 +21,7 @@ export class SvgAutopilotComponent implements OnDestroy {
   protected readonly updateInterval = input<number | undefined>(undefined);
   protected readonly targetPilotHeadingTrue = input.required<boolean>();
   protected readonly autopilotTarget = input.required<number | null>();
-  protected readonly courseXte = input.required<number>();
+  protected readonly courseXte = input.required<number | null>();
   protected readonly compassHeading = input.required<number | null>();
   protected readonly headingDirectionTrue = input.required<boolean>();
   protected readonly appWindAngle = input.required<number | null>();
@@ -179,6 +179,13 @@ export class SvgAutopilotComponent implements OnDestroy {
         switch (state) {
           case "auto":
           case "route": {
+            // A lost XTE reads '--', not an on-track 0 m.
+            if (xteValue == null || !Number.isFinite(xteValue)) {
+              this.apModeValueAnnotation.set('');
+              this.apModeValue.set('--');
+              this.apModeValueDirection.set('');
+              break;
+            }
             let xte: string;
             let xteAnnotation: string;
             let xteDirection: string;
