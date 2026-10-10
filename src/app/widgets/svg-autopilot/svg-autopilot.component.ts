@@ -74,7 +74,7 @@ export class SvgAutopilotComponent implements OnDestroy {
     }
     if (["wind", "true wind"].includes(state)) {
       const hdg = this.lockedHdg() ?? null;
-      if (hdg === null) return '';
+      if (hdg === null || hdg === 0) return '';
       return hdg > 0 ? 'Stbd' : 'Port';
     }
     return '';

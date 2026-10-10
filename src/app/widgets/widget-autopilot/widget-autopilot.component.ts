@@ -710,7 +710,7 @@ export class WidgetAutopilotComponent implements OnInit, OnDestroy {
       }
     });
     this.streams.observe('autopilotV2Target', newValue => {
-      if (newValue.data?.value) {
+      if (newValue.data?.value != null) {
         this.autopilotTarget.set(newValue.data.value);
       } else {
         this.autopilotTarget.set(null);
