@@ -40,7 +40,8 @@ Skip's boot config is split across two tiers (`lib/skip-config.mjs`):
 Dashboards JSON-Patch/autosave POSTs with 200 (a failure would park an error
 snackbar inside the measurement), reports the KIP history-series plugin as
 disabled (suppressing the series-reconcile POST ~750 ms after boot), and
-advertises server version 2.24.0 (Skip gates widget history on ≥ 2.22.1).
+advertises server version 2.33.0 (Skip refuses to boot below 2.26.0), and
+serves a Nautical (Metric) unit-preferences preset by default.
 
 ## Scenarios → audit findings (`scenarios.mjs`)
 
