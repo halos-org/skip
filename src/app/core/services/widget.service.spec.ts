@@ -70,6 +70,14 @@ describe('WidgetService', () => {
     expect(service.getDefaultConfig('widget-text')).toBeDefined();
   });
 
+  it('exposes OPTION_UNITS once the component has been loaded', async () => {
+    expect(service.getOptionUnits('widget-sea-horizon')).toBeUndefined();
+
+    await service.getComponentType('widget-sea-horizon');
+
+    expect(service.getOptionUnits('widget-sea-horizon')).toEqual({ 'gauge.heelCautionAngle': 'rad', 'gauge.heelAlarmAngle': 'rad' });
+  });
+
   describe('provider-API dependencies', () => {
     const autopilotStatus = async (respondToProbe: () => Promise<void>) => {
       const pending = service.getSkipWidgetsWithStatus();

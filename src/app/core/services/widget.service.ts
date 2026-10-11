@@ -132,6 +132,8 @@ export class WidgetService {
   // Static DEFAULT_CONFIG captured when a widget loads, so config-only consumers (historical-series
   // reconciliation) can read it synchronously without forcing a chunk download.
   private readonly _defaultConfigCache = new Map<string, IWidgetSvcConfig | undefined>();
+  // Static OPTION_UNITS captured alongside, so the options dialog knows which options are stored in SI.
+  private readonly _optionUnitsCache = new Map<string, Readonly<Record<string, string>> | undefined>();
   // Lazy loaders: each value dynamically imports its widget component on first use, so the widget's
   // code + vendor deps live in a separate chunk fetched only when that widget type is instantiated.
   private readonly _componentTypeMap: Record<string, () => Promise<Type<unknown>>> = {
@@ -735,11 +737,10 @@ export class WidgetService {
 
     const promise = loader()
       .then(componentType => {
-        // Capture the static DEFAULT_CONFIG so config-only consumers can read it without re-loading.
-        this._defaultConfigCache.set(
-          selector,
-          (componentType as { DEFAULT_CONFIG?: IWidgetSvcConfig }).DEFAULT_CONFIG
-        );
+        // Capture the statics so config-only consumers can read them without re-loading.
+        const statics = componentType as { DEFAULT_CONFIG?: IWidgetSvcConfig; OPTION_UNITS?: Record<string, string> };
+        this._defaultConfigCache.set(selector, statics.DEFAULT_CONFIG);
+        this._optionUnitsCache.set(selector, statics.OPTION_UNITS);
         return componentType;
       })
       .catch((error: unknown) => {
@@ -764,6 +765,14 @@ export class WidgetService {
    */
   public getDefaultConfig(selector: string): IWidgetSvcConfig | undefined {
     return this._defaultConfigCache.get(selector);
+  }
+
+  /**
+   * A loaded widget type's static OPTION_UNITS: the options it stores in SI, by dotted config path,
+   * and the unit of each. Undefined until the component has loaded, and for a widget with none.
+   */
+  public getOptionUnits(selector: string): Readonly<Record<string, string>> | undefined {
+    return this._optionUnitsCache.get(selector);
   }
 
   /**
