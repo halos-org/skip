@@ -338,13 +338,11 @@ const V25_RUDDER_ANGLE_PATH = 'self.steering.rudderAngle';
  */
 export interface MigrationMessageSink {
   info(message: string): void;
-  error(message: string): void;
 }
 
 /** A sink for in-memory migrations, which have no overlay to report into. */
 export const CONSOLE_MIGRATION_SINK: MigrationMessageSink = {
-  info: message => console.log(message),
-  error: message => console.warn(message)
+  info: message => console.log(message)
 };
 
 /**
@@ -385,8 +383,8 @@ export interface ConfigMigrationResult {
  * Upgrade a config to the current app-config version purely in memory: no slot I/O, no reload.
  * Every config copy Skip renders without the persistent upgrade goes through here: imports, the
  * published shared config, profiles loaded by a session that cannot write them, and Freeboard tile
- * configs. Throws a distinct, actionable error for a missing, below-floor or too-new version, or a
- * step that refuses its input. The caller's object is never mutated.
+ * configs. Throws a distinct, actionable error for a missing, below-floor or too-new version, and
+ * passes on any error a step throws. The caller's object is never mutated.
  */
 export function migrateConfig(config: IConfig, sink: MigrationMessageSink): ConfigMigrationResult {
   const version = config.app?.configVersion as unknown;
@@ -403,13 +401,8 @@ export function migrateConfig(config: IConfig, sink: MigrationMessageSink): Conf
   let working = cloneDeep(config);
   let current = version;
   while (current < LATEST_APP_CONFIG_VERSION) {
-    const upgraded = migrateOneAppVersion(working, current, sink);
-    const nextVersion = upgraded?.app?.configVersion;
-    if (!upgraded || typeof nextVersion !== 'number' || nextVersion <= current) {
-      throw new Error(`This configuration could not be migrated from version ${current}.`);
-    }
-    working = upgraded;
-    current = nextVersion;
+    working = migrateOneAppVersion(working, current, sink);
+    current = working.app!.configVersion;
   }
   return { config: working, migrated: version !== LATEST_APP_CONFIG_VERSION };
 }
@@ -437,14 +430,14 @@ export function migrateWidgetConfig(type: string, config: IWidgetSvcConfig, from
 }
 
 /**
- * One step of the chain, from `fromVersion` to the next version; null when no step starts there or
- * the step refused its input. The single dispatch both the persistent upgrade and the in-memory
- * chain route through, so a new LATEST_APP_CONFIG_VERSION is reachable only by adding its step here.
+ * One step of the chain, from `fromVersion` to the next version. The single dispatch both the
+ * persistent upgrade and the in-memory chain route through, so a new LATEST_APP_CONFIG_VERSION is
+ * reachable only by adding its step here.
  */
-export function migrateOneAppVersion(config: IConfig, fromVersion: number, sink: MigrationMessageSink): IConfig | null {
+export function migrateOneAppVersion(config: IConfig, fromVersion: number, sink: MigrationMessageSink): IConfig {
   switch (fromVersion) {
     case 11: return upgradeConfigV11toV12(config, sink);
-    case 12: return upgradeConfigV12toV13(config, sink);
+    case 12: return upgradeConfigV12toV13(config);
     case 13: return upgradeConfigV13toV14(config, sink);
     case 14: return upgradeConfigV14toV15(config, sink);
     case 15: return upgradeConfigV15toV16(config, sink);
@@ -457,80 +450,71 @@ export function migrateOneAppVersion(config: IConfig, fromVersion: number, sink:
     case 22: return upgradeConfigV22toV23(config, sink);
     case 23: return upgradeConfigV23toV24(config, sink);
     case 24: return upgradeConfigV24toV25(config, sink);
-    default: return null;
+    default: throw new Error(`No migration step starts at config version ${fromVersion}.`);
   }
 }
 
-function upgradeConfigV11toV12(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 11) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} upgrade is not supported. Skipping...`);
-      return null;
-    }
-    removeSplitShellConfigKeys(appConfig);
-    migrateUseNeedleToEnableNeedle(config.dashboards, sink);
-    // Iterate dashboards and force widget selector to 'widget-host2'
-    let updatedWidgetCount = 0;
-    let dimensionUpdatedCount = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (dash && Array.isArray(dash.configuration)) {
-          for (const widget of allWidgets(dash.configuration)) {
-            if (widget && typeof widget === 'object') {
-              if (widget.selector !== 'widget-host2') {
-                widget.selector = 'widget-host2';
-                updatedWidgetCount++;
-              }
-              // Helper to safely double a numeric property if > 0 (handles undefined and numeric strings)
-              const maybeDouble = (prop: string) => {
-                const raw = widget[prop] as unknown;
-                const numVal = typeof raw === 'string' ? Number(raw) : (raw as number);
-                if (Number.isFinite(numVal) && numVal !== 0) {
-                  widget[prop] = numVal * 2;
-                  dimensionUpdatedCount++;
-                }
-              };
-              maybeDouble('w');
-              maybeDouble('h');
-              maybeDouble('x');
-              maybeDouble('y');
+/** A step's result: the config stamped with the version the step produces. */
+function stamp(config: IConfig, version: number): IConfig {
+  config.app!.configVersion = version;
+  return { app: config.app, theme: config.theme, dashboards: config.dashboards };
+}
 
-              // If width/height were missing, add them using minW/minH (or 2)
-              if (widget['w'] === undefined || widget['w'] === null) {
-                const minW = widget['minW'];
-                const baseW = minW ? minW : 2;
-                widget['w'] = baseW;
+function upgradeConfigV11toV12(config: IConfig, sink: MigrationMessageSink): IConfig {
+  removeSplitShellConfigKeys(config.app!);
+  migrateUseNeedleToEnableNeedle(config.dashboards, sink);
+  // Iterate dashboards and force widget selector to 'widget-host2'
+  let updatedWidgetCount = 0;
+  let dimensionUpdatedCount = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (dash && Array.isArray(dash.configuration)) {
+        for (const widget of allWidgets(dash.configuration)) {
+          if (widget && typeof widget === 'object') {
+            if (widget.selector !== 'widget-host2') {
+              widget.selector = 'widget-host2';
+              updatedWidgetCount++;
+            }
+            // Helper to safely double a numeric property if > 0 (handles undefined and numeric strings)
+            const maybeDouble = (prop: string) => {
+              const raw = widget[prop] as unknown;
+              const numVal = typeof raw === 'string' ? Number(raw) : (raw as number);
+              if (Number.isFinite(numVal) && numVal !== 0) {
+                widget[prop] = numVal * 2;
                 dimensionUpdatedCount++;
               }
-              if (widget['h'] === undefined || widget['h'] === null) {
-                const minH = widget['minH'];
-                const baseH = minH ? minH : 2;
-                widget['h'] = baseH;
-                dimensionUpdatedCount++;
-              }
+            };
+            maybeDouble('w');
+            maybeDouble('h');
+            maybeDouble('x');
+            maybeDouble('y');
+
+            // If width/height were missing, add them using minW/minH (or 2)
+            if (widget['w'] === undefined || widget['w'] === null) {
+              const minW = widget['minW'];
+              const baseW = minW ? minW : 2;
+              widget['w'] = baseW;
+              dimensionUpdatedCount++;
+            }
+            if (widget['h'] === undefined || widget['h'] === null) {
+              const minH = widget['minH'];
+              const baseH = minH ? minH : 2;
+              widget['h'] = baseH;
+              dimensionUpdatedCount++;
             }
           }
         }
       }
     }
-    if (updatedWidgetCount) {
-      sink.info(`[Upgrade] Updated ${updatedWidgetCount} widget selector(s) to 'widget-host2'.`);
-    }
-    if (dimensionUpdatedCount) {
-      sink.info(`[Upgrade] Doubled widget grid metrics for ${dimensionUpdatedCount} non-zero (w/h/x/y) entries.`);
-    }
-
-    appConfig.configVersion = MIGRATION_OUTPUT_VERSION;
-
-    return {
-      app: appConfig, theme: config.theme, dashboards: config.dashboards
-    };
-
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading ${config.app?.configVersion}: ${(error as Error).message}`);
-    return null;
   }
+  if (updatedWidgetCount) {
+    sink.info(`[Upgrade] Updated ${updatedWidgetCount} widget selector(s) to 'widget-host2'.`);
+  }
+  if (dimensionUpdatedCount) {
+    sink.info(`[Upgrade] Doubled widget grid metrics for ${dimensionUpdatedCount} non-zero (w/h/x/y) entries.`);
+  }
+
+  return stamp(config, MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -538,36 +522,24 @@ function upgradeConfigV11toV12(config: IConfig, sink: MigrationMessageSink): ICo
  * so the app-level dataset registry and the per-widget `datasetUUID` / `chartEngine` fields it fed
  * are dead. Strip them and stamp v13. Genuine graph inputs (path/source/window/units) are untouched.
  */
-function upgradeConfigV12toV13(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 12) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v12 config. Skipping...`);
-      return null;
-    }
+function upgradeConfigV12toV13(config: IConfig): IConfig {
+  delete (config.app as unknown as Record<string, unknown>).dataSets;
 
-    delete (appConfig as unknown as Record<string, unknown>).dataSets;
-
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const cfg = (widget as { input?: { widgetProperties?: { config?: Record<string, unknown> } } })
-            ?.input?.widgetProperties?.config;
-          if (cfg && typeof cfg === 'object') {
-            delete cfg.datasetUUID;
-            delete cfg.chartEngine;
-          }
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const cfg = (widget as { input?: { widgetProperties?: { config?: Record<string, unknown> } } })
+          ?.input?.widgetProperties?.config;
+        if (cfg && typeof cfg === 'object') {
+          delete cfg.datasetUUID;
+          delete cfg.chartEngine;
         }
       }
     }
-
-    appConfig.configVersion = V13_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v12->v13: ${(error as Error).message}`);
-    return null;
   }
+
+  return stamp(config, V13_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -580,54 +552,42 @@ function upgradeConfigV12toV13(config: IConfig, sink: MigrationMessageSink): ICo
  * widget is deliberately left untouched (see SUBFIELD_WIDGET_TYPES). Idempotent: a path already at
  * the compound level matches no suffix.
  */
-function upgradeConfigV13toV14(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 13) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v13 config. Skipping...`);
-      return null;
-    }
-
-    let rewritten = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: {
-            type?: unknown;
-            config?: { paths?: unknown; supportAutomaticHistoricalSeries?: boolean };
-          } } })?.input?.widgetProperties;
-          if (!wp || typeof wp.type !== 'string' || !SUBFIELD_WIDGET_TYPES.has(wp.type)) continue;
-          const type = wp.type;
-          const cfg = wp.config;
-          const paths = cfg?.paths;
-          if (paths && typeof paths === 'object') {
-            // paths is either a Record<string, IWidgetPath> or an IWidgetPath[]; Object.values covers both.
-            for (const pathCfg of Object.values(paths as Record<string, { path?: unknown; isPathConfigurable?: boolean }>)) {
-              if (!pathCfg || typeof pathCfg.path !== 'string') continue;
-              if (COMPOUND_SUBFIELD_PATH_SUFFIXES.some(s => (pathCfg.path as string).endsWith(s))) {
-                pathCfg.path = (pathCfg.path as string).slice(0, (pathCfg.path as string).lastIndexOf('.'));
-                pathCfg.isPathConfigurable = false;
-                rewritten++;
-              }
+function upgradeConfigV13toV14(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let rewritten = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: {
+          type?: unknown;
+          config?: { paths?: unknown; supportAutomaticHistoricalSeries?: boolean };
+        } } })?.input?.widgetProperties;
+        if (!wp || typeof wp.type !== 'string' || !SUBFIELD_WIDGET_TYPES.has(wp.type)) continue;
+        const type = wp.type;
+        const cfg = wp.config;
+        const paths = cfg?.paths;
+        if (paths && typeof paths === 'object') {
+          // paths is either a Record<string, IWidgetPath> or an IWidgetPath[]; Object.values covers both.
+          for (const pathCfg of Object.values(paths as Record<string, { path?: unknown; isPathConfigurable?: boolean }>)) {
+            if (!pathCfg || typeof pathCfg.path !== 'string') continue;
+            if (COMPOUND_SUBFIELD_PATH_SUFFIXES.some(s => (pathCfg.path as string).endsWith(s))) {
+              pathCfg.path = (pathCfg.path as string).slice(0, (pathCfg.path as string).lastIndexOf('.'));
+              pathCfg.isPathConfigurable = false;
+              rewritten++;
             }
           }
-          if (cfg && (type === 'widget-heel-gauge' || type === 'widget-horizon')) {
-            cfg.supportAutomaticHistoricalSeries = false;
-          }
+        }
+        if (cfg && (type === 'widget-heel-gauge' || type === 'widget-horizon')) {
+          cfg.supportAutomaticHistoricalSeries = false;
         }
       }
     }
-    if (rewritten) {
-      sink.info(`[Upgrade] Rewrote ${rewritten} compound sub-field path(s) to their canonical whole path.`);
-    }
-
-    appConfig.configVersion = V14_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v13->v14: ${(error as Error).message}`);
-    return null;
   }
+  if (rewritten) {
+    sink.info(`[Upgrade] Rewrote ${rewritten} compound sub-field path(s) to their canonical whole path.`);
+  }
+
+  return stamp(config, V14_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -640,57 +600,45 @@ function upgradeConfigV13toV14(config: IConfig, sink: MigrationMessageSink): ICo
  * `longPath`/`latPath` siblings survive the runtime default-merge. Scoped to `widget-position`
  * only — a generic widget handed the whole object would render garbage.
  */
-function upgradeConfigV14toV15(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 14) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v14 config. Skipping...`);
-      return null;
-    }
-
-    let rewritten = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: {
-            type?: unknown;
-            config?: { paths?: unknown };
-          } } })?.input?.widgetProperties;
-          if (!wp || wp.type !== 'widget-position') continue;
-          const cfg = wp.config;
-          if (!cfg || typeof cfg !== 'object') continue;
-          // Preserve a user-pinned source / sampleTime from whichever legacy coordinate entry exists.
-          const oldPaths = cfg.paths as Record<string, { source?: unknown; sampleTime?: unknown }> | undefined;
-          const donor = oldPaths && typeof oldPaths === 'object'
-            ? Object.values(oldPaths).find(p => p && typeof p === 'object')
-            : undefined;
-          cfg.paths = {
-            positionPath: {
-              description: 'Position',
-              path: 'self.navigation.position',
-              source: typeof donor?.source === 'string' ? donor.source : 'default',
-              pathType: 'object',
-              isPathConfigurable: true,
-              showPathSkUnitsFilter: false,
-              pathSkUnitsFilter: null,
-              sampleTime: typeof donor?.sampleTime === 'number' ? donor.sampleTime : 500
-            }
-          };
-          rewritten++;
-        }
+function upgradeConfigV14toV15(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let rewritten = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: {
+          type?: unknown;
+          config?: { paths?: unknown };
+        } } })?.input?.widgetProperties;
+        if (!wp || wp.type !== 'widget-position') continue;
+        const cfg = wp.config;
+        if (!cfg || typeof cfg !== 'object') continue;
+        // Preserve a user-pinned source / sampleTime from whichever legacy coordinate entry exists.
+        const oldPaths = cfg.paths as Record<string, { source?: unknown; sampleTime?: unknown }> | undefined;
+        const donor = oldPaths && typeof oldPaths === 'object'
+          ? Object.values(oldPaths).find(p => p && typeof p === 'object')
+          : undefined;
+        cfg.paths = {
+          positionPath: {
+            description: 'Position',
+            path: 'self.navigation.position',
+            source: typeof donor?.source === 'string' ? donor.source : 'default',
+            pathType: 'object',
+            isPathConfigurable: true,
+            showPathSkUnitsFilter: false,
+            pathSkUnitsFilter: null,
+            sampleTime: typeof donor?.sampleTime === 'number' ? donor.sampleTime : 500
+          }
+        };
+        rewritten++;
       }
     }
-    if (rewritten) {
-      sink.info(`[Upgrade] Collapsed ${rewritten} position widget(s) to a single location path.`);
-    }
-
-    appConfig.configVersion = V15_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v14->v15: ${(error as Error).message}`);
-    return null;
   }
+  if (rewritten) {
+    sink.info(`[Upgrade] Collapsed ${rewritten} position widget(s) to a single location path.`);
+  }
+
+  return stamp(config, V15_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -705,59 +653,47 @@ function upgradeConfigV14toV15(config: IConfig, sink: MigrationMessageSink): ICo
  * + rad->deg conversion still runs, `isPathConfigurable: false`, `convertUnitTo: 'deg'`), discarding
  * stale stored overrides. Racer paths are already scalar/fixed, so only their timeout changes.
  */
-function upgradeConfigV15toV16(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 15) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v15 config. Skipping...`);
-      return null;
-    }
-
-    const ATTITUDE_WIDGET_TYPES = new Set(['widget-heel-gauge', 'widget-horizon']);
-    // All-fixed-path widgets whose Paths tab (and its timeout control) is now suppressed.
-    const TIMEOUT_DEFAULT_WIDGET_TYPES = new Set([
-      'widget-heel-gauge', 'widget-horizon', 'widget-racer-timer', 'widget-racer-line'
-    ]);
-    let rewritten = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: {
-            type?: unknown;
-            config?: { paths?: unknown; enableTimeout?: boolean; dataTimeout?: number };
-          } } })?.input?.widgetProperties;
-          if (!wp || typeof wp.type !== 'string' || !TIMEOUT_DEFAULT_WIDGET_TYPES.has(wp.type) || !wp.config) continue;
-          if (ATTITUDE_WIDGET_TYPES.has(wp.type)) {
-            const paths = wp.config.paths;
-            if (paths && typeof paths === 'object') {
-              for (const pathCfg of Object.values(paths as Record<string, Record<string, unknown>>)) {
-                if (!pathCfg || typeof pathCfg !== 'object') continue;
-                // Discard stale overrides — the fixed attitude path is not user-configurable.
-                pathCfg.path = 'self.navigation.attitude';
-                pathCfg.pathType = 'number';
-                pathCfg.isPathConfigurable = false;
-                pathCfg.convertUnitTo = 'deg';
-                rewritten++;
-              }
+function upgradeConfigV15toV16(config: IConfig, sink: MigrationMessageSink): IConfig {
+  const ATTITUDE_WIDGET_TYPES = new Set(['widget-heel-gauge', 'widget-horizon']);
+  // All-fixed-path widgets whose Paths tab (and its timeout control) is now suppressed.
+  const TIMEOUT_DEFAULT_WIDGET_TYPES = new Set([
+    'widget-heel-gauge', 'widget-horizon', 'widget-racer-timer', 'widget-racer-line'
+  ]);
+  let rewritten = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: {
+          type?: unknown;
+          config?: { paths?: unknown; enableTimeout?: boolean; dataTimeout?: number };
+        } } })?.input?.widgetProperties;
+        if (!wp || typeof wp.type !== 'string' || !TIMEOUT_DEFAULT_WIDGET_TYPES.has(wp.type) || !wp.config) continue;
+        if (ATTITUDE_WIDGET_TYPES.has(wp.type)) {
+          const paths = wp.config.paths;
+          if (paths && typeof paths === 'object') {
+            for (const pathCfg of Object.values(paths as Record<string, Record<string, unknown>>)) {
+              if (!pathCfg || typeof pathCfg !== 'object') continue;
+              // Discard stale overrides — the fixed attitude path is not user-configurable.
+              pathCfg.path = 'self.navigation.attitude';
+              pathCfg.pathType = 'number';
+              pathCfg.isPathConfigurable = false;
+              pathCfg.convertUnitTo = 'deg';
+              rewritten++;
             }
           }
-          // The Paths tab (and its timeout control) is gone — default the timeout on.
-          wp.config.enableTimeout = true;
-          wp.config.dataTimeout = 5;
         }
+        // The Paths tab (and its timeout control) is gone — default the timeout on.
+        wp.config.enableTimeout = true;
+        wp.config.dataTimeout = 5;
       }
     }
-    if (rewritten) {
-      sink.info(`[Upgrade] Reset ${rewritten} attitude path(s) to the fixed hidden default.`);
-    }
-
-    appConfig.configVersion = V16_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v15->v16: ${(error as Error).message}`);
-    return null;
   }
+  if (rewritten) {
+    sink.info(`[Upgrade] Reset ${rewritten} attitude path(s) to the fixed hidden default.`);
+  }
+
+  return stamp(config, V16_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -766,46 +702,34 @@ function upgradeConfigV15toV16(config: IConfig, sink: MigrationMessageSink): ICo
  * value (the minimum — the most responsive) and delete the per-path field. Widgets without paths
  * are left untouched (they have no cadence to carry).
  */
-function upgradeConfigV16toV17(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 16) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v16 config. Skipping...`);
-      return null;
-    }
-
-    let rewritten = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: {
-            config?: { paths?: unknown; updateInterval?: number };
-          } } })?.input?.widgetProperties;
-          const cfg = wp?.config;
-          if (!cfg || !cfg.paths || typeof cfg.paths !== 'object') continue;
-          const sampleTimes: number[] = [];
-          for (const pathCfg of Object.values(cfg.paths as Record<string, Record<string, unknown>>)) {
-            if (!pathCfg || typeof pathCfg !== 'object') continue;
-            const st = pathCfg['sampleTime'];
-            if (typeof st === 'number' && Number.isFinite(st) && st > 0) sampleTimes.push(st);
-            delete pathCfg['sampleTime'];
-          }
-          cfg.updateInterval = sampleTimes.length ? Math.min(...sampleTimes) : DEFAULT_WIDGET_UPDATE_INTERVAL_MS;
-          rewritten++;
+function upgradeConfigV16toV17(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let rewritten = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: {
+          config?: { paths?: unknown; updateInterval?: number };
+        } } })?.input?.widgetProperties;
+        const cfg = wp?.config;
+        if (!cfg || !cfg.paths || typeof cfg.paths !== 'object') continue;
+        const sampleTimes: number[] = [];
+        for (const pathCfg of Object.values(cfg.paths as Record<string, Record<string, unknown>>)) {
+          if (!pathCfg || typeof pathCfg !== 'object') continue;
+          const st = pathCfg['sampleTime'];
+          if (typeof st === 'number' && Number.isFinite(st) && st > 0) sampleTimes.push(st);
+          delete pathCfg['sampleTime'];
         }
+        cfg.updateInterval = sampleTimes.length ? Math.min(...sampleTimes) : DEFAULT_WIDGET_UPDATE_INTERVAL_MS;
+        rewritten++;
       }
     }
-    if (rewritten) {
-      sink.info(`[Upgrade] Collapsed per-path sampleTime to a widget-level updateInterval on ${rewritten} widget(s).`);
-    }
-
-    appConfig.configVersion = V17_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v16->v17: ${(error as Error).message}`);
-    return null;
   }
+  if (rewritten) {
+    sink.info(`[Upgrade] Collapsed per-path sampleTime to a widget-level updateInterval on ${rewritten} widget(s).`);
+  }
+
+  return stamp(config, V17_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -814,52 +738,40 @@ function upgradeConfigV16toV17(config: IConfig, sink: MigrationMessageSink): ICo
  * source, discarding stored overrides (escape-hatch loss accepted). Keys are unchanged, so a
  * field-patch is safe; pathOptions is base-sourced from DEFAULT_CONFIG and is not written here.
  */
-function upgradeConfigV17toV18(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 17) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v17 config. Skipping...`);
-      return null;
-    }
-
-    let rewritten = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: {
-            type?: unknown;
-            config?: { paths?: unknown };
-          } } })?.input?.widgetProperties;
-          if (!wp || typeof wp.type !== 'string') continue;
-          const targets = V18_WIND_PATH_DEFAULTS[wp.type];
-          const paths = wp.config?.paths;
-          if (!targets || !paths || typeof paths !== 'object') continue;
-          const pathMap = paths as Record<string, Record<string, unknown>>;
-          for (const [key, target] of Object.entries(targets)) {
-            const pathCfg = pathMap[key];
-            if (!pathCfg || typeof pathCfg !== 'object') continue;
-            pathCfg['path'] = target.path;
-            pathCfg['isPathConfigurable'] = target.isPathConfigurable;
-            if (target.description !== undefined) pathCfg['description'] = target.description;
-            // Reset the source pin too: a pin left over from the pre-reset path can point at a
-            // source bucket the new canonical path never fills, silently starving the widget.
-            pathCfg['source'] = 'default';
-            rewritten++;
-          }
+function upgradeConfigV17toV18(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let rewritten = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: {
+          type?: unknown;
+          config?: { paths?: unknown };
+        } } })?.input?.widgetProperties;
+        if (!wp || typeof wp.type !== 'string') continue;
+        const targets = V18_WIND_PATH_DEFAULTS[wp.type];
+        const paths = wp.config?.paths;
+        if (!targets || !paths || typeof paths !== 'object') continue;
+        const pathMap = paths as Record<string, Record<string, unknown>>;
+        for (const [key, target] of Object.entries(targets)) {
+          const pathCfg = pathMap[key];
+          if (!pathCfg || typeof pathCfg !== 'object') continue;
+          pathCfg['path'] = target.path;
+          pathCfg['isPathConfigurable'] = target.isPathConfigurable;
+          if (target.description !== undefined) pathCfg['description'] = target.description;
+          // Reset the source pin too: a pin left over from the pre-reset path can point at a
+          // source bucket the new canonical path never fills, silently starving the widget.
+          pathCfg['source'] = 'default';
+          rewritten++;
         }
       }
     }
-    if (rewritten) {
-      sink.info(`[Upgrade] Reset ${rewritten} wind-family path(s) to the fixed/choice default.`);
-    }
-
-    appConfig.configVersion = V18_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v17->v18: ${(error as Error).message}`);
-    return null;
   }
+  if (rewritten) {
+    sink.info(`[Upgrade] Reset ${rewritten} wind-family path(s) to the fixed/choice default.`);
+  }
+
+  return stamp(config, V18_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -869,52 +781,40 @@ function upgradeConfigV17toV18(config: IConfig, sink: MigrationMessageSink): ICo
  * unchanged, so a pinned source stays valid and is kept. The dead slot is deleted outright because
  * the runtime base+user merge would otherwise resurrect a stored orphan key.
  */
-function upgradeConfigV18toV19(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 18) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v18 config. Skipping...`);
-      return null;
-    }
-
-    let changed = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: {
-            type?: unknown;
-            config?: { paths?: unknown };
-          } } })?.input?.widgetProperties;
-          if (!wp || wp.type !== 'widget-autopilot') continue;
-          const paths = wp.config?.paths;
-          if (!paths || typeof paths !== 'object') continue;
-          const pathMap = paths as Record<string, Record<string, unknown>>;
-          for (const slot of V19_AUTOPILOT_FIXED_SLOTS) {
-            if (pathMap[slot] && typeof pathMap[slot] === 'object') {
-              pathMap[slot]['isPathConfigurable'] = false;
-              changed++;
-            }
+function upgradeConfigV18toV19(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let changed = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: {
+          type?: unknown;
+          config?: { paths?: unknown };
+        } } })?.input?.widgetProperties;
+        if (!wp || wp.type !== 'widget-autopilot') continue;
+        const paths = wp.config?.paths;
+        if (!paths || typeof paths !== 'object') continue;
+        const pathMap = paths as Record<string, Record<string, unknown>>;
+        for (const slot of V19_AUTOPILOT_FIXED_SLOTS) {
+          if (pathMap[slot] && typeof pathMap[slot] === 'object') {
+            pathMap[slot]['isPathConfigurable'] = false;
+            changed++;
           }
-          for (const slot of V19_AUTOPILOT_REMOVED_SLOTS) {
-            if (slot in pathMap) {
-              delete pathMap[slot];
-              changed++;
-            }
+        }
+        for (const slot of V19_AUTOPILOT_REMOVED_SLOTS) {
+          if (slot in pathMap) {
+            delete pathMap[slot];
+            changed++;
           }
         }
       }
     }
-    if (changed) {
-      sink.info(`[Upgrade] Slimmed ${changed} autopilot path field(s).`);
-    }
-
-    appConfig.configVersion = V19_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v18->v19: ${(error as Error).message}`);
-    return null;
   }
+  if (changed) {
+    sink.info(`[Upgrade] Slimmed ${changed} autopilot path field(s).`);
+  }
+
+  return stamp(config, V19_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -956,93 +856,57 @@ function convertToSi(config: IConfig, sink: MigrationMessageSink, conversions: R
  * v19 -> v20: the first SI step, for Wind Steer (see windSteerToSi). Also deletes racesteer's
  * `laylineEnable`/`laylineAngle`, which nothing in racesteer ever read.
  */
-function upgradeConfigV19toV20(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 19) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v19 config. Skipping...`);
-      return null;
-    }
+function upgradeConfigV19toV20(config: IConfig, sink: MigrationMessageSink): IConfig {
+  convertToSi(config, sink, { 'widget-wind-steer': windSteerToSi });
 
-    convertToSi(config, sink, { 'widget-wind-steer': windSteerToSi });
-
-    let removed = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
-          if (!wp || wp.type !== 'widget-racesteer' || !wp.config) continue;
-          for (const key of ['laylineEnable', 'laylineAngle']) {
-            if (key in wp.config) {
-              delete wp.config[key];
-              removed++;
-            }
+  let removed = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
+        if (!wp || wp.type !== 'widget-racesteer' || !wp.config) continue;
+        for (const key of ['laylineEnable', 'laylineAngle']) {
+          if (key in wp.config) {
+            delete wp.config[key];
+            removed++;
           }
         }
       }
     }
-    if (removed) {
-      sink.info(`[Upgrade] Removed ${removed} unused racesteer option(s).`);
-    }
-
-    appConfig.configVersion = V20_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v19->v20: ${(error as Error).message}`);
-    return null;
   }
+  if (removed) {
+    sink.info(`[Upgrade] Removed ${removed} unused racesteer option(s).`);
+  }
+
+  return stamp(config, V20_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
  * v20 -> v21: the SI steps for Sea Horizon's heel angles and the AIS radar's range rings and COG
  * vector time (see seaHorizonToSi and aisRadarToSi).
  */
-function upgradeConfigV20toV21(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 20) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v20 config. Skipping...`);
-      return null;
-    }
+function upgradeConfigV20toV21(config: IConfig, sink: MigrationMessageSink): IConfig {
+  convertToSi(config, sink, { 'widget-sea-horizon': seaHorizonToSi, 'widget-ais-radar': aisRadarToSi });
 
-    convertToSi(config, sink, { 'widget-sea-horizon': seaHorizonToSi, 'widget-ais-radar': aisRadarToSi });
-
-    appConfig.configVersion = V21_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v20->v21: ${(error as Error).message}`);
-    return null;
-  }
+  return stamp(config, V21_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
  * v21 -> v22: the SI steps for the gauges', numeric's and data-chart's scale bounds (see
  * gaugeBoundsToSi, numericBoundsToSi and dataChartBoundsToSi).
  */
-function upgradeConfigV21toV22(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 21) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v21 config. Skipping...`);
-      return null;
-    }
+function upgradeConfigV21toV22(config: IConfig, sink: MigrationMessageSink): IConfig {
+  convertToSi(config, sink, {
+    'widget-gauge-ng-radial': gaugeBoundsToSi,
+    'widget-gauge-ng-linear': gaugeBoundsToSi,
+    'widget-gauge-steel': gaugeBoundsToSi,
+    'widget-simple-linear': gaugeBoundsToSi,
+    'widget-numeric': numericBoundsToSi,
+    'widget-data-chart': dataChartBoundsToSi
+  });
 
-    convertToSi(config, sink, {
-      'widget-gauge-ng-radial': gaugeBoundsToSi,
-      'widget-gauge-ng-linear': gaugeBoundsToSi,
-      'widget-gauge-steel': gaugeBoundsToSi,
-      'widget-simple-linear': gaugeBoundsToSi,
-      'widget-numeric': numericBoundsToSi,
-      'widget-data-chart': dataChartBoundsToSi
-    });
-
-    appConfig.configVersion = V22_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v21->v22: ${(error as Error).message}`);
-    return null;
-  }
+  return stamp(config, V22_MIGRATION_OUTPUT_VERSION);
 }
 
 /** The pointer form of a dotted compound sub-field path, with the field it addresses; null for any other path. */
@@ -1062,62 +926,50 @@ function toSubfieldPointerPath(path: string): { path: string; field: string } | 
  * value as radians. Idempotent: a pointer path matches no suffix. Unknown dotted paths are left alone,
  * since without metadata a field cannot be told from a path segment.
  */
-function upgradeConfigV22toV23(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 22) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v22 config. Skipping...`);
-      return null;
-    }
-
-    let rewritten = 0;
-    let unitsChanged = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
-          if (!wp || typeof wp.type !== 'string' || SUBFIELD_WIDGET_TYPES.has(wp.type)) continue;
-          const cfg = wp.config;
-          if (!cfg || typeof cfg !== 'object') continue;
-          const paths = cfg['paths'];
-          if (paths && typeof paths === 'object') {
-            for (const pathCfg of Object.values(paths as Record<string, WidgetConfigRecord>)) {
-              if (!pathCfg || typeof pathCfg !== 'object' || typeof pathCfg['path'] !== 'string') continue;
-              const pointer = toSubfieldPointerPath(pathCfg['path']);
-              if (!pointer) continue;
-              pathCfg['path'] = pointer.path;
-              rewritten++;
-              const unit = pathCfg['convertUnitTo'];
-              if ((pointer.field === 'latitude' || pointer.field === 'longitude')
-                && typeof unit === 'string' && V23_ANGLE_GROUP_MEASURES.has(unit)) {
-                pathCfg['convertUnitTo'] = V23_POSITION_DEGREES;
-                unitsChanged++;
-              }
+function upgradeConfigV22toV23(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let rewritten = 0;
+  let unitsChanged = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
+        if (!wp || typeof wp.type !== 'string' || SUBFIELD_WIDGET_TYPES.has(wp.type)) continue;
+        const cfg = wp.config;
+        if (!cfg || typeof cfg !== 'object') continue;
+        const paths = cfg['paths'];
+        if (paths && typeof paths === 'object') {
+          for (const pathCfg of Object.values(paths as Record<string, WidgetConfigRecord>)) {
+            if (!pathCfg || typeof pathCfg !== 'object' || typeof pathCfg['path'] !== 'string') continue;
+            const pointer = toSubfieldPointerPath(pathCfg['path']);
+            if (!pointer) continue;
+            pathCfg['path'] = pointer.path;
+            rewritten++;
+            const unit = pathCfg['convertUnitTo'];
+            if ((pointer.field === 'latitude' || pointer.field === 'longitude')
+              && typeof unit === 'string' && V23_ANGLE_GROUP_MEASURES.has(unit)) {
+              pathCfg['convertUnitTo'] = V23_POSITION_DEGREES;
+              unitsChanged++;
             }
           }
-          const chartPath = cfg['datachartPath'];
-          const chartPointer = typeof chartPath === 'string' ? toSubfieldPointerPath(chartPath) : null;
-          if (chartPointer) {
-            cfg['datachartPath'] = chartPointer.path;
-            rewritten++;
-          }
+        }
+        const chartPath = cfg['datachartPath'];
+        const chartPointer = typeof chartPath === 'string' ? toSubfieldPointerPath(chartPath) : null;
+        if (chartPointer) {
+          cfg['datachartPath'] = chartPointer.path;
+          rewritten++;
         }
       }
     }
-    if (rewritten) {
-      sink.info(`[Upgrade] Rewrote ${rewritten} compound sub-field path(s) to pointer form.`);
-    }
-    if (unitsChanged) {
-      sink.info(`[Upgrade] Switched ${unitsChanged} latitude/longitude unit(s) from the Angle group to position degrees.`);
-    }
-
-    appConfig.configVersion = V23_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v22->v23: ${(error as Error).message}`);
-    return null;
   }
+  if (rewritten) {
+    sink.info(`[Upgrade] Rewrote ${rewritten} compound sub-field path(s) to pointer form.`);
+  }
+  if (unitsChanged) {
+    sink.info(`[Upgrade] Switched ${unitsChanged} latitude/longitude unit(s) from the Angle group to position degrees.`);
+  }
+
+  return stamp(config, V23_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -1126,40 +978,28 @@ function upgradeConfigV22toV23(config: IConfig, sink: MigrationMessageSink): ICo
  * (`self.navigation.attitude#/roll`) filtered to angles, so the options dialog offers a path
  * picker. The data source stays as stored. Idempotent: a pointer path is left as it is.
  */
-function upgradeConfigV23toV24(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 23) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v23 config. Skipping...`);
-      return null;
-    }
-
-    let opened = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
-          if (wp?.type !== 'widget-heel-gauge') continue;
-          const paths = wp.config?.['paths'] as Record<string, WidgetConfigRecord> | undefined;
-          const slot = paths?.['angle'];
-          if (!slot || typeof slot !== 'object') continue;
-          if (slot['path'] === 'self.navigation.attitude') slot['path'] = 'self.navigation.attitude#/roll';
-          if (slot['isPathConfigurable'] !== true) opened++;
-          Object.assign(slot, { description: 'Angle', isPathConfigurable: true, showPathSkUnitsFilter: false, pathSkUnitsFilter: 'rad' });
-        }
+function upgradeConfigV23toV24(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let opened = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
+        if (wp?.type !== 'widget-heel-gauge') continue;
+        const paths = wp.config?.['paths'] as Record<string, WidgetConfigRecord> | undefined;
+        const slot = paths?.['angle'];
+        if (!slot || typeof slot !== 'object') continue;
+        if (slot['path'] === 'self.navigation.attitude') slot['path'] = 'self.navigation.attitude#/roll';
+        if (slot['isPathConfigurable'] !== true) opened++;
+        Object.assign(slot, { description: 'Angle', isPathConfigurable: true, showPathSkUnitsFilter: false, pathSkUnitsFilter: 'rad' });
       }
     }
-    if (opened) {
-      sink.info(`[Upgrade] Made ${opened} heel gauge path(s) configurable, reading the roll by default.`);
-    }
-
-    appConfig.configVersion = V24_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v23->v24: ${(error as Error).message}`);
-    return null;
   }
+  if (opened) {
+    sink.info(`[Upgrade] Made ${opened} heel gauge path(s) configurable, reading the roll by default.`);
+  }
+
+  return stamp(config, V24_MIGRATION_OUTPUT_VERSION);
 }
 
 /**
@@ -1168,43 +1008,31 @@ function upgradeConfigV23toV24(config: IConfig, sink: MigrationMessageSink): ICo
  * is reset to the standard one together with its source, which may name a source that never fills
  * the standard path; an already standard path keeps its source.
  */
-function upgradeConfigV24toV25(config: IConfig, sink: MigrationMessageSink): IConfig | null {
-  try {
-    const appConfig = config.app;
-    if (!appConfig || appConfig.configVersion !== 24) {
-      sink.error(`[Upgrade Service] Config version ${appConfig?.configVersion} is not an upgradable v24 config. Skipping...`);
-      return null;
-    }
-
-    let fixed = 0;
-    if (Array.isArray(config.dashboards)) {
-      for (const dash of config.dashboards) {
-        if (!dash || !Array.isArray(dash.configuration)) continue;
-        for (const widget of allWidgets(dash.configuration)) {
-          const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
-          if (wp?.type !== 'widget-wind-steer') continue;
-          const paths = wp.config?.['paths'] as Record<string, WidgetConfigRecord> | undefined;
-          const slot = paths?.['rudderAngle'];
-          if (!slot || typeof slot !== 'object') continue;
-          if (slot['path'] !== V25_RUDDER_ANGLE_PATH) {
-            slot['path'] = V25_RUDDER_ANGLE_PATH;
-            slot['source'] = 'default';
-          }
-          if (slot['isPathConfigurable'] !== false) fixed++;
-          slot['isPathConfigurable'] = false;
+function upgradeConfigV24toV25(config: IConfig, sink: MigrationMessageSink): IConfig {
+  let fixed = 0;
+  if (Array.isArray(config.dashboards)) {
+    for (const dash of config.dashboards) {
+      if (!dash || !Array.isArray(dash.configuration)) continue;
+      for (const widget of allWidgets(dash.configuration)) {
+        const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: WidgetConfigRecord } } })?.input?.widgetProperties;
+        if (wp?.type !== 'widget-wind-steer') continue;
+        const paths = wp.config?.['paths'] as Record<string, WidgetConfigRecord> | undefined;
+        const slot = paths?.['rudderAngle'];
+        if (!slot || typeof slot !== 'object') continue;
+        if (slot['path'] !== V25_RUDDER_ANGLE_PATH) {
+          slot['path'] = V25_RUDDER_ANGLE_PATH;
+          slot['source'] = 'default';
         }
+        if (slot['isPathConfigurable'] !== false) fixed++;
+        slot['isPathConfigurable'] = false;
       }
     }
-    if (fixed) {
-      sink.info(`[Upgrade] Fixed ${fixed} wind steer rudder angle path(s) to ${V25_RUDDER_ANGLE_PATH}.`);
-    }
-
-    appConfig.configVersion = V25_MIGRATION_OUTPUT_VERSION;
-    return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
-  } catch (error) {
-    sink.error(`[Upgrade Service] Error upgrading v24->v25: ${(error as Error).message}`);
-    return null;
   }
+  if (fixed) {
+    sink.info(`[Upgrade] Fixed ${fixed} wind steer rudder angle path(s) to ${V25_RUDDER_ANGLE_PATH}.`);
+  }
+
+  return stamp(config, V25_MIGRATION_OUTPUT_VERSION);
 }
 
 export function migrateUseNeedleToEnableNeedle(dashboards: Dashboard[], sink: MigrationMessageSink): void {

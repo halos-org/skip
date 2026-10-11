@@ -33,8 +33,7 @@ export class ConfigurationUpgradeService {
   public messages = signal<string[]>([]);
 
   private readonly sink: MigrationMessageSink = {
-    info: message => this.pushMsg(message),
-    error: message => this.pushError(message)
+    info: message => this.pushMsg(message)
   };
 
   // Source versions we support upgrading FROM (remote file version & app.configVersion).
@@ -146,7 +145,6 @@ export class ConfigurationUpgradeService {
 
             this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${MIGRATION_OUTPUT_VERSION}.`);
             const migratedConfig = migrateOneAppVersion(config, 11, this.sink);
-            if (!migratedConfig) continue; // skip if not eligible
 
             this.pushMsg(`[Upgrade] Saving upgraded configurations...`);
             await this._storage.setConfig(
@@ -184,7 +182,6 @@ export class ConfigurationUpgradeService {
             }
             this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V20_MIGRATION_OUTPUT_VERSION}.`);
             const migratedConfig = migrateOneAppVersion(config, 19, this.sink);
-            if (!migratedConfig) continue;
 
             await this._storage.setConfig(item.scope, item.name, migratedConfig);
           } catch (error) {
@@ -251,7 +248,6 @@ export class ConfigurationUpgradeService {
           if (config?.app?.configVersion !== version) continue;
           this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${version + 1}.`);
           const migratedConfig = migrateOneAppVersion(config, version, this.sink);
-          if (!migratedConfig) continue;
 
           await this._storage.setConfig(item.scope, item.name, migratedConfig);
         } catch (error) {

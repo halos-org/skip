@@ -21,10 +21,9 @@ const configAt = (version: unknown): IConfig =>
     dashboards: []
   } as unknown as IConfig);
 
-function recordingSink(): MigrationMessageSink & { infos: string[]; errors: string[] } {
+function recordingSink(): MigrationMessageSink & { infos: string[] } {
   const infos: string[] = [];
-  const errors: string[] = [];
-  return { infos, errors, info: m => infos.push(m), error: m => errors.push(m) };
+  return { infos, info: m => infos.push(m) };
 }
 
 // A v18 dashboard holding one autopilot whose windAngleTrueWater slot the v18 -> v19 step deletes.
@@ -81,7 +80,6 @@ describe('migrateConfig (in-memory migration chain)', () => {
     expect(paths['windAngleTrueWater']).toBeUndefined();
     expect(paths['headingTrue'].isPathConfigurable).toBe(false);
     expect(sink.infos.some(m => /autopilot/i.test(m))).toBe(true);
-    expect(sink.errors).toEqual([]);
   });
 
   it('rejects a below-floor config with a distinct "too old" error', () => {
@@ -114,19 +112,11 @@ describe('migrateConfig (in-memory migration chain)', () => {
 
   it('has a step for every version from the floor up to latest (guards future LATEST bumps)', () => {
     for (let from = MIN_MIGRATABLE_APP_CONFIG_VERSION; from < LATEST_APP_CONFIG_VERSION; from++) {
-      const upgraded = migrateOneAppVersion(configAt(from), from, recordingSink());
       // A bump of LATEST_APP_CONFIG_VERSION that forgets to register the new step lands here: the
-      // dispatch returns null for the now-in-range version, and every config below it stops loading.
-      expect(upgraded, `no upgrade step registered for config version ${from}`).not.toBeNull();
-      expect(upgraded?.app?.configVersion).toBeGreaterThan(from);
+      // dispatch throws for the now-in-range version, and every config below it stops loading.
+      const upgraded = migrateOneAppVersion(configAt(from), from, recordingSink());
+      expect(upgraded.app?.configVersion).toBeGreaterThan(from);
     }
-  });
-
-  it('reports a step that refuses its input through the sink error channel', () => {
-    const sink = recordingSink();
-
-    expect(migrateOneAppVersion(configAt(13), 12, sink)).toBeNull();
-    expect(sink.errors).toHaveLength(1);
   });
 });
 
@@ -172,7 +162,7 @@ describe('migrateWidgetConfig (a single widget config through the chain)', () =>
     const cfg = { updateInterval: 1000 } as IWidgetSvcConfig;
     const info = vi.fn();
 
-    const migrated = migrateWidgetConfig('widget-numeric', cfg, MIN_MIGRATABLE_APP_CONFIG_VERSION, { info, error: vi.fn() });
+    const migrated = migrateWidgetConfig('widget-numeric', cfg, MIN_MIGRATABLE_APP_CONFIG_VERSION, { info });
 
     expect(migrated['w' as keyof IWidgetSvcConfig]).toBeUndefined();
     expect(migrated.updateInterval).toBe(1000);
@@ -230,12 +220,6 @@ describe('v19 -> v20: Wind Steer close-hauled options in SI', () => {
     ]), 19, recordingSink());
     expect(widgetConfigs(migrated as IConfig)).toEqual([{ windSectorEnable: true }, { laylineAngle: 12 }]);
   });
-
-  it('refuses a config that is not at v19', () => {
-    const sink = recordingSink();
-    expect(migrateOneAppVersion(configWith(18, []), 19, sink)).toBeNull();
-    expect(sink.errors).toHaveLength(1);
-  });
 });
 
 describe('v20 -> v21: Sea Horizon heel angles and AIS radar options in SI', () => {
@@ -280,12 +264,6 @@ describe('v20 -> v21: Sea Horizon heel angles and AIS radar options in SI', () =
     const migrated = migrateOneAppVersion(
       configWith(20, [{ type: 'widget-wind-steer', config: { closeHauledLineAngle: 0.6 } }]), 20, recordingSink());
     expect(widgetConfigs(migrated as IConfig)[0]).toEqual({ closeHauledLineAngle: 0.6 });
-  });
-
-  it('refuses a config that is not at v20', () => {
-    const sink = recordingSink();
-    expect(migrateOneAppVersion(configWith(19, []), 20, sink)).toBeNull();
-    expect(sink.errors).toHaveLength(1);
   });
 
   it('v19 -> v20 does not run the v21 steps', () => {
@@ -451,12 +429,6 @@ describe('v21 -> v22: scale bounds in SI', () => {
     expect(widgetConfigs(migrated)).toEqual([{ displayScale: { lower: 0, upper: 100 } }, { displayScale: { lower: 0, upper: 360 } }]);
   });
 
-  it('refuses a config that is not at v21', () => {
-    const sink = recordingSink();
-    expect(migrateOneAppVersion(configWith(20, []), 21, sink)).toBeNull();
-    expect(sink.errors).toHaveLength(1);
-  });
-
   it('v20 -> v21 does not run the v22 steps', () => {
     const migrated = migrateOneAppVersion(configWith(20, [gauge('widget-gauge-steel', 'rpm', 0, 3600)]), 20, recordingSink()) as IConfig;
     expect(scale(widgetConfigs(migrated)[0])).toEqual({ lower: 0, upper: 3600, type: 'linear' });
@@ -565,7 +537,6 @@ describe('v22 -> v23: dotted compound sub-field paths to pointer form', () => {
       '[Upgrade] Rewrote 2 compound sub-field path(s) to pointer form.',
       '[Upgrade] Switched 1 latitude/longitude unit(s) from the Angle group to position degrees.'
     ]);
-    expect(sink.errors).toEqual([]);
   });
 
   it('migrates a Freeboard tile config at v22 through migrateWidgetConfig', () => {
@@ -575,12 +546,6 @@ describe('v22 -> v23: dotted compound sub-field paths to pointer form', () => {
 
     expect(slotOf(migrated)).toMatchObject({ path: 'self.navigation.position#/longitude', convertUnitTo: 'pdeg' });
     expect(slotOf(cfg as unknown as Record<string, unknown>)['path']).toBe('self.navigation.position.longitude');
-  });
-
-  it('refuses a config that is not at v22', () => {
-    const sink = recordingSink();
-    expect(migrateOneAppVersion(configWith(21, []), 22, sink)).toBeNull();
-    expect(sink.errors).toHaveLength(1);
   });
 });
 
