@@ -1080,9 +1080,10 @@ export class DataService implements OnDestroy {
   }
 
   /**
-   * Server-supplied display-unit preference for a path (Signal K unit-preferences plugin), captured
-   * off the existing sendMeta=all stream. Returns undefined when the plugin is absent or the path
-   * carries no displayUnits meta. A pointer path takes its field's, from {@link getPathMeta}.
+   * Server-supplied display-unit preference for a path (Signal K unit preferences), captured off the
+   * existing sendMeta=all stream. Returns undefined when the path carries no displayUnits meta: it
+   * has no units, or a unit the server has no category for. A pointer path takes its field's, from
+   * {@link getPathMeta}.
    */
   public getPathDisplayUnits(path: string): ISkDisplayUnits | undefined {
     return this.getPathMeta(path)?.displayUnits;

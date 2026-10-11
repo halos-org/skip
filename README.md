@@ -12,7 +12,7 @@
 
 **Skip is a Signal K marine instrument panel and dashboard: equally at home under a finger, a mouse, or a keyboard, and ready to use across all your devices.**
 
-Skip turns your Signal K data into clear, purpose-built instrument dashboards. Install it from the Signal K app store, then open Skip in a browser and it's ready to go. A single instance works everywhere — no per-device deployment is needed.
+Skip turns your Signal K data into clear, purpose-built instrument dashboards. Install it from the Signal K app store (Signal K server 2.26.0 or later), then open Skip in a browser and it's ready to go. A single instance works everywhere — no per-device deployment is needed.
 
 Skip is designed for sailors and boaters who want:
 
@@ -121,7 +121,9 @@ On a locked page, a long press on a widget opens its recent history as a graph �
 
 ## Display Units
 
-Skip displays every value in the units set by your Signal K server's **unit preferences**, converting automatically — there are no unit settings in Skip to keep in sync. Set your units once on the server and every unit-preferences-aware app, Skip included, follows. Requires Signal K server 2.23.0 or later; on an older server Skip shows values in Signal K's own units (SI: metres, m/s, Kelvin, Pascal, m³/s).
+Skip displays every value in the units set by your Signal K server's **unit preferences**, converting automatically — there are no unit settings in Skip to keep in sync. Set your units once on the server and every unit-preferences-aware app, Skip included, follows.
+
+Skip requires Signal K server 2.26.0 or later. On an older server Skip shows a notice naming the server's version instead of your dashboards; update the server from its admin UI, then reload Skip.
 
 **Where to set them.** In the Signal K server admin UI, go to **Server → Configuration → Settings** and scroll to **Unit Preferences**. Preferences are stored per user, so they follow your login across devices; an anonymous visitor gets the server's default preset.
 
@@ -144,7 +146,7 @@ Skip displays every value in the units set by your Signal K server's **unit pref
 
 **Custom presets and units** cover the rest. The server accepts uploaded presets and custom unit definitions through its `/signalk/v1/unitpreferences/*` API, so a unit combination that no built-in preset offers can still drive every client. Signal K's own [Unit Preferences guide](https://github.com/SignalK/signalk-server/blob/master/docs/guides/unitpreferences.md) documents the full API and the standard category list.
 
-**What Skip does with it.** Skip reads each path's preference from the server's metadata, applies the conversion, and labels the value with that unit — the label always matches the conversion applied. When the server states no preference for a path, Skip shows the Signal K value as-is with no unit label rather than guessing. Where the server asks for a unit Skip has no conversion for, it does the same and names the unit in the browser console (`[Units Service] Server display unit '<unit>' …`), which is worth quoting in a bug report.
+**What Skip does with it.** Skip reads each path's preference from the server's metadata, applies the conversion, and labels the value with that unit — the label always matches the conversion applied. When the server attaches no unit to a path — the path has no Signal K unit, or one the server has no category for, such as lux or VA — Skip shows the Signal K value as-is with no unit label rather than guessing. Where the server asks for a unit Skip has no conversion for, it does the same and names the unit in the browser console (`[Units Service] Server display unit '<unit>' …`), which is worth quoting in a bug report.
 
 ## Widget Library
 
