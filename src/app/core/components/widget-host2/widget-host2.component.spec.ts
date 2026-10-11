@@ -1,7 +1,7 @@
 import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Component, input, signal } from '@angular/core';
 import { of } from 'rxjs';
 import { WidgetHost2Component } from './widget-host2.component';
 import { DialogService } from '../../services/dialog.service';
@@ -14,6 +14,15 @@ import { UnitsService } from '../../services/units.service';
 import { IWidget, IWidgetSvcConfig } from '../../interfaces/widgets-interface';
 import { WidgetRuntimeDirective } from '../../directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../directives/widget-streams.directive';
+
+@Component({ selector: 'stub-widget', template: '' })
+class StubWidgetComponent {
+    public static readonly DEFAULT_CONFIG = {};
+    public static readonly OPTION_UNITS = { 'displayScale.upper': 'm/s' };
+    public readonly id = input<string>();
+    public readonly type = input<string>();
+    public readonly theme = input<unknown>();
+}
 
 class DashboardServiceStub {
     public readonly isDashboardStatic = signal<boolean>(true);
@@ -76,8 +85,9 @@ describe('WidgetHost2Component', () => {
                 {
                     provide: WidgetService,
                     useValue: {
-                        getComponentType: vi.fn().mockReturnValue(undefined),
-                        getWidgetName: vi.fn().mockReturnValue(undefined)
+                        getComponentType: vi.fn().mockResolvedValue(StubWidgetComponent),
+                        getWidgetName: vi.fn().mockReturnValue(undefined),
+                        getOptionUnits: vi.fn()
                     }
                 },
                 {
@@ -145,22 +155,61 @@ describe('WidgetHost2Component', () => {
         expect(dialogServiceMock.openWidgetHistoryDialog).not.toHaveBeenCalled();
     });
 
-    it('ignores options dialog open request when dashboard is locked', () => {
+    it('ignores options dialog open request when dashboard is locked', async () => {
         dashboard.isDashboardStatic.set(true);
 
-        component.openWidgetOptions(new Event('dblclick'));
+        await component.openWidgetOptions(new Event('dblclick'));
 
         expect(dialogServiceMock.openWidgetOptions).not.toHaveBeenCalled();
     });
 
-    it('tells the options dialog which widget type it edits', () => {
+    it('tells the options dialog which widget type it edits', async () => {
         dashboard.isDashboardStatic.set(false);
 
-        component.openWidgetOptions(new Event('dblclick'));
+        await component.openWidgetOptions(new Event('dblclick'));
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledWith(expect.objectContaining({
             config: expect.objectContaining({ widgetType: 'widget-numeric', displayName: 'STW' })
         }));
+    });
+
+    // The dialog reads the type's SI options from WidgetService, which knows them only once the
+    // widget's chunk has loaded.
+    it('opens options requested during the widget load once its option units are known', async () => {
+        dashboard.isDashboardStatic.set(false);
+        const widgetService = TestBed.inject(WidgetService) as unknown as { getComponentType: Mock; getOptionUnits: Mock };
+        let finishLoad: () => void = () => undefined;
+        let loaded = false;
+        widgetService.getComponentType.mockReturnValue(new Promise(resolve => {
+            finishLoad = () => { loaded = true; resolve(StubWidgetComponent); };
+        }));
+        widgetService.getOptionUnits.mockImplementation(() => loaded ? StubWidgetComponent.OPTION_UNITS : undefined);
+        let unitsAtOpen: unknown;
+        dialogServiceMock.openWidgetOptions.mockImplementation(() => {
+            unitsAtOpen = widgetService.getOptionUnits('widget-numeric');
+            return { afterClosed: () => of(null) };
+        });
+
+        const opening = component.openWidgetOptions(new Event('dblclick'));
+        await Promise.resolve();
+        expect(dialogServiceMock.openWidgetOptions).not.toHaveBeenCalled();
+
+        finishLoad();
+        await opening;
+        expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
+        expect(unitsAtOpen).toEqual(StubWidgetComponent.OPTION_UNITS);
+    });
+
+    it('opens no options dialog when the widget failed to load, and opens one once it loads', async () => {
+        dashboard.isDashboardStatic.set(false);
+        const widgetService = TestBed.inject(WidgetService) as unknown as { getComponentType: Mock };
+        widgetService.getComponentType.mockResolvedValueOnce(undefined);
+
+        await component.openWidgetOptions(new Event('dblclick'));
+        expect(dialogServiceMock.openWidgetOptions).not.toHaveBeenCalled();
+
+        await component.openWidgetOptions(new Event('dblclick'));
+        expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
     });
 
     it('opens the action menu on single-tap when the dashboard is unlocked', () => {
@@ -191,10 +240,11 @@ describe('WidgetHost2Component', () => {
         expect(openMenu).not.toHaveBeenCalled();
     });
 
-    it('routes the Settings action to the widget options dialog', () => {
+    it('routes the Settings action to the widget options dialog', async () => {
         dashboard.isDashboardStatic.set(false);
 
         (component as unknown as { onWidgetAction: (id: string) => void }).onWidgetAction('settings');
+        await Promise.resolve();
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
     });
@@ -328,8 +378,7 @@ describe('WidgetHost2Component', () => {
         testWidget.autoOpenOptionsOnCreate = true;
 
         fixture.detectChanges();
-        await Promise.resolve();
-        await Promise.resolve();
+        await new Promise(resolve => setTimeout(resolve));
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
         expect(testWidget.autoOpenOptionsOnCreate).toBeUndefined();
@@ -339,7 +388,7 @@ describe('WidgetHost2Component', () => {
         dashboard.isDashboardStatic.set(false);
 
         fixture.detectChanges();
-        await Promise.resolve();
+        await new Promise(resolve => setTimeout(resolve));
 
         expect(dialogServiceMock.openWidgetOptions).not.toHaveBeenCalled();
     });
@@ -352,8 +401,7 @@ describe('WidgetHost2Component', () => {
         dialogServiceMock.openWidgetOptions.mockReturnValue({ afterClosed: () => of(null) });
 
         fixture.detectChanges();
-        await Promise.resolve();
-        await Promise.resolve();
+        await new Promise(resolve => setTimeout(resolve));
 
         expect(dialogServiceMock.openWidgetOptions).toHaveBeenCalledTimes(1);
         expect(testWidget.config).toEqual(configSnapshot);

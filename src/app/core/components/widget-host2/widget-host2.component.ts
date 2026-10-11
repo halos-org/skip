@@ -286,20 +286,20 @@ export class WidgetHost2Component extends BaseWidget implements OnInit, OnDestro
   }
 
   /**
-   * Open the widget options dialog (skips when dashboard is static).
+   * Open the widget options dialog (skips when dashboard is static), once the widget's component has
+   * loaded: the dialog reads the type's OPTION_UNITS, cached by that load, to show SI options converted.
    * @param e Event used to stop propagation (click/context menu/etc.).
-   * @returns void
    * @example
    * this.openWidgetOptions(event);
    */
-  public openWidgetOptions(e: Event | CustomEvent): void {
+  public async openWidgetOptions(e: Event | CustomEvent): Promise<void> {
     (e as Event).stopPropagation();
     this.debug('openWidgetOptions invoked', { widgetId: this.widgetProperties?.uuid, static: this.dashboard.isDashboardStatic() });
     if (!this.dashboard.isDashboardStatic()) {
       if (!this.acquireOverlay('options')) {
         return;
       }
-      if (!this.widgetProperties) {
+      if (!this.widgetProperties || !await this.widgetService.getComponentType(this.widgetProperties.type)) {
         this.releaseOverlay('options');
         return;
       }

@@ -184,6 +184,16 @@ describe('WidgetConfigPanelComponent', () => {
 
     expect(openWidgetOptions).not.toHaveBeenCalled();
   });
+
+  it('does not open the settings dialog when the widget component fails to load', async () => {
+    const { openWidgetOptions, component } = setup({
+      getWidgetName: () => 'Wind Steer', getComponentType: vi.fn(async () => undefined), getDefaultConfig: vi.fn()
+    } as unknown as Partial<WidgetService>);
+
+    await component.ngOnInit();
+
+    expect(openWidgetOptions).not.toHaveBeenCalled();
+  });
 });
 
 /**

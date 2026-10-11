@@ -52,11 +52,12 @@ export class WidgetConfigPanelComponent implements OnInit, OnDestroy {
     const widgetName = this.widgetService.getWidgetName(type);
     if (widgetName === undefined) return;
 
-    // Load the widget component so its static DEFAULT_CONFIG is cached: this iframe never renders the
-    // widget, so getDefaultConfig would otherwise be empty and the options form would have no fields.
-    // Runs alongside the host connect.
-    const [saved] = await Promise.all([this.connectAndLoad(type), this.widgetService.getComponentType(type)]);
-    if (this.disposed) return;
+    // Load the widget component so its statics are cached: this iframe never renders the widget, so
+    // without the load getDefaultConfig would be empty and the options form would have no fields, and
+    // getOptionUnits would be empty and the dialog would show SI options unconverted. A failed load
+    // opens nothing. Runs alongside the host connect.
+    const [saved, componentType] = await Promise.all([this.connectAndLoad(type), this.widgetService.getComponentType(type)]);
+    if (this.disposed || !componentType) return;
 
     // Seed the form with the saved config merged onto the CURRENT default (like the tile applies it),
     // so fields added by a later Skip version are present and editable, not dropped.
