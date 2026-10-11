@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, inject, AfterViewInit, effect, Signal, DestroyRef, signal, untracked, viewChild, ElementRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, inject, AfterViewInit, effect, Signal, DestroyRef, signal, untracked, viewChild, ElementRef, computed } from '@angular/core';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { OverlayModule } from '@angular/cdk/overlay';
 import { Title } from '@angular/platform-browser';
@@ -41,7 +43,7 @@ const MOUSE_PEEK_THROTTLE_MS = 250;
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
-  imports: [RouterModule, MatIconModule, MatProgressSpinnerModule, OverlayModule, GestureDirective, ScrollNavDirective, ToolbarComponent]
+  imports: [RouterModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, OverlayModule, CdkTrapFocus, GestureDirective, ScrollNavDirective, ToolbarComponent]
 })
 export class AppComponent implements AfterViewInit, OnDestroy {
   // Services pre-initialized via APP_INITIALIZER; injected here for their lifecycle.
@@ -85,6 +87,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   protected readonly bootstrapStatus = toSignal(this._appNetworkInit.bootstrapStatus$, { initialValue: 'starting' });
   protected readonly bootstrapIssue: Signal<IBootstrapIssue> = toSignal(this._appNetworkInit.bootstrapIssue$, { initialValue: { reason: 'none' } as IBootstrapIssue });
   protected dashboardVisible = signal<boolean>(false);
+  protected readonly serverUnsupported = computed(() => this.bootstrapIssue().reason === 'server-unsupported');
+  private readonly serverRetryButton = viewChild('serverRetry', { read: ElementRef<HTMLButtonElement> });
   private missingConfigPromptShown = false;
   private authBlockedPromptShown = false;
   private connectionErrorPromptShown = false;
@@ -144,6 +148,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
         .subscribe(dismissed => {
           if (dismissed) this.settings.dismissSiScaleResets();
         });
+    });
+
+    effect(() => {
+      this.serverRetryButton()?.nativeElement.focus();
     });
 
     effect(() => {
@@ -293,7 +301,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
     // Yield to a focused control that consumes the keystroke, or to an open
     // modal (dialog/menu/select) that owns the keyboard.
-    if (isInteractiveKeyTarget(event.target) || isBlockingOverlayOpen()) return;
+    if (isInteractiveKeyTarget(event.target) || isBlockingOverlayOpen() || this.serverUnsupported()) return;
     switch (key) {
       case 'arrowright':
         if (this.pageNav('next')) event.preventDefault();
@@ -329,6 +337,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     if (direction === 'next') this._dashboard.navigateToNextDashboard();
     else this._dashboard.navigateToPreviousDashboard();
     return true;
+  }
+
+  protected retryUnsupportedServer(): void {
+    void this._reload.reload();
   }
 
   protected onChromeIntent(intent: ChromeIntent): void {

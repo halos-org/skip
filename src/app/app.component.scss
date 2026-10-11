@@ -14,8 +14,8 @@
   min-height: 0;
 }
 
-/* Configuration Upgrade Overlay */
-.config-upgrade-overlay {
+/* Blocking overlay: the configuration upgrade and the unsupported server notice */
+.blocking-overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -27,7 +27,7 @@
   pointer-events: all;
 }
 
-.config-upgrade-card {
+.blocking-overlay-card {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -41,14 +41,14 @@
   box-shadow: 0 6px 22px rgba(0,0,0,0.55);
 }
 
-.config-upgrade-text h3 {
+.blocking-overlay-text h3 {
   margin: 0 0 4px;
   font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: .5px;
 }
 
-.config-upgrade-text p {
+.blocking-overlay-text p {
   margin: 0 0 10px;
   font-size: .8rem;
   opacity: .85;
@@ -67,3 +67,39 @@
 }
 
 .config-upgrade-messages li { margin-bottom: 2px; }
+
+/* Unsupported server notice: the card stacked, with an action row */
+.server-unsupported-card {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: calc(100vw - 32px);
+}
+
+.overlay-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+// The flat button marks keyboard focus only with a faint state-layer tint.
+.server-unsupported-card .overlay-actions button:focus-visible {
+  outline: 2px solid var(--mat-sys-on-surface);
+  outline-offset: 2px;
+}
+
+// A Freeboard widget tile is an iframe too small for the full card: keep the heading and Retry.
+@media (max-width: 299px), (max-height: 239px) {
+  .server-unsupported-card {
+    width: auto;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .server-unsupported-message {
+    display: none;
+  }
+
+  .overlay-actions {
+    justify-content: center;
+  }
+}
