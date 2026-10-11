@@ -21,6 +21,13 @@ import {
 // app-config version 10) and the chained per-version steps from config-migration.util, reporting
 // progress through the messages signal for the upgrade overlay.
 
+/**
+ * Lowest app-config version of a stored slot that the chained upgrade migrates. Skip's own config
+ * namespace started at v12, so no Skip wrote a v11 slot; v11 configs reach Skip only as imports,
+ * which the in-memory chain migrates.
+ */
+export const MIN_UPGRADABLE_SLOT_VERSION = 12;
+
 @Injectable({ providedIn: 'root' })
 export class ConfigurationUpgradeService {
   private _storage = inject(StorageService);
@@ -71,7 +78,7 @@ export class ConfigurationUpgradeService {
    * @returns {Promise<void>} Resolves when the selected upgrade flow has completed.
    *
    * @example
-   * await this.upgradeService.runUpgrade(11);
+   * await this.upgradeService.runUpgrade(19);
    *
    * @example
    * await this.upgradeService.runUpgrade();
@@ -120,52 +127,11 @@ export class ConfigurationUpgradeService {
         setTimeout(() => this._settings.reloadApp(), 1500);
       } catch (error) {
         this.pushError('Error fetching configuration data: ' + (error as Error).message);
-        // Clear the blocking overlay so the error is visible, matching the v11/v12 paths.
+        // Clear the blocking overlay so the error is visible, matching the chained upgrade.
         this.upgrading.set(false);
       }
 
-    } else if (version === 11) {
-      // Remote (Signal K) configs
-      try {
-        const configsList: Config[] = await this._storage.listConfigs(11);
-
-        for (const item of configsList) {
-          try {
-            const config = await this._storage.getConfig(item.scope, item.name, 11);
-            const originalConfig = cloneDeep(config);
-
-            this.pushMsg(`[Upgrade] Saving configuration backup to file ${item.scope}/${item.name}...`);
-            await this._storage.setConfig(
-              item.scope,
-              item.name,
-              originalConfig,
-              11.99
-            );
-
-            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${MIGRATION_OUTPUT_VERSION}.`);
-            const migratedConfig = migrateOneAppVersion(config, 11, this.sink);
-
-            this.pushMsg(`[Upgrade] Saving upgraded configurations...`);
-            await this._storage.setConfig(
-              item.scope,
-              item.name,
-              migratedConfig
-            );
-          } catch (error) {
-            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
-          }
-        }
-        // After processing remote configs, reload
-        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
-        setTimeout(() => this._settings.reloadApp(), 1500);
-      } catch (error) {
-        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
-        // Clear the blocking overlay so the error is visible; no reload — the server still holds
-        // v11, so the upgrade retries on the next boot instead of reload-looping on a dead link.
-        this.upgrading.set(false);
-      }
-
-    } else if (version >= 12 && version < LATEST_APP_CONFIG_VERSION) {
+    } else if (version >= MIN_UPGRADABLE_SLOT_VERSION && version < LATEST_APP_CONFIG_VERSION) {
       await this.upgradeRemoteSlots(version);
 
     } else {

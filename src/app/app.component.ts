@@ -22,7 +22,7 @@ import { ChromeVisibilityService } from './core/services/chrome-visibility.servi
 import { EmbedModeService } from './core/services/embed-mode.service';
 import { StorageService } from './core/services/storage.service';
 import { NotificationsService } from './core/services/notifications.service';
-import { ConfigurationUpgradeService } from './core/services/configuration-upgrade.service';
+import { ConfigurationUpgradeService, MIN_UPGRADABLE_SLOT_VERSION } from './core/services/configuration-upgrade.service';
 import { RemoteDashboardsService } from './core/services/remote-dashboards.service';
 import { PageSwitchService } from './core/services/page-switch.service';
 import { ToastService } from './core/services/toast.service';
@@ -33,7 +33,7 @@ import { NotificationOverlayService } from './core/services/notification-overlay
 import { DialogService } from './core/services/dialog.service';
 import { resolveBrowserTabTitle } from './core/utils/browser-tab-title.util';
 import { HOTKEY_KEYS, isInteractiveKeyTarget, isBlockingOverlayOpen } from './core/utils/hotkey-target.util';
-import { MIN_MIGRATABLE_APP_CONFIG_VERSION, skipsPersistentUpgrade } from './core/utils/config-migration.util';
+import { skipsPersistentUpgrade } from './core/utils/config-migration.util';
 import { LATEST_APP_CONFIG_VERSION } from './core/constants/config-versions.const';
 
 const MOUSE_PEEK_THROTTLE_MS = 250;
@@ -120,7 +120,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       if (this.settings.configUpgrade()) {
         const liveVersion = this.settings.getConfigVersion();
 
-        if (liveVersion !== undefined && liveVersion >= MIN_MIGRATABLE_APP_CONFIG_VERSION && liveVersion < LATEST_APP_CONFIG_VERSION) {
+        if (liveVersion !== undefined && liveVersion >= MIN_UPGRADABLE_SLOT_VERSION && liveVersion < LATEST_APP_CONFIG_VERSION) {
           this.upgrade.runUpgrade(liveVersion);
         }
 

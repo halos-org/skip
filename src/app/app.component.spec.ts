@@ -764,7 +764,7 @@ describe('AppComponent — embed mode chrome', () => {
 });
 
 // Self-contained: exercises the two constructor effects that must stand down under embed — the
-// automatic v11/v12 config migration (writes every user slot + reloadApp), and the
+// automatic config migration (writes every user slot + reloadApp), and the
 // missing-shared-config 'Create' prompt (its action calls settings.resetSettings, a write). Wires the
 // real root SettingsService / ConfigurationUpgradeService (spied) like the chrome suite, plus a
 // toggleable EmbedModeService. (#216 E6)
@@ -834,7 +834,7 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
   // A session that cannot write is in embed's position: it can neither run the migration nor act on
   // the manual instructions, so neither may be raised at it (#552).
   it('does NOT run the config migration in a session that cannot write', async () => {
-    const { runUpgradeSpy } = await render({ embed: false, canPersist: false, configUpgrade: true, configVersion: 11 });
+    const { runUpgradeSpy } = await render({ embed: false, canPersist: false, configUpgrade: true, configVersion: 12 });
     expect(runUpgradeSpy).not.toHaveBeenCalled();
   });
 
@@ -848,12 +848,18 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     expect(dialogSpy).toHaveBeenCalled();
   });
 
-  it('does NOT run the config migration under embed even with an upgradeable v11/v12 config', async () => {
-    const { runUpgradeSpy } = await render({ embed: true, configUpgrade: true, configVersion: 11 });
+  it('does NOT run the config migration under embed even with an upgradeable v12 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: true, configUpgrade: true, configVersion: 12 });
     expect(runUpgradeSpy).not.toHaveBeenCalled();
   });
 
-  it('runs the config migration in the full app (not embed) for an upgradeable v11/v12 config', async () => {
+  // Skip's own config namespace started at v12, so no Skip wrote a v11 slot.
+  it('does NOT run the config migration for a v11 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 11 });
+    expect(runUpgradeSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs the config migration in the full app (not embed) for an upgradeable v12 config', async () => {
     const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 12 });
     expect(runUpgradeSpy).toHaveBeenCalledWith(12);
   });
