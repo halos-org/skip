@@ -467,8 +467,8 @@ describe('WidgetSeaHorizonComponent heel bands', () => {
 
   it('uses the configured caution and alarm angles', () => {
     const h = mount(baseConfig({ heelCautionAngle: 12, heelAlarmAngle: 24 }));
-    expect(h.component.cautionAngle()).toBe(12);
-    expect(h.component.alarmAngle()).toBe(24);
+    expect(h.component.cautionAngle()).toBeCloseTo(12, 9);
+    expect(h.component.alarmAngle()).toBeCloseTo(24, 9);
   });
 
   // The angles above are what the settings panel shows; this is what the dial draws. Without tying
@@ -546,8 +546,8 @@ describe('WidgetSeaHorizonComponent heel bands', () => {
   // What a new Sea Horizon draws: the angles its DEFAULT_CONFIG stores, read as the widget reads them.
   it('draws the default caution band from 20° and the alarm band from 30°', () => {
     const h = mount({ ...baseConfig(), gauge: WidgetSeaHorizonComponent.DEFAULT_CONFIG.gauge } as IWidgetSvcConfig);
-    expect(h.component.cautionAngle()).toBe(20);
-    expect(h.component.alarmAngle()).toBe(30);
+    expect(h.component.cautionAngle()).toBeCloseTo(20, 9);
+    expect(h.component.alarmAngle()).toBeCloseTo(30, 9);
     const bands = h.component.heelBands();
     expect(bands[2].d.startsWith(arcStart(BAND_R_OUTER, 20))).toBe(true);
     expect(bands[4].d.startsWith(arcStart(BAND_R_OUTER, 30))).toBe(true);
@@ -567,8 +567,8 @@ describe('WidgetSeaHorizonComponent heel bands', () => {
 
   it('defaults to a cruising band when the angles are missing', () => {
     const h = mount(baseConfig());
-    expect(h.component.cautionAngle()).toBe(20);
-    expect(h.component.alarmAngle()).toBe(30);
+    expect(h.component.cautionAngle()).toBeCloseTo(20, 9);
+    expect(h.component.alarmAngle()).toBeCloseTo(30, 9);
   });
 
   // An alarm at or below the caution angle would collapse the caution band to zero width and start

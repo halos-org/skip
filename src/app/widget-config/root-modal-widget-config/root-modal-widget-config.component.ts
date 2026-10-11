@@ -54,13 +54,12 @@ interface PathSiOptions {
 }
 
 /**
- * An SI option in the form: the stored value, what the form showed for it and in which unit, and the
- * unit the form's value is in now. `null` is a bound left unset.
+ * An SI option in the form: the stored value, what the form showed for it, and the unit the form's
+ * value is in now. `null` is a bound left unset.
  */
 interface SiField extends SiOption {
   si: number | null;
   shown: number | null;
-  shownIn: string;
   /** For an option that follows a path: where the path is, and the path and slot unit `unit` was resolved for. */
   follows?: { source: SiUnitSource; resolvedFor: string };
 }
@@ -544,7 +543,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
       if (typeof si !== 'number' || !Number.isFinite(si)) continue;
       const shown = presentedOption(presentationValue(this.units, option.unit, si));
       set(formConfig, option.path, shown);
-      this.siFields.push({ ...option, si, shown, shownIn: option.unit });
+      this.siFields.push({ ...option, si, shown });
     }
     for (const group of RootModalWidgetConfigComponent.PATH_SI_OPTIONS) {
       if (!widgetType || !group.types.includes(widgetType)) continue;
@@ -556,7 +555,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
         const si = typeof value === 'number' && Number.isFinite(value) ? value : null;
         const shown = this.presented(unit, si);
         set(formConfig, optionPath, shown);
-        this.siFields.push({ path: optionPath, unit, si, shown, shownIn: unit, follows: { source: group.source, resolvedFor: this.resolutionKey(path, stored) } });
+        this.siFields.push({ path: optionPath, unit, si, shown, follows: { source: group.source, resolvedFor: this.resolutionKey(path, stored) } });
       }
     }
   }
@@ -629,7 +628,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
     for (const field of this.fieldsFollowing(source)) {
       const control = this.formMaster.get(field.path as string[]);
       if (field.follows?.resolvedFor !== builtFor || !control || control.value !== field.shown || unit === field.unit) continue;
-      field.unit = field.shownIn = unit;
+      field.unit = unit;
       field.shown = this.presented(unit, field.si);
       control.setValue(field.shown);
     }
@@ -650,16 +649,13 @@ export class RootModalWidgetConfigComponent implements OnInit {
   }
 
   /**
-   * Converts each SI option back from the form's unit. An option whose shown value and unit are both
-   * unchanged keeps its stored SI value exactly, so opening and saving without edits changes nothing.
-   * An option that follows a path and is left empty is stored unset.
+   * Converts each SI option back from the form's unit. An option that follows a path and is left
+   * empty is stored unset.
    */
   private storeSiOptionsInSi(config: IWidgetSvcConfig): void {
     for (const field of this.siFields) {
       const value: unknown = get(config, field.path);
-      if (value === field.shown && field.unit === field.shownIn) {
-        set(config, field.path, field.si);
-      } else if (typeof value === 'number' && Number.isFinite(value)) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
         set(config, field.path, this.fromPresentation(field.unit, value));
       } else if (field.follows) {
         set(config, field.path, null);

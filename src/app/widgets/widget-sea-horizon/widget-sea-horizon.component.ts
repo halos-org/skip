@@ -4,7 +4,7 @@ import type { IPathUpdate } from '../../core/services/data.service';
 import { ITheme } from '../../core/services/app-service';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective, widgetPathSignature, WidgetRepointTracker } from '../../core/directives/widget-streams.directive';
-import { presentedOption, toDegrees } from '../../core/utils/si-presentation.util';
+import { toDegrees } from '../../core/utils/si-presentation.util';
 
 /**
  * Sea Horizon — a marine attitude indicator.
@@ -129,12 +129,9 @@ function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-/**
- * A stored heel angle (rad) in degrees as the user entered it, or the default when it is not a
- * finite number. Rounded so 30° stored in rad reads back as 30, not 29.999999999999996.
- */
+/** A stored heel angle (rad) in degrees, or the default when it is not a finite number. */
 function heelAngleDegrees(rad: unknown, defaultRad: number): number {
-  return presentedOption(toDegrees(typeof rad === 'number' && isFinite(rad) ? rad : defaultRad));
+  return toDegrees(typeof rad === 'number' && isFinite(rad) ? rad : defaultRad);
 }
 
 /** Heel scale: a tick every 5°, major every 10°. */
