@@ -101,7 +101,7 @@ describe('readTileConfig', () => {
   it('reads an unstamped tile config as the version before the stamp existed', () => {
     // Version 19: the v19 -> v20 step converts the Wind Steer close-hauled angle to rad.
     expect(readTileConfig('widget-wind-steer', { config: { updateInterval: 1000, laylineAngle: 30 } }))
-      .toEqual({ updateInterval: 1000, closeHauledLineAngle: 30 * Math.PI / 180, siVersion: 20 });
+      .toEqual({ updateInterval: 1000, closeHauledLineAngle: 30 * Math.PI / 180 });
   });
 
   it('migrates a tile config from its stamped version', () => {
@@ -111,7 +111,7 @@ describe('readTileConfig', () => {
   });
 
   it('applies a config stamped with the current version as saved', () => {
-    const cfg = { updateInterval: 2000, siVersion: 20 } as IWidgetSvcConfig;
+    const cfg = { updateInterval: 2000 } as IWidgetSvcConfig;
 
     expect(readTileConfig('widget-wind-steer', tileConfigState(cfg))).toEqual(cfg);
   });
@@ -142,14 +142,14 @@ describe('tileConfigState', () => {
 
 describe('WidgetHostBridge', () => {
   it('loads the saved per-instance config on connect and follows later state.changed events', async () => {
-    bus.setState({ config: { updateInterval: 3000, siVersion: 20 } });
+    bus.setState({ config: { updateInterval: 3000 } });
     const bridge = new WidgetHostBridge();
     bridge.enable('widget-wind-steer');
-    await vi.waitFor(() => expect(bridge.config()).toEqual({ updateInterval: 3000, siVersion: 20 }));
+    await vi.waitFor(() => expect(bridge.config()).toEqual({ updateInterval: 3000 }));
 
-    bus.setState({ config: { updateInterval: 5000, siVersion: 20 } });
+    bus.setState({ config: { updateInterval: 5000 } });
     bus.fireStateChanged();
-    await vi.waitFor(() => expect(bridge.config()).toEqual({ updateInterval: 5000, siVersion: 20 }));
+    await vi.waitFor(() => expect(bridge.config()).toEqual({ updateInterval: 5000 }));
 
     bridge.disable();
   });

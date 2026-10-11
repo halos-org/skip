@@ -580,7 +580,7 @@
   "meta": {
     "configFileVersion": 11,
     "configVersion": 25,
-    "optionUnitsRule": "Skip receives every Signal K number in SI, and every widget option that holds a measured quantity is stored in SI. The numeric options that configure the widget itself are the exception; meta.widgetSettingUnits gives their units. A widget's optionUnits maps an option, named by its dotted path inside the widget config, to the unit it is stored in; for an array option the unit applies to each element. A widget config that holds any of these options must also carry siVersion set to the widget's defaultConfig.siVersion, when the defaultConfig has one. Skip reads such a widget config without siVersion as holding the older, pre-SI units and converts it, so SI values written without the marker are converted a second time. A unit written as 'SI unit of <slot>' is the Signal K SI unit of the path that path slot (or path option) points at, such as K for a temperature. A scale bound set to null is unset: the widget uses the path's own display scale, and a data graph scales itself.",
+    "optionUnitsRule": "Skip receives every Signal K number in SI, and every widget option that holds a measured quantity is stored in SI. The numeric options that configure the widget itself are the exception; meta.widgetSettingUnits gives their units. A widget's optionUnits maps an option, named by its dotted path inside the widget config, to the unit it is stored in; for an array option the unit applies to each element. A unit written as 'SI unit of <slot>' is the Signal K SI unit of the path that path slot (or path option) points at, such as K for a temperature. A scale bound set to null is unset: the widget uses the path's own display scale, and a data graph scales itself.",
     "schemaVersion": 1,
     "skipVersion": "1.6.0",
     "widgetSettingUnits": {
@@ -656,8 +656,7 @@
         "color": "grey",
         "dataTimeout": 5,
         "enableTimeout": false,
-        "filterSelfPaths": false,
-        "siVersion": 21
+        "filterSelfPaths": false
       },
       "defaultHeight": 8,
       "defaultWidth": 5,
@@ -1119,7 +1118,6 @@
         "showLabel": true,
         "showTimeScale": false,
         "showYScale": false,
-        "siVersion": 22,
         "startScaleAtZero": false,
         "timeScale": "minute",
         "trackAgainstAverage": false,
@@ -1312,7 +1310,6 @@
             "suppressBootstrapNull": true
           }
         },
-        "siVersion": 22,
         "supportAutomaticHistoricalSeries": true,
         "updateInterval": 500
       },
@@ -1386,7 +1383,6 @@
             "suppressBootstrapNull": true
           }
         },
-        "siVersion": 22,
         "supportAutomaticHistoricalSeries": true,
         "updateInterval": 500
       },
@@ -1456,7 +1452,6 @@
             "source": null
           }
         },
-        "siVersion": 22,
         "supportAutomaticHistoricalSeries": true,
         "updateInterval": 500
       },
@@ -1852,7 +1847,6 @@
         "showMax": false,
         "showMin": false,
         "showMiniChart": false,
-        "siVersion": 22,
         "supportAutomaticHistoricalSeries": true,
         "updateInterval": 500,
         "verticalChart": false,
@@ -3366,7 +3360,6 @@
             "source": "default"
           }
         },
-        "siVersion": 21,
         "supportAutomaticHistoricalSeries": false,
         "updateInterval": 1000
       },
@@ -3446,7 +3439,6 @@
             "source": null
           }
         },
-        "siVersion": 22,
         "supportAutomaticHistoricalSeries": true,
         "updateInterval": 500
       },
@@ -3875,7 +3867,6 @@
         "rudderEnable": true,
         "runLineEnable": false,
         "sailSetupEnable": false,
-        "siVersion": 20,
         "supportAutomaticHistoricalSeries": false,
         "twaEnable": true,
         "twsEnable": true,

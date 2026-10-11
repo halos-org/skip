@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   ConfigTooOldError,
-  SI_VERSION_KEY,
   V22_MEASURE_TO_SI,
-  applySiSteps,
   MIN_MIGRATABLE_APP_CONFIG_VERSION,
   MigrationMessageSink,
   migrateConfig,
@@ -156,7 +154,7 @@ describe('migrateWidgetConfig (a single widget config through the chain)', () =>
   });
 
   it('returns a current-version widget config unchanged', () => {
-    const cfg = { updateInterval: 1000, siVersion: 20 } as IWidgetSvcConfig;
+    const cfg = { updateInterval: 1000 } as IWidgetSvcConfig;
 
     expect(migrateWidgetConfig('widget-wind-steer', cfg, LATEST_APP_CONFIG_VERSION, recordingSink())).toEqual(cfg);
   });
@@ -215,14 +213,14 @@ describe('v19 -> v20: Wind Steer close-hauled options in SI', () => {
 
     expect(migrated?.app?.configVersion).toBe(20);
     const [windsteer] = widgetConfigs(migrated as IConfig);
-    expect(windsteer).toEqual({ closeHauledLineEnable: false, closeHauledLineAngle: 40 * Math.PI / 180, [SI_VERSION_KEY]: 20 });
+    expect(windsteer).toEqual({ closeHauledLineEnable: false, closeHauledLineAngle: 40 * Math.PI / 180 });
     // Frozen factor pinned by literal value.
     expect(windsteer['closeHauledLineAngle']).toBe(0.6981317007977318);
   });
 
-  it('leaves a Wind Steer without the close-hauled options to its defaults, but marks it', () => {
+  it('leaves a Wind Steer without the close-hauled options to its defaults', () => {
     const migrated = migrateOneAppVersion(configWith(19, [{ type: 'widget-wind-steer', config: { updateInterval: 500 } }]), 19, recordingSink());
-    expect(widgetConfigs(migrated as IConfig)[0]).toEqual({ updateInterval: 500, [SI_VERSION_KEY]: 20 });
+    expect(widgetConfigs(migrated as IConfig)[0]).toEqual({ updateInterval: 500 });
   });
 
   it("deletes racesteer's unread layline options and leaves other widgets alone", () => {
@@ -240,53 +238,6 @@ describe('v19 -> v20: Wind Steer close-hauled options in SI', () => {
   });
 });
 
-describe('applySiSteps (per-widget SI markers)', () => {
-  const unmarked = (): Record<string, unknown> => ({ laylineEnable: true, laylineAngle: 30 });
-
-  it('reruns of v19 -> v20 on marked Wind Steer configs change nothing', () => {
-    const first = migrateOneAppVersion(configWith(19, [{ type: 'widget-wind-steer', config: unmarked() }]), 19, recordingSink()) as IConfig;
-    const expected = structuredClone(widgetConfigs(first));
-    // A tab on an older build lowered the stamp but kept the migrated widgets.
-    first.app!.configVersion = 19;
-
-    const again = migrateOneAppVersion(first, 19, recordingSink()) as IConfig;
-    expect(widgetConfigs(again)).toEqual(expected);
-  });
-
-  it('converts unmarked Wind Steer configs written back under the current stamp', () => {
-    // An older build's dashboards-only save leaves the stamp at latest.
-    const config = configWith(LATEST_APP_CONFIG_VERSION, [{ type: 'widget-wind-steer', config: unmarked() }]);
-
-    expect(applySiSteps(config, recordingSink())).toBe(true);
-    expect(widgetConfigs(config)[0]).toEqual({ closeHauledLineEnable: true, closeHauledLineAngle: 30 * Math.PI / 180, [SI_VERSION_KEY]: 20 });
-  });
-
-  it('migrateConfig runs the SI steps on a current-version copy too, without touching the caller object', () => {
-    const original = configWith(LATEST_APP_CONFIG_VERSION, [{ type: 'widget-wind-steer', config: unmarked() }]);
-    const result = migrateConfig(original, recordingSink());
-
-    expect(result.migrated).toBe(true);
-    expect(widgetConfigs(result.config)[0][SI_VERSION_KEY]).toBe(20);
-    expect(widgetConfigs(original)[0]).toEqual(unmarked());
-  });
-
-  it('deletes a stale pre-SI key an older build merged back into a marked config, without reading it', () => {
-    const angle = 0.6;
-    const config = configWith(LATEST_APP_CONFIG_VERSION, [{
-      type: 'widget-wind-steer',
-      config: { closeHauledLineAngle: angle, laylineAngle: 45, laylineEnable: true, [SI_VERSION_KEY]: 20 }
-    }]);
-
-    expect(applySiSteps(config, recordingSink())).toBe(true);
-    expect(widgetConfigs(config)[0]).toEqual({ closeHauledLineAngle: angle, [SI_VERSION_KEY]: 20 });
-  });
-
-  it('reports no change for marked configs without stale keys', () => {
-    const config = configWith(LATEST_APP_CONFIG_VERSION, [{ type: 'widget-wind-steer', config: { closeHauledLineAngle: 0.6, [SI_VERSION_KEY]: 20 } }]);
-    expect(applySiSteps(config, recordingSink())).toBe(false);
-  });
-});
-
 describe('v20 -> v21: Sea Horizon heel angles and AIS radar options in SI', () => {
   const seaHorizon = (gauge: Record<string, unknown>) => ({ type: 'widget-sea-horizon', config: { gauge } });
   const aisRadar = (ais: Record<string, unknown>) => ({ type: 'widget-ais-radar', config: { ais } });
@@ -298,7 +249,7 @@ describe('v20 -> v21: Sea Horizon heel angles and AIS radar options in SI', () =
     expect(migrated?.app?.configVersion).toBe(21);
     const [config] = widgetConfigs(migrated as IConfig);
     // Frozen factor pinned by literal values.
-    expect(config).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659, heelAlarmAngle: 0.5235987755982988, damping: 3 }, [SI_VERSION_KEY]: 21 });
+    expect(config).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659, heelAlarmAngle: 0.5235987755982988, damping: 3 } });
   });
 
   it('converts the AIS range rings to metres and the COG vector time to seconds, renaming its key', () => {
@@ -308,28 +259,27 @@ describe('v20 -> v21: Sea Horizon heel angles and AIS radar options in SI', () =
     const [config] = widgetConfigs(migrated as IConfig);
     // Frozen factors pinned by literal values.
     expect(config).toEqual({
-      ais: { rangeRings: [1852, 5556, 11112, 22224, 44448, 88896], rangeIndex: '3', cogVectorsSeconds: 600, showCogVectors: true },
-      [SI_VERSION_KEY]: 21
+      ais: { rangeRings: [1852, 5556, 11112, 22224, 44448, 88896], rangeIndex: '3', cogVectorsSeconds: 600, showCogVectors: true }
     });
   });
 
-  it('marks a Sea Horizon or AIS radar without the options, and leaves other widgets alone', () => {
+  it('leaves a Sea Horizon or AIS radar without the options as it is, and other widgets alone', () => {
     const migrated = migrateOneAppVersion(configWith(20, [
       { type: 'widget-sea-horizon', config: { updateInterval: 500 } },
       { type: 'widget-ais-radar', config: { ais: { viewMode: 'north-up' } } },
       { type: 'widget-heel-gauge', config: { gauge: { heelCautionAngle: 20 } } }
     ]), 20, recordingSink());
     expect(widgetConfigs(migrated as IConfig)).toEqual([
-      { updateInterval: 500, [SI_VERSION_KEY]: 21 },
-      { ais: { viewMode: 'north-up' }, [SI_VERSION_KEY]: 21 },
+      { updateInterval: 500 },
+      { ais: { viewMode: 'north-up' } },
       { gauge: { heelCautionAngle: 20 } }
     ]);
   });
 
   it('leaves Wind Steer to the v20 step: a v20 config keeps its close-hauled angle', () => {
     const migrated = migrateOneAppVersion(
-      configWith(20, [{ type: 'widget-wind-steer', config: { closeHauledLineAngle: 0.6, [SI_VERSION_KEY]: 20 } }]), 20, recordingSink());
-    expect(widgetConfigs(migrated as IConfig)[0]).toEqual({ closeHauledLineAngle: 0.6, [SI_VERSION_KEY]: 20 });
+      configWith(20, [{ type: 'widget-wind-steer', config: { closeHauledLineAngle: 0.6 } }]), 20, recordingSink());
+    expect(widgetConfigs(migrated as IConfig)[0]).toEqual({ closeHauledLineAngle: 0.6 });
   });
 
   it('refuses a config that is not at v20', () => {
@@ -343,55 +293,10 @@ describe('v20 -> v21: Sea Horizon heel angles and AIS radar options in SI', () =
     expect(widgetConfigs(migrated as IConfig)[0]).toEqual({ gauge: { heelCautionAngle: 20 } });
   });
 
-  it('reruns of v20 -> v21 on marked Sea Horizon and AIS radar configs change nothing', () => {
-    const first = migrateOneAppVersion(configWith(20, [
-      seaHorizon({ heelCautionAngle: 20, heelAlarmAngle: 30 }),
-      aisRadar({ rangeRings: [1, 3, 6], cogVectorsMinutes: 10 })
-    ]), 20, recordingSink()) as IConfig;
-    const expected = structuredClone(widgetConfigs(first));
-    // A tab on an older build lowered the stamp but kept the migrated widgets.
-    first.app!.configVersion = 20;
-
-    const again = migrateOneAppVersion(first, 20, recordingSink()) as IConfig;
-    expect(widgetConfigs(again)).toEqual(expected);
-  });
-
-  it('converts unmarked Sea Horizon and AIS radar configs written back under the current stamp', () => {
-    // An older build's dashboards-only save leaves the stamp at latest.
-    const config = configWith(LATEST_APP_CONFIG_VERSION, [
-      seaHorizon({ heelCautionAngle: 20, heelAlarmAngle: 30 }),
-      aisRadar({ rangeRings: [1, 3], cogVectorsMinutes: 5 })
-    ]);
-
-    expect(applySiSteps(config, recordingSink())).toBe(true);
-    expect(widgetConfigs(config)).toEqual([
-      { gauge: { heelCautionAngle: 0.3490658503988659, heelAlarmAngle: 0.5235987755982988 }, [SI_VERSION_KEY]: 21 },
-      { ais: { rangeRings: [1852, 5556], cogVectorsSeconds: 300 }, [SI_VERSION_KEY]: 21 }
-    ]);
-  });
-
   it('migrateConfig carries a v19 Sea Horizon through both steps to rad', () => {
     const result = migrateConfig(configWith(19, [seaHorizon({ heelCautionAngle: 20 })]), recordingSink());
     expect(result.config.app?.configVersion).toBe(LATEST_APP_CONFIG_VERSION);
-    expect(widgetConfigs(result.config)[0]).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659 }, [SI_VERSION_KEY]: 21 });
-  });
-
-  it('deletes a stale COG vector time an older build merged back into a marked AIS radar, without reading it', () => {
-    const config = configWith(LATEST_APP_CONFIG_VERSION, [
-      aisRadar({ rangeRings: [1852], cogVectorsSeconds: 900, cogVectorsMinutes: 10 })
-    ]);
-    (widgetConfigs(config)[0])[SI_VERSION_KEY] = 21;
-
-    expect(applySiSteps(config, recordingSink())).toBe(true);
-    expect(widgetConfigs(config)[0]).toEqual({ ais: { rangeRings: [1852], cogVectorsSeconds: 900 }, [SI_VERSION_KEY]: 21 });
-  });
-
-  it('reports no change for marked Sea Horizon and AIS radar configs without stale keys', () => {
-    const config = configWith(LATEST_APP_CONFIG_VERSION, [
-      { type: 'widget-sea-horizon', config: { gauge: { heelCautionAngle: 0.3 }, [SI_VERSION_KEY]: 21 } },
-      { type: 'widget-ais-radar', config: { ais: { cogVectorsSeconds: 600 }, [SI_VERSION_KEY]: 21 } }
-    ]);
-    expect(applySiSteps(config, recordingSink())).toBe(false);
+    expect(widgetConfigs(result.config)[0]).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659 } });
   });
 });
 
@@ -436,7 +341,6 @@ describe('v21 -> v22: scale bounds in SI', () => {
       expect(migrated.app?.configVersion).toBe(22);
       const [config] = widgetConfigs(migrated);
       expect(config['displayScale']).toEqual({ lower: 0, upper: 60, type: 'linear' });
-      expect(config[SI_VERSION_KEY]).toBe(22);
       expect(resets(migrated)).toBeUndefined();
     });
   }
@@ -459,7 +363,6 @@ describe('v21 -> v22: scale bounds in SI', () => {
     const [config] = widgetConfigs(migrated);
     expect(config['yScaleMin']).toBe(0);
     expect(config['yScaleMax']).toBeCloseTo(5.144, 3);
-    expect(config[SI_VERSION_KEY]).toBe(22);
   });
 
   it('resets and lists bounds whose stored unit is empty, unitless, missing, unknown or a string format', () => {
@@ -475,9 +378,8 @@ describe('v21 -> v22: scale bounds in SI', () => {
     const configs = widgetConfigs(migrated);
     for (const config of configs.slice(0, 4)) {
       expect(config['displayScale']).toEqual({ lower: null, upper: null, type: 'linear' });
-      expect(config[SI_VERSION_KEY]).toBe(22);
     }
-    expect(configs[4]).toMatchObject({ yScaleMin: null, yScaleMax: null, [SI_VERSION_KEY]: 22 });
+    expect(configs[4]).toMatchObject({ yScaleMin: null, yScaleMax: null });
     expect(resets(migrated)).toEqual([
       { dashboardId: 'd1', dashboard: '1', widget: 'RPM', type: 'widget-gauge-steel', options: ['displayScale.lower', 'displayScale.upper'] },
       { dashboardId: 'd1', dashboard: '1', widget: 'RPM', type: 'widget-simple-linear', options: ['displayScale.lower', 'displayScale.upper'] },
@@ -503,19 +405,18 @@ describe('v21 -> v22: scale bounds in SI', () => {
 
     expect(widgetConfigs(migrated)[0]).toEqual({
       displayName: 'Pressure', convertUnitTo: 'mbar', yScaleMin: null, yScaleMax: null, yScaleSuggestedMin: null,
-      enableMinMaxScaleLimit: true, [SI_VERSION_KEY]: 22
+      enableMinMaxScaleLimit: true
     });
     expect(resets(migrated)).toEqual([{ dashboardId: 'd1', dashboard: '1', widget: 'Pressure', type: 'widget-data-chart', options: ['yScaleMin', 'yScaleMax'] }]);
   });
 
-  it('only marks widgets without numeric bounds, adding no reset list', () => {
+  it('adds no reset list for widgets without numeric bounds', () => {
     const migrated = migrateOneAppVersion(configWith(21, [
       gauge('widget-gauge-steel', '', null, null),
       { type: 'widget-numeric', config: { paths: { numericPath: { path: 'self.x', convertUnitTo: 'unitless' } } } },
       { type: 'widget-data-chart', config: { yScaleMin: null } }
     ]), 21, recordingSink()) as IConfig;
 
-    expect(widgetConfigs(migrated).map(c => c[SI_VERSION_KEY])).toEqual([22, 22, 22]);
     expect(migrated.app && 'siScaleResets' in migrated.app).toBe(false);
   });
 
@@ -561,36 +462,17 @@ describe('v21 -> v22: scale bounds in SI', () => {
     expect(scale(widgetConfigs(migrated)[0])).toEqual({ lower: 0, upper: 3600, type: 'linear' });
   });
 
-  it('gives identical results when migrated twice, and a rerun on marked widgets changes nothing', () => {
+  it('gives identical results when migrated twice', () => {
     const input = () => configWith(21, [gauge('widget-gauge-steel', 'rpm', 0, 3600), gauge('widget-gauge-steel', '', 0, 100), numeric('knots', 0, 10)]);
     const first = migrateOneAppVersion(input(), 21, recordingSink()) as IConfig;
     const second = migrateOneAppVersion(input(), 21, recordingSink()) as IConfig;
     expect(second).toEqual(first);
-
-    const expected = structuredClone(first);
-    // A tab on an older build lowered the stamp but kept the migrated widgets.
-    first.app!.configVersion = 21;
-    const again = migrateOneAppVersion(first, 21, recordingSink()) as IConfig;
-    expect(widgetConfigs(again)).toEqual(widgetConfigs(expected));
-    expect(resets(again)).toEqual(resets(expected));
-    expect(applySiSteps(again, recordingSink())).toBe(false);
-  });
-
-  it('converts unmarked configs an older build wrote back under the current stamp', () => {
-    const config = configWith(LATEST_APP_CONFIG_VERSION, [gauge('widget-gauge-ng-radial', 'rpm', 0, 3600), gauge('widget-gauge-steel', 'unitless', 0, 100)]);
-
-    expect(applySiSteps(config, recordingSink())).toBe(true);
-    expect(widgetConfigs(config).map(scale)).toEqual([
-      { lower: 0, upper: 60, type: 'linear' },
-      { lower: null, upper: null, type: 'linear' }
-    ]);
-    expect(resets(config)).toHaveLength(1);
   });
 
   it('migrateConfig carries a v21 config through the SI step to the latest version', () => {
     const result = migrateConfig(configWith(21, [gauge('widget-gauge-ng-radial', 'rpm', 0, 3600)]), recordingSink());
     expect(result.config.app?.configVersion).toBe(LATEST_APP_CONFIG_VERSION);
-    expect(widgetConfigs(result.config)[0]).toMatchObject({ displayScale: { lower: 0, upper: 60 }, [SI_VERSION_KEY]: 22 });
+    expect(widgetConfigs(result.config)[0]).toMatchObject({ displayScale: { lower: 0, upper: 60 } });
   });
 });
 
@@ -836,37 +718,31 @@ describe('widgets nested in group widgets', () => {
     });
   }
 
-  it('applySiSteps converts and marks a grouped and a doubly grouped widget on every load', () => {
-    const windSteer = () => leaf('widget-wind-steer', { laylineEnable: true, laylineAngle: 30 });
-    const config = dashboardOf(LATEST_APP_CONFIG_VERSION, [grouped(windSteer(), grouped(windSteer()))]);
-    const sink = recordingSink();
+  // Each SI conversion runs in exactly one version step, so a chain over all three converts every
+  // option once, top-level or grouped, and reports each reset once.
+  it('migrateConfig converts each SI option exactly once from v19, grouped widgets included', () => {
+    const config = dashboardOf(19, [
+      leaf('widget-wind-steer', { laylineAngle: 40 }),
+      grouped(
+        leaf('widget-sea-horizon', { gauge: { heelAlarmAngle: 20 } }),
+        grouped(leaf('widget-ais-radar', { ais: { rangeRings: [1], cogVectorsMinutes: 5 } })),
+        leaf('widget-numeric', { paths: { numericPath: { convertUnitTo: 'knots' } }, yScaleMax: 10 }),
+        leaf('widget-data-chart', { displayName: 'Baro', yScaleMax: 1030 })
+      )
+    ]);
 
-    expect(applySiSteps(config, sink)).toBe(true);
-    const [child, inner] = childrenOf(entries(config)[0]);
-    for (const converted of [configOf(child), configOf(childrenOf(inner)[0])]) {
-      expect(converted).toEqual({ closeHauledLineEnable: true, closeHauledLineAngle: expect.any(Number), [SI_VERSION_KEY]: 20 });
-      expect(converted['closeHauledLineAngle'] as number).toBeCloseTo(0.5236, 3);
-    }
-    expect(sink.infos).toContain('[Upgrade] Converted 2 widget config(s) to SI units.');
-  });
+    const result = migrateConfig(config, recordingSink());
 
-  // The stored siVersion is trusted: a grouped widget an older build stamped without converting
-  // (it never reached grouped widgets) is not repaired, since its values cannot be told from SI ones.
-  it('applySiSteps trusts the stored marker: a stamped grouped widget holding pre-SI values is left as it is', () => {
-    const stamped = (): Record<string, unknown> =>
-      ({ paths: { numericPath: { convertUnitTo: 'knots' } }, yScaleMin: 0, yScaleMax: 10, [SI_VERSION_KEY]: 22 });
-    const config = dashboardOf(LATEST_APP_CONFIG_VERSION, [grouped(leaf('widget-numeric', stamped()))]);
-    const sink = recordingSink();
-
-    expect(applySiSteps(config, sink)).toBe(false);
-    expect(configOf(childrenOf(entries(config)[0])[0])).toEqual(stamped());
-    expect(sink.infos).toEqual([]);
-  });
-
-  it('migrateConfig carries a grouped widget of a current-stamp config through the SI steps', () => {
-    const result = migrateConfig(dashboardOf(LATEST_APP_CONFIG_VERSION, [grouped(leaf('widget-sea-horizon', { gauge: { heelAlarmAngle: 20 } }))]), recordingSink());
-    expect(result.migrated).toBe(true);
-    expect(configOf(childrenOf(entries(result.config)[0])[0])).toEqual({ gauge: { heelAlarmAngle: 20 * Math.PI / 180 }, [SI_VERSION_KEY]: 21 });
+    const [windSteer, group] = entries(result.config);
+    const [seaHorizon, inner, numeric, dataChart] = childrenOf(group);
+    expect(configOf(windSteer)).toEqual({ closeHauledLineAngle: 0.6981317007977318 });
+    expect(configOf(seaHorizon)).toEqual({ gauge: { heelAlarmAngle: 20 * Math.PI / 180 } });
+    expect(configOf(childrenOf(inner)[0])).toEqual({ ais: { rangeRings: [1852], cogVectorsSeconds: 300 } });
+    expect(configOf(numeric)['yScaleMax']).toBeCloseTo(5.144, 3);
+    expect(configOf(dataChart)).toEqual({ displayName: 'Baro', yScaleMax: null });
+    expect((result.config.app as IAppConfig).siScaleResets).toEqual([
+      { dashboardId: 'd1', dashboard: '1', widget: 'Baro', type: 'widget-data-chart', options: ['yScaleMax'] }
+    ]);
   });
 
   it('migrateUseNeedleToEnableNeedle renames the needle option of a grouped widget', () => {
@@ -883,6 +759,6 @@ describe('widgets nested in group widgets', () => {
     const migrated = entries(result.config);
     expect(migrated).toHaveLength(odd.length + 1);
     expect(migrated.slice(0, odd.length).map(e => e['subGridOpts'])).toEqual(odd.map(e => e['subGridOpts']));
-    expect(configOf(migrated[odd.length])[SI_VERSION_KEY]).toBe(20);
+    expect(configOf(migrated[odd.length])).toEqual({ closeHauledLineAngle: 40 * Math.PI / 180 });
   });
 });

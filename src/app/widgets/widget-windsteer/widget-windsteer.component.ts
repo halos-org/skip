@@ -271,8 +271,7 @@ export class WidgetWindComponent implements OnDestroy {
     polarOverlayEnable: true,
     updateInterval: 1000,
     enableTimeout: false,
-    dataTimeout: DEFAULT_DATA_TIMEOUT_SECONDS,
-    siVersion: 20
+    dataTimeout: DEFAULT_DATA_TIMEOUT_SECONDS
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */

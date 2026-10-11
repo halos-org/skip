@@ -47,8 +47,7 @@ export class WidgetSimpleLinearComponent {
     color: 'contrast',
     updateInterval: 500,
     enableTimeout: false,
-    dataTimeout: 5,
-    siVersion: 22
+    dataTimeout: 5
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */

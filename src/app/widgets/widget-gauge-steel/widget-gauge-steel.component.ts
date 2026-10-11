@@ -59,8 +59,7 @@ export class WidgetSteelGaugeComponent {
     updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
-    ignoreZones: false,
-    siVersion: 22
+    ignoreZones: false
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */

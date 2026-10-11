@@ -907,7 +907,7 @@ describe('ConfigurationUpgradeService', () => {
             expect(mockStorage.setConfig.mock.calls[1]).toHaveLength(3);
             expect(written.app.configVersion).toBe(20);
             expect(written.dashboards[0].configuration[0].input.widgetProperties.config)
-                .toEqual({ closeHauledLineEnable: true, closeHauledLineAngle: 40 * Math.PI / 180, siVersion: 20 });
+                .toEqual({ closeHauledLineEnable: true, closeHauledLineAngle: 40 * Math.PI / 180 });
         });
 
         it('keeps an existing backup: a rerun never overwrites it', async () => {
@@ -1012,8 +1012,8 @@ describe('ConfigurationUpgradeService', () => {
         const written = mockStorage.setConfig.mock.calls[0][2];
         expect(written.app.configVersion).toBe(21);
         const [sea, ais] = written.dashboards[0].configuration.map((w: { input: { widgetProperties: { config: unknown } } }) => w.input.widgetProperties.config);
-        expect(sea).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659, heelAlarmAngle: 0.5235987755982988 }, siVersion: 21 });
-        expect(ais).toEqual({ ais: { rangeRings: [1852, 5556, 11112, 22224, 44448, 88896], cogVectorsSeconds: 600 }, siVersion: 21 });
+        expect(sea).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659, heelAlarmAngle: 0.5235987755982988 } });
+        expect(ais).toEqual({ ais: { rangeRings: [1852, 5556, 11112, 22224, 44448, 88896], cogVectorsSeconds: 600 } });
     });
 
     it('v20 upgrade skips a slot that is not at version 20 (no re-stamp)', async () => {
@@ -1073,7 +1073,7 @@ describe('ConfigurationUpgradeService', () => {
         expect(written.app.configVersion).toBe(22);
         const [gauge, numeric] = written.dashboards[0].configuration.map((w: { input: { widgetProperties: { config: Record<string, unknown> } } }) => w.input.widgetProperties.config);
         expect(gauge['displayScale']).toEqual({ lower: 0, upper: 60 });
-        expect(numeric).toMatchObject({ yScaleMin: null, yScaleMax: null, siVersion: 22 });
+        expect(numeric).toMatchObject({ yScaleMin: null, yScaleMax: null });
         expect(written.app.siScaleResets).toEqual([{ dashboardId: 'd0', dashboard: 'Engine', widget: 'Tank', type: 'widget-numeric', options: ['yScaleMin', 'yScaleMax'] }]);
     });
 

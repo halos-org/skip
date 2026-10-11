@@ -4,7 +4,7 @@
  * and config panel migrate tile configs without the dashboard stack. ConfigurationUpgradeService
  * runs the same steps persistently over the stored slots.
  */
-import { cloneDeep, has, unset } from 'lodash-es';
+import { cloneDeep } from 'lodash-es';
 import type { IAppConfig, IConfig, ISiScaleReset } from '../interfaces/app-settings.interfaces';
 import type { Dashboard } from '../services/dashboard.service';
 import { DEFAULT_WIDGET_UPDATE_INTERVAL_MS, IWidgetSvcConfig } from '../interfaces/widgets-interface';
@@ -36,32 +36,13 @@ export const V23_MIGRATION_OUTPUT_VERSION = 23;
 export const V24_MIGRATION_OUTPUT_VERSION = 24;
 export const V25_MIGRATION_OUTPUT_VERSION = 25;
 
-/**
- * The per-widget SI marker: the version of the last SI step whose shape a widget config is in.
- * An SI step converts stored numbers to SI, which must happen exactly once per widget, and the
- * app-config stamp cannot guarantee that: a tab still on an older build can lower the stamp or
- * write back widget configs it loaded before the upgrade. So each SI step converts a widget only
- * when this marker is below the step's version, runs on every load of every config copy, and
- * marks what it processed. A widget's DEFAULT_CONFIG carries the marker of its latest SI step.
- */
-export const SI_VERSION_KEY = 'siVersion';
-
 type WidgetConfigRecord = Record<string, unknown>;
 
-interface SiStep {
-  version: number;
-  types: ReadonlySet<string>;
-  /**
-   * Converts an unmarked widget config in place. Returns the options it reset to `null` because it
-   * had no unit to convert them from, as dotted paths from the config root, if any.
-   */
-  convert(config: WidgetConfigRecord): readonly string[] | void;
-  /**
-   * Pre-SI keys an older build can merge back into a marked config; deleted without being read.
-   * Each is a property path from the widget config root, dotted for a nested option.
-   */
-  staleKeys: readonly string[];
-}
+/**
+ * Converts one widget config's stored options to SI, in place. Returns the options it reset to
+ * `null` because it had no unit to convert them from, as dotted paths from the config root, if any.
+ */
+type SiConversion = (config: WidgetConfigRecord) => readonly string[] | void;
 
 const isRecord = (value: unknown): value is WidgetConfigRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -74,19 +55,16 @@ const V20_RAD_PER_DEG = 0.017453292519943295;
  * v20: Wind Steer's close-hauled options are renamed from the misnomer `layline…` (#616) and the
  * angle is stored in rad instead of degrees.
  */
-const V20_WINDSTEER_SI_STEP: SiStep = {
-  version: V20_MIGRATION_OUTPUT_VERSION,
-  types: new Set(['widget-wind-steer']),
-  staleKeys: ['laylineEnable', 'laylineAngle'],
-  convert(config) {
-    if (typeof config['laylineEnable'] === 'boolean') {
-      config['closeHauledLineEnable'] = config['laylineEnable'];
-    }
-    const angle = config['laylineAngle'];
-    if (typeof angle === 'number' && Number.isFinite(angle)) {
-      config['closeHauledLineAngle'] = angle * V20_RAD_PER_DEG;
-    }
+const windSteerToSi: SiConversion = config => {
+  if (typeof config['laylineEnable'] === 'boolean') {
+    config['closeHauledLineEnable'] = config['laylineEnable'];
   }
+  const angle = config['laylineAngle'];
+  if (typeof angle === 'number' && Number.isFinite(angle)) {
+    config['closeHauledLineAngle'] = angle * V20_RAD_PER_DEG;
+  }
+  delete config['laylineEnable'];
+  delete config['laylineAngle'];
 };
 
 // Frozen for the v21 steps, whatever later steps or the renderer's table use.
@@ -95,18 +73,13 @@ const V21_METRES_PER_NM = 1852;
 const V21_SECONDS_PER_MINUTE = 60;
 
 /** v21: Sea Horizon's heel caution and alarm angles are stored in rad instead of degrees. */
-const V21_SEA_HORIZON_SI_STEP: SiStep = {
-  version: V21_MIGRATION_OUTPUT_VERSION,
-  types: new Set(['widget-sea-horizon']),
-  staleKeys: [],
-  convert(config) {
-    const gauge = config['gauge'];
-    if (!isRecord(gauge)) return;
-    for (const key of ['heelCautionAngle', 'heelAlarmAngle']) {
-      const angle = gauge[key];
-      if (typeof angle === 'number' && Number.isFinite(angle)) {
-        gauge[key] = angle * V21_RAD_PER_DEG;
-      }
+const seaHorizonToSi: SiConversion = config => {
+  const gauge = config['gauge'];
+  if (!isRecord(gauge)) return;
+  for (const key of ['heelCautionAngle', 'heelAlarmAngle']) {
+    const angle = gauge[key];
+    if (typeof angle === 'number' && Number.isFinite(angle)) {
+      gauge[key] = angle * V21_RAD_PER_DEG;
     }
   }
 };
@@ -115,22 +88,18 @@ const V21_SEA_HORIZON_SI_STEP: SiStep = {
  * v21: the AIS radar's range rings are stored in metres instead of nautical miles, and its COG
  * vector time in seconds instead of minutes, which renames `cogVectorsMinutes` to `cogVectorsSeconds`.
  */
-const V21_AIS_RADAR_SI_STEP: SiStep = {
-  version: V21_MIGRATION_OUTPUT_VERSION,
-  types: new Set(['widget-ais-radar']),
-  staleKeys: ['ais.cogVectorsMinutes'],
-  convert(config) {
-    const ais = config['ais'];
-    if (!isRecord(ais)) return;
-    const rings = ais['rangeRings'];
-    if (Array.isArray(rings)) {
-      ais['rangeRings'] = rings.map(nm => (typeof nm === 'number' && Number.isFinite(nm) ? nm * V21_METRES_PER_NM : nm));
-    }
-    const minutes = ais['cogVectorsMinutes'];
-    if (typeof minutes === 'number' && Number.isFinite(minutes)) {
-      ais['cogVectorsSeconds'] = minutes * V21_SECONDS_PER_MINUTE;
-    }
+const aisRadarToSi: SiConversion = config => {
+  const ais = config['ais'];
+  if (!isRecord(ais)) return;
+  const rings = ais['rangeRings'];
+  if (Array.isArray(rings)) {
+    ais['rangeRings'] = rings.map(nm => (typeof nm === 'number' && Number.isFinite(nm) ? nm * V21_METRES_PER_NM : nm));
   }
+  const minutes = ais['cogVectorsMinutes'];
+  if (typeof minutes === 'number' && Number.isFinite(minutes)) {
+    ais['cogVectorsSeconds'] = minutes * V21_SECONDS_PER_MINUTE;
+  }
+  delete ais['cogVectorsMinutes'];
 };
 
 /**
@@ -281,44 +250,22 @@ function slotUnit(config: WidgetConfigRecord, slot: string): unknown {
  * v22: gauge `displayScale` bounds are stored in SI instead of the unit of the gauge path's stored
  * `convertUnitTo`. Bounds without a known unit are reset, so the gauge takes its path's own scale.
  */
-const V22_GAUGE_SI_STEP: SiStep = {
-  version: V22_MIGRATION_OUTPUT_VERSION,
-  types: new Set(['widget-gauge-ng-radial', 'widget-gauge-ng-linear', 'widget-gauge-steel', 'widget-simple-linear']),
-  staleKeys: [],
-  convert(config) {
-    const scale = config['displayScale'];
-    if (!isRecord(scale)) return;
-    return boundsToSi(scale, ['lower', 'upper'], slotUnit(config, 'gaugePath'), 'displayScale.');
-  }
+const gaugeBoundsToSi: SiConversion = config => {
+  const scale = config['displayScale'];
+  if (!isRecord(scale)) return;
+  return boundsToSi(scale, ['lower', 'upper'], slotUnit(config, 'gaugePath'), 'displayScale.');
 };
 
-/** v22: the numeric's minigraph y bounds are stored in SI, like the gauges' (see V22_GAUGE_SI_STEP). */
-const V22_NUMERIC_SI_STEP: SiStep = {
-  version: V22_MIGRATION_OUTPUT_VERSION,
-  types: new Set(['widget-numeric']),
-  staleKeys: [],
-  convert(config) {
-    return boundsToSi(config, ['yScaleMin', 'yScaleMax'], slotUnit(config, 'numericPath'));
-  }
-};
+/** v22: the numeric's minigraph y bounds are stored in SI, like the gauges' (see gaugeBoundsToSi). */
+const numericBoundsToSi: SiConversion = config =>
+  boundsToSi(config, ['yScaleMin', 'yScaleMax'], slotUnit(config, 'numericPath'));
 
 /**
  * v22: data-chart y bounds are stored in SI. They were entered in whatever unit the chart showed,
  * which the config does not record, so they are all reset and the chart auto-scales.
  */
-const V22_DATA_CHART_SI_STEP: SiStep = {
-  version: V22_MIGRATION_OUTPUT_VERSION,
-  types: new Set(['widget-data-chart']),
-  staleKeys: [],
-  convert(config) {
-    return boundsToSi(config, ['yScaleMin', 'yScaleMax', 'yScaleSuggestedMin', 'yScaleSuggestedMax'], undefined);
-  }
-};
-
-const SI_STEPS: readonly SiStep[] = [
-  V20_WINDSTEER_SI_STEP, V21_SEA_HORIZON_SI_STEP, V21_AIS_RADAR_SI_STEP,
-  V22_GAUGE_SI_STEP, V22_NUMERIC_SI_STEP, V22_DATA_CHART_SI_STEP
-];
+const dataChartBoundsToSi: SiConversion = config =>
+  boundsToSi(config, ['yScaleMin', 'yScaleMax', 'yScaleSuggestedMin', 'yScaleSuggestedMax'], undefined);
 
 /**
  * v17 -> v18 target shape for the wind-family widgets' swept paths, keyed by runtime widget `type`
@@ -464,62 +411,7 @@ export function migrateConfig(config: IConfig, sink: MigrationMessageSink): Conf
     working = upgraded;
     current = nextVersion;
   }
-  const siChanged = applySiSteps(working, sink);
-  return { config: working, migrated: version !== LATEST_APP_CONFIG_VERSION || siChanged };
-}
-
-/**
- * Runs every SI step up to `upToVersion` over a config's widgets, in place, gated only by each
- * widget's {@link SI_VERSION_KEY} marker and never by the app-config stamp. Every load of every
- * config copy goes through here before any code merges widget defaults, which carry the latest
- * marker, into a widget config. Returns whether anything changed.
- */
-export function applySiSteps(config: IConfig, sink: MigrationMessageSink, upToVersion = Number.POSITIVE_INFINITY): boolean {
-  if (!Array.isArray(config.dashboards)) return false;
-  let converted = 0;
-  let cleaned = 0;
-  const resets: ISiScaleReset[] = [];
-  config.dashboards.forEach((dash, index) => {
-    if (!dash || !Array.isArray(dash.configuration)) return;
-    for (const widget of allWidgets(dash.configuration)) {
-      const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: unknown } } })?.input?.widgetProperties;
-      if (!wp || typeof wp.type !== 'string' || !wp.config || typeof wp.config !== 'object') continue;
-      const cfg = wp.config as WidgetConfigRecord;
-      for (const step of SI_STEPS) {
-        if (step.version > upToVersion || !step.types.has(wp.type)) continue;
-        const marker = cfg[SI_VERSION_KEY];
-        if (typeof marker !== 'number' || marker < step.version) {
-          const reset = step.convert(cfg);
-          if (reset?.length) {
-            const entry: ISiScaleReset = {
-              dashboardId: String(dash.id),
-              dashboard: nonEmptyString(dash.name) ?? String(index + 1),
-              widget: nonEmptyString(cfg['displayName']) ?? wp.type,
-              type: wp.type,
-              options: [...reset]
-            };
-            resets.push(entry);
-            sink.info(`[Upgrade] The scale range of "${entry.widget}" on dashboard "${entry.dashboard}" had no known unit and was reset; set it again in the widget's options.`);
-          }
-          cfg[SI_VERSION_KEY] = step.version;
-          converted++;
-        }
-        for (const key of step.staleKeys) {
-          if (has(cfg, key)) {
-            unset(cfg, key);
-            cleaned++;
-          }
-        }
-      }
-    }
-  });
-  if (resets.length && isRecord(config.app)) {
-    const app = config.app as IAppConfig;
-    app.siScaleResets = [...(app.siScaleResets ?? []), ...resets];
-  }
-  if (converted) sink.info(`[Upgrade] Converted ${converted} widget config(s) to SI units.`);
-  if (cleaned) sink.info(`[Upgrade] Removed ${cleaned} pre-SI option(s) from widget configs.`);
-  return converted > 0 || cleaned > 0;
+  return { config: working, migrated: version !== LATEST_APP_CONFIG_VERSION };
 }
 
 // The dashboard entry shape the steps walk to reach a widget config.
@@ -1026,7 +918,42 @@ function upgradeConfigV18toV19(config: IConfig, sink: MigrationMessageSink): ICo
 }
 
 /**
- * v19 -> v20: the first SI step, for Wind Steer (see V20_WINDSTEER_SI_STEP). Also deletes racesteer's
+ * Runs each widget's conversion, by widget type, over every widget of a config, nested ones
+ * included, in place. A reset option is reported through the sink and recorded in the app
+ * config's `siScaleResets`, which the reset notice reads.
+ */
+function convertToSi(config: IConfig, sink: MigrationMessageSink, conversions: Readonly<Record<string, SiConversion>>): void {
+  if (!Array.isArray(config.dashboards)) return;
+  let converted = 0;
+  const resets: ISiScaleReset[] = [];
+  config.dashboards.forEach((dash, index) => {
+    if (!dash || !Array.isArray(dash.configuration)) return;
+    for (const widget of allWidgets(dash.configuration)) {
+      const wp = (widget as { input?: { widgetProperties?: { type?: unknown; config?: unknown } } })?.input?.widgetProperties;
+      if (!wp || typeof wp.type !== 'string' || !Object.hasOwn(conversions, wp.type) || !isRecord(wp.config)) continue;
+      const reset = conversions[wp.type](wp.config);
+      converted++;
+      if (!reset?.length) continue;
+      const entry: ISiScaleReset = {
+        dashboardId: String(dash.id),
+        dashboard: nonEmptyString(dash.name) ?? String(index + 1),
+        widget: nonEmptyString(wp.config['displayName']) ?? wp.type,
+        type: wp.type,
+        options: [...reset]
+      };
+      resets.push(entry);
+      sink.info(`[Upgrade] The scale range of "${entry.widget}" on dashboard "${entry.dashboard}" had no known unit and was reset; set it again in the widget's options.`);
+    }
+  });
+  if (resets.length && isRecord(config.app)) {
+    const app = config.app as IAppConfig;
+    app.siScaleResets = [...(app.siScaleResets ?? []), ...resets];
+  }
+  if (converted) sink.info(`[Upgrade] Converted ${converted} widget config(s) to SI units.`);
+}
+
+/**
+ * v19 -> v20: the first SI step, for Wind Steer (see windSteerToSi). Also deletes racesteer's
  * `laylineEnable`/`laylineAngle`, which nothing in racesteer ever read.
  */
 function upgradeConfigV19toV20(config: IConfig, sink: MigrationMessageSink): IConfig | null {
@@ -1037,7 +964,7 @@ function upgradeConfigV19toV20(config: IConfig, sink: MigrationMessageSink): ICo
       return null;
     }
 
-    applySiSteps(config, sink, V20_MIGRATION_OUTPUT_VERSION);
+    convertToSi(config, sink, { 'widget-wind-steer': windSteerToSi });
 
     let removed = 0;
     if (Array.isArray(config.dashboards)) {
@@ -1069,7 +996,7 @@ function upgradeConfigV19toV20(config: IConfig, sink: MigrationMessageSink): ICo
 
 /**
  * v20 -> v21: the SI steps for Sea Horizon's heel angles and the AIS radar's range rings and COG
- * vector time (see V21_SEA_HORIZON_SI_STEP and V21_AIS_RADAR_SI_STEP).
+ * vector time (see seaHorizonToSi and aisRadarToSi).
  */
 function upgradeConfigV20toV21(config: IConfig, sink: MigrationMessageSink): IConfig | null {
   try {
@@ -1079,7 +1006,7 @@ function upgradeConfigV20toV21(config: IConfig, sink: MigrationMessageSink): ICo
       return null;
     }
 
-    applySiSteps(config, sink, V21_MIGRATION_OUTPUT_VERSION);
+    convertToSi(config, sink, { 'widget-sea-horizon': seaHorizonToSi, 'widget-ais-radar': aisRadarToSi });
 
     appConfig.configVersion = V21_MIGRATION_OUTPUT_VERSION;
     return { app: appConfig, theme: config.theme, dashboards: config.dashboards };
@@ -1091,7 +1018,7 @@ function upgradeConfigV20toV21(config: IConfig, sink: MigrationMessageSink): ICo
 
 /**
  * v21 -> v22: the SI steps for the gauges', numeric's and data-chart's scale bounds (see
- * V22_GAUGE_SI_STEP, V22_NUMERIC_SI_STEP and V22_DATA_CHART_SI_STEP).
+ * gaugeBoundsToSi, numericBoundsToSi and dataChartBoundsToSi).
  */
 function upgradeConfigV21toV22(config: IConfig, sink: MigrationMessageSink): IConfig | null {
   try {
@@ -1101,7 +1028,14 @@ function upgradeConfigV21toV22(config: IConfig, sink: MigrationMessageSink): ICo
       return null;
     }
 
-    applySiSteps(config, sink, V22_MIGRATION_OUTPUT_VERSION);
+    convertToSi(config, sink, {
+      'widget-gauge-ng-radial': gaugeBoundsToSi,
+      'widget-gauge-ng-linear': gaugeBoundsToSi,
+      'widget-gauge-steel': gaugeBoundsToSi,
+      'widget-simple-linear': gaugeBoundsToSi,
+      'widget-numeric': numericBoundsToSi,
+      'widget-data-chart': dataChartBoundsToSi
+    });
 
     appConfig.configVersion = V22_MIGRATION_OUTPUT_VERSION;
     return { app: appConfig, theme: config.theme, dashboards: config.dashboards };

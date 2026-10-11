@@ -114,7 +114,7 @@ describe('WidgetConfigPanelComponent', () => {
 
   it('seeds the form from an unstamped Wind Steer tile with its close-hauled angle converted to rad', async () => {
     hostWithState({ config: { laylineEnable: false, laylineAngle: 30 } });
-    const { openWidgetOptions, component } = setup(loadedWidget({ closeHauledLineEnable: true, closeHauledLineAngle: Math.PI / 4, siVersion: 20 }));
+    const { openWidgetOptions, component } = setup(loadedWidget({ closeHauledLineEnable: true, closeHauledLineAngle: Math.PI / 4 }));
 
     await component.ngOnInit();
 
@@ -164,9 +164,9 @@ describe('WidgetConfigPanelComponent', () => {
   });
 
   it('saves the edited config stamped with the current version, which the tile then applies as saved', async () => {
-    const saved = { updateInterval: 2500, siVersion: 20 } as IWidgetSvcConfig;
+    const saved = { updateInterval: 2500 } as IWidgetSvcConfig;
     const set = hostWithState({ config: { updateInterval: 3000 } });
-    const { component } = setup(loadedWidget({ updateInterval: 1000, siVersion: 20 }), 'widget-wind-steer', saved);
+    const { component } = setup(loadedWidget({ updateInterval: 1000 }), 'widget-wind-steer', saved);
 
     await component.ngOnInit();
 

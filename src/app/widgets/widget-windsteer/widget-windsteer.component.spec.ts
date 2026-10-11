@@ -11,7 +11,6 @@ import { ActivePolarService, ActivePolarStatus } from '../../core/services/activ
 import { Polar, PolarResult, PolarTargets, toCanonicalPolarTable } from '../../core/utils/polar-engine.util';
 import { OverlayPoint, OverlayScale, POLAR_PATH_KEYS, VMC_HEADING_STEP, polarCurve, speedToRadius } from '../../core/utils/polar-overlay.util';
 import { PolarOverlayMode, WindTraceSample } from '../svg-windsteer/svg-windsteer.component';
-import { SI_VERSION_KEY, V20_MIGRATION_OUTPUT_VERSION } from '../../core/utils/config-migration.util';
 import hurmaPolar from '../../core/utils/polar-engine.hurma-polar.fixture.json';
 
 const DEG = Math.PI / 180;
@@ -675,12 +674,11 @@ describe('WidgetWindComponent drift/current gating (#441, #637)', () => {
 });
 
 describe('WidgetWindComponent default config', () => {
-  it('stores the close-hauled angle in rad, 45° by default, and carries the SI marker of the v20 step', () => {
+  it('stores the close-hauled angle in rad, 45° by default', () => {
     expect(WidgetWindComponent.DEFAULT_CONFIG.closeHauledLineAngle).toBe(Math.PI / 4);
     expect(WidgetWindComponent.DEFAULT_CONFIG.closeHauledLineEnable).toBe(true);
     expect(WidgetWindComponent.DEFAULT_CONFIG.closeHauledAngleFromPolar).toBe(true);
     expect(WidgetWindComponent.DEFAULT_CONFIG.runLineEnable).toBe(false);
-    expect(WidgetWindComponent.DEFAULT_CONFIG[SI_VERSION_KEY as 'siVersion']).toBe(V20_MIGRATION_OUTPUT_VERSION);
     expect(WidgetWindComponent.OPTION_UNITS).toEqual({ closeHauledLineAngle: 'rad' });
   });
 });

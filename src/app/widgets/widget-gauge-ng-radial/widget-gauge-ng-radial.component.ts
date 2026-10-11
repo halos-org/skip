@@ -76,8 +76,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
     enableTimeout: false,
     color: 'contrast',
     dataTimeout: 5,
-    ignoreZones: false,
-    siVersion: 22
+    ignoreZones: false
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */

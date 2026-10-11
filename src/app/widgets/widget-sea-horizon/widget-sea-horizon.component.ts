@@ -667,8 +667,7 @@ export class WidgetSeaHorizonComponent {
     numDecimal: 1,
     updateInterval: 1000,
     enableTimeout: true,
-    dataTimeout: 5,
-    siVersion: 21
+    dataTimeout: 5
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */

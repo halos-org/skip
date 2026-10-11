@@ -124,7 +124,6 @@ describe('extractWidgetSchemas', () => {
     const gauge = seaHorizon?.defaultConfig['gauge'] as Record<string, unknown>;
     expect(gauge['heelCautionAngle']).toBeCloseTo(20 * Math.PI / 180, 15);
     expect(gauge['heelAlarmAngle']).toBeCloseTo(30 * Math.PI / 180, 15);
-    expect(seaHorizon?.defaultConfig['siVersion']).toBe(21);
 
     const ais = bySelector('widget-ais-radar');
     expect(ais?.optionUnits).toEqual({ 'ais.rangeRings': 'm', 'ais.cogVectorsSeconds': 's' });

@@ -109,8 +109,7 @@ export class WidgetDataGraphComponent implements OnDestroy {
     yScaleSuggestedMax: null,
     enableMinMaxScaleLimit: false,
     yScaleMin: null,
-    yScaleMax: null,
-    siVersion: 22
+    yScaleMax: null
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */
