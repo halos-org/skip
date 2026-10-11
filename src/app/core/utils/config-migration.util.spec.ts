@@ -346,10 +346,10 @@ describe('v21 -> v22: scale bounds in SI', () => {
   it('resets and lists bounds whose stored unit is empty, unitless, missing, unknown or a string format', () => {
     const sink = recordingSink();
     const migrated = migrateOneAppVersion(configWith(21, [
-      gauge('widget-gauge-steel', '', 0, 100),
-      gauge('widget-simple-linear', 'unitless', 0, 100),
-      gauge('widget-gauge-ng-radial', undefined, 0, 100),
-      gauge('widget-gauge-ng-linear', 'furlongs', 0, 100),
+      gauge('widget-gauge-steel', '', 0, 120),
+      gauge('widget-simple-linear', 'unitless', 0, 120),
+      gauge('widget-gauge-ng-radial', undefined, 0, 120),
+      gauge('widget-gauge-ng-linear', 'furlongs', 0, 120),
       numeric('D HH:MM:SS', 0, 3600)
     ]), 21, sink) as IConfig;
 
@@ -369,7 +369,7 @@ describe('v21 -> v22: scale bounds in SI', () => {
   });
 
   it('resets and lists a widget with only one numeric bound', () => {
-    const migrated = migrateOneAppVersion(configWith(21, [gauge('widget-gauge-steel', '', null, 100)]), 21, recordingSink()) as IConfig;
+    const migrated = migrateOneAppVersion(configWith(21, [gauge('widget-gauge-steel', '', null, 120)]), 21, recordingSink()) as IConfig;
 
     expect(scale(widgetConfigs(migrated)[0])).toEqual({ lower: null, upper: null, type: 'linear' });
     expect(resets(migrated)).toEqual([{ dashboardId: 'd1', dashboard: '1', widget: 'RPM' }]);
@@ -386,6 +386,35 @@ describe('v21 -> v22: scale bounds in SI', () => {
       enableMinMaxScaleLimit: true
     });
     expect(resets(migrated)).toEqual([{ dashboardId: 'd1', dashboard: '1', widget: 'Pressure' }]);
+  });
+
+  // Before v22 a numeric defaulted to 'unitless' 0-10 and a gauge to 'unitless' 0-100: the user never
+  // set those ranges, so resetting them needs no notice.
+  it('resets the pre-v22 default ranges without listing them', () => {
+    const migrated = migrateOneAppVersion(configWith(21, [
+      numeric('unitless', 0, 10),
+      gauge('widget-gauge-ng-radial', 'unitless', 0, 100)
+    ]), 21, recordingSink()) as IConfig;
+
+    const [numericConfig, gaugeConfig] = widgetConfigs(migrated);
+    expect(numericConfig).toMatchObject({ yScaleMin: null, yScaleMax: null });
+    expect(scale(gaugeConfig)).toEqual({ lower: null, upper: null, type: 'linear' });
+    expect(resets(migrated)).toBeUndefined();
+  });
+
+  it('lists a reset range with any bound off the pre-v22 default', () => {
+    const migrated = migrateOneAppVersion(configWith(21, [
+      numeric('unitless', 0, 20),
+      gauge('widget-gauge-ng-radial', 'unitless', 0, 200)
+    ]), 21, recordingSink()) as IConfig;
+
+    const [numericConfig, gaugeConfig] = widgetConfigs(migrated);
+    expect(numericConfig).toMatchObject({ yScaleMin: null, yScaleMax: null });
+    expect(scale(gaugeConfig)).toEqual({ lower: null, upper: null, type: 'linear' });
+    expect(resets(migrated)).toEqual([
+      { dashboardId: 'd1', dashboard: '1', widget: 'SOG' },
+      { dashboardId: 'd1', dashboard: '1', widget: 'RPM' }
+    ]);
   });
 
   it('adds no reset list for widgets without numeric bounds', () => {

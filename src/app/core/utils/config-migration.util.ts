@@ -221,9 +221,12 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 
 /**
  * Converts the listed options of `holder` from `measure` to SI, or, when `measure` is not in the
- * frozen table, resets the numeric ones to `null`. Returns whether it reset any.
+ * frozen table, resets the numeric ones to `null`. Returns whether it reset any that the user had
+ * set: a reset value equal to the widget's pre-v22 default in `oldDefaults` was never chosen, and
+ * resetting it needs no notice.
  */
-function boundsToSi(holder: WidgetConfigRecord, keys: readonly string[], measure: unknown): boolean {
+function boundsToSi(holder: WidgetConfigRecord, keys: readonly string[], measure: unknown,
+  oldDefaults: Readonly<Record<string, number>> = {}): boolean {
   const factors = typeof measure === 'string' && Object.hasOwn(V22_MEASURE_TO_SI, measure) ? V22_MEASURE_TO_SI[measure] : undefined;
   let reset = false;
   for (const key of keys) {
@@ -233,11 +236,15 @@ function boundsToSi(holder: WidgetConfigRecord, keys: readonly string[], measure
       holder[key] = (value - factors[0]) / factors[1];
     } else {
       holder[key] = null;
-      reset = true;
+      reset ||= value !== oldDefaults[key];
     }
   }
   return reset;
 }
+
+// The pre-v22 DEFAULT_CONFIG bounds, all in the 'unitless' unit the widgets defaulted to.
+const V22_OLD_GAUGE_DEFAULTS = Object.freeze({ lower: 0, upper: 100 });
+const V22_OLD_NUMERIC_DEFAULTS = Object.freeze({ yScaleMin: 0, yScaleMax: 10 });
 
 /** The stored `convertUnitTo` of a widget's path slot, the unit its bounds were entered in. */
 function slotUnit(config: WidgetConfigRecord, slot: string): unknown {
@@ -253,12 +260,12 @@ function slotUnit(config: WidgetConfigRecord, slot: string): unknown {
 const gaugeBoundsToSi: SiConversion = config => {
   const scale = config['displayScale'];
   if (!isRecord(scale)) return;
-  return boundsToSi(scale, ['lower', 'upper'], slotUnit(config, 'gaugePath'));
+  return boundsToSi(scale, ['lower', 'upper'], slotUnit(config, 'gaugePath'), V22_OLD_GAUGE_DEFAULTS);
 };
 
 /** v22: the numeric's minigraph y bounds are stored in SI, like the gauges' (see gaugeBoundsToSi). */
 const numericBoundsToSi: SiConversion = config =>
-  boundsToSi(config, ['yScaleMin', 'yScaleMax'], slotUnit(config, 'numericPath'));
+  boundsToSi(config, ['yScaleMin', 'yScaleMax'], slotUnit(config, 'numericPath'), V22_OLD_NUMERIC_DEFAULTS);
 
 /**
  * v22: data-chart y bounds are stored in SI. They were entered in whatever unit the chart showed,

@@ -1062,7 +1062,7 @@ describe('ConfigurationUpgradeService', () => {
                 { input: { widgetProperties: { type: 'widget-gauge-steel', config: {
                     displayName: 'RPM', paths: { gaugePath: { path: 'self.x', convertUnitTo: 'rpm' } }, displayScale: { lower: 0, upper: 3600 } } } } },
                 { input: { widgetProperties: { type: 'widget-numeric', config: {
-                    displayName: 'Tank', paths: { numericPath: { path: 'self.y', convertUnitTo: 'unitless' } }, yScaleMin: 0, yScaleMax: 10 } } } }
+                    displayName: 'Tank', paths: { numericPath: { path: 'self.y', convertUnitTo: 'unitless' } }, yScaleMin: 0, yScaleMax: 100 } } } }
             ] }]
         });
 
