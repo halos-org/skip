@@ -73,6 +73,15 @@ export function presentedScaleBounds(
 }
 
 /**
+ * The measure a gauge draws its scale and zones in: the one the streams directive tagged the latest
+ * value with, else the unit stored with the slot, so a path that has not reported yet (an engine off
+ * at the dock) still shows its scale in that unit; else SI.
+ */
+export function gaugeScaleMeasure(tagged: string, stored: string | null | undefined): string {
+  return tagged || stored || 'unitless';
+}
+
+/**
  * The measure an SI-stored option that follows a path is shown in, the one the widget presents the
  * path in: the server's measure for the path, else the unit stored with the slot, else SI
  * ('unitless'). A measure counts only when it converts numbers affinely, so a string format such as

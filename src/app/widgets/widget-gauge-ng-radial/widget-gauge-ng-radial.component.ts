@@ -19,7 +19,7 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { WidgetStreamsDirective, widgetPathSignature, WidgetRepointTracker } from '../../core/directives/widget-streams.directive';
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
 import { UnitsService } from '../../core/services/units.service';
-import { presentationValue, presentedScaleBounds } from '../../core/utils/si-presentation.util';
+import { gaugeScaleMeasure, presentationValue, presentedScaleBounds } from '../../core/utils/si-presentation.util';
 import { ITheme } from '../../core/services/app-service';
 
 @Component({
@@ -114,7 +114,7 @@ export class WidgetGaugeNgRadialComponent implements AfterViewInit {
   private effectiveUnit = signal<string>('');
   /** Measure used to reinterpret scale/zones/clamp: the tagged measure, falling back to the stored config unit before the first update. */
   private effectiveMeasure = computed<string>(() =>
-    this.effectiveUnit() || (this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo ?? 'unitless')
+    gaugeScaleMeasure(this.effectiveUnit(), this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo)
   );
   /** The scale bounds in the presentation measure, which the clamp shares. */
   private scaleBounds = computed(() => presentedScaleBounds(

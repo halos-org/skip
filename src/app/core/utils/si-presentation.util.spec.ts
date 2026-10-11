@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pathOptionMeasure, presentationValue, presentedBound, presentedOption, presentedScaleBounds, toDegrees } from './si-presentation.util';
+import { gaugeScaleMeasure, pathOptionMeasure, presentationValue, presentedBound, presentedOption, presentedScaleBounds, toDegrees } from './si-presentation.util';
 
 describe('toDegrees', () => {
   it('converts rad to degrees and passes null and undefined through', () => {
@@ -121,5 +121,13 @@ describe('pathOptionMeasure', () => {
     expect(pathOptionMeasure(units, null, undefined)).toBe('unitless');
     expect(pathOptionMeasure(units, 'self.navigation.position.latitude', 'latitudeMin')).toBe('unitless');
     expect(pathOptionMeasure(units, 'self.propulsion.main.temperature', 'no-such-measure')).toBe('unitless');
+  });
+});
+
+describe('gaugeScaleMeasure', () => {
+  it('takes the tagged measure, else the stored unit, else SI', () => {
+    expect(gaugeScaleMeasure('fahrenheit', 'celsius')).toBe('fahrenheit');
+    expect(gaugeScaleMeasure('', 'celsius')).toBe('celsius');
+    expect(gaugeScaleMeasure('', undefined)).toBe('unitless');
   });
 });
