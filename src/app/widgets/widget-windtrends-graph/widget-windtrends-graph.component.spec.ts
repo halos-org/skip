@@ -33,7 +33,8 @@ describe('WidgetWindTrendsGraphComponent', () => {
   const unitsMock = {
     convertToUnit: (_unit: string, value: number) => value,
     resolvePathMeasure: () => 'knots',
-    getUnitDisplaySymbol: (measure: string) => measure
+    getUnitDisplaySymbol: (measure: string) => measure,
+    getRenderableUnitSymbol: UnitsService.prototype.getRenderableUnitSymbol
   };
   // Speed measure resolution folds the path's meta subject; a single emission is enough to resolve it.
   const dataMock = { getPathMetaObservable: () => of(null) };

@@ -959,8 +959,7 @@ export class WidgetWindTrendsGraphComponent implements OnDestroy {
   /** Display symbol for the resolved wind-speed measure; empty (no label) before the server's
    *  displayUnits resolve or when the path carries no unit preference — never a wrong or raw-key label. */
   private speedUnitSymbol(): string {
-    const measure = this.speedMeasureKey;
-    return measure && measure !== 'unitless' ? this.unitsService.getUnitDisplaySymbol(measure) : '';
+    return this.unitsService.getRenderableUnitSymbol(this.speedMeasureKey);
   }
 
   private getRowValue(row: IGraphDatapoint, seriesType: 'value' | 'sma' | 'ema' | 'dema' | 'avg' | 'min' | 'max'): number | null {

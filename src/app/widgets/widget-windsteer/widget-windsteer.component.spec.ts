@@ -17,6 +17,7 @@ const DEG = Math.PI / 180;
 
 const unitsServiceStub = {
   getUnitDisplaySymbol: (measure: string | null | undefined) => measure ?? '',
+  getRenderableUnitSymbol: UnitsService.prototype.getRenderableUnitSymbol,
   // Model only what the gate needs: SI m/s in, display unit out (knots ~1.94384x; m/s identity).
   convertToUnit: (unit: string, value: number) => unit === 'knots' ? value * 1.94384 : value
 };
