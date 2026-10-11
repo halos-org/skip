@@ -322,7 +322,9 @@ export class WidgetStreamsDirective implements OnDestroy {
         const measure$ = this.dataService.getPathMetaObservable(fieldPath).pipe(
           map(() => {
             const resolved = this.unitsService.resolvePathMeasure(fieldPath);
-            // Before any unit meta resolves, resolvePathMeasure returns 'unitless'. Tag the value with
+            // Before any unit meta resolves, resolvePathMeasure returns 'unitless'. Values can flow in
+            // that window: a path whose value the server sends before its meta waits for the REST
+            // backfill, and an object field waits for the unit preferences to load. Tag the value with
             // the widget's stored unit until a real measure resolves, so its readout and scale are
             // presented in that unit instead of as bare SI.
             const measure = resolved === 'unitless' && structuralMeasure ? structuralMeasure : resolved;

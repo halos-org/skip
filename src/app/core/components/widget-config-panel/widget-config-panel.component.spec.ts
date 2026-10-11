@@ -114,7 +114,7 @@ describe('WidgetConfigPanelComponent', () => {
 
   it('seeds the form from an unstamped Wind Steer tile with its close-hauled angle converted to rad', async () => {
     hostWithState({ config: { laylineEnable: false, laylineAngle: 30 } });
-    const { openWidgetOptions, component } = setup(loadedWidget({ closeHauledLineEnable: true, closeHauledLineAngle: Math.PI / 4, siVersion: 20 }));
+    const { openWidgetOptions, component } = setup(loadedWidget({ closeHauledLineEnable: true, closeHauledLineAngle: Math.PI / 4 }));
 
     await component.ngOnInit();
 
@@ -164,9 +164,9 @@ describe('WidgetConfigPanelComponent', () => {
   });
 
   it('saves the edited config stamped with the current version, which the tile then applies as saved', async () => {
-    const saved = { updateInterval: 2500, siVersion: 20 } as IWidgetSvcConfig;
+    const saved = { updateInterval: 2500 } as IWidgetSvcConfig;
     const set = hostWithState({ config: { updateInterval: 3000 } });
-    const { component } = setup(loadedWidget({ updateInterval: 1000, siVersion: 20 }), 'widget-wind-steer', saved);
+    const { component } = setup(loadedWidget({ updateInterval: 1000 }), 'widget-wind-steer', saved);
 
     await component.ngOnInit();
 
@@ -178,6 +178,16 @@ describe('WidgetConfigPanelComponent', () => {
   it('does not open the settings dialog for an unrecognized widget type', async () => {
     const { openWidgetOptions, component } = setup({
       getWidgetName: () => undefined, getComponentType: vi.fn(), getDefaultConfig: vi.fn()
+    } as unknown as Partial<WidgetService>);
+
+    await component.ngOnInit();
+
+    expect(openWidgetOptions).not.toHaveBeenCalled();
+  });
+
+  it('does not open the settings dialog when the widget component fails to load', async () => {
+    const { openWidgetOptions, component } = setup({
+      getWidgetName: () => 'Wind Steer', getComponentType: vi.fn(async () => undefined), getDefaultConfig: vi.fn()
     } as unknown as Partial<WidgetService>);
 
     await component.ngOnInit();
@@ -215,11 +225,12 @@ describe('WidgetConfigPanelComponent polar overlay status', () => {
           useValue: {
             getWidgetName: () => 'Wind Steer',
             getComponentType: vi.fn(async () => WidgetWindComponent),
-            getDefaultConfig: () => structuredClone(WidgetWindComponent.DEFAULT_CONFIG)
+            getDefaultConfig: () => structuredClone(WidgetWindComponent.DEFAULT_CONFIG),
+            getOptionUnits: () => WidgetWindComponent.OPTION_UNITS
           }
         },
         { provide: ActivePolarService, useValue: polar },
-        { provide: UnitsService, useValue: { getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }), skBaseUnits: [], convertToUnit: (unit: string, value: number) => unit === 'deg' ? value * 180 / Math.PI : value } },
+        { provide: UnitsService, useValue: { getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }), skBaseUnits: [], convertToUnit: (unit: string, value: number) => unit === 'deg' ? value * 180 / Math.PI : value, getRenderableUnitSymbol: (unit: string) => unit } },
         { provide: AppService, useValue: { configurableThemeColors: [] } }
       ]
     });

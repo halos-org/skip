@@ -11,9 +11,6 @@ import { WidgetAutopilotComponent } from '../app/widgets/widget-autopilot/widget
 import { WidgetHorizonComponent } from '../app/widgets/widget-horizon/widget-horizon.component';
 import { WidgetHeelGaugeComponent } from '../app/widgets/widget-heel-gauge/widget-heel-gauge.component';
 import { WidgetSimpleLinearComponent } from '../app/widgets/widget-simple-linear/widget-simple-linear.component';
-import { applySiSteps, SI_VERSION_KEY } from '../app/core/utils/config-migration.util';
-import { IConfig } from '../app/core/interfaces/app-settings.interfaces';
-import { LATEST_APP_CONFIG_VERSION } from '../app/core/constants/config-versions.const';
 
 // The shipped seed is stamped at LATEST_APP_CONFIG_VERSION, so config migrations never run on a
 // fresh install/profile. A widget whose path shape drifts from its DEFAULT_CONFIG therefore ships
@@ -59,7 +56,7 @@ describe('DefaultDashboard seed', () => {
   // drifted (angleTrueGround / speedOverGround) undetected before Effort B corrected it — guard every
   // seeded slot against the default so it can't drift again. pathOptions is base-sourced (supplied by
   // the runtime merge), so it is deliberately excluded here.
-  it('seeds widget-wind-steer with the SI close-hauled options and marker of its DEFAULT_CONFIG', () => {
+  it('seeds widget-wind-steer with the SI close-hauled options of its DEFAULT_CONFIG', () => {
     const seedWidgets = seededWidgetsOfType('widget-wind-steer');
     expect(seedWidgets.length).toBeGreaterThan(0);
     const defaults = WidgetWindComponent.DEFAULT_CONFIG;
@@ -67,7 +64,6 @@ describe('DefaultDashboard seed', () => {
       const cfg = (widget.input?.widgetProperties?.config ?? {}) as Record<string, unknown>;
       expect(cfg['closeHauledLineEnable']).toBe(defaults.closeHauledLineEnable);
       expect(cfg['closeHauledLineAngle']).toBe(defaults.closeHauledLineAngle);
-      expect(cfg['siVersion']).toBe(defaults.siVersion);
       expect('laylineAngle' in cfg).toBe(false);
     }
   });
@@ -220,9 +216,8 @@ describe('wind-family path config shape', () => {
   }
 });
 
-// The seed is stored config stamped at LATEST: no chain step ever converts it, and the SI steps that
-// run on every load would convert an unmarked widget and rewrite the slot. So it must already be in
-// the shape the latest SI steps produce.
+// The seed is stored config stamped at LATEST, so no chain step ever converts it: it must already be
+// in the shape the SI steps produce.
 describe('seed scale bounds in SI', () => {
   interface SeedConfig { displayName?: string; displayScale?: { lower?: unknown; upper?: unknown }; yScaleMin?: unknown; yScaleMax?: unknown; [key: string]: unknown }
   const seeded = (type: string, displayName: string): SeedConfig[] =>
@@ -231,24 +226,11 @@ describe('seed scale bounds in SI', () => {
       .filter(wp => wp?.type === type && wp.config?.displayName === displayName)
       .map(wp => wp!.config!);
 
-  it('is a fixed point of the SI steps, with no reset', () => {
-    const config = {
-      app: { configVersion: LATEST_APP_CONFIG_VERSION },
-      theme: { themeName: '' },
-      dashboards: structuredClone(DefaultDashboard)
-    } as unknown as IConfig;
-    const infos: string[] = [];
-
-    expect(applySiSteps(config, { info: m => infos.push(m), error: m => infos.push(m) })).toBe(false);
-    expect(infos).toEqual([]);
-  });
-
-  it('stores gauge bounds in SI and marks the gauges', () => {
+  it('stores gauge bounds in SI', () => {
     const rpm = [...seeded('widget-gauge-ng-radial', 'Engine'), ...seeded('widget-gauge-steel', 'RPM')];
     expect(rpm.length).toBe(2);
     for (const config of rpm) {
       expect(config.displayScale).toMatchObject({ lower: 0, upper: 60 });
-      expect(config[SI_VERSION_KEY]).toBe(22);
     }
     const [coolant] = seeded('widget-gauge-ng-linear', 'Coolant Temperature');
     expect(coolant.displayScale?.lower).toBeCloseTo(273.15);

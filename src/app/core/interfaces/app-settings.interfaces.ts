@@ -47,9 +47,6 @@ export interface ISiScaleReset {
   dashboard: string;
   /** The widget's displayName, or its type when it has none. */
   widget: string;
-  type: string;
-  /** The reset options as dotted paths inside the widget config, such as `displayScale.lower`. */
-  options: string[];
 }
 
 export interface IThemeConfig {

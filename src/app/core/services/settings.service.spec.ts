@@ -919,8 +919,8 @@ describe('SettingsService — reloadApp target (query-string preservation, #216 
 
 describe('SettingsService — SI scale reset list', () => {
   const RESETS: ISiScaleReset[] = [
-    { dashboardId: 'id-helm', dashboard: 'Helm', widget: 'Engine RPM', type: 'widget-gauge-ng-radial', options: ['displayScale.lower', 'displayScale.upper'] },
-    { dashboardId: 'id-2', dashboard: '2', widget: 'widget-data-graph', type: 'widget-data-graph', options: ['yScaleMin'] }
+    { dashboardId: 'id-helm', dashboard: 'Helm', widget: 'Engine RPM' },
+    { dashboardId: 'id-2', dashboard: '2', widget: 'widget-data-graph' }
   ];
 
   it('exposes the list the loaded profile holds', () => {

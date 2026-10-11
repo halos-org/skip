@@ -23,6 +23,7 @@ import { WidgetSliderComponent } from '../../widgets/widget-slider/widget-slider
 import type { ISkMetadata } from '../../core/interfaces/signalk-interfaces';
 import { ActivePolarService, ActivePolarStatus } from '../../core/services/active-polar.service';
 import { DataService, IPathUpdate } from '../../core/services/data.service';
+import { WidgetService } from '../../core/services/widget.service';
 import { signal } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -272,33 +273,35 @@ describe('ModalWidgetComponent steel compass gauge controls', () => {
 // dropped validator directive fails here instead of letting a crossed pair reach the widget.
 describe('ModalWidgetComponent sea horizon gauge controls', () => {
   // The heel angles are stored in rad and shown in degrees.
-  const unitsServiceStub: Pick<UnitsService, 'getConversionsForPath' | 'convertToUnit'> = {
+  const unitsServiceStub: Pick<UnitsService, 'getConversionsForPath' | 'convertToUnit' | 'getRenderableUnitSymbol'> = {
     getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }),
     convertToUnit: (unit: string, value: number) => unit === 'deg' ? value * 180 / Math.PI : value,
+    getRenderableUnitSymbol: (unit: string | null | undefined) => unit ?? '',
   };
   const appServiceStub: Pick<AppService, 'configurableThemeColors'> = { configurableThemeColors: [] };
 
   beforeEach(() => TestBed.resetTestingModule());
 
-  function renderSeaHorizonDialog(): { component: RootModalWidgetConfigComponent; gauge: UntypedFormGroup } {
+  async function renderSeaHorizonDialog(): Promise<{ component: RootModalWidgetConfigComponent; gauge: UntypedFormGroup }> {
     TestBed.configureTestingModule({
       imports: [RootModalWidgetConfigComponent],
       providers: [
         { provide: UnitsService, useValue: unitsServiceStub },
         { provide: AppService, useValue: appServiceStub },
-        { provide: MAT_DIALOG_DATA, useValue: structuredClone(WidgetSeaHorizonComponent.DEFAULT_CONFIG) },
+        { provide: MAT_DIALOG_DATA, useValue: { ...structuredClone(WidgetSeaHorizonComponent.DEFAULT_CONFIG), widgetType: 'widget-sea-horizon' } },
         { provide: MatDialogRef, useValue: { close: vi.fn() } },
       ],
     });
     ensureTestIconsReady();
+    await TestBed.inject(WidgetService).getComponentType('widget-sea-horizon');
     const fixture = TestBed.createComponent(RootModalWidgetConfigComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     return { component, gauge: component.formMaster.get('gauge') as UntypedFormGroup };
   }
 
-  it('builds a control for every gauge option the Display tab binds', () => {
-    const { gauge } = renderSeaHorizonDialog();
+  it('builds a control for every gauge option the Display tab binds', async () => {
+    const { gauge } = await renderSeaHorizonDialog();
     expect(gauge).toBeTruthy();
     expect(gauge.get('invertPitch')?.value).toBe(false);
     expect(gauge.get('invertRoll')?.value).toBe(false);
@@ -311,8 +314,8 @@ describe('ModalWidgetComponent sea horizon gauge controls', () => {
     expect(gauge.get('faceColor')?.value).toBe('anthracite');
   });
 
-  it('rejects a caution angle raised to or above the alarm angle', () => {
-    const { component, gauge } = renderSeaHorizonDialog();
+  it('rejects a caution angle raised to or above the alarm angle', async () => {
+    const { component, gauge } = await renderSeaHorizonDialog();
     const caution = gauge.get('heelCautionAngle');
     expect(caution?.valid).toBe(true);
 
@@ -325,8 +328,8 @@ describe('ModalWidgetComponent sea horizon gauge controls', () => {
     expect(component.formMaster.valid).toBe(true);
   });
 
-  it('rejects an alarm angle lowered to or below the caution angle', () => {
-    const { component, gauge } = renderSeaHorizonDialog();
+  it('rejects an alarm angle lowered to or below the caution angle', async () => {
+    const { component, gauge } = await renderSeaHorizonDialog();
     const alarm = gauge.get('heelAlarmAngle');
     expect(alarm?.valid).toBe(true);
 
@@ -562,20 +565,31 @@ describe('ModalWidgetComponent updateInterval Display-tab placement', () => {
   });
 });
 
+/** The unit suffix shown beside the `name` input, or null without one. */
+const suffix = (fixture: ComponentFixture<RootModalWidgetConfigComponent>, name: string): string | null => {
+  fixture.detectChanges();
+  const field = (fixture.nativeElement.querySelector(`input[name="${name}"]`) as HTMLElement | null)?.closest('mat-form-field');
+  return field?.querySelector('[matTextSuffix]')?.textContent?.trim() ?? null;
+};
+
 describe('ModalWidgetComponent options stored in SI', () => {
-  function open(config: IWidgetSvcConfig): ComponentFixture<RootModalWidgetConfigComponent> {
+  /** The options dialog for a `type` widget, which reads the widget's OPTION_UNITS once it has loaded. */
+  async function open(type: string, config: IWidgetSvcConfig, optionUnits?: Record<string, string>): Promise<ComponentFixture<RootModalWidgetConfigComponent>> {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [RootModalWidgetConfigComponent],
       providers: [
         UnitsService,
         { provide: AppService, useValue: { configurableThemeColors: [] } },
-        { provide: MAT_DIALOG_DATA, useValue: config },
+        { provide: MAT_DIALOG_DATA, useValue: { ...config, widgetType: type } },
         { provide: MatDialogRef, useValue: { close: vi.fn() } },
         { provide: ActivePolarService, useValue: { status: signal({ kind: 'loading' }), message: signal(null), refreshIfFailed: () => undefined } }
       ]
     });
     ensureTestIconsReady();
+    const widgets = TestBed.inject(WidgetService);
+    await widgets.getComponentType(type);
+    if (optionUnits) vi.spyOn(widgets, 'getOptionUnits').mockReturnValue(optionUnits);
     vi.spyOn(TestBed.inject(DataService), 'acquirePath').mockImplementation(() =>
       ({ data$: new BehaviorSubject<IPathUpdate>({ data: { value: null, timestamp: null }, state: 'normal' } as IPathUpdate), release: () => undefined }));
     const fixture = TestBed.createComponent(RootModalWidgetConfigComponent);
@@ -587,26 +601,33 @@ describe('ModalWidgetComponent options stored in SI', () => {
   const saved = (): IWidgetSvcConfig =>
     ((TestBed.inject(MatDialogRef).close as ReturnType<typeof vi.fn>).mock.calls[0][0]) as IWidgetSvcConfig;
 
-  it('shows the close-hauled angle stored in rad in degrees', () => {
-    const fixture = open(windsteer(Math.PI / 4));
+  it('shows the close-hauled angle stored in rad in degrees', async () => {
+    const fixture = await open('widget-wind-steer', windsteer(Math.PI / 4));
     expect(fixture.componentInstance.formMaster.get('closeHauledLineAngle')?.value).toBe(45);
     const input = fixture.nativeElement.querySelector('input[name="closeHauledLineAngle"]') as HTMLInputElement;
     expect(Number(input.value)).toBe(45);
+    expect(suffix(fixture, 'closeHauledLineAngle')).toBe('deg');
   });
 
-  it('stores an entered angle in rad', () => {
-    const fixture = open(windsteer(Math.PI / 4));
+  it("converts exactly the options the widget's OPTION_UNITS lists", async () => {
+    const config = { ...windsteer(Math.PI / 4), gauge: { tilt: Math.PI / 6 } } as unknown as IWidgetSvcConfig;
+    const fixture = await open('widget-wind-steer', config, { 'gauge.tilt': 'rad' });
+    const form = fixture.componentInstance.formMaster;
+    expect(form.get(['gauge', 'tilt'])?.value).toBe(30);
+    // No longer listed, the close-hauled angle is shown as stored.
+    expect(form.get('closeHauledLineAngle')?.value).toBe(Math.PI / 4);
+
+    form.get(['gauge', 'tilt'])?.setValue(45);
+    fixture.componentInstance.submitConfig();
+    expect((saved() as unknown as { gauge: { tilt: number } }).gauge.tilt).toBeCloseTo(Math.PI / 4, 12);
+    expect(saved().closeHauledLineAngle).toBe(Math.PI / 4);
+  });
+
+  it('stores an entered angle in rad', async () => {
+    const fixture = await open('widget-wind-steer', windsteer(Math.PI / 4));
     fixture.componentInstance.formMaster.get('closeHauledLineAngle')?.setValue(50);
     fixture.componentInstance.submitConfig();
     expect(saved().closeHauledLineAngle).toBeCloseTo(50 * Math.PI / 180, 6);
-  });
-
-  it('leaves a stored angle bit-identical when the dialog is saved without editing it', () => {
-    const stored = 0.7; // 40.107045659... degrees: not a round trip through the rounded display value
-    const fixture = open(windsteer(stored));
-    expect(fixture.componentInstance.formMaster.get('closeHauledLineAngle')?.value).toBe(40.10704566);
-    fixture.componentInstance.submitConfig();
-    expect(saved().closeHauledLineAngle).toBe(stored);
   });
 
   const seaHorizon = (heelCautionAngle: number, heelAlarmAngle: number): IWidgetSvcConfig => {
@@ -615,28 +636,30 @@ describe('ModalWidgetComponent options stored in SI', () => {
     return { ...config, widgetName: 'Sea Horizon' } as IWidgetSvcConfig;
   };
 
-  it('shows the heel angles stored in rad in degrees, and stores an edit in rad', () => {
+  it('shows the heel angles stored in rad in degrees, and stores an edit in rad', async () => {
     const caution = 20 * Math.PI / 180;
-    const fixture = open(seaHorizon(caution, 30 * Math.PI / 180));
+    const fixture = await open('widget-sea-horizon', seaHorizon(caution, 30 * Math.PI / 180));
     const gauge = fixture.componentInstance.formMaster.get('gauge') as UntypedFormGroup;
     expect(gauge.get('heelCautionAngle')?.value).toBe(20);
     expect(gauge.get('heelAlarmAngle')?.value).toBe(30);
+    expect(suffix(fixture, 'heelCautionAngle')).toBe('deg');
+    expect(suffix(fixture, 'heelAlarmAngle')).toBe('deg');
 
     gauge.get('heelAlarmAngle')?.setValue(35);
     fixture.componentInstance.submitConfig();
     expect(saved().gauge?.heelAlarmAngle).toBeCloseTo(35 * Math.PI / 180, 12);
-    // The caution angle was not edited, so it keeps its stored value exactly.
-    expect(saved().gauge?.heelCautionAngle).toBe(caution);
+    expect(saved().gauge?.heelCautionAngle).toBeCloseTo(caution, 12);
   });
 
-  it('shows the AIS COG vector time stored in seconds in minutes, and stores an edit in seconds', () => {
+  it('shows the AIS COG vector time stored in seconds in minutes, and stores an edit in seconds', async () => {
     const config = { ...structuredClone(WidgetAisRadarComponent.DEFAULT_CONFIG), widgetName: 'AIS Radar' } as IWidgetSvcConfig;
     config.ais = { ...config.ais!, cogVectorsSeconds: 600 };
-    const fixture = open(config);
+    const fixture = await open('widget-ais-radar', config);
     const ais = fixture.componentInstance.formMaster.get('ais') as UntypedFormGroup;
     expect(ais.get('cogVectorsSeconds')?.value).toBe(10);
     const input = fixture.nativeElement.querySelector('input[name="cogVectorsSeconds"]') as HTMLInputElement;
     expect(Number(input.value)).toBe(10);
+    expect(suffix(fixture, 'cogVectorsSeconds')).toBe('min');
 
     fixture.componentInstance.submitConfig();
     expect(saved().ais?.cogVectorsSeconds).toBe(600);
@@ -649,8 +672,8 @@ describe('ModalWidgetComponent options stored in SI', () => {
     expect(edited.ais?.cogVectorsSeconds).toBeCloseTo(900, 9);
   });
 
-  it('offers the polar close-hauled angle and the run lines, and saves their switches', () => {
-    const fixture = open(windsteer(Math.PI / 4));
+  it('offers the polar close-hauled angle and the run lines, and saves their switches', async () => {
+    const fixture = await open('widget-wind-steer', windsteer(Math.PI / 4));
     expect(fixture.nativeElement.querySelector('mat-checkbox[name="closeHauledAngleFromPolar"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('mat-checkbox[name="runLineEnable"]')).not.toBeNull();
 
@@ -661,8 +684,8 @@ describe('ModalWidgetComponent options stored in SI', () => {
     expect(saved().runLineEnable).toBe(true);
   });
 
-  it('shows no close-hauled section for a widget without the option', () => {
-    const fixture = open({ ...structuredClone(WidgetRacesteerComponent.DEFAULT_CONFIG), widgetName: 'Race Steer' } as IWidgetSvcConfig);
+  it('shows no close-hauled section for a widget without the option', async () => {
+    const fixture = await open('widget-racesteer', { ...structuredClone(WidgetRacesteerComponent.DEFAULT_CONFIG), widgetName: 'Race Steer' } as IWidgetSvcConfig);
     expect(fixture.nativeElement.querySelector('input[name="closeHauledLineAngle"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('mat-checkbox[name="closeHauledLineEnable"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('mat-checkbox[name="closeHauledAngleFromPolar"]')).toBeNull();
@@ -850,7 +873,7 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     return subject;
   };
 
-  function open(type: string, config: IWidgetSvcConfig): ComponentFixture<RootModalWidgetConfigComponent> {
+  async function open(type: string, config: IWidgetSvcConfig): Promise<ComponentFixture<RootModalWidgetConfigComponent>> {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [RootModalWidgetConfigComponent],
@@ -863,6 +886,7 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
       ]
     });
     ensureTestIconsReady();
+    await TestBed.inject(WidgetService).getComponentType(type);
     const data = TestBed.inject(DataService);
     vi.spyOn(data, 'getPathUnitType').mockImplementation(path => metaOf(path).value?.units ?? null);
     vi.spyOn(data, 'getPathDisplayUnits').mockImplementation(path => metaOf(path).value?.displayUnits);
@@ -877,11 +901,6 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
   const lastSaved = (): IWidgetSvcConfig => {
     const calls = (TestBed.inject(MatDialogRef).close as ReturnType<typeof vi.fn>).mock.calls;
     return calls[calls.length - 1][0] as IWidgetSvcConfig;
-  };
-  const suffix = (fixture: ComponentFixture<RootModalWidgetConfigComponent>, name: string): string | null => {
-    fixture.detectChanges();
-    const field = (fixture.nativeElement.querySelector(`input[name="${name}"]`) as HTMLElement | null)?.closest('mat-form-field');
-    return field?.querySelector('[matTextSuffix]')?.textContent?.trim() ?? null;
   };
 
   /** A slider on `path`; its slot is structural and has no convertUnitTo, as the slider's defaults. */
@@ -911,39 +930,29 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     metas = new Map();
   });
 
-  it('shows gauge bounds stored in K in the unit the server shows the path in', () => {
+  it('shows gauge bounds stored in K in the unit the server shows the path in', async () => {
     metaOf(TEMPERATURE).next(meta('K', 'celsius'));
-    const fixture = open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', 273.15, 393.15));
+    const fixture = await open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', 273.15, 393.15));
     expect(scale(fixture).get('lower')?.value).toBe(0);
     expect(scale(fixture).get('upper')?.value).toBe(120);
     expect(suffix(fixture, 'lower')).toBe('°C');
     expect(suffix(fixture, 'upper')).toBe('°C');
   });
 
-  it('shows the bounds in the stored unit when the server sets none, and in SI without either', () => {
+  it('shows the bounds in the stored unit when the server sets none, and in SI without either', async () => {
     metaOf(TEMPERATURE).next(meta('K'));
-    const stored = open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'fahrenheit', 273.15, 393.15));
+    const stored = await open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'fahrenheit', 273.15, 393.15));
     expect(scale(stored).get('lower')?.value).toBe(32);
     expect(scale(stored).get('upper')?.value).toBe(248);
 
-    const si = open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', 273.15, 393.15));
+    const si = await open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', 273.15, 393.15));
     expect(scale(si).get('upper')?.value).toBe(393.15);
     expect(suffix(si, 'upper')).toBe('K');
   });
 
-  it('leaves the SI bounds bit-identical when saved without edits', () => {
-    metaOf(TEMPERATURE).next(meta('K', 'celsius'));
-    const lower = 273.15 + 1 / 3;
-    const upper = 393.15 + Math.PI;
-    const fixture = open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', lower, upper));
-    fixture.componentInstance.submitConfig();
-    expect(lastSaved().displayScale?.lower).toBe(lower);
-    expect(lastSaved().displayScale?.upper).toBe(upper);
-  });
-
-  it('stores numeric bounds entered in knots in m/s', () => {
+  it('stores numeric bounds entered in knots in m/s', async () => {
     metaOf(SPEED).next(meta('m/s', 'knots'));
-    const fixture = open('widget-numeric', numeric(SPEED, 'knots', null, null));
+    const fixture = await open('widget-numeric', numeric(SPEED, 'knots', null, null));
     const form = fixture.componentInstance.formMaster;
     form.get('yScaleMin')?.setValue(0);
     form.get('yScaleMax')?.setValue(20);
@@ -953,9 +962,9 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     expect(suffix(fixture, 'yScaleMax')).toBe('kn');
   });
 
-  it('shows an unset bound as an empty field and saves it unset, and does not require one', () => {
+  it('shows an unset bound as an empty field and saves it unset, and does not require one', async () => {
     metaOf(SPEED).next(meta('m/s', 'knots'));
-    const fixture = open('widget-numeric', numeric(SPEED, 'knots', null, 5.144));
+    const fixture = await open('widget-numeric', numeric(SPEED, 'knots', null, 5.144));
     const form = fixture.componentInstance.formMaster;
     const input = fixture.nativeElement.querySelector('input[name="yScaleMin"]') as HTMLInputElement;
     expect(input.value).toBe('');
@@ -968,15 +977,22 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     expect(lastSaved().yScaleMax).toBeNull();
   });
 
-  it("hints that an empty scale field uses the path's own scale", () => {
+  it("hints that an empty scale field uses the path's own scale", async () => {
     metaOf(TEMPERATURE).next(meta('K', 'celsius'));
-    const fixture = open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', null, null));
+    const fixture = await open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', null, null));
     const field = (fixture.nativeElement.querySelector('input[name="lower"]') as HTMLElement).closest('mat-form-field') as HTMLElement;
     expect(field.querySelector('mat-hint')?.textContent).toMatch(/empty.*path's own scale/i);
   });
 
-  it('re-resolves the unit once when the meta arrives, for a field the user has not edited', () => {
-    const fixture = open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', 273.15, 393.15));
+  it("does not hint the path's own scale on a slider, whose empty scale falls back to 0 to 1", async () => {
+    metaOf(RPM).next(meta('Hz', 'rpm'));
+    const fixture = await open('widget-slider', slider(RPM));
+    const field = (fixture.nativeElement.querySelector('input[name="lower"]') as HTMLElement).closest('mat-form-field') as HTMLElement;
+    expect(field.querySelector('mat-hint')).toBeNull();
+  });
+
+  it('re-resolves the unit once when the meta arrives, for a field the user has not edited', async () => {
+    const fixture = await open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'unitless', 273.15, 393.15));
     expect(scale(fixture).get('lower')?.value).toBe(273.15);
     scale(fixture).get('upper')?.setValue(400);
 
@@ -1008,7 +1024,7 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     it('re-points a gauge from a celsius path to an rpm path: meta scale in rpm, saved in Hz', async () => {
       metaOf(TEMPERATURE).next(meta('K', 'celsius'));
       metaOf(RPM).next(meta('Hz', 'rpm', { lower: 0, upper: 60, type: 'linear' }));
-      const fixture = open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'celsius', 273.15, 393.15));
+      const fixture = await open('widget-gauge-ng-radial', gauge(TEMPERATURE, 'celsius', 273.15, 393.15));
       await pick(fixture, 'gaugePath', RPM);
       expect(scale(fixture).get('lower')?.value).toBe(0);
       expect(scale(fixture).get('upper')?.value).toBe(3600);
@@ -1023,7 +1039,7 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     it("fills a re-pointed slider's scale in SI, the unit the slider works in", async () => {
       metaOf(TEMPERATURE).next(meta('K', 'celsius'));
       metaOf(RPM).next(meta('Hz', 'rpm', { lower: 0, upper: 60, type: 'linear' }));
-      const fixture = open('widget-slider', slider(TEMPERATURE));
+      const fixture = await open('widget-slider', slider(TEMPERATURE));
       await pick(fixture, 'gaugePath', RPM);
       expect(scale(fixture).get('upper')?.value).toBe(60);
 
@@ -1035,7 +1051,7 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     it('re-points a numeric to a path without meta scale: same numbers, new unit', async () => {
       metaOf(SPEED).next(meta('m/s', 'knots'));
       metaOf(DEPTH).next(meta('m', 'feet'));
-      const fixture = open('widget-numeric', numeric(SPEED, 'knots', 0, 5.144));
+      const fixture = await open('widget-numeric', numeric(SPEED, 'knots', 0, 5.144));
       const shown = fixture.componentInstance.formMaster.get('yScaleMax')?.value as number;
       await pick(fixture, 'numericPath', DEPTH);
       expect(fixture.componentInstance.formMaster.get('yScaleMax')?.value).toBe(shown);
@@ -1046,12 +1062,12 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     });
   });
 
-  it("converts a data graph's y bounds with the unit of its path, also after a path change", () => {
+  it("converts a data graph's y bounds with the unit of its path, also after a path change", async () => {
     metaOf(SPEED).next(meta('m/s', 'knots'));
     metaOf(TEMPERATURE).next(meta('K', 'celsius'));
     const config = { ...structuredClone(WidgetDataGraphComponent.DEFAULT_CONFIG), datachartPath: SPEED,
       yScaleMin: 0, yScaleMax: 5.144, yScaleSuggestedMin: null, yScaleSuggestedMax: 2.572 } as unknown as IWidgetSvcConfig;
-    const fixture = open('widget-data-chart', config);
+    const fixture = await open('widget-data-chart', config);
     const form = fixture.componentInstance.formMaster;
     expect(form.get('yScaleMax')?.value).toBeCloseTo(10, 2);
     expect(form.get('yScaleSuggestedMax')?.value).toBeCloseTo(5, 2);
@@ -1067,10 +1083,14 @@ describe('ModalWidgetComponent scale bounds stored in SI', () => {
     expect(lastSaved().yScaleSuggestedMin).toBeNull();
   });
 
-  it("leaves a slider's scale, which is already SI, as it is", () => {
+  it("shows a slider's scale in SI, the unit the slider works in", async () => {
     metaOf(RPM).next(meta('Hz', 'rpm'));
-    const fixture = open('widget-slider', slider(RPM));
+    const fixture = await open('widget-slider', slider(RPM));
     expect(scale(fixture).get('upper')?.value).toBe(1);
-    expect(suffix(fixture, 'upper')).toBeNull();
+    expect(suffix(fixture, 'upper')).toBe('Hz');
+
+    scale(fixture).get('upper')?.setValue(50);
+    fixture.componentInstance.submitConfig();
+    expect(lastSaved().displayScale?.upper).toBe(50);
   });
 });

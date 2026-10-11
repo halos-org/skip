@@ -4,7 +4,7 @@
  *  - the remote storage FILE version: the applicationData URL path segment holding the config slots;
  *  - the app-config schema version: the `configVersion` property inside profile (IAppConfig) blobs;
  *  - the per-device connectionConfig schema version: its own space, decoupled from the app config.
- * Legacy source-version literals with a single definition site (file v9, app v10, the 11.99
+ * Legacy source-version literals with a single definition site (file v9, app v10, the 19.99
  * backup slot) stay in ConfigurationUpgradeService.
  */
 

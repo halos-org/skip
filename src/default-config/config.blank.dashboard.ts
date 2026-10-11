@@ -40,7 +40,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Speed Over Ground",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -88,7 +87,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Depth",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -136,7 +134,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Course Over Ground (True)",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -184,7 +181,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Engine",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "gaugePath": {
@@ -418,8 +414,7 @@ export const DefaultDashboard: Dashboard[] = [
               "invertRudder": false,
               "updateInterval": 1000,
               "enableTimeout": false,
-              "dataTimeout": 5,
-              "siVersion": 20
+              "dataTimeout": 5
             }
           }
         }
@@ -440,7 +435,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Fuel",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "gaugePath": {
@@ -490,7 +484,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Coolant Temperature",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "gaugePath": {
@@ -634,7 +627,6 @@ export const DefaultDashboard: Dashboard[] = [
             "uuid": "ac80f808-19e6-454d-8e60-54b335e0e84f",
             "config": {
               "displayName": "Barometer",
-              "siVersion": 22,
               "color": "grey",
               "filterSelfPaths": true,
               "datachartPath": "self.environment.outside.pressure",
@@ -726,7 +718,6 @@ export const DefaultDashboard: Dashboard[] = [
             "uuid": "7ba92365-4d4c-4f79-ab16-6633ff964a52",
             "config": {
               "displayName": "True Wind Speed",
-              "siVersion": 22,
               "color": "orange",
               "filterSelfPaths": true,
               "datachartPath": "self.environment.wind.speedOverGround",
@@ -775,7 +766,6 @@ export const DefaultDashboard: Dashboard[] = [
             "uuid": "2f298899-8195-4610-833f-3e9c9cef6770",
             "config": {
               "displayName": "Outside temperature",
-              "siVersion": 22,
               "color": "contrast",
               "filterSelfPaths": true,
               "datachartPath": "self.environment.outside.temperature",
@@ -823,7 +813,6 @@ export const DefaultDashboard: Dashboard[] = [
             "uuid": "1c05e838-d28b-4216-9737-38b47c77b394",
             "config": {
               "displayName": "Seawater temperature",
-              "siVersion": 22,
               "color": "blue",
               "filterSelfPaths": true,
               "datachartPath": "self.environment.water.temperature",
@@ -871,7 +860,6 @@ export const DefaultDashboard: Dashboard[] = [
             "uuid": "69e6dfc2-705e-437f-b7b4-d381d305bb88",
             "config": {
               "displayName": "Barometer",
-              "siVersion": 22,
               "color": "grey",
               "filterSelfPaths": true,
               "datachartPath": "self.environment.outside.pressure",
@@ -951,7 +939,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Cabin temperature",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -998,7 +985,6 @@ export const DefaultDashboard: Dashboard[] = [
             "uuid": "c0205b09-fe37-4370-8141-fbedcd4b3d32",
             "config": {
               "displayName": "Fridge temperature",
-              "siVersion": 22,
               "color": "purple",
               "filterSelfPaths": true,
               "datachartPath": "self.environment.inside.refridgerator.temperature",
@@ -1086,7 +1072,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "RPM",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "gaugePath": {
@@ -1135,7 +1120,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Speed Over Ground",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -1181,7 +1165,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Depth",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -1231,7 +1214,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Course Over Ground",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -1432,7 +1414,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Bearing To Waypoint",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -1479,7 +1460,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Oil Temperature",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "gaugePath": {
@@ -1530,7 +1510,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Distance To Waypoint",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -1577,7 +1556,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Coolant Temperature",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "gaugePath": {
@@ -1663,7 +1641,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Fuel",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "gaugePath": {
@@ -1794,7 +1771,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Depth",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -2019,8 +1995,7 @@ export const DefaultDashboard: Dashboard[] = [
               "invertRudder": false,
               "updateInterval": 1000,
               "enableTimeout": false,
-              "dataTimeout": 5,
-              "siVersion": 20
+              "dataTimeout": 5
             }
           }
         }
@@ -2040,7 +2015,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Speed Over Ground",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -2088,7 +2062,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Speed Through Water",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -2137,7 +2110,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Velocity Made Good",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -2242,7 +2214,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Bearing To Waypoint",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {
@@ -2290,7 +2261,6 @@ export const DefaultDashboard: Dashboard[] = [
             "config": {
               "supportAutomaticHistoricalSeries": true,
               "displayName": "Distance To Waypoint",
-              "siVersion": 22,
               "filterSelfPaths": true,
               "paths": {
                 "numericPath": {

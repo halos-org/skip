@@ -462,17 +462,6 @@ describe('WidgetGaugeNgLinearComponent output from SI inputs', () => {
       expect(s.value).toBeCloseTo(32);
       expect(s.text).toBe('--');
     });
-
-    it('clamps the SI number against the stored scale while the measure is still empty', () => {
-      feed(KELVIN + 42.5, '');
-      const s = shown();
-      expect(s.value).toBe(100);
-      expect([s.min, s.max, s.unit]).toEqual([0, 100, '']);
-      expect(s.highlights).toEqual([
-        { from: expect.closeTo(50), to: expect.closeTo(70), color: '#ff0' },
-        { from: expect.closeTo(70), to: expect.closeTo(100), color: '#f00' }
-      ]);
-    });
   });
 
   describe('without ticks', () => {

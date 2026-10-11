@@ -10,7 +10,7 @@ import { getColors } from '../../core/utils/themeColors.utils';
 import { getHighlights } from '../../core/utils/zones-highlight.utils';
 import { UnitsService } from '../../core/services/units.service';
 import { States } from '../../core/interfaces/signalk-interfaces';
-import { presentationValue, presentedScaleBounds } from '../../core/utils/si-presentation.util';
+import { gaugeScaleMeasure, presentationValue, presentedScaleBounds } from '../../core/utils/si-presentation.util';
 
 @Component({
   selector: 'widget-simple-linear',
@@ -47,8 +47,7 @@ export class WidgetSimpleLinearComponent {
     color: 'contrast',
     updateInterval: 500,
     enableTimeout: false,
-    dataTimeout: 5,
-    siVersion: 22
+    dataTimeout: 5
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */
@@ -87,7 +86,7 @@ export class WidgetSimpleLinearComponent {
    * first value.
    */
   private readonly effectiveMeasure = computed<string>(() =>
-    this.effectiveUnit() || (this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo ?? '')
+    gaugeScaleMeasure(this.effectiveUnit(), this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo)
   );
   private readonly scaleBounds = computed(() => presentedScaleBounds(
     this.unitsService,

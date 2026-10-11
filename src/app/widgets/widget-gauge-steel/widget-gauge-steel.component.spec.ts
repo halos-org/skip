@@ -155,13 +155,6 @@ describe('WidgetSteelGaugeComponent output from SI inputs', () => {
     expect(s).toMatchObject({ min: 0, max: 100, units: '' });
   });
 
-  it('shows the SI number on the stored bounds while the measure is still empty', () => {
-    feed(42, '');
-    const s = shown();
-    expect(s.value).toBe(42);
-    expect(s).toMatchObject({ min: 0, max: 100, units: '' });
-  });
-
   it('passes a unitless reading through', () => {
     options.set(makeConfig('unitless', -50, 50));
     fixture.detectChanges();

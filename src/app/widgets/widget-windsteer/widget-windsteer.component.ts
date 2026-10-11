@@ -271,8 +271,7 @@ export class WidgetWindComponent implements OnDestroy {
     polarOverlayEnable: true,
     updateInterval: 1000,
     enableTimeout: false,
-    dataTimeout: DEFAULT_DATA_TIMEOUT_SECONDS,
-    siVersion: 20
+    dataTimeout: DEFAULT_DATA_TIMEOUT_SECONDS
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */
@@ -304,17 +303,17 @@ export class WidgetWindComponent implements OnDestroy {
   protected appWindSpeed = signal(0);
   private appWindSpeedMeasure = signal('');
   protected appWindSpeedDisplay = computed(() => presentationValue(this.unitsService, this.appWindSpeedMeasure(), this.appWindSpeed()));
-  protected appWindSpeedUnit = computed(() => this.speedUnitSymbol(this.appWindSpeedMeasure()));
+  protected appWindSpeedUnit = computed(() => this.unitsService.getRenderableUnitSymbol(this.appWindSpeedMeasure()));
   protected trueWindAngle = signal(0);
   protected trueWindFresh = signal(false);
   protected trueWindSpeed = signal(0);
   private trueWindSpeedMeasure = signal('');
   protected trueWindSpeedDisplay = computed(() => presentationValue(this.unitsService, this.trueWindSpeedMeasure(), this.trueWindSpeed()));
-  protected trueWindSpeedUnit = computed(() => this.speedUnitSymbol(this.trueWindSpeedMeasure()));
+  protected trueWindSpeedUnit = computed(() => this.unitsService.getRenderableUnitSymbol(this.trueWindSpeedMeasure()));
   protected driftFlow = signal(0);
   private driftMeasure = signal('');
   protected driftFlowDisplay = computed(() => presentationValue(this.unitsService, this.driftMeasure(), this.driftFlow()));
-  protected driftUnit = computed(() => this.speedUnitSymbol(this.driftMeasure()));
+  protected driftUnit = computed(() => this.unitsService.getRenderableUnitSymbol(this.driftMeasure()));
   // Evaluated on every raw sample, not the deduped driftFlow: the dedup step equals the band width.
   protected setArrowActive = signal(false);
   protected driftSet = signal(0);
@@ -786,14 +785,6 @@ export class WidgetWindComponent implements OnDestroy {
 
   private stopWindTrace() {
     this.windTraceCleanupSub?.unsubscribe();
-  }
-
-  // The speed readouts derive their unit symbol from the measure the streams directive tagged the
-  // value with (server-resolved for these display paths), never the stored convertUnitTo. An empty
-  // or still-unitless measure (meta not yet resolved) renders no symbol rather than a wrong one, so
-  // the label always matches the value.
-  private speedUnitSymbol(measure: string): string {
-    return measure && measure !== 'unitless' ? this.unitsService.getUnitDisplaySymbol(measure) : '';
   }
 
 }

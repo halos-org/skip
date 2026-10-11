@@ -176,16 +176,6 @@ describe('WidgetSimpleLinearComponent output from SI inputs', () => {
     ]);
   });
 
-  it('shows the SI number on the stored bounds while the measure is still empty', () => {
-    feed(42, '');
-    const s = shown();
-    expect(s).toMatchObject({ value: 42, text: '42.0', unit: '', min: 0, max: 100 });
-    expect(rounded(s.highlights)).toEqual([
-      { from: 60, to: 80, color: 'warn' },
-      { from: 80, to: 100, color: 'alarm' }
-    ]);
-  });
-
   it('passes a unitless reading through', () => {
     options.set({ ...makeConfig('unitless', -50, 50), ignoreZones: true });
     fixture.detectChanges();

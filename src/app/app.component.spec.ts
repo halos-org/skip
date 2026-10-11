@@ -17,6 +17,9 @@ import { DialogService } from './core/services/dialog.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
 import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
+import { RouterOverlayNavigationService } from './core/services/router-overlay-navigation.service';
+import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { IConfig, ISiScaleReset } from './core/interfaces/app-settings.interfaces';
 import { LATEST_APP_CONFIG_VERSION } from './core/constants/config-versions.const';
 
@@ -761,7 +764,7 @@ describe('AppComponent — embed mode chrome', () => {
 });
 
 // Self-contained: exercises the two constructor effects that must stand down under embed — the
-// automatic v11/v12 config migration (writes every user slot + reloadApp), and the
+// automatic config migration (writes every user slot + reloadApp), and the
 // missing-shared-config 'Create' prompt (its action calls settings.resetSettings, a write). Wires the
 // real root SettingsService / ConfigurationUpgradeService (spied) like the chrome suite, plus a
 // toggleable EmbedModeService. (#216 E6)
@@ -831,7 +834,7 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
   // A session that cannot write is in embed's position: it can neither run the migration nor act on
   // the manual instructions, so neither may be raised at it (#552).
   it('does NOT run the config migration in a session that cannot write', async () => {
-    const { runUpgradeSpy } = await render({ embed: false, canPersist: false, configUpgrade: true, configVersion: 11 });
+    const { runUpgradeSpy } = await render({ embed: false, canPersist: false, configUpgrade: true, configVersion: 12 });
     expect(runUpgradeSpy).not.toHaveBeenCalled();
   });
 
@@ -845,12 +848,18 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     expect(dialogSpy).toHaveBeenCalled();
   });
 
-  it('does NOT run the config migration under embed even with an upgradeable v11/v12 config', async () => {
-    const { runUpgradeSpy } = await render({ embed: true, configUpgrade: true, configVersion: 11 });
+  it('does NOT run the config migration under embed even with an upgradeable v12 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: true, configUpgrade: true, configVersion: 12 });
     expect(runUpgradeSpy).not.toHaveBeenCalled();
   });
 
-  it('runs the config migration in the full app (not embed) for an upgradeable v11/v12 config', async () => {
+  // Skip's own config namespace started at v12, so no Skip wrote a v11 slot.
+  it('does NOT run the config migration for a v11 config', async () => {
+    const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 11 });
+    expect(runUpgradeSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs the config migration in the full app (not embed) for an upgradeable v12 config', async () => {
     const { runUpgradeSpy } = await render({ embed: false, configUpgrade: true, configVersion: 12 });
     expect(runUpgradeSpy).toHaveBeenCalledWith(12);
   });
@@ -1018,10 +1027,10 @@ describe('AppComponent — embed boot performs zero server-config writes (#216 E
 
 describe('AppComponent — SI scale reset notice', () => {
   const RESETS: ISiScaleReset[] = [
-    { dashboardId: 'id-helm', dashboard: 'Helm', widget: 'Engine RPM', type: 'widget-gauge-ng-radial', options: ['displayScale.lower', 'displayScale.upper'] }
+    { dashboardId: 'id-helm', dashboard: 'Helm', widget: 'Engine RPM' }
   ];
 
-  async function render(opts: { embed?: boolean; canPersist?: boolean; resets?: ISiScaleReset[]; dialogResult?: boolean | undefined; upgrading?: boolean; configUpgrade?: boolean }) {
+  async function render(opts: { embed?: boolean; canPersist?: boolean; resets?: ISiScaleReset[]; dialogResult?: boolean | undefined; upgrading?: boolean; configUpgrade?: boolean; navigate?: boolean; realDialog?: boolean }) {
     TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [
@@ -1048,12 +1057,22 @@ describe('AppComponent — SI scale reset notice', () => {
     const upgrade = TestBed.inject(ConfigurationUpgradeService);
     vi.spyOn(upgrade, 'runUpgrade').mockResolvedValue(undefined);
     upgrade.upgrading.set(opts.upgrading ?? false);
-    const dialogSpy = vi.spyOn(TestBed.inject(DialogService), 'openSiScaleResetsDialog').mockReturnValue(of(opts.dialogResult));
+    const dialogService = TestBed.inject(DialogService);
+    const dialogSpy = opts.realDialog
+      ? vi.spyOn(dialogService, 'openSiScaleResetsDialog')
+      : vi.spyOn(dialogService, 'openSiScaleResetsDialog').mockReturnValue(of(opts.dialogResult));
+    // Constructed by an app initializer in main.ts, so it is listening before the first navigation.
+    TestBed.inject(RouterOverlayNavigationService);
 
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     TestBed.tick();
-    return { dialogSpy, dismissSpy, resets, upgrade };
+    const router = TestBed.inject(Router);
+    if (opts.navigate ?? true) {
+      await router.navigateByUrl('/');
+      TestBed.tick();
+    }
+    return { dialogSpy, dismissSpy, resets, upgrade, router };
   }
 
   afterEach(() => vi.restoreAllMocks());
@@ -1062,6 +1081,20 @@ describe('AppComponent — SI scale reset notice', () => {
     const { dialogSpy } = await render({});
     expect(dialogSpy).toHaveBeenCalledTimes(1);
     expect(dialogSpy).toHaveBeenCalledWith(RESETS);
+  });
+
+  it('waits for the first navigation to end', async () => {
+    const { dialogSpy, router } = await render({ navigate: false });
+    expect(dialogSpy).not.toHaveBeenCalled();
+
+    await router.navigateByUrl('/');
+    TestBed.tick();
+    expect(dialogSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('is still open after the first navigation, which closes every open dialog', async () => {
+    await render({ realDialog: true });
+    expect(TestBed.inject(MatDialog).openDialogs.length).toBe(1);
   });
 
   it('does not show it under embed', async () => {

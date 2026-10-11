@@ -51,7 +51,7 @@ describe('ConfigurationUpgradeService', () => {
     it('does not migrate anything in a session that cannot write (#552)', async () => {
         mockStorage.canPersist.mockReturnValue(false);
 
-        await service.runUpgrade(11);
+        await service.runUpgrade(12);
 
         expect(mockStorage.listConfigs).not.toHaveBeenCalled();
         expect(mockStorage.setConfig).not.toHaveBeenCalled();
@@ -63,65 +63,6 @@ describe('ConfigurationUpgradeService', () => {
 
         expect(mockStorage.listConfigs).toHaveBeenCalledWith(9);
         expect(service.error()).toBeNull();
-    });
-
-    it('v11 upgrade backs up and persists every slot to the server (anti-loop)', async () => {
-        mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
-        mockStorage.getConfig.mockResolvedValue({
-            app: { configVersion: 11 },
-            theme: { themeName: '' },
-            dashboards: []
-        });
-
-        await service.runUpgrade(11);
-
-        // Original v11 config is backed up to the 11.99 file version first...
-        expect(mockStorage.setConfig).toHaveBeenCalledWith(
-            'user', 'default',
-            expect.objectContaining({ app: expect.objectContaining({ configVersion: 11 }) }),
-            11.99);
-        // ...then the upgraded v12 result lands on the server's active file version. If the
-        // server copy stays v11 the upgrade re-triggers on every boot.
-        expect(mockStorage.setConfig).toHaveBeenCalledWith(
-            'user', 'default',
-            expect.objectContaining({ app: expect.objectContaining({ configVersion: 12 }) }));
-    });
-
-    it('v11 upgrade reloads the app exactly once after the slots are persisted', async () => {
-        vi.useFakeTimers();
-        try {
-            mockStorage.listConfigs.mockResolvedValueOnce([{ scope: 'user', name: 'default' }]);
-            mockStorage.getConfig.mockResolvedValue({
-                app: { configVersion: 11 },
-                theme: { themeName: '' },
-                dashboards: []
-            });
-
-            await service.runUpgrade(11);
-            vi.advanceTimersByTime(1500);
-
-            expect(mockAppSettings.reloadApp).toHaveBeenCalledTimes(1);
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
-    it('clears the blocking overlay when the v11 slot listing fails, without reloading', async () => {
-        vi.useFakeTimers();
-        try {
-            mockStorage.listConfigs.mockRejectedValueOnce(new Error('offline'));
-
-            await service.runUpgrade(11);
-
-            // The overlay is gated solely on upgrading(); leaving it set wedges the app behind
-            // a spinner with no dismiss. No reload either: the server still holds v11, so the
-            // upgrade retries next boot instead of reload-looping on a dead link.
-            expect(service.upgrading()).toBe(false);
-            vi.advanceTimersByTime(5000);
-            expect(mockAppSettings.reloadApp).not.toHaveBeenCalled();
-        } finally {
-            vi.useRealTimers();
-        }
     });
 
     it('v12 upgrade drops the dataset registry, strips widget recorder vestige, and stamps v13', async () => {
@@ -907,7 +848,7 @@ describe('ConfigurationUpgradeService', () => {
             expect(mockStorage.setConfig.mock.calls[1]).toHaveLength(3);
             expect(written.app.configVersion).toBe(20);
             expect(written.dashboards[0].configuration[0].input.widgetProperties.config)
-                .toEqual({ closeHauledLineEnable: true, closeHauledLineAngle: 40 * Math.PI / 180, siVersion: 20 });
+                .toEqual({ closeHauledLineEnable: true, closeHauledLineAngle: 40 * Math.PI / 180 });
         });
 
         it('keeps an existing backup: a rerun never overwrites it', async () => {
@@ -1012,8 +953,8 @@ describe('ConfigurationUpgradeService', () => {
         const written = mockStorage.setConfig.mock.calls[0][2];
         expect(written.app.configVersion).toBe(21);
         const [sea, ais] = written.dashboards[0].configuration.map((w: { input: { widgetProperties: { config: unknown } } }) => w.input.widgetProperties.config);
-        expect(sea).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659, heelAlarmAngle: 0.5235987755982988 }, siVersion: 21 });
-        expect(ais).toEqual({ ais: { rangeRings: [1852, 5556, 11112, 22224, 44448, 88896], cogVectorsSeconds: 600 }, siVersion: 21 });
+        expect(sea).toEqual({ gauge: { heelCautionAngle: 0.3490658503988659, heelAlarmAngle: 0.5235987755982988 } });
+        expect(ais).toEqual({ ais: { rangeRings: [1852, 5556, 11112, 22224, 44448, 88896], cogVectorsSeconds: 600 } });
     });
 
     it('v20 upgrade skips a slot that is not at version 20 (no re-stamp)', async () => {
@@ -1062,7 +1003,7 @@ describe('ConfigurationUpgradeService', () => {
                 { input: { widgetProperties: { type: 'widget-gauge-steel', config: {
                     displayName: 'RPM', paths: { gaugePath: { path: 'self.x', convertUnitTo: 'rpm' } }, displayScale: { lower: 0, upper: 3600 } } } } },
                 { input: { widgetProperties: { type: 'widget-numeric', config: {
-                    displayName: 'Tank', paths: { numericPath: { path: 'self.y', convertUnitTo: 'unitless' } }, yScaleMin: 0, yScaleMax: 10 } } } }
+                    displayName: 'Tank', paths: { numericPath: { path: 'self.y', convertUnitTo: 'unitless' } }, yScaleMin: 0, yScaleMax: 100 } } } }
             ] }]
         });
 
@@ -1073,8 +1014,8 @@ describe('ConfigurationUpgradeService', () => {
         expect(written.app.configVersion).toBe(22);
         const [gauge, numeric] = written.dashboards[0].configuration.map((w: { input: { widgetProperties: { config: Record<string, unknown> } } }) => w.input.widgetProperties.config);
         expect(gauge['displayScale']).toEqual({ lower: 0, upper: 60 });
-        expect(numeric).toMatchObject({ yScaleMin: null, yScaleMax: null, siVersion: 22 });
-        expect(written.app.siScaleResets).toEqual([{ dashboardId: 'd0', dashboard: 'Engine', widget: 'Tank', type: 'widget-numeric', options: ['yScaleMin', 'yScaleMax'] }]);
+        expect(numeric).toMatchObject({ yScaleMin: null, yScaleMax: null });
+        expect(written.app.siScaleResets).toEqual([{ dashboardId: 'd0', dashboard: 'Engine', widget: 'Tank' }]);
     });
 
     it('v21 upgrade skips a slot that is not at version 21 (no re-stamp)', async () => {
@@ -1189,7 +1130,7 @@ describe('ConfigurationUpgradeService', () => {
 
         await service.runUpgrade(); // legacy (version-less) path
 
-        // The catch must reset upgrading(), matching the v11/v12 paths; leaving it set
+        // The catch must reset upgrading(), matching the chained upgrade; leaving it set
         // wedges the app behind the upgrade overlay with no dismiss.
         expect(service.upgrading()).toBe(false);
     });

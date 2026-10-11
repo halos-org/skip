@@ -168,8 +168,7 @@ export class WidgetAisRadarComponent implements AfterViewInit, OnDestroy {
       showUnconfirmedTargets: true,
       showSelf: true
     },
-    color: 'grey',
-    siVersion: 21
+    color: 'grey'
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */

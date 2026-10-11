@@ -15,7 +15,7 @@ import { DefaultConnectionConfig } from '../../../default-config/config.blank.co
 import { buildDefaultConfig } from '../../../default-config/config.default.factory';
 import { isValidConfigShape } from '../utils/config-shape.util';
 import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
-import { CONSOLE_MIGRATION_SINK, ConfigMigrationResult, applySiSteps, migrateConfig, skipsPersistentUpgrade } from '../utils/config-migration.util';
+import { CONSOLE_MIGRATION_SINK, ConfigMigrationResult, migrateConfig, skipsPersistentUpgrade } from '../utils/config-migration.util';
 import { cloneDeep } from 'lodash-es';
 import { compare } from 'compare-versions';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
@@ -267,8 +267,6 @@ export class AppNetworkInitService implements OnDestroy {
             const result = this.migrateProfileInMemory(remoteConfig);
             remoteConfig = result.config;
             migratedInMemory = result.migrated;
-          } else {
-            await this.applySiStepsToOwnProfile(effectiveSharedConfigName, remoteConfig);
           }
           const bootstrapContext: IStorageRemoteBootstrapContext = {
             sharedConfigName: effectiveSharedConfigName,
@@ -448,25 +446,6 @@ export class AppNetworkInitService implements OnDestroy {
     } catch (error) {
       console.warn(`[AppInit Network Service] The loaded profile cannot be migrated (${(error as Error).message}); rendering it as stored.`);
       return { config, migrated: false };
-    }
-  }
-
-  /**
-   * Runs the SI steps over the session's own profile before anything renders it, when the slot is
-   * already stamped current: a tab still on an older build can write widget configs it loaded
-   * before the SI upgrade back into such a slot, and the stamp-gated persistent upgrade would never
-   * see them again. A slot that changed is written back; a failed write only means the steps run
-   * again on the next load. An older slot is left untouched for the persistent upgrade, which must
-   * back it up before converting it: DashboardService writes the loaded dashboards back at boot, so
-   * converting them here would put SI numbers into the slot before the backup is taken.
-   */
-  private async applySiStepsToOwnProfile(name: string, config: IConfig): Promise<void> {
-    if (config.app?.configVersion !== LATEST_APP_CONFIG_VERSION) return;
-    if (!applySiSteps(config, CONSOLE_MIGRATION_SINK)) return;
-    try {
-      await this.storage.setConfig('user', name, config, REMOTE_CONFIG_FILE_VERSION);
-    } catch (error) {
-      console.warn(`[AppInit Network Service] Could not save the SI conversion of profile '${name}' (${(error as Error).message}); it runs again on the next load.`);
     }
   }
 

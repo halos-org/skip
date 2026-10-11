@@ -395,8 +395,6 @@ export interface IWidgetSvcConfig {
   closeHauledAngleFromPolar?: boolean;
   /** Used by wind Widget: show the run lines, the headings at the active polar's run angle either side of the true wind */
   runLineEnable?: boolean;
-  /** The version of the last SI config step whose shape this widget config is in (config-migration.util SI_VERSION_KEY) */
-  siVersion?: number;
   /** Used by wind Widget: enable/disable Waypoint UI feature */
   waypointEnable?: boolean;
   /** Used by wind Widget: enable/disable COG UI feature */

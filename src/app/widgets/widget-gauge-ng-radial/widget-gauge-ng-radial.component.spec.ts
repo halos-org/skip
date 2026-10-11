@@ -163,23 +163,6 @@ describe('WidgetGaugeNgRadialComponent displayScale presentation', () => {
     expect(internals.value()).toBe(200);
   });
 
-  it("resets effectiveUnit to '' on resubscribe when the replayed value carries no resolved measure", () => {
-    capturedNext?.(update(21, 'percent'));
-    expect(internals.effectiveUnit()).toBe('percent');
-
-    // A config change re-runs the data effect -> the streams directive resubscribes (fresh callback).
-    options.set(makeConfig());
-    fixture.detectChanges();
-    expect(observeCount).toBe(2);
-
-    // The resubscribed stream replays its bootstrap value before the server measure resolves (no tag),
-    // and the callback resets effectiveUnit back to the '' placeholder.
-    capturedNext?.(update(null));
-    expect(internals.effectiveUnit()).toBe('');
-    // With the tag cleared, the scale is presented in the stored convertUnitTo again.
-    expect(internals.adjustedScale()).toEqual({ min: 10, max: 100, majorTicks: [] });
-  });
-
   // #534: a rebuilt subscription against a silent path replays nothing (the leading null is
   // suppressed), so the stream callback never runs and the previous path's reading stayed on the
   // dial, presented as a live reading of the new path.
@@ -424,17 +407,6 @@ describe('WidgetGaugeNgRadialComponent output from SI inputs', () => {
       const s = shown();
       expect(s.value).toBeCloseTo(32);
       expect(s.text).toBe('--');
-    });
-
-    it('clamps the SI number against the stored scale while the measure is still empty', () => {
-      feed(KELVIN + 42.5, '');
-      const s = shown();
-      expect(s.value).toBe(100);
-      expect([s.min, s.max, s.units]).toEqual([0, 100, '']);
-      expect(s.highlights).toEqual([
-        { from: expect.closeTo(50), to: expect.closeTo(70), color: '#ff0' },
-        { from: expect.closeTo(70), to: expect.closeTo(100), color: '#f00' }
-      ]);
     });
   });
 

@@ -80,12 +80,10 @@ const OPTION_UNITS_RULE =
   'Skip receives every Signal K number in SI, and every widget option that holds a measured quantity is stored in ' +
   'SI. The numeric options that configure the widget itself are the exception; meta.widgetSettingUnits gives their ' +
   "units. A widget's optionUnits maps an option, named by its dotted path inside the widget config, to the unit it is " +
-  'stored in; for an array option the unit applies to each element. A widget config that holds any of these ' +
-  "options must also carry siVersion set to the widget's defaultConfig.siVersion, when the defaultConfig has one. " +
-  'Skip reads such a widget config without siVersion as holding the older, pre-SI units and converts it, so SI ' +
-  'values written without the marker are converted a second time. A unit written as \'SI unit of <slot>\' is the Signal K SI unit of the path that ' +
+  'stored in; for an array option the unit applies to each element. A unit written as \'SI unit of <slot>\' is ' +
+  'the Signal K SI unit of the path that ' +
   'path slot (or path option) points at, such as K for a temperature. A scale bound set to null is unset: the ' +
-  "widget uses the path's own display scale, and a data graph scales itself.";
+  "widget uses the path's own display scale, a slider uses 0 to 1, and a data graph scales itself.";
 
 /**
  * Extracts Skip's widget catalog (`_widgetDefinition`) from widget.service.ts.

@@ -7,7 +7,7 @@ import { WidgetStreamsDirective } from '../../core/directives/widget-streams.dir
 import { WidgetMetadataDirective } from '../../core/directives/widget-metadata.directive';
 import { UnitsService } from '../../core/services/units.service';
 import { ITheme } from '../../core/services/app-service';
-import { presentationValue, presentedScaleBounds } from '../../core/utils/si-presentation.util';
+import { gaugeScaleMeasure, presentationValue, presentedScaleBounds } from '../../core/utils/si-presentation.util';
 
 @Component({
   selector: 'widget-gauge-steel',
@@ -59,8 +59,7 @@ export class WidgetSteelGaugeComponent {
     updateInterval: 500,
     enableTimeout: false,
     dataTimeout: 5,
-    ignoreZones: false,
-    siVersion: 22
+    ignoreZones: false
   };
 
   /** Options stored in a unit their value alone does not show; published in the dashboard schema. */
@@ -81,7 +80,7 @@ export class WidgetSteelGaugeComponent {
 
   /** Measure the scale is presented in: the tagged one, else the stored convertUnitTo before the first update. */
   private readonly effectiveMeasure = computed<string>(() =>
-    this.effectiveUnit() || (this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo ?? 'unitless')
+    gaugeScaleMeasure(this.effectiveUnit(), this.runtime.options()?.paths?.['gaugePath']?.convertUnitTo)
   );
   /** The scale bounds in the presentation measure, which the clamp shares. */
   private readonly scaleBounds = computed(() => presentedScaleBounds(

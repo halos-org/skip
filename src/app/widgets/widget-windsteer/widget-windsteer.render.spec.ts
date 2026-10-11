@@ -18,6 +18,7 @@ const KNOTS_PER_MS = 1.94384;
 
 const unitsServiceStub = {
   getUnitDisplaySymbol: (measure: string | null | undefined) => measure === 'knots' ? 'kn' : (measure ?? ''),
+  getRenderableUnitSymbol: UnitsService.prototype.getRenderableUnitSymbol,
   convertToUnit: (unit: string, value: number) => {
     if (unit === 'knots') return value * KNOTS_PER_MS;
     if (unit === 'deg') return value / DEG;

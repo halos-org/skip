@@ -1001,69 +1001,24 @@ describe('AppNetworkInitService', () => {
             expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
         });
 
-        describe("a writable session's own profile (per-widget SI steps)", () => {
-            const windsteerAt = (version: number, config: Record<string, unknown>): IConfig => ({
-                app: { configVersion: version },
+        // The boot saves the loaded dashboards back, so a conversion here would reach the slot
+        // before the persistent upgrade backs it up.
+        it("leaves a writable session's older slot unconverted for the persistent upgrade", async () => {
+            seedPersistedConnConfig('default');
+            loginAs();
+            const config = {
+                app: { configVersion: 19 },
                 theme: { themeName: '' },
                 dashboards: [{ id: 'd0', configuration: [
-                    { id: 'w0', input: { widgetProperties: { type: 'widget-wind-steer', uuid: 'w0', config } } }
+                    { id: 'w0', input: { widgetProperties: { type: 'widget-wind-steer', uuid: 'w0', config: { laylineEnable: true, laylineAngle: 30 } } } }
                 ] }]
-            } as unknown as IConfig);
-            const windsteerConfig = (config: IConfig): Record<string, unknown> =>
-                (config.dashboards[0].configuration?.[0] as unknown as { input: { widgetProperties: { config: Record<string, unknown> } } })
-                    .input.widgetProperties.config;
-            const converted = { closeHauledLineEnable: true, closeHauledLineAngle: 30 * Math.PI / 180, siVersion: 20 };
+            } as unknown as IConfig;
+            mockStorage.getConfig.mockResolvedValue(structuredClone(config));
 
-            it('converts unmarked widgets in a current slot before render and writes the slot back', async () => {
-                seedPersistedConnConfig('default');
-                loginAs();
-                mockStorage.getConfig.mockResolvedValue(windsteerAt(LATEST_APP_CONFIG_VERSION, { laylineEnable: true, laylineAngle: 30 }));
+            await service.initNetworkServices();
 
-                await service.initNetworkServices();
-
-                expect(windsteerConfig(bootstrappedConfig())).toEqual(converted);
-                expect(mockStorage.setConfig).toHaveBeenCalledExactlyOnceWith('user', 'default', expect.anything(), REMOTE_CONFIG_FILE_VERSION);
-                expect(windsteerConfig(mockStorage.setConfig.mock.calls[0][2] as IConfig)).toEqual(converted);
-            });
-
-            // The boot saves the loaded dashboards back, so a conversion here would reach the slot
-            // before the persistent upgrade backs it up.
-            it('leaves an older slot unconverted for the persistent upgrade', async () => {
-                seedPersistedConnConfig('default');
-                loginAs();
-                mockStorage.getConfig.mockResolvedValue(windsteerAt(19, { laylineEnable: true, laylineAngle: 30 }));
-
-                await service.initNetworkServices();
-
-                expect(bootstrappedConfig().app?.configVersion).toBe(19);
-                expect(windsteerConfig(bootstrappedConfig())).toEqual({ laylineEnable: true, laylineAngle: 30 });
-                expect(mockStorage.setConfig).not.toHaveBeenCalled();
-            });
-
-            it('writes nothing when every widget is already marked', async () => {
-                seedPersistedConnConfig('default');
-                loginAs();
-                mockStorage.getConfig.mockResolvedValue(windsteerAt(LATEST_APP_CONFIG_VERSION, { closeHauledLineAngle: 0.6, siVersion: 20 }));
-
-                await service.initNetworkServices();
-
-                expect(mockStorage.setConfig).not.toHaveBeenCalled();
-            });
-
-            it('still boots when the write-back fails; the steps run again on the next load', async () => {
-                seedPersistedConnConfig('default');
-                loginAs();
-                mockStorage.getConfig.mockResolvedValue(windsteerAt(LATEST_APP_CONFIG_VERSION, { laylineAngle: 30 }));
-                mockStorage.setConfig.mockRejectedValueOnce(new Error('write failed'));
-                const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-                await service.initNetworkServices();
-
-                expect(warn).toHaveBeenCalledWith(expect.stringMatching(/runs again on the next load/));
-                expect(windsteerConfig(bootstrappedConfig())['siVersion']).toBe(20);
-                expect(latestStatus()).toBe('ready');
-                warn.mockRestore();
-            });
+            expect(bootstrappedConfig()).toEqual(config);
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
         });
 
         describe('a session that does not run the persistent upgrade', () => {
