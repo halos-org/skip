@@ -78,6 +78,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private upgradeMessagesRef = viewChild<ElementRef<HTMLUListElement> | undefined>('upgradeMessages');
   private _upgradeShown = false;
   private _siScaleResetsShown = false;
+  /** RouterOverlayNavigationService closes every dialog when a navigation starts, the first one included. */
+  private readonly _firstNavigationEnded = signal(false);
 
   // Exposed for the shell template.
   protected readonly dashboardStatic = this._dashboard.isDashboardStatic;
@@ -140,7 +142,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     // shows it, and not before the persistent upgrade that may still add to it has finished.
     effect(() => {
       const resets = this.settings.siScaleResets();
-      if (!resets.length || this._siScaleResetsShown) return;
+      if (!resets.length || this._siScaleResetsShown || !this._firstNavigationEnded()) return;
       if (skipsPersistentUpgrade(this._embedMode, this._storage) || this.settings.configUpgrade() || this.upgrade.upgrading()) return;
       this._siScaleResetsShown = true;
       untracked(() => this._dialog.openSiScaleResetsDialog(resets))
@@ -194,6 +196,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this._router.events
       .pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed(this._destroyRef))
       .subscribe((e: NavigationEnd) => {
+        this._firstNavigationEnded.set(true);
         try {
           this.dashboardVisible.set(this.isUrlDashboard((e as NavigationEnd).urlAfterRedirects || (e as NavigationEnd).url));
         } catch { /* ignore */ }

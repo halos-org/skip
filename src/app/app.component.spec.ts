@@ -17,6 +17,9 @@ import { DialogService } from './core/services/dialog.service';
 import { ToastService } from './core/services/toast.service';
 import { ReloadService } from './core/services/reload.service';
 import { ToolbarComponent } from './core/components/toolbar/toolbar.component';
+import { RouterOverlayNavigationService } from './core/services/router-overlay-navigation.service';
+import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { IConfig, ISiScaleReset } from './core/interfaces/app-settings.interfaces';
 import { LATEST_APP_CONFIG_VERSION } from './core/constants/config-versions.const';
 
@@ -1021,7 +1024,7 @@ describe('AppComponent — SI scale reset notice', () => {
     { dashboardId: 'id-helm', dashboard: 'Helm', widget: 'Engine RPM' }
   ];
 
-  async function render(opts: { embed?: boolean; canPersist?: boolean; resets?: ISiScaleReset[]; dialogResult?: boolean | undefined; upgrading?: boolean; configUpgrade?: boolean }) {
+  async function render(opts: { embed?: boolean; canPersist?: boolean; resets?: ISiScaleReset[]; dialogResult?: boolean | undefined; upgrading?: boolean; configUpgrade?: boolean; navigate?: boolean; realDialog?: boolean }) {
     TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [
@@ -1048,12 +1051,22 @@ describe('AppComponent — SI scale reset notice', () => {
     const upgrade = TestBed.inject(ConfigurationUpgradeService);
     vi.spyOn(upgrade, 'runUpgrade').mockResolvedValue(undefined);
     upgrade.upgrading.set(opts.upgrading ?? false);
-    const dialogSpy = vi.spyOn(TestBed.inject(DialogService), 'openSiScaleResetsDialog').mockReturnValue(of(opts.dialogResult));
+    const dialogService = TestBed.inject(DialogService);
+    const dialogSpy = opts.realDialog
+      ? vi.spyOn(dialogService, 'openSiScaleResetsDialog')
+      : vi.spyOn(dialogService, 'openSiScaleResetsDialog').mockReturnValue(of(opts.dialogResult));
+    // Constructed by an app initializer in main.ts, so it is listening before the first navigation.
+    TestBed.inject(RouterOverlayNavigationService);
 
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     TestBed.tick();
-    return { dialogSpy, dismissSpy, resets, upgrade };
+    const router = TestBed.inject(Router);
+    if (opts.navigate ?? true) {
+      await router.navigateByUrl('/');
+      TestBed.tick();
+    }
+    return { dialogSpy, dismissSpy, resets, upgrade, router };
   }
 
   afterEach(() => vi.restoreAllMocks());
@@ -1062,6 +1075,20 @@ describe('AppComponent — SI scale reset notice', () => {
     const { dialogSpy } = await render({});
     expect(dialogSpy).toHaveBeenCalledTimes(1);
     expect(dialogSpy).toHaveBeenCalledWith(RESETS);
+  });
+
+  it('waits for the first navigation to end', async () => {
+    const { dialogSpy, router } = await render({ navigate: false });
+    expect(dialogSpy).not.toHaveBeenCalled();
+
+    await router.navigateByUrl('/');
+    TestBed.tick();
+    expect(dialogSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('is still open after the first navigation, which closes every open dialog', async () => {
+    await render({ realDialog: true });
+    expect(TestBed.inject(MatDialog).openDialogs.length).toBe(1);
   });
 
   it('does not show it under embed', async () => {
