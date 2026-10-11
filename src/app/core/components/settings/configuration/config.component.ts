@@ -7,7 +7,6 @@ import { AuthenticationService } from '../../../services/authentication.service'
 import { ToastService } from '../../../services/toast.service';
 import { SettingsService } from '../../../services/settings.service';
 import { IConfig } from '../../../interfaces/app-settings.interfaces';
-import { StorageService } from '../../../services/storage.service';
 import { ProfileService } from '../../../services/profile.service';
 import { DialogService } from '../../../services/dialog.service';
 import { MatButton } from '@angular/material/button';
@@ -23,7 +22,6 @@ import { RouterLink } from '@angular/router';
 })
 export class SettingsConfigComponent {
   private settings = inject(SettingsService);
-  private storageSvc = inject(StorageService);
   private toast = inject(ToastService);
   private auth = inject(AuthenticationService);
   private profileService = inject(ProfileService);
@@ -32,14 +30,11 @@ export class SettingsConfigComponent {
   private isUserSession = toSignal(this.auth.isUserSession$, { initialValue: false });
 
   protected readonly pageTitle = 'Profiles';
-  public supportApplicationData = this.storageSvc.isAppDataSupported;
 
   // Profiles are user-scope: available with a real Signal K user session (the same-origin SSO session,
   // where the httpOnly session cookie carries auth). Keying off isUserSession$ gates profiles to a
   // genuine signed-in user; an anonymous visitor has no user scope.
-  protected profilesAvailable = computed(() =>
-    this.supportApplicationData && this.isUserSession()
-  );
+  protected profilesAvailable = computed(() => this.isUserSession());
   // Read is available to any user session; profile mutations (create/rename/duplicate/delete/import)
   // need write capability — a read-only session must not get live write controls.
   protected canWriteUserData = toSignal(this.auth.canWriteUserData$, { initialValue: false });

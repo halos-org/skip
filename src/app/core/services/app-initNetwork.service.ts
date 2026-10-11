@@ -17,6 +17,7 @@ import { isValidConfigShape } from '../utils/config-shape.util';
 import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
 import { CONSOLE_MIGRATION_SINK, ConfigMigrationResult, applySiSteps, migrateConfig, skipsPersistentUpgrade } from '../utils/config-migration.util';
 import { cloneDeep } from 'lodash-es';
+import { compare } from 'compare-versions';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { DataService } from './data.service';
 import { SignalKDeltaService } from './signalk-delta.service';
@@ -35,10 +36,15 @@ const CONNECTION_CONFIG_KEY = LOCAL_CONFIG_KEYS.connectionConfig;
 // user scope belongs to a signed-in identity an anonymous visitor does not have.
 const ANONYMOUS_CONFIG_SCOPE = 'global';
 const ANONYMOUS_CONFIG_NAME = 'default';
+/**
+ * Oldest Signal K server Skip runs on. From 2.26.0 the server attaches display units to every path
+ * with an SI unit, including identity conversions; older servers leave many paths in raw SI.
+ */
+export const MIN_SIGNALK_SERVER_VERSION = '2.26.0';
 export type TBootstrapStatus = 'starting' | 'ready' | 'degraded';
 /** Bootstrap auth verdict. 'anonymous' is a session-less read-only visit that must not be redirected. */
 export type TCookieAuthOutcome = 'redirecting' | 'proceed' | 'anonymous' | 'auth-blocked';
-export type TBootstrapIssueReason = 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked';
+export type TBootstrapIssueReason = 'none' | 'missing-shared-config' | 'network-unreachable' | 'unauthorized' | 'unknown' | 'auth-blocked' | 'server-unsupported';
 export type TAuthBlockedCause = 'budget-exhausted' | 'sign-in-required';
 
 export interface IBootstrapIssue {
@@ -46,6 +52,9 @@ export interface IBootstrapIssue {
   statusCode?: number;
   sharedConfigName?: string;
   cause?: TAuthBlockedCause;
+  /** The version an unsupported server reported, and the minimum it fell short of. */
+  serverVersion?: string;
+  requiredVersion?: string;
 }
 
 @Injectable()
@@ -149,6 +158,7 @@ export class AppNetworkInitService implements OnDestroy {
   public async initNetworkServices() {
     let startupDegraded = false;
     let redirecting = false;
+    let serverUnsupported = false;
     this.loadLocalStorageConfig();
     this.preloadFonts();
     this.internetReachability.start();
@@ -172,6 +182,17 @@ export class AppNetworkInitService implements OnDestroy {
           true,
           embedOrEphemeral ? true : (profileDemand ?? true)
         );
+        // Checked before the login refresh: SignalKDeltaService opens the WebSocket as soon as
+        // isLoggedIn$ turns true, which would leave a live stream running behind the notice.
+        // initializeConnection resolves only after the discovery response set the version.
+        const serverVersion = this.connection.serverVersion$.getValue()!;
+        if (compare(serverVersion, MIN_SIGNALK_SERVER_VERSION, '<')) {
+          startupDegraded = true;
+          serverUnsupported = true;
+          this._bootstrapIssue$.next({ reason: 'server-unsupported', serverVersion, requiredVersion: MIN_SIGNALK_SERVER_VERSION });
+          this._bootstrapStatus$.next('degraded');
+          return;
+        }
       }
 
       // Same-origin session: state comes from loginStatus, not a credential login.
@@ -308,8 +329,11 @@ export class AppNetworkInitService implements OnDestroy {
         this._bootstrapStatus$.next('ready');
       }
       console.log("[AppInit Network Service] Initialization completed");
-      // Enable WebSocket functionality now that initialization is complete
-      this.connectionStateMachine.enableWebSocketMode();
+      // Enable WebSocket functionality now that initialization is complete. Not on a server below the
+      // floor: the app stays blocked, so an HTTP rediscovery must not open a stream behind the notice.
+      if (!serverUnsupported) {
+        this.connectionStateMachine.enableWebSocketMode();
+      }
 
       // Start the WebSocket only on a clean bootstrap from a fresh HTTPConnected state. Skip it when
       // degraded/redirecting (e.g. the cookie auth-blocked path, where HTTP is connected but there is

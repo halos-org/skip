@@ -284,7 +284,6 @@ class AuthStub {
 }
 class ConnStub {
   serverServiceEndpoint$ = new BehaviorSubject<IEndpointStatus>({ state: EndpointStatus.Disconnected } as IEndpointStatus);
-  serverVersion$ = new BehaviorSubject<string | null>(null);
 }
 
 function endpoint(httpServiceUrl: string, state: EndpointStatus = EndpointStatus.Connected): IEndpointStatus {
@@ -293,12 +292,12 @@ function endpoint(httpServiceUrl: string, state: EndpointStatus = EndpointStatus
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
-describe('StorageService — applicationData URLs, scope & version gate (characterization)', () => {
+describe('StorageService — applicationData URLs & scope (characterization)', () => {
   const HTTP = 'https://sk.local/signalk/v1/api/';
   const ENDPOINT = 'https://sk.local/signalk/v1/applicationData/';
   let http: HttpTestingController;
 
-  function setup(opts: { httpUrl?: string; version?: string | null; loggedIn?: boolean } = {}) {
+  function setup(opts: { httpUrl?: string; loggedIn?: boolean } = {}) {
     ensureLocalStorage();
     const auth = new AuthStub();
     const conn = new ConnStub();
@@ -311,7 +310,6 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
     });
     const service = TestBed.inject(StorageService);
     http = TestBed.inject(HttpTestingController);
-    if (opts.version !== undefined) conn.serverVersion$.next(opts.version);
     auth.isLoggedIn$.next(opts.loggedIn ?? true);
     conn.serverServiceEndpoint$.next(endpoint(opts.httpUrl ?? HTTP));
     service.activeConfigFileVersion = 11;
@@ -324,16 +322,6 @@ describe('StorageService — applicationData URLs, scope & version gate (charact
   it('derives the applicationData endpoint by stripping the trailing "api/" from the v1 URL', () => {
     const { service } = setup({ httpUrl: 'https://sk.local/signalk/v1/api/' });
     expect((service as unknown as StoragePrivate).serverEndpoint).toBe('https://sk.local/signalk/v1/applicationData/');
-  });
-
-  it('gates isAppDataSupported on at server version 1.27.0 (boundary inclusive)', () => {
-    expect(setup({ version: '1.27.0' }).service.isAppDataSupported).toBe(true);
-  });
-  it('gates isAppDataSupported off below 1.27.0', () => {
-    expect(setup({ version: '1.26.9' }).service.isAppDataSupported).toBe(false);
-  });
-  it('reports isAppDataSupported for a clearly newer server', () => {
-    expect(setup({ version: '2.5.0' }).service.isAppDataSupported).toBe(true);
   });
 
   // An anonymous readonly principal may READ applicationData (SK admin-gates only the write verbs),

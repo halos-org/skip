@@ -23,10 +23,10 @@
 </div>
 
 @if (upgrade.upgrading()) {
-  <div class="config-upgrade-overlay" role="alert" aria-live="polite">
-    <div class="config-upgrade-card">
+  <div class="blocking-overlay" role="alert" aria-live="polite">
+    <div class="blocking-overlay-card">
       <mat-progress-spinner diameter="46" mode="indeterminate"></mat-progress-spinner>
-      <div class="config-upgrade-text">
+      <div class="blocking-overlay-text">
         <h3>Upgrading Configuration…</h3>
         <p>Please wait a moment while we migrate your pages and widgets.</p>
         @if (upgrade.messages().length) {
@@ -36,6 +36,30 @@
             }
           </ul>
         }
+      </div>
+    </div>
+  </div>
+}
+
+@if (serverUnsupported()) {
+  <div class="blocking-overlay">
+    <div
+      class="blocking-overlay-card server-unsupported-card"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="server-unsupported-title"
+      aria-describedby="server-unsupported-message"
+      cdkTrapFocus
+    >
+      <div class="blocking-overlay-text">
+        <h3 id="server-unsupported-title">Signal K server too old</h3>
+        <div id="server-unsupported-message" class="server-unsupported-message">
+          <p>This server runs Signal K {{ bootstrapIssue().serverVersion }}. Skip needs {{ bootstrapIssue().requiredVersion }} or later.</p>
+          <p>Update the server from the Signal K Admin UI, then retry.</p>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button #serverRetry mat-flat-button type="button" (click)="retryUnsupportedServer()">Retry</button>
       </div>
     </div>
   </div>

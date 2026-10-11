@@ -1,13 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { DestroyRef, inject, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { BehaviorSubject, catchError, distinctUntilChanged, forkJoin, map, Observable, of, startWith, switchMap, timeout } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, forkJoin, map, Observable, of, startWith, switchMap } from 'rxjs';
 import { ISkDisplayUnits } from '../interfaces/signalk-interfaces';
 import { resolveSignalKServerRoot } from '../utils/signalk-plugin-url.util';
 import { SignalKConnectionService } from './signalk-connection.service';
-
-/** A server that does not answer within this is treated like one without unit preferences. */
-const UNIT_PREFERENCES_TIMEOUT_MS = 10_000;
 
 /** `GET /signalk/v1/unitpreferences/categories`, reduced to what Skip reads. */
 interface IUnitCategories {
@@ -43,7 +40,7 @@ export function displayUnitsBySiUnit(categories: IUnitCategories, preset: IActiv
 
 /**
  * The server's unit preferences, for values the server cannot attach `displayUnits` to: the fields
- * of an object path. Loaded from the unit-preferences API (Signal K server 2.23 and later) whenever
+ * of an object path. Loaded from the unit-preferences API whenever
  * the connection reaches a new server. `/active` is the server-wide preset, not a user's own.
  */
 @Injectable({ providedIn: 'root' })
@@ -51,7 +48,7 @@ export class UnitPreferencesService {
   private readonly http = inject(HttpClient);
   private readonly connection = inject(SignalKConnectionService);
 
-  /** Display units by SI unit (see {@link displayUnitsBySiUnit}); null until loaded or when the server has none. */
+  /** Display units by SI unit (see {@link displayUnitsBySiUnit}); null until the current server's preferences have loaded. */
   public readonly displayUnits$ = new BehaviorSubject<ReadonlyMap<string, ISkDisplayUnits> | null>(null);
 
   constructor() {
@@ -64,14 +61,12 @@ export class UnitPreferencesService {
     ).subscribe(units => this.displayUnits$.next(units));
   }
 
-  private load(baseUrl: string): Observable<Map<string, ISkDisplayUnits> | null> {
+  private load(baseUrl: string): Observable<Map<string, ISkDisplayUnits>> {
     return forkJoin([
       this.http.get<IUnitCategories>(`${baseUrl}/categories`),
       this.http.get<IActivePreset>(`${baseUrl}/active`),
     ]).pipe(
-      timeout(UNIT_PREFERENCES_TIMEOUT_MS),
       map(([categories, preset]) => displayUnitsBySiUnit(categories, preset)),
-      catchError(() => of(null)),
     );
   }
 }

@@ -4,7 +4,7 @@ import { BehaviorSubject, Subject, of } from 'rxjs';
 import { signal, WritableSignal } from '@angular/core';
 import { AppComponent } from './app.component';
 import { ConnectionState, IConnectionStatus } from './core/services/connection-state-machine.service';
-import { AppNetworkInitService } from './core/services/app-initNetwork.service';
+import { AppNetworkInitService, IBootstrapIssue } from './core/services/app-initNetwork.service';
 import { DashboardService } from './core/services/dashboard.service';
 import { uiEventService } from './core/services/uiEvent.service';
 import { AppService } from './core/services/app-service';
@@ -44,7 +44,7 @@ interface AppComponentNotifyApi {
 describe('AppComponent', () => {
   const appNetworkInitServiceStub = {
     bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
-    bootstrapIssue$: new BehaviorSubject({ reason: 'none' }),
+    bootstrapIssue$: new BehaviorSubject<IBootstrapIssue>({ reason: 'none' }),
   };
 
   let dashboard: {
@@ -377,6 +377,89 @@ describe('AppComponent', () => {
     });
   });
 
+  describe('unsupported Signal K server notice', () => {
+    async function renderUnsupported(serverVersion = '2.25.9'): Promise<ComponentFixture<AppComponent>> {
+      appNetworkInitServiceStub.bootstrapIssue$.next({ reason: 'server-unsupported', serverVersion, requiredVersion: '2.26.0' });
+      appNetworkInitServiceStub.bootstrapStatus$.next('degraded');
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return fixture;
+    }
+
+    function notice(fixture: ComponentFixture<AppComponent>): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector('[role="alertdialog"]');
+    }
+
+    function retryButton(fixture: ComponentFixture<AppComponent>): HTMLButtonElement {
+      return notice(fixture)!.querySelector('button') as HTMLButtonElement;
+    }
+
+    it('names the detected version, the minimum and where to update the server', async () => {
+      const fixture = await renderUnsupported('2.25.9');
+      const text = notice(fixture)?.textContent ?? '';
+      expect(text).toContain('Signal K server too old');
+      expect(text).toContain('2.25.9');
+      expect(text).toContain('2.26.0');
+      expect(text).toContain('Signal K Admin UI');
+    });
+
+    it('is a modal alert dialog labelled by its heading', async () => {
+      const fixture = await renderUnsupported();
+      const dialog = notice(fixture)!;
+      const label = document.getElementById(dialog.getAttribute('aria-labelledby') ?? '');
+      expect(dialog.getAttribute('aria-modal')).toBe('true');
+      expect(label?.textContent).toContain('Signal K server too old');
+    });
+
+    it('offers Retry as its only control, focused on show', async () => {
+      const fixture = await renderUnsupported();
+      expect(notice(fixture)!.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])').length).toBe(1);
+      expect(retryButton(fixture).textContent).toContain('Retry');
+      expect(document.activeElement).toBe(retryButton(fixture));
+    });
+
+    it('traps focus inside the notice', async () => {
+      const fixture = await renderUnsupported();
+      const card = notice(fixture)!;
+      // The CDK trap brackets the trapped region with tabbable anchors that bounce focus back in.
+      expect(card.previousElementSibling?.classList.contains('cdk-focus-trap-anchor')).toBe(true);
+      expect(card.nextElementSibling?.classList.contains('cdk-focus-trap-anchor')).toBe(true);
+    });
+
+    it('reloads through the reachability-gated seam on Retry', async () => {
+      const fixture = await renderUnsupported();
+      retryButton(fixture).click();
+      expect(reloadService.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the dashboard hotkeys inert behind it', async () => {
+      const fixture = await renderUnsupported();
+      const app = fixture.componentInstance as unknown as AppComponentHotkeyApi;
+      app.dashboardVisible.set(true);
+      for (const key of ['e', 'f', 'n', 'arrowright', 'arrowleft']) {
+        app.handleKeyDown(key, { ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, target: document.body, preventDefault: vi.fn() });
+      }
+      expect(dashboard.setStaticDashboard).not.toHaveBeenCalled();
+      expect(uiEvent.toggleFullScreen).not.toHaveBeenCalled();
+      expect(appService.toggleNightMode).not.toHaveBeenCalled();
+      expect(dashboard.navigateToNextDashboard).not.toHaveBeenCalled();
+      expect(dashboard.navigateToPreviousDashboard).not.toHaveBeenCalled();
+    });
+
+    it('raises no recovery toast of its own', async () => {
+      await renderUnsupported();
+      expect(toast.show).not.toHaveBeenCalledWith(expect.any(String), 0, true, 'warn', expect.anything());
+    });
+
+    it('is absent on a clean bootstrap', async () => {
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(notice(fixture)).toBeNull();
+    });
+  });
+
   describe('automatic toolbar reveal opt-out (#495)', () => {
     // The setting lives on the real root SettingsService the component injects; driving it through
     // the setter would also queue a server write, so the read side is stubbed. The stub must be
@@ -613,10 +696,10 @@ describe('AppComponent — toolbar settings effect against the real visibility s
 // EmbedModeService, which the main suite does not stub. Under embed the toolbar is unmounted from
 // the DOM entirely (not CSS-hidden). (#216 E6)
 describe('AppComponent — embed mode chrome', () => {
-  async function render(embed: boolean): Promise<ComponentFixture<AppComponent>> {
+  async function render(embed: boolean, issue: IBootstrapIssue = { reason: 'none' }): Promise<ComponentFixture<AppComponent>> {
     const appNetworkInitServiceStub = {
       bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
-      bootstrapIssue$: new BehaviorSubject({ reason: 'none' }),
+      bootstrapIssue$: new BehaviorSubject<IBootstrapIssue>(issue),
     };
     const dashboard = {
       isDashboardStatic: signal(true),
@@ -668,6 +751,12 @@ describe('AppComponent — embed mode chrome', () => {
   it('mounts the toolbar on a visible dashboard when not embedded', async () => {
     const fixture = await render(false);
     expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).not.toBeNull();
+  });
+
+  it('shows the unsupported-server notice under embed too', async () => {
+    const fixture = await render(true, { reason: 'server-unsupported', serverVersion: '2.25.9', requiredVersion: '2.26.0' });
+    const dialog = (fixture.nativeElement as HTMLElement).querySelector('[role="alertdialog"]');
+    expect(dialog?.textContent).toContain('2.25.9');
   });
 });
 

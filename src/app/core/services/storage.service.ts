@@ -3,7 +3,6 @@ import { EndpointStatus, IEndpointStatus, SignalKConnectionService } from './sig
 import { Injectable, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { IConfig } from "../interfaces/app-settings.interfaces";
-import { compare } from 'compare-versions';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Subject } from 'rxjs/internal/Subject';
 import { tap, concatMap, catchError, finalize, lastValueFrom, of, BehaviorSubject, timeout } from 'rxjs';
@@ -54,7 +53,6 @@ export class StorageService {
   private readonly _auth = inject(AuthenticationService);
 
   private serverEndpoint: string | null = null;
-  public isAppDataSupported = false;
   private configFileVersion: number | null = null;
   public sharedConfigName: string;
   private InitConfig: IConfig | null = null;
@@ -108,14 +106,6 @@ export class StorageService {
       .subscribe((status: IEndpointStatus) => {
         this._networkStatus = status;
         this.isStorageServiceReady();
-      });
-
-    server.serverVersion$
-      .pipe(takeUntilDestroyed())
-      .subscribe(version => {
-        if (version) {
-          this.isAppDataSupported = compare(version, '1.27.0', ">=");
-        }
       });
 
     // Serial queue for ALL applicationData writes — JSON patches (patchConfig/removeItem)

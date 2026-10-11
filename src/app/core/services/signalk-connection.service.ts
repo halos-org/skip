@@ -338,10 +338,6 @@ export class SignalKConnectionService {
     return this.serverName;
   }
 
-  public get skServerVersion() : string | null {
-    return this.serverVersion$.getValue();
-  }
-
   public get skServerRoles() : string[] {
     return this.serverRoles;
   }

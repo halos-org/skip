@@ -3,7 +3,7 @@ import { HttpTestingController } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { AppNetworkInitService, IBootstrapIssue, TCookieAuthOutcome } from './app-initNetwork.service';
+import { AppNetworkInitService, IBootstrapIssue, MIN_SIGNALK_SERVER_VERSION, TCookieAuthOutcome } from './app-initNetwork.service';
 import { IConfig, IConnectionConfig } from '../interfaces/app-settings.interfaces';
 import { EndpointStatus, IEndpointStatus, SignalKConnectionService } from './signalk-connection.service';
 import { AuthenticationService, ILoginStatus } from './authentication.service';
@@ -33,7 +33,9 @@ describe('AppNetworkInitService', () => {
 
     const mockConnection = {
         initializeConnection: vi.fn().mockResolvedValue(undefined),
-        setSubscribeAll: vi.fn()
+        setSubscribeAll: vi.fn(),
+        serverServiceEndpoint$: new BehaviorSubject<IEndpointStatus | null>(null),
+        serverVersion$: new BehaviorSubject<string | null>(MIN_SIGNALK_SERVER_VERSION)
     };
 
     const mockAuth = {
@@ -116,6 +118,7 @@ describe('AppNetworkInitService', () => {
         mockStorage.setConfig.mockClear();
         mockStorage.canPersist.mockClear().mockReturnValue(true);
         mockConnection.setSubscribeAll.mockClear();
+        mockConnection.serverVersion$.next(MIN_SIGNALK_SERVER_VERSION);
         mockEmbed.embed.mockClear().mockReturnValue(false);
         mockEmbed.profile.mockClear().mockReturnValue(null);
         mockAuth.loginStatusValue = null;
@@ -820,6 +823,104 @@ describe('AppNetworkInitService', () => {
         });
     });
 
+    describe('Signal K server version floor', () => {
+        function loggedInBoot(version: string): void {
+            mockConnection.serverVersion$.next(version);
+            mockConnectionStateMachine.currentState = ConnectionState.HTTPConnected;
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+        }
+
+        it.each(['2.26.0', '2.33.0', '2.33.0-beta.1'])('boots normally on server %s', async (version) => {
+            loggedInBoot(version);
+
+            await service.initNetworkServices();
+
+            expect(latestIssue()).toEqual({ reason: 'none' });
+            expect(latestStatus()).toBe('ready');
+            expect(mockStorage.getConfig).toHaveBeenCalled();
+            expect(mockConnectionStateMachine.startWebSocketConnection).toHaveBeenCalledTimes(1);
+        });
+
+        it.each(['2.25.9', '2.26.0-beta.2'])('refuses to boot on server %s', async (version) => {
+            loggedInBoot(version);
+
+            await service.initNetworkServices();
+
+            expect(latestIssue()).toEqual({ reason: 'server-unsupported', serverVersion: version, requiredVersion: '2.26.0' });
+            expect(latestStatus()).toBe('degraded');
+            expect(mockStorage.getConfig).not.toHaveBeenCalled();
+            expect(mockStorage.bootstrapRemoteContext).not.toHaveBeenCalled();
+        });
+
+        it('checks before the login refresh, so a signed-in session never opens the WebSocket', async () => {
+            loggedInBoot('2.25.9');
+
+            await service.initNetworkServices();
+
+            // SignalKDeltaService connects as soon as isLoggedIn$ turns true, so the refresh itself
+            // must not run behind the notice.
+            expect(mockAuth.refreshLoginStatus).not.toHaveBeenCalled();
+            expect(isLoggedIn$.value).toBe(false);
+            expect(mockConnectionStateMachine.startWebSocketConnection).not.toHaveBeenCalled();
+            expect(mockSsoRedirect.attemptAutoRedirect).not.toHaveBeenCalled();
+        });
+
+        it('does not reset the sign-in redirect budget on an unsupported server', async () => {
+            loggedInBoot('2.25.9');
+
+            await service.initNetworkServices();
+
+            expect(mockSsoRedirect.resetBudget).not.toHaveBeenCalled();
+        });
+
+        describe('against the real connection state machine and delta service', () => {
+            let stateMachine: ConnectionStateMachine;
+            let entered: ConnectionState[];
+
+            beforeEach(() => {
+                TestBed.resetTestingModule();
+                TestBed.configureTestingModule({
+                    providers: [
+                        AppNetworkInitService,
+                        ConnectionStateMachine,
+                        SignalKDeltaService,
+                        {
+                            provide: SignalKConnectionService,
+                            useValue: {
+                                ...mockConnection,
+                                serverServiceEndpoint$: new BehaviorSubject<IEndpointStatus>({
+                                    state: EndpointStatus.Disconnected, message: '', serverDescription: '',
+                                    httpServiceUrl: '', WsServiceUrl: ''
+                                })
+                            }
+                        },
+                        { provide: AuthenticationService, useValue: mockAuth },
+                        { provide: SsoRedirectService, useValue: mockSsoRedirect },
+                        { provide: DataService, useValue: {} },
+                        { provide: StorageService, useValue: mockStorage },
+                        { provide: InternetReachabilityService, useValue: mockInternetReachability },
+                        { provide: EmbedModeService, useValue: mockEmbed }
+                    ]
+                });
+                stateMachine = TestBed.inject(ConnectionStateMachine);
+                TestBed.inject(SignalKDeltaService);
+                service = TestBed.inject(AppNetworkInitService);
+                entered = [];
+                stateMachine.state$.subscribe(s => entered.push(s));
+                mockConnection.serverVersion$.next('2.25.9');
+                stateMachine.onHTTPDiscoverySuccess();
+            });
+
+            it('does not open the WebSocket when HTTP discovery succeeds again behind the notice', async () => {
+                await service.initNetworkServices();
+
+                stateMachine.onHTTPDiscoverySuccess();
+
+                expect(entered).not.toContain(ConnectionState.WebSocketConnecting);
+            });
+        });
+    });
+
     // Ephemeral URL-selected profile (#216 E6): a valid `?profile=<name>` loads a different slot for
     // this session only; it must thread into getConfig + bootstrap but NEVER persist to localStorage.
     describe('ephemeral URL profile override (#216 E6)', () => {
@@ -1078,7 +1179,7 @@ describe('AppNetworkInitService', () => {
                                         state: EndpointStatus.Connected, message: '', serverDescription: '',
                                         httpServiceUrl: 'http://localhost/signalk/v1/api/', WsServiceUrl: ''
                                     }),
-                                    serverVersion$: new BehaviorSubject<string | null>(null)
+                                    serverVersion$: new BehaviorSubject<string | null>(MIN_SIGNALK_SERVER_VERSION)
                                 }
                             },
                             { provide: AuthenticationService, useValue: { ...mockAuth, canWriteUserData: () => writable } },

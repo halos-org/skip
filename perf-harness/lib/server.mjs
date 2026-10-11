@@ -88,8 +88,31 @@ function targetSceneDelta(tg, t) {
   ] }] });
 }
 
-// Skip gates widget history on server.version >= 2.22.1 (settings.service.ts).
-const SERVER_VERSION = '2.24.0';
+// Skip refuses to boot below its Signal K server floor (2.26.0).
+const SERVER_VERSION = '2.33.0';
+
+// GET /signalk/v1/unitpreferences/{categories,active} for a subset of the built-in
+// "Nautical (Metric)" preset. Skip treats this API as always present, so the mock serves it
+// unless a scenario overrides it through control.unitPreferences.
+const DEFAULT_UNIT_PREFERENCES = {
+  categories: { categoryToBaseUnit: {
+    angle: 'rad', angleDegrees: 'deg', speed: 'm/s', distance: 'm', depth: 'm', length: 'm',
+    temperature: 'K', pressure: 'Pa', volume: 'm3', volumeRate: 'm3/s', percentage: 'ratio',
+  } },
+  active: { name: 'Nautical (Metric)', categories: {
+    angle: { baseUnit: 'rad', targetUnit: 'degree', displayFormat: '0.0', formula: 'value * 57.29577951308231', inverseFormula: 'value / 57.29577951308231', symbol: '°' },
+    angleDegrees: { baseUnit: 'deg', targetUnit: 'deg', displayFormat: '0.0' },
+    speed: { baseUnit: 'm/s', targetUnit: 'kn', displayFormat: '0.0', formula: 'value * 1.94384', inverseFormula: 'value * 0.514444', symbol: 'kn' },
+    distance: { baseUnit: 'm', targetUnit: 'naut-mile', displayFormat: '0.0', symbol: 'nmi' },
+    depth: { baseUnit: 'm', targetUnit: 'm', displayFormat: '0.0', symbol: 'm' },
+    length: { baseUnit: 'm', targetUnit: 'm', displayFormat: '0.0', symbol: 'm' },
+    temperature: { baseUnit: 'K', targetUnit: 'C', displayFormat: '0.0', formula: 'value - 273.15', inverseFormula: 'value + 273.15', symbol: '°C' },
+    pressure: { baseUnit: 'Pa', targetUnit: 'mbar', displayFormat: '0', formula: 'value / 100', inverseFormula: 'value * 100', symbol: 'mbar' },
+    volume: { baseUnit: 'm3', targetUnit: 'liter', displayFormat: '0.0', formula: 'value * 1000', inverseFormula: 'value / 1000', symbol: 'L' },
+    volumeRate: { baseUnit: 'm3/s', targetUnit: 'L/h', displayFormat: '0.0', formula: 'value * 3600000', inverseFormula: 'value / 3600000', symbol: 'L/h' },
+    percentage: { baseUnit: 'ratio', targetUnit: 'percent', displayFormat: '0', formula: 'value * 100', inverseFormula: 'value / 100', symbol: '%' },
+  } },
+};
 
 function helloMsg() {
   return JSON.stringify({ name: 'skip-mock', version: SERVER_VERSION, self: SELF_URN, roles: ['master', 'main'], timestamp: iso(Date.now()) });
@@ -127,11 +150,11 @@ function historyResponse(paths, rows, stepSec) {
  *            restSelfValues:{path:value}, resources:{'<type>/<id>':body}, unitPreferences:{<name>:body} }
  * restSelfValues answers GET /signalk/v1/api/vessels/self/<path as segments> with a v1 leaf; resources
  * answers GET /signalk/v2/api/resources/<type>/<id>. Anything else under those roots stays as before.
- * unitPreferences answers GET /signalk/v1/unitpreferences/<name> (`categories`, `active`); without it
- * those routes 404, as on a server older than 2.23.
+ * unitPreferences answers GET /signalk/v1/unitpreferences/<name> (`categories`, `active`); it
+ * defaults to DEFAULT_UNIT_PREFERENCES, and a name it does not hold 404s.
  */
 export async function startServer({ publicDir, base, port }) {
-  const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], selfValues: null, selfMeta: null, restSelfValues: null, resources: null, unitPreferences: null, ais: { count: 0, churnPerSec: 0 } };
+  const control = { streaming: false, rateHz: 10, selfPaths: ['navigation.speedOverGround'], selfValues: null, selfMeta: null, restSelfValues: null, resources: null, unitPreferences: DEFAULT_UNIT_PREFERENCES, ais: { count: 0, churnPerSec: 0 } };
   let history = { rows: 0, stepSec: 1, paths: ['navigation.speedOverGround'] };
   let configDoc = null; // IConfig served from applicationData (set per scenario by the runner)
   let sent = 0;

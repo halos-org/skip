@@ -188,9 +188,9 @@ export interface ISkMetadata {
   method?: TMethod[];
   displayScale?: ISkDisplayScale
   /**
-   * Server-supplied display-unit preference (Signal K unit-preferences plugin). Present per path
-   * when the plugin is installed; absent otherwise. `targetUnit`/`symbol` are the plugin's unit key
-   * and abbreviation; `formula`/`inverseFormula` are math.js expressions (SI <-> target) reserved for
+   * Server-supplied display-unit preference (Signal K unit preferences). Absent on a path with no
+   * units or with a unit the server has no category for. `targetUnit`/`symbol` are the server's unit
+   * key and abbreviation; `formula`/`inverseFormula` are math.js expressions (SI <-> target) reserved for
    * a later phase — Skip currently maps `targetUnit` onto its own conversion engine.
    */
   displayUnits?: ISkDisplayUnits;

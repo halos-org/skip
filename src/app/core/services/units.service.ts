@@ -895,12 +895,13 @@ export class UnitsService {
   }
 
   /**
-   * The server's preferred display measure for a path (Signal K unit-preferences plugin), used as the
+   * The server's preferred display measure for a path (Signal K unit preferences), used as the
    * default conversion target when present. Returns a measure only when the server's targetUnit maps
    * to a Skip measure that is valid for the path's own conversion group — so the resolved measure
    * drives BOTH the conversion and the label from one source (the "label matches conversion"
-   * invariant). Undefined when there is no server preference or it is not honourable (unit-less path,
-   * or an unmapped/unsupported target), in which case the caller falls back to 'unitless'.
+   * invariant). Undefined when the path carries no displayUnits (a unit the server has no category
+   * for, such as Pa.s, Lux, kg/m3, VA, VAR or %) or the target is unmapped or unsupported, in which
+   * case the caller falls back to 'unitless'.
    * Per-widget overrides are unaffected: this only supplies the default a fresh path selection seeds.
    *
    * The target is matched against the path's own group BEFORE the alias table, so a target that is
@@ -924,7 +925,7 @@ export class UnitsService {
 
   /**
    * Server targets Skip cannot honour degrade to 'unitless' — a raw SI value with no label, which is
-   * indistinguishable on screen from a path the server states no preference for. #536 took a user's
+   * indistinguishable on screen from a path the server attaches no display unit to. #536 took a user's
    * bug report to find for exactly that reason, so name the target that was dropped. Once per target
    * per session: the resolver runs on every meta emission, and a repeating console line is noise the
    * next reader learns to scroll past.
