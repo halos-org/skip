@@ -34,10 +34,10 @@
   gap: 18px;
   padding: 20px 24px;
   width: clamp(300px, 60vw, 640px);
-  background: var(--skip-background, #1f1f1f);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: var(--mat-sys-surface-container-high);
+  border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 14px;
-  color: var(--skip-contrast-color, #fff);
+  color: var(--mat-sys-on-surface);
   box-shadow: 0 6px 22px rgba(0,0,0,0.55);
 }
 
