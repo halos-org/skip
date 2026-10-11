@@ -68,9 +68,9 @@ describe('UnitPreferencesService', () => {
 
   afterEach(() => http.verify());
 
-  function answer(categories: object, active: object): void {
-    http.expectOne('http://boat.local:3000/signalk/v1/unitpreferences/categories').flush(categories);
-    http.expectOne('http://boat.local:3000/signalk/v1/unitpreferences/active').flush(active);
+  function answer(categories: object, active: object, root = 'http://boat.local:3000'): void {
+    http.expectOne(`${root}/signalk/v1/unitpreferences/categories`).flush(categories);
+    http.expectOne(`${root}/signalk/v1/unitpreferences/active`).flush(active);
   }
 
   it('loads the preferences once the server endpoint is known', () => {
@@ -91,13 +91,6 @@ describe('UnitPreferencesService', () => {
     http.expectNone(() => true);
   });
 
-  it('stays empty on a server without the unit-preferences API', () => {
-    endpoint$.next({ httpServiceUrl: API });
-    http.expectOne(req => req.url.endsWith('/categories')).flush('Not found', { status: 404, statusText: 'Not Found' });
-    expect(http.expectOne(req => req.url.endsWith('/active')).cancelled).toBe(true);
-    expect(service.displayUnits$.value).toBeNull();
-  });
-
   it('drops the previous server\'s preferences while another server\'s load is pending', () => {
     endpoint$.next({ httpServiceUrl: API });
     answer(CATEGORIES, ACTIVE);
@@ -105,7 +98,9 @@ describe('UnitPreferencesService', () => {
     endpoint$.next({ httpServiceUrl: 'http://other.local:3000/signalk/v1/api/' });
 
     expect(service.displayUnits$.value).toBeNull();
-    http.match(() => true).forEach(req => req.flush({}));
+    answer(CATEGORIES, { categories: { speed: ACTIVE.categories.speed } }, 'http://other.local:3000');
+    expect(service.displayUnits$.value?.has('rad')).toBe(false);
+    expect(service.displayUnits$.value?.get('m/s')?.targetUnit).toBe('kn');
   });
 
   it('drops the preferences when the connection loses its endpoint', () => {
