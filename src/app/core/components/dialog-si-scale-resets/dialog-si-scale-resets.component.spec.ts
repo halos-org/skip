@@ -5,11 +5,11 @@ import { DialogSiScaleResetsComponent } from './dialog-si-scale-resets.component
 import type { ISiScaleReset } from '../../interfaces/app-settings.interfaces';
 
 const RESETS: ISiScaleReset[] = [
-  { dashboardId: 'd1', dashboard: 'Helm', widget: 'Engine RPM', type: 'widget-gauge-ng-radial', options: ['displayScale.lower', 'displayScale.upper'] },
-  { dashboardId: 'd2', dashboard: 'Nav', widget: 'widget-data-chart', type: 'widget-data-chart', options: ['yScaleMin'] },
-  { dashboardId: 'd1', dashboard: 'Helm', widget: 'Coolant', type: 'widget-numeric', options: ['yScaleMax'] },
+  { dashboardId: 'd1', dashboard: 'Helm', widget: 'Engine RPM' },
+  { dashboardId: 'd2', dashboard: 'Nav', widget: 'widget-data-chart' },
+  { dashboardId: 'd1', dashboard: 'Helm', widget: 'Coolant' },
   // Another dashboard with the same name: it gets its own heading.
-  { dashboardId: 'd3', dashboard: 'Helm', widget: 'Depth', type: 'widget-numeric', options: ['yScaleMax'] }
+  { dashboardId: 'd3', dashboard: 'Helm', widget: 'Depth' }
 ];
 
 function render() {

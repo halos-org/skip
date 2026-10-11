@@ -39,10 +39,10 @@ export const V25_MIGRATION_OUTPUT_VERSION = 25;
 type WidgetConfigRecord = Record<string, unknown>;
 
 /**
- * Converts one widget config's stored options to SI, in place. Returns the options it reset to
- * `null` because it had no unit to convert them from, as dotted paths from the config root, if any.
+ * Converts one widget config's stored options to SI, in place. Returns true when it reset an option
+ * to `null` because it had no unit to convert it from.
  */
-type SiConversion = (config: WidgetConfigRecord) => readonly string[] | void;
+type SiConversion = (config: WidgetConfigRecord) => boolean | void;
 
 const isRecord = (value: unknown): value is WidgetConfigRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -221,11 +221,11 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 
 /**
  * Converts the listed options of `holder` from `measure` to SI, or, when `measure` is not in the
- * frozen table, resets the numeric ones to `null`. Returns the reset options, prefixed by `prefix`.
+ * frozen table, resets the numeric ones to `null`. Returns whether it reset any.
  */
-function boundsToSi(holder: WidgetConfigRecord, keys: readonly string[], measure: unknown, prefix = ''): string[] {
+function boundsToSi(holder: WidgetConfigRecord, keys: readonly string[], measure: unknown): boolean {
   const factors = typeof measure === 'string' && Object.hasOwn(V22_MEASURE_TO_SI, measure) ? V22_MEASURE_TO_SI[measure] : undefined;
-  const reset: string[] = [];
+  let reset = false;
   for (const key of keys) {
     const value = holder[key];
     if (!isFiniteNumber(value)) continue;
@@ -233,7 +233,7 @@ function boundsToSi(holder: WidgetConfigRecord, keys: readonly string[], measure
       holder[key] = (value - factors[0]) / factors[1];
     } else {
       holder[key] = null;
-      reset.push(prefix + key);
+      reset = true;
     }
   }
   return reset;
@@ -253,7 +253,7 @@ function slotUnit(config: WidgetConfigRecord, slot: string): unknown {
 const gaugeBoundsToSi: SiConversion = config => {
   const scale = config['displayScale'];
   if (!isRecord(scale)) return;
-  return boundsToSi(scale, ['lower', 'upper'], slotUnit(config, 'gaugePath'), 'displayScale.');
+  return boundsToSi(scale, ['lower', 'upper'], slotUnit(config, 'gaugePath'));
 };
 
 /** v22: the numeric's minigraph y bounds are stored in SI, like the gauges' (see gaugeBoundsToSi). */
@@ -833,13 +833,11 @@ function convertToSi(config: IConfig, sink: MigrationMessageSink, conversions: R
       if (!wp || typeof wp.type !== 'string' || !Object.hasOwn(conversions, wp.type) || !isRecord(wp.config)) continue;
       const reset = conversions[wp.type](wp.config);
       converted++;
-      if (!reset?.length) continue;
+      if (!reset) continue;
       const entry: ISiScaleReset = {
         dashboardId: String(dash.id),
         dashboard: nonEmptyString(dash.name) ?? String(index + 1),
-        widget: nonEmptyString(wp.config['displayName']) ?? wp.type,
-        type: wp.type,
-        options: [...reset]
+        widget: nonEmptyString(wp.config['displayName']) ?? wp.type
       };
       resets.push(entry);
       sink.info(`[Upgrade] The scale range of "${entry.widget}" on dashboard "${entry.dashboard}" had no known unit and was reset; set it again in the widget's options.`);

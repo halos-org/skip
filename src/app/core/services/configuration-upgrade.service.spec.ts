@@ -1074,7 +1074,7 @@ describe('ConfigurationUpgradeService', () => {
         const [gauge, numeric] = written.dashboards[0].configuration.map((w: { input: { widgetProperties: { config: Record<string, unknown> } } }) => w.input.widgetProperties.config);
         expect(gauge['displayScale']).toEqual({ lower: 0, upper: 60 });
         expect(numeric).toMatchObject({ yScaleMin: null, yScaleMax: null });
-        expect(written.app.siScaleResets).toEqual([{ dashboardId: 'd0', dashboard: 'Engine', widget: 'Tank', type: 'widget-numeric', options: ['yScaleMin', 'yScaleMax'] }]);
+        expect(written.app.siScaleResets).toEqual([{ dashboardId: 'd0', dashboard: 'Engine', widget: 'Tank' }]);
     });
 
     it('v21 upgrade skips a slot that is not at version 21 (no re-stamp)', async () => {

@@ -1018,7 +1018,7 @@ describe('AppComponent — embed boot performs zero server-config writes (#216 E
 
 describe('AppComponent — SI scale reset notice', () => {
   const RESETS: ISiScaleReset[] = [
-    { dashboardId: 'id-helm', dashboard: 'Helm', widget: 'Engine RPM', type: 'widget-gauge-ng-radial', options: ['displayScale.lower', 'displayScale.upper'] }
+    { dashboardId: 'id-helm', dashboard: 'Helm', widget: 'Engine RPM' }
   ];
 
   async function render(opts: { embed?: boolean; canPersist?: boolean; resets?: ISiScaleReset[]; dialogResult?: boolean | undefined; upgrading?: boolean; configUpgrade?: boolean }) {
