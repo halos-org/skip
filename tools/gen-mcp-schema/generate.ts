@@ -83,7 +83,7 @@ const OPTION_UNITS_RULE =
   'stored in; for an array option the unit applies to each element. A unit written as \'SI unit of <slot>\' is ' +
   'the Signal K SI unit of the path that ' +
   'path slot (or path option) points at, such as K for a temperature. A scale bound set to null is unset: the ' +
-  "widget uses the path's own display scale, and a data graph scales itself.";
+  "widget uses the path's own display scale, a slider uses 0 to 1, and a data graph scales itself.";
 
 /**
  * Extracts Skip's widget catalog (`_widgetDefinition`) from widget.service.ts.

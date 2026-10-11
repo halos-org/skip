@@ -157,7 +157,7 @@
                   @if (lowerUnit) {
                     <span matTextSuffix>{{ lowerUnit }}</span>
                   }
-                  @if (lowerUnit !== null) {
+                  @if (lowerUnit !== null && emptyScaleUsesPathScale) {
                     <mat-hint>Leave empty to use the path's own scale.</mat-hint>
                   }
                 </mat-form-field>
@@ -173,7 +173,7 @@
                   @if (upperUnit) {
                     <span matTextSuffix>{{ upperUnit }}</span>
                   }
-                  @if (upperUnit !== null) {
+                  @if (upperUnit !== null && emptyScaleUsesPathScale) {
                     <mat-hint>Leave empty to use the path's own scale.</mat-hint>
                   }
                 </mat-form-field>
@@ -350,7 +350,7 @@
                     name="closeHauledLineAngle"
                     formControlName="closeHauledLineAngle"
                   />
-                  <span matTextSuffix>&deg;</span>
+                  <span matTextSuffix>{{ siUnitSymbol('closeHauledLineAngle') }}</span>
                   <mat-hint>Measured from the true wind. With Angle from Polar, used while the active polar gives no angle.</mat-hint>
                 </mat-form-field>
               }
@@ -762,7 +762,7 @@
                     Plot target COG vector
                   </mat-checkbox>
                   <mat-form-field>
-                    <mat-label>COG plot length (minutes)</mat-label>
+                    <mat-label>COG plot length</mat-label>
                     <input
                       type="number"
                       min="1"
@@ -772,6 +772,7 @@
                       name="cogVectorsSeconds"
                       formControlName="cogVectorsSeconds"
                     />
+                    <span matTextSuffix>{{ siUnitSymbol('ais.cogVectorsSeconds') }}</span>
                   </mat-form-field>
                   <mat-checkbox
                     name="showUnconfirmedTargets"
@@ -869,7 +870,7 @@
                       name="heelCautionAngle"
                       formControlName="heelCautionAngle"
                     />
-                    <span matTextSuffix>°</span>
+                    <span matTextSuffix>{{ siUnitSymbol('gauge.heelCautionAngle') }}</span>
                     <mat-error>Must be below the alarm angle</mat-error>
                   </mat-form-field>
                   <mat-form-field formGroupName="gauge">
@@ -883,7 +884,7 @@
                       name="heelAlarmAngle"
                       formControlName="heelAlarmAngle"
                     />
-                    <span matTextSuffix>°</span>
+                    <span matTextSuffix>{{ siUnitSymbol('gauge.heelAlarmAngle') }}</span>
                     <mat-error>Must be above the caution angle</mat-error>
                   </mat-form-field>
                   <mat-form-field formGroupName="gauge">

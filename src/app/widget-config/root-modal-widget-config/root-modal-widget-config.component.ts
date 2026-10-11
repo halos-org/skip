@@ -33,6 +33,7 @@ import { ActivePolarService } from '../../core/services/active-polar.service';
 import { DataService } from '../../core/services/data.service';
 import { POLAR_PATH_KEYS } from '../../core/utils/polar-overlay.util';
 import { UnitsService } from '../../core/services/units.service';
+import { WidgetService } from '../../core/services/widget.service';
 import { pathOptionMeasure, presentationValue, presentedOption } from '../../core/utils/si-presentation.util';
 
 /** An option stored in SI and shown in the form in a presentation unit. */
@@ -44,13 +45,13 @@ interface SiOption {
 }
 
 /** Where the path an option follows is: a path slot, or a config key holding a path. */
-type SiUnitSource = { slot: string } | { pathKey: 'datachartPath' };
+type SiUnitSource = { slot: string } | { pathKey: string };
 
-/** Options of the listed widget types stored in SI and shown in the unit the widget presents a path in. */
-interface PathSiOptions {
-  types: readonly string[];
-  source: SiUnitSource;
-  paths: readonly (readonly string[])[];
+/** The path an option follows, the unit stored with its slot, and whether the slot is structural. */
+interface SiUnitResolution {
+  path: string | null;
+  stored: string | null;
+  structural: boolean;
 }
 
 /**
@@ -84,31 +85,20 @@ export class RootModalWidgetConfigComponent implements OnInit {
   private static readonly KEY_PATHS = 'paths';
   private static readonly KEY_AIS = 'ais';
   private static readonly KEY_CONVERT_UNIT_TO = 'convertUnitTo';
-  /** Options stored in SI; the form shows and accepts them in the listed unit. */
-  private static readonly SI_OPTIONS: readonly SiOption[] = [
-    { path: ['closeHauledLineAngle'], unit: 'deg' },
-    { path: ['gauge', 'heelCautionAngle'], unit: 'deg' },
-    { path: ['gauge', 'heelAlarmAngle'], unit: 'deg' },
-    { path: ['ais', 'cogVectorsSeconds'], unit: 'Minutes' }
-  ];
-  private static readonly PATH_SI_OPTIONS: readonly PathSiOptions[] = [
-    {
-      types: ['widget-gauge-ng-radial', 'widget-gauge-ng-linear', 'widget-gauge-steel', 'widget-simple-linear'],
-      source: { slot: 'gaugePath' },
-      paths: [['displayScale', 'lower'], ['displayScale', 'upper']]
-    },
-    { types: ['widget-numeric'], source: { slot: 'numericPath' }, paths: [['yScaleMin'], ['yScaleMax']] },
-    {
-      types: ['widget-data-chart'],
-      source: { pathKey: 'datachartPath' },
-      paths: [['yScaleMin'], ['yScaleMax'], ['yScaleSuggestedMin'], ['yScaleSuggestedMax']]
-    }
-  ];
+  /**
+   * The unit the form shows an option stored in a fixed SI unit in, where that is not the SI unit
+   * itself. The widget's OPTION_UNITS says which options are stored in SI.
+   */
+  private static readonly FORM_UNITS: Readonly<Record<string, string>> = { rad: 'deg', s: 'Minutes' };
+  /** How OPTION_UNITS names the SI unit of the path a slot or path option points at. */
+  private static readonly PATH_SI_UNIT = /^SI unit of (\S+)$/;
   private dialogRef = inject<MatDialogRef<RootModalWidgetConfigComponent>>(MatDialogRef);
   private fb = inject(UntypedFormBuilder);
   private app = inject(AppService);
   private readonly destroyRef = inject(DestroyRef);
   protected widgetConfig = inject<IWidgetSvcConfig & { widgetName?: string; widgetType?: string }>(MAT_DIALOG_DATA);
+  /** An empty scale bound falls back to the path's display scale, except on the slider, which falls back to 0–1. */
+  protected readonly emptyScaleUsesPathScale = this.widgetConfig.widgetType !== 'widget-slider';
 
   public titleDialog = this.widgetConfig?.widgetName
     ? `${this.widgetConfig.widgetName} — Widget Settings`
@@ -124,8 +114,9 @@ export class RootModalWidgetConfigComponent implements OnInit {
   private readonly activePolar = inject(ActivePolarService);
   private readonly data = inject(DataService);
   private readonly units = inject(UnitsService);
+  private readonly widgets = inject(WidgetService);
   private siFields: SiField[] = [];
-  /** The unit symbol of each option that follows a path, by its dotted config path. */
+  /** The unit symbol of each SI option, by its dotted config path. */
   private readonly siUnitSymbols = signal<ReadonlyMap<string, string>>(new Map());
   /** The Wind Steer polar overlay's SI input paths, and those the server has sent at least once. */
   private polarOverlayPaths: string[] = [];
@@ -527,36 +518,44 @@ export class RootModalWidgetConfigComponent implements OnInit {
     this.dialogRef.close(nextConfig);
   }
 
-  /**
-   * The unit symbol an SI option that follows a path is shown with, by its dotted config path, or
-   * null for a field that is not such an option.
-   */
+  /** The unit symbol an SI option is shown with, by its dotted config path, or null for any other field. */
   protected siUnitSymbol(key: string): string | null {
     return this.siUnitSymbols().get(key) ?? null;
   }
 
-  /** Replaces each SI option in the form's copy of the config with its value in the form's unit. */
+  /**
+   * Replaces each option the widget's OPTION_UNITS lists in the form's copy of the config with its
+   * value in the form's unit.
+   */
   private showSiOptionsInPresentationUnits(formConfig: object, widgetType: string | undefined): void {
     this.siFields = [];
-    for (const option of RootModalWidgetConfigComponent.SI_OPTIONS) {
-      const si: unknown = get(formConfig, option.path);
-      if (typeof si !== 'number' || !Number.isFinite(si)) continue;
-      const shown = presentedOption(presentationValue(this.units, option.unit, si));
-      set(formConfig, option.path, shown);
-      this.siFields.push({ ...option, si, shown });
-    }
-    for (const group of RootModalWidgetConfigComponent.PATH_SI_OPTIONS) {
-      if (!widgetType || !group.types.includes(widgetType)) continue;
-      const { path, stored } = this.siUnitSourceIn(group.source, keys => get(formConfig, keys));
-      const unit = pathOptionMeasure(this.units, path, stored);
-      for (const optionPath of group.paths) {
-        if (!has(formConfig, optionPath)) continue;
-        const value: unknown = get(formConfig, optionPath);
-        const si = typeof value === 'number' && Number.isFinite(value) ? value : null;
+    const sources = new Map<string, SiUnitSource>();
+    const optionUnits = (widgetType && this.widgets.getOptionUnits(widgetType)) || {};
+    for (const [name, siUnit] of Object.entries(optionUnits)) {
+      const path = name.split('.');
+      const value: unknown = get(formConfig, path);
+      const si = typeof value === 'number' && Number.isFinite(value) ? value : null;
+      const followed = RootModalWidgetConfigComponent.PATH_SI_UNIT.exec(siUnit)?.[1];
+      if (followed === undefined) {
+        // An option with no number to show, such as the AIS range rings, has no field.
+        if (si === null) continue;
+        const unit = RootModalWidgetConfigComponent.FORM_UNITS[siUnit] ?? siUnit;
         const shown = this.presented(unit, si);
-        set(formConfig, optionPath, shown);
-        this.siFields.push({ path: optionPath, unit, si, shown, follows: { source: group.source, resolvedFor: this.resolutionKey(path, stored) } });
+        set(formConfig, path, shown);
+        this.siFields.push({ path, unit, si, shown });
+        continue;
       }
+      if (!has(formConfig, path)) continue;
+      let source = sources.get(followed);
+      if (!source) {
+        source = has(formConfig, ['paths', followed]) ? { slot: followed } : { pathKey: followed };
+        sources.set(followed, source);
+      }
+      const resolution = this.siUnitSourceIn(source, keys => get(formConfig, keys));
+      const unit = this.measureOf(resolution);
+      const shown = this.presented(unit, si);
+      set(formConfig, path, shown);
+      this.siFields.push({ path, unit, si, shown, follows: { source, resolvedFor: this.resolutionKey(resolution) } });
     }
   }
 
@@ -564,18 +563,31 @@ export class RootModalWidgetConfigComponent implements OnInit {
     return si == null ? null : presentedOption(presentationValue(this.units, unit, si));
   }
 
-  /** The path an option follows and the unit stored with its slot, read through `read`. */
-  private siUnitSourceIn(source: SiUnitSource, read: (keys: string[]) => unknown): { path: string | null; stored: string | null } {
+  /** The path an option follows, the unit stored with its slot and whether that is structural, read through `read`. */
+  private siUnitSourceIn(source: SiUnitSource, read: (keys: string[]) => unknown): SiUnitResolution {
     const text = (value: unknown): string | null => typeof value === 'string' && value !== '' ? value : null;
-    if ('pathKey' in source) return { path: text(read([source.pathKey])), stored: null };
-    return { path: text(read(['paths', source.slot, 'path'])), stored: text(read(['paths', source.slot, RootModalWidgetConfigComponent.KEY_CONVERT_UNIT_TO])) };
+    if ('pathKey' in source) return { path: text(read([source.pathKey])), stored: null, structural: false };
+    const slot = ['paths', source.slot];
+    return {
+      path: text(read([...slot, 'path'])),
+      stored: text(read([...slot, RootModalWidgetConfigComponent.KEY_CONVERT_UNIT_TO])),
+      structural: read([...slot, 'showConvertUnitTo']) === false
+    };
   }
 
-  private resolutionKey(path: string | null, stored: string | null): string {
+  /**
+   * The measure the widget presents the path in: a structural slot presents in its fixed unit, or in
+   * SI when it has none (the slider); only a display slot follows the server's measure for the path.
+   */
+  private measureOf({ path, stored, structural }: SiUnitResolution): string {
+    return pathOptionMeasure(this.units, structural ? null : path, stored);
+  }
+
+  private resolutionKey({ path, stored }: SiUnitResolution): string {
     return JSON.stringify([path, stored]);
   }
 
-  private siUnitSourceInForm(source: SiUnitSource): { path: string | null; stored: string | null } {
+  private siUnitSourceInForm(source: SiUnitSource): SiUnitResolution {
     return this.siUnitSourceIn(source, keys => this.formMaster.get(keys)?.value);
   }
 
@@ -596,9 +608,10 @@ export class RootModalWidgetConfigComponent implements OnInit {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(() => this.followRepoint(source));
 
-      const { path, stored } = this.siUnitSourceInForm(source);
+      const resolution = this.siUnitSourceInForm(source);
+      const { path } = resolution;
       if (path && this.units.resolvePathMeasure(path) === 'unitless' && this.data.getPathMeta(path) == null) {
-        const builtFor = this.resolutionKey(path, stored);
+        const builtFor = this.resolutionKey(resolution);
         this.data.getPathMetaObservable(path)
           .pipe(filter(meta => meta != null), take(1), takeUntilDestroyed(this.destroyRef))
           .subscribe(() => this.resolveOnMetaArrival(source, builtFor));
@@ -611,9 +624,9 @@ export class RootModalWidgetConfigComponent implements OnInit {
   }
 
   private followRepoint(source: SiUnitSource): void {
-    const { path, stored } = this.siUnitSourceInForm(source);
-    const key = this.resolutionKey(path, stored);
-    const unit = pathOptionMeasure(this.units, path, stored);
+    const resolution = this.siUnitSourceInForm(source);
+    const key = this.resolutionKey(resolution);
+    const unit = this.measureOf(resolution);
     for (const field of this.fieldsFollowing(source)) {
       if (field.follows?.resolvedFor === key) continue;
       field.unit = unit;
@@ -623,8 +636,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
   }
 
   private resolveOnMetaArrival(source: SiUnitSource, builtFor: string): void {
-    const { path, stored } = this.siUnitSourceInForm(source);
-    const unit = pathOptionMeasure(this.units, path, stored);
+    const unit = this.measureOf(this.siUnitSourceInForm(source));
     for (const field of this.fieldsFollowing(source)) {
       const control = this.formMaster.get(field.path as string[]);
       if (field.follows?.resolvedFor !== builtFor || !control || control.value !== field.shown || unit === field.unit) continue;
@@ -638,9 +650,8 @@ export class RootModalWidgetConfigComponent implements OnInit {
   private refreshSiUnitSymbols(): void {
     const symbols = new Map<string, string>();
     for (const field of this.siFields) {
-      if (!field.follows) continue;
-      // SI is shown with the path's own unit.
-      const measure = field.unit === 'unitless'
+      // SI that follows a path is shown with the path's own unit.
+      const measure = field.follows && field.unit === 'unitless'
         ? this.data.getPathUnitType(this.siUnitSourceInForm(field.follows.source).path ?? '')
         : field.unit;
       symbols.set(field.path.join('.'), this.units.getRenderableUnitSymbol(measure));

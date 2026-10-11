@@ -215,11 +215,12 @@ describe('WidgetConfigPanelComponent polar overlay status', () => {
           useValue: {
             getWidgetName: () => 'Wind Steer',
             getComponentType: vi.fn(async () => WidgetWindComponent),
-            getDefaultConfig: () => structuredClone(WidgetWindComponent.DEFAULT_CONFIG)
+            getDefaultConfig: () => structuredClone(WidgetWindComponent.DEFAULT_CONFIG),
+            getOptionUnits: () => WidgetWindComponent.OPTION_UNITS
           }
         },
         { provide: ActivePolarService, useValue: polar },
-        { provide: UnitsService, useValue: { getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }), skBaseUnits: [], convertToUnit: (unit: string, value: number) => unit === 'deg' ? value * 180 / Math.PI : value } },
+        { provide: UnitsService, useValue: { getConversionsForPath: (): IConversionPathList => ({ base: 'unitless', conversions: [] }), skBaseUnits: [], convertToUnit: (unit: string, value: number) => unit === 'deg' ? value * 180 / Math.PI : value, getRenderableUnitSymbol: (unit: string) => unit } },
         { provide: AppService, useValue: { configurableThemeColors: [] } }
       ]
     });
