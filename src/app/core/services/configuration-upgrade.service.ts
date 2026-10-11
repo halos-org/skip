@@ -12,7 +12,6 @@ import { removeLocalStorageItem, setLocalStorageItem } from '../utils/local-stor
 import {
   MIGRATION_OUTPUT_VERSION,
   MigrationMessageSink,
-  V20_MIGRATION_OUTPUT_VERSION,
   migrateOneAppVersion,
   migrateUseNeedleToEnableNeedle,
   removeSplitShellConfigKeys
@@ -166,40 +165,6 @@ export class ConfigurationUpgradeService {
         this.upgrading.set(false);
       }
 
-    } else if (version === 19) {
-      // Remote (Signal K) configs. v19 slots live in the same active file version as v11..v18.
-      try {
-        const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
-        let activeHeldBack = false;
-
-        for (const item of configsList) {
-          try {
-            const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
-            if (config?.app?.configVersion !== 19) continue;
-            if (!await this.backUpV19Once(item, config)) {
-              activeHeldBack ||= item.scope === 'user' && item.name === this._storage.sharedConfigName;
-              continue;
-            }
-            this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${V20_MIGRATION_OUTPUT_VERSION}.`);
-            const migratedConfig = migrateOneAppVersion(config, 19, this.sink);
-
-            await this._storage.setConfig(item.scope, item.name, migratedConfig);
-          } catch (error) {
-            this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
-          }
-        }
-        if (activeHeldBack) {
-          // The active slot is still at v19, so a reload would run this upgrade again at once.
-          this.upgrading.set(false);
-          return;
-        }
-        this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
-        setTimeout(() => this._settings.reloadApp(), 1500);
-      } catch (error) {
-        this.pushError('Error fetching configuration data. Aborting upgrade. Details: ' + (error as Error).message);
-        this.upgrading.set(false);
-      }
-
     } else if (version >= 12 && version < LATEST_APP_CONFIG_VERSION) {
       await this.upgradeRemoteSlots(version);
 
@@ -237,15 +202,22 @@ export class ConfigurationUpgradeService {
    * One chained step, from `version` to the next, over every slot at `version` in the active file
    * version, then a reload. A slot at another version is left for the upgrade that matches it. A
    * failed slot listing clears the overlay without reloading, so the upgrade retries on the next boot.
+   * A v19 slot is backed up before it is converted; one whose backup fails stays at v19, and when
+   * that is the active slot there is no reload, since it would run this upgrade again at once.
    */
   private async upgradeRemoteSlots(version: number): Promise<void> {
     try {
       const configsList: Config[] = await this._storage.listConfigs(REMOTE_CONFIG_FILE_VERSION);
+      let activeHeldBack = false;
 
       for (const item of configsList) {
         try {
           const config = await this._storage.getConfig(item.scope, item.name, REMOTE_CONFIG_FILE_VERSION);
           if (config?.app?.configVersion !== version) continue;
+          if (version === 19 && !await this.backUpV19Once(item, config)) {
+            activeHeldBack ||= item.scope === 'user' && item.name === this._storage.sharedConfigName;
+            continue;
+          }
           this.pushMsg(`[Upgrade] ${item.scope}/${item.name} -> v${version + 1}.`);
           const migratedConfig = migrateOneAppVersion(config, version, this.sink);
 
@@ -253,6 +225,10 @@ export class ConfigurationUpgradeService {
         } catch (error) {
           this.pushError(`[Upgrade] Error upgrading ${item.scope}/${item.name}: ${(error as Error).message}`);
         }
+      }
+      if (activeHeldBack) {
+        this.upgrading.set(false);
+        return;
       }
       this.pushMsg(`[Upgrade] Reloading app to finalize upgrade...`);
       setTimeout(() => this._settings.reloadApp(), 1500);
