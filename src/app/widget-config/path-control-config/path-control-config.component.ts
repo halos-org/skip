@@ -13,8 +13,6 @@ import { MatInput } from '@angular/material/input';
 import { MatFormField, MatLabel, MatSuffix, MatError, MatHint } from '@angular/material/form-field';
 import { AsyncPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { compare } from 'compare-versions';
-import { SignalKConnectionService } from '../../core/services/signalk-connection.service';
 import { IDynamicControl } from '../../core/interfaces/widgets-interface';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { IPathSlotRequirements, pathPointerValidator, pathRequiredValidator, pathSlotWarning } from '../../core/utils/path-validators.util';
@@ -29,7 +27,6 @@ import { pathOptionMeasure, presentationValue, presentedOption } from '../../cor
 export class PathControlConfigComponent implements OnInit, OnChanges {
   private readonly _data = inject(DataService);
   private readonly _units = inject(UnitsService);
-  private readonly _connection = inject(SignalKConnectionService);
   private readonly _destroyRef = inject(DestroyRef);
 
   readonly pathFormGroup = input.required<UntypedFormGroup>();
@@ -149,21 +146,10 @@ export class PathControlConfigComponent implements OnInit, OnChanges {
   /** What this slot demands of a path — the filters behind both the offered list and the warning. */
   private slotRequirements(): IPathSlotRequirements {
     const pathFormGroup = this.pathFormGroup();
-    let supportsPUT = false;
-    if (pathFormGroup.value.supportsPut) {
-      let isMultiCTRLTypeLight = false;
-      if (this.multiCTRLArray().length > 0) {
-        isMultiCTRLTypeLight = this.multiCTRLArray().some((ctrlItem: IDynamicControl) =>
-            ctrlItem.pathID === this.pathFormGroup().value.pathID && ctrlItem.type === '3' // type 3 = light
-          );
-      }
-
-      if (isMultiCTRLTypeLight) {
-        supportsPUT = false;
-      } else {
-        supportsPUT = this._connection.skServerVersion != null && compare(this._connection.skServerVersion, '2.12.0', ">=") ? pathFormGroup.value.supportsPut : false;
-      }
-    }
+    const isMultiCTRLTypeLight = this.multiCTRLArray().some((ctrlItem: IDynamicControl) =>
+      ctrlItem.pathID === pathFormGroup.value.pathID && ctrlItem.type === '3' // type 3 = light
+    );
+    const supportsPUT = !!pathFormGroup.value.supportsPut && !isMultiCTRLTypeLight;
 
     return {
       pathType: pathFormGroup.controls['pathType'].value,

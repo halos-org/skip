@@ -28,7 +28,6 @@ describe('PathControlConfigComponent', () => {
     await TestBed.configureTestingModule({
       imports: [PathControlConfigComponent],
       providers: [
-        { provide: SignalKConnectionService, useValue: { skServerVersion: '2.14.0', serverServiceEndpoint$: EMPTY, serverVersion$: EMPTY } },
         {
           provide: DataService,
           useValue: {
@@ -83,6 +82,22 @@ describe('PathControlConfigComponent', () => {
     pathForm.addControl('hideFromConfig', new UntypedFormControl(true));
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.flex-container')).toBeNull();
+  });
+
+  it('offers PUT-capable paths to a PUT slot without consulting the server version', () => {
+    const putPath: IPathMetaData = { path: 'self.electrical.switches.anchorLight.state' };
+    const getPaths = vi.spyOn(TestBed.inject(DataService), 'getPathsAndFieldsByType').mockReturnValue([putPath]);
+    component.filterPaths('');
+    expect(getPaths).toHaveBeenLastCalledWith('number', true, false, false);
+    expect(component.filteredPaths.value).toEqual([putPath]);
+  });
+
+  it('does not demand PUT for the path of a light control', () => {
+    const light: IDynamicControl = { ctrlLabel: 'Anchor light', type: '3', pathID: 'uuid-1', color: 'contrast', isNumeric: false };
+    fixture.componentRef.setInput('multiCTRLArray', [light]);
+    const getPaths = vi.spyOn(TestBed.inject(DataService), 'getPathsAndFieldsByType').mockReturnValue([]);
+    component.filterPaths('');
+    expect(getPaths).toHaveBeenLastCalledWith('number', false, false, false);
   });
 
   const enableFormFields = (setValues: boolean) =>
@@ -362,7 +377,6 @@ describe('PathControlConfigComponent re-pointing a scale widget', () => {
     TestBed.configureTestingModule({
       imports: [PathControlConfigComponent],
       providers: [
-        { provide: SignalKConnectionService, useValue: { skServerVersion: '2.14.0', serverServiceEndpoint$: EMPTY, serverVersion$: EMPTY } },
         {
           provide: DataService,
           useValue: {
@@ -478,7 +492,7 @@ describe('PathControlConfigComponent with pointer paths', () => {
     await TestBed.configureTestingModule({
       imports: [PathControlConfigComponent],
       providers: [
-        { provide: SignalKConnectionService, useValue: { skServerVersion: '2.14.0', serverServiceEndpoint$: EMPTY, serverVersion$: EMPTY } },
+        { provide: SignalKConnectionService, useValue: { serverServiceEndpoint$: EMPTY, serverVersion$: EMPTY } },
         {
           provide: SignalKDeltaService,
           useValue: {

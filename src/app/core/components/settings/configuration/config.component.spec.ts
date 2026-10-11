@@ -4,7 +4,6 @@ import { BehaviorSubject, of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsConfigComponent } from './config.component';
 import { AuthenticationService } from '../../../services/authentication.service';
-import { StorageService } from '../../../services/storage.service';
 import { ToastService } from '../../../services/toast.service';
 import { SettingsService } from '../../../services/settings.service';
 import { ProfileService, IProfileSummary } from '../../../services/profile.service';
@@ -59,7 +58,6 @@ describe('SettingsConfigComponent', () => {
       imports: [SettingsConfigComponent],
       providers: [
         { provide: AuthenticationService, useValue: { isUserSession$: isUserSessionSubject.asObservable(), canWriteUserData$: canWriteUserDataSubject.asObservable() } },
-        { provide: StorageService, useValue: { isAppDataSupported: true } },
         { provide: ToastService, useValue: toastMock },
         { provide: ProfileService, useValue: profileMock },
         { provide: DialogService, useValue: dialogMock },
