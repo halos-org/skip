@@ -542,9 +542,7 @@ export class RootModalWidgetConfigComponent implements OnInit {
     for (const option of RootModalWidgetConfigComponent.SI_OPTIONS) {
       const si: unknown = get(formConfig, option.path);
       if (typeof si !== 'number' || !Number.isFinite(si)) continue;
-      const converted = this.units.convertToUnit(option.unit, si);
-      if (converted == null || !Number.isFinite(converted)) continue;
-      const shown = presentedOption(converted);
+      const shown = presentedOption(presentationValue(this.units, option.unit, si));
       set(formConfig, option.path, shown);
       this.siFields.push({ ...option, si, shown, shownIn: option.unit });
     }
@@ -674,8 +672,8 @@ export class RootModalWidgetConfigComponent implements OnInit {
    * conversions recover the inverse without a table of its own.
    */
   private fromPresentation(unit: string, value: number): number {
-    const f0 = this.units.convertToUnit(unit, 0) ?? 0;
-    const f1 = this.units.convertToUnit(unit, 1) ?? 1;
+    const f0 = presentationValue(this.units, unit, 0);
+    const f1 = presentationValue(this.units, unit, 1);
     return (value - f0) / (f1 - f0);
   }
 
