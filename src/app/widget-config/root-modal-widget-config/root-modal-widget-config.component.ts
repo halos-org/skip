@@ -36,14 +36,6 @@ import { UnitsService } from '../../core/services/units.service';
 import { WidgetService } from '../../core/services/widget.service';
 import { pathOptionMeasure, presentationValue, presentedOption } from '../../core/utils/si-presentation.util';
 
-/** An option stored in SI and shown in the form in a presentation unit. */
-interface SiOption {
-  /** Where the option sits in the widget config. */
-  path: readonly string[];
-  /** The measure the form shows it in. */
-  unit: string;
-}
-
 /** Where the path an option follows is: a path slot, or a config key holding a path. */
 type SiUnitSource = { slot: string } | { pathKey: string };
 
@@ -55,10 +47,14 @@ interface SiUnitResolution {
 }
 
 /**
- * An SI option in the form: the stored value, what the form showed for it, and the unit the form's
- * value is in now. `null` is a bound left unset.
+ * An option stored in SI and shown in the form in a presentation unit: the stored value, what the
+ * form showed for it, and the unit the form's value is in now. `null` is a bound left unset.
  */
-interface SiField extends SiOption {
+interface SiField {
+  /** Where the option sits in the widget config. */
+  path: readonly string[];
+  /** The measure the form shows it in. */
+  unit: string;
   si: number | null;
   shown: number | null;
   /** For an option that follows a path: where the path is, and the path and slot unit `unit` was resolved for. */
