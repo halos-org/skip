@@ -120,6 +120,29 @@ describe('WidgetRuntimeDirective config merge', () => {
     expect(merged?.paths?.['p'].convertUnitTo).toBe('m');
   });
 
+  /**
+   * Whether a slot is offered for editing is the widget's call, not a saved choice: a
+   * widget that opens a fixed path up has to reach the copies already on a dashboard.
+   */
+  it('takes how a slot is offered from the defaults', () => {
+    const merged = build(
+      { paths: {
+        opened: { description: 'P', path: 'self.cog', source: 'default', pathType: 'number', isPathConfigurable: true },
+        hidden: { description: 'Q', path: 'self.q', source: 'default', pathType: 'number', isPathConfigurable: false, hideFromConfig: true },
+        shown: { description: 'R', path: 'self.r', source: 'default', pathType: 'number', isPathConfigurable: false }
+      } },
+      { paths: {
+        opened: { description: 'P', path: 'self.cog', source: 'gps2', pathType: 'number', isPathConfigurable: false },
+        hidden: { description: 'Q', path: 'self.q', source: 'default', pathType: 'number', isPathConfigurable: false },
+        shown: { description: 'R', path: 'self.r', source: 'default', pathType: 'number', isPathConfigurable: false, hideFromConfig: true }
+      } }
+    );
+    expect(merged?.paths?.['opened'].isPathConfigurable).toBe(true);
+    expect(merged?.paths?.['opened'].source).toBe('gps2');
+    expect(merged?.paths?.['hidden'].hideFromConfig).toBe(true);
+    expect(merged?.paths?.['shown'].hideFromConfig).toBeUndefined();
+  });
+
   it('keeps the saved unit where the widget exposes it for editing', () => {
     const merged = build(
       { paths: { p: { description: 'P', path: 'self.len', source: 'default', pathType: 'number', isPathConfigurable: false, convertUnitTo: 'm', showConvertUnitTo: true } } },

@@ -22,6 +22,7 @@ import {SignalkRequestsService} from '../../core/services/signalk-requests.servi
 import {ToastService} from '../../core/services/toast.service';
 import {DashboardService} from '../../core/services/dashboard.service';
 import {CanvasService} from '../../core/services/canvas.service';
+import { SoundService } from '../../core/services/sound.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {getColors} from '../../core/utils/themeColors.utils';
 import {FormsModule} from '@angular/forms';
@@ -95,6 +96,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   protected readonly dashboard = inject(DashboardService);
   private readonly canvas = inject(CanvasService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly sound = inject(SoundService);
 
   // Canvas refs
   private canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvasMainRef');
@@ -424,19 +426,6 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
 
   private beep(frequency = 440, duration = 100) {
     if (!this.runtime.options()?.playBeeps) return;
-    // Audio is a courtesy, and it is blocked often enough — autoplay policy, no output device, a
-    // sandboxed embed — that it must not take down the caller. This runs from the PUT-result
-    // handler, where a throw would have swallowed the command's outcome.
-    try {
-      const AudioCtx = (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
-      const audioCtx = new AudioCtx();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
-      oscillator.type = 'sine'; oscillator.frequency.value = frequency; gainNode.gain.value = 0.1;
-      oscillator.start(); oscillator.stop(audioCtx.currentTime + duration / 1000);
-    } catch {
-      /* no audio available */
-    }
+    this.sound.playTone(frequency, duration);
   }
 }

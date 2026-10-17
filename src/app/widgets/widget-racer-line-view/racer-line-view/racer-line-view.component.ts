@@ -36,6 +36,15 @@ export const VMG_TITLE: Record<TVmgName, string> = {
  * are - they belong beside the line ends and under the line - and the host owns what they
  * mean, so the geometry and the Signal K requests stay in separate places.
  */
+/** An end of the line. */
+export type TLineEnd = 'port' | 'stb';
+
+/**
+ * Where an end's last ping has got to: sent and waiting, answered either way, or nothing
+ * to show. The host owns it, since only the host sees the plugin's answer.
+ */
+export type TEndFeedback = 'idle' | 'pending' | 'ok' | 'error';
+
 export type TLineViewAction =
   | { kind: 'mode' }
   | { kind: 'browse'; step: -1 | 1 }
@@ -272,7 +281,9 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
    */
   public mode = input<0 | 1 | 2 | 3>(0);
   /** Which end was pressed, for the host to act on. */
-  public endPressed = output<'port' | 'stb'>();
+  public endPressed = output<TLineEnd>();
+  /** How each end's last ping is going, shown on its target. */
+  public endFeedback = input<Record<TLineEnd, TEndFeedback>>({ port: 'idle', stb: 'idle' });
   /** Everything else a control in the drawing asks for. */
   public action = output<TLineViewAction>();
   /** The named lines the plugin knows, the one in use, and the one being browsed. */

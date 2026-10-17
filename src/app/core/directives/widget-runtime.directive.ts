@@ -39,6 +39,7 @@ export class WidgetRuntimeDirective {
     if (base && user) {
       merged = merge(cloneDeep(base), cloneDeep(user));
       restoreFixedPaths(merged, base);
+      restoreSlotPresentation(merged, base);
       dropRetiredWiring(merged, base);
     } else if (base && !user) {
       merged = cloneDeep(base);
@@ -129,6 +130,26 @@ function restoreFixedPaths(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): vo
     mergedPath.dropInvalidSamples = basePath.dropInvalidSamples;
     mergedPath.showConvertUnitTo = basePath.showConvertUnitTo;
     if (basePath.showConvertUnitTo === false) mergedPath.convertUnitTo = basePath.convertUnitTo;
+  }
+}
+
+/**
+ * Take back from the widget's defaults how each of its path slots is offered for editing.
+ *
+ * `isPathConfigurable` and `hideFromConfig` are the widget's decision about what its
+ * options dialog shows, never something the user set - but like the wiring they ride in
+ * the saved snapshot, and because the saved value wins the merge, a widget that later
+ * opens a fixed slot up (or hides one) would change only for new widgets, while every
+ * one already on a dashboard kept the dialog it was placed with.
+ */
+function restoreSlotPresentation(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): void {
+  if (!merged.paths || !base.paths) return;
+  for (const [key, basePath] of Object.entries(base.paths)) {
+    const mergedPath = merged.paths[key];
+    if (!basePath || !mergedPath) continue;
+    mergedPath.isPathConfigurable = basePath.isPathConfigurable;
+    if (basePath.hideFromConfig === undefined) delete mergedPath.hideFromConfig;
+    else mergedPath.hideFromConfig = basePath.hideFromConfig;
   }
 }
 

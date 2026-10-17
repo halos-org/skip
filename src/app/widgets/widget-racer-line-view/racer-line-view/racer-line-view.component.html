@@ -143,6 +143,9 @@
              end can be hit even when the drawn mark is small. -->
         @if (s.editEnds; as ends) {
           <rect class="end-target port"
+            [class.pending]="endFeedback().port === 'pending'"
+            [class.ok]="endFeedback().port === 'ok'"
+            [class.error]="endFeedback().port === 'error'"
             [attr.x]="ends.port.x - ends.port.size / 2" [attr.y]="ends.port.y - ends.port.size / 2"
             [attr.width]="ends.port.size" [attr.height]="ends.port.size" [attr.rx]="ends.port.rx"
             role="button" tabindex="0" [attr.aria-label]="ends.port.title"
@@ -152,6 +155,9 @@
             <title>{{ ends.port.title }}</title>
           </rect>
           <rect class="end-target stb"
+            [class.pending]="endFeedback().stb === 'pending'"
+            [class.ok]="endFeedback().stb === 'ok'"
+            [class.error]="endFeedback().stb === 'error'"
             [attr.x]="ends.stb.x - ends.stb.size / 2" [attr.y]="ends.stb.y - ends.stb.size / 2"
             [attr.width]="ends.stb.size" [attr.height]="ends.stb.size" [attr.rx]="ends.stb.rx"
             role="button" tabindex="0" [attr.aria-label]="ends.stb.title"

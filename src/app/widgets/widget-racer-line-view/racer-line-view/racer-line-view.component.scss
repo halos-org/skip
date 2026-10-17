@@ -202,12 +202,49 @@
     fill: var(--skip-starboard-color);
   }
 
+  // A ping's progress, after the side colours so it wins over them. Pending is neutral -
+  // the press registered, nothing is known yet - and the answer is told by more than
+  // colour, since the port end's red is already close to the alarm's: done is a solid
+  // green, failed a blinking outline.
+  &.pending {
+    fill: var(--skip-grey-color);
+    stroke: var(--skip-contrast-color);
+    stroke-width: 3;
+    stroke-dasharray: 8 6;
+    animation: end-ping-pending 0.8s ease-in-out infinite alternate;
+  }
+
+  &.ok {
+    fill: var(--skip-green-color);
+    fill-opacity: 0.85;
+    stroke: var(--skip-green-color);
+    stroke-width: 4;
+  }
+
+  &.error {
+    fill: var(--skip-zone-alarm-color);
+    stroke: var(--skip-zone-alarm-color);
+    stroke-width: 6;
+    animation: end-ping-error 0.5s steps(1, end) 6;
+  }
+
   // As with the controls: reachable and operable from the keyboard, but with no ring
   // left behind on the one last pressed.
   &:focus,
   &:focus-visible {
     outline: none;
   }
+}
+
+@keyframes end-ping-pending {
+  from { fill-opacity: 0.25; }
+  to { fill-opacity: 0.7; }
+}
+
+// Alternates the fill on and off, the outline staying, so the target never vanishes.
+@keyframes end-ping-error {
+  0% { fill-opacity: 0.85; }
+  50% { fill-opacity: 0.1; }
 }
 
 // Controls drawn into the SVG, so they sit beside the marks they act on and scale with

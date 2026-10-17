@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WidgetRacerLineViewComponent } from './widget-racer-line-view.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
@@ -11,6 +11,8 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { RacerLineViewComponent } from './racer-line-view/racer-line-view.component';
 import { parsePointer } from '../../core/utils/pointer-path.util';
+import { SoundService } from '../../core/services/sound.service';
+import type { IWidgetPath } from '../../core/interfaces/widgets-interface';
 
 /**
  * The widget subscribes and hands the values down; the drawing turns them into SVG. These tests
@@ -38,6 +40,7 @@ describe('WidgetRacerLineViewComponent', () => {
   // Only the lock state is read, and a locked dashboard is the state the controls are
   // usable in; unlocked covers them with the drag overlay.
   const dashboardMock = { isDashboardStatic: signal(true) };
+  const soundMock = { playTone: vi.fn() };
   const unitsMock: Partial<UnitsService> = {
     convertToUnit: vi.fn((_unit: string, value: number) => value),
     getUnitDisplaySymbol: vi.fn((measure: string | null | undefined) => measure ?? '')
@@ -46,6 +49,7 @@ describe('WidgetRacerLineViewComponent', () => {
   beforeEach(async () => {
     feeds = new Map();
     requestsMock.putRequest.mockClear();
+    soundMock.playTone.mockClear();
     const streamsMock = {
       // The real directive throws on a pointer that is not RFC 6901 ('lines' instead of
       // '/lines'), and a mock that takes anything hides it: the widget's effect dies, the
@@ -66,7 +70,8 @@ describe('WidgetRacerLineViewComponent', () => {
         { provide: WidgetStreamsDirective, useValue: streamsMock },
         { provide: UnitsService, useValue: unitsMock },
         { provide: SignalkRequestsService, useValue: requestsMock },
-        { provide: DashboardService, useValue: dashboardMock }
+        { provide: DashboardService, useValue: dashboardMock },
+        { provide: SoundService, useValue: soundMock }
       ]
     }).compileComponents();
 
@@ -76,6 +81,23 @@ describe('WidgetRacerLineViewComponent', () => {
     set('type', 'widget-racer-line-view');
     set('theme', null);
     fixture.detectChanges();
+  });
+
+  /**
+   * The server's source priorities are per path, so a boat with two GPSs can have its
+   * position from one and its COG and SOG from the other. The three navigation paths take
+   * a path and source of their own to override that; the plugin's paths have one
+   * publisher, and showing twenty of them would bury the three that matter.
+   */
+  it('offers the boat\u2019s navigation for configuration, and hides the plugin\u2019s paths', () => {
+    const paths = WidgetRacerLineViewComponent.DEFAULT_CONFIG.paths as Record<string, IWidgetPath>;
+    const configurable = Object.keys(paths).filter(k => paths[k].isPathConfigurable);
+    expect(configurable.sort()).toEqual(['cogPath', 'positionPath', 'sogPath']);
+    const shown = Object.keys(paths).filter(k => !paths[k].hideFromConfig);
+    expect(shown.sort()).toEqual(['cogPath', 'headingPath', 'positionPath', 'sogPath', 'twdPath']);
+    for (const key of Object.keys(paths).filter(k => paths[k].path?.startsWith('self.navigation.racing.'))) {
+      expect(paths[key].hideFromConfig, `${key} is offered`).toBe(true);
+    }
   });
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
@@ -1039,6 +1061,95 @@ describe('WidgetRacerLineViewComponent', () => {
       expect(requestsMock.putRequest).toHaveBeenCalledTimes(1);
       expect(requestsMock.putRequest.mock.calls[0][0]).toBe('navigation.racing.setStartLine');
       expect(requestsMock.putRequest.mock.calls[0][1]).toEqual({ end: 'port', position: 'bow' });
+    });
+
+    /**
+     * A ping changes nothing on screen - the boat is already on the end it sets - so the
+     * target itself has to say the press was taken, and then what the plugin made of it.
+     */
+    describe('ping feedback', () => {
+      const target = (end: 'port' | 'stb') =>
+        svg()!.querySelector<SVGElement>(`.end-target.${end}`)!;
+      const ping = (end: 'port' | 'stb') => {
+        target(end).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        fixture.detectChanges();
+      };
+      const reply = (requestId: string, statusCode: number) => {
+        requestResults.next({ requestId, state: 'COMPLETED', statusCode, widgetUUID: 'racer-line-view-test' });
+        fixture.detectChanges();
+      };
+      const state = (end: 'port' | 'stb') =>
+        ['pending', 'ok', 'error'].filter(c => target(end).classList.contains(c));
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        aLine(0.00035, 0.00030);
+        setEditing(true);
+      });
+      afterEach(() => vi.useRealTimers());
+
+      it('shows the press at once, neutral, with no sound until the plugin answers', () => {
+        ping('port');
+        expect(state('port')).toEqual(['pending']);
+        expect(state('stb')).toEqual([]);
+        expect(soundMock.playTone).not.toHaveBeenCalled();
+      });
+
+      it('turns to success and pips once on a 200, then clears', () => {
+        ping('port');
+        reply('req-1', 200);
+        expect(state('port')).toEqual(['ok']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(1);
+        vi.advanceTimersByTime(2000);
+        fixture.detectChanges();
+        expect(state('port')).toEqual([]);
+      });
+
+      it('turns to failure and sounds twice, low, on anything else', () => {
+        ping('stb');
+        reply('req-1', 403);
+        expect(state('stb')).toEqual(['error']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+        const [frequency] = soundMock.playTone.mock.calls[0] as [number];
+        expect(frequency).toBeLessThan(440);
+      });
+
+      it('fails a ping that is never answered', () => {
+        ping('port');
+        vi.advanceTimersByTime(6000);
+        fixture.detectChanges();
+        expect(state('port')).toEqual(['error']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+      });
+
+      it('fails at once a ping that could not be sent', () => {
+        requestsMock.putRequest.mockReturnValueOnce(null);
+        ping('port');
+        expect(state('port')).toEqual(['error']);
+      });
+
+      it('settles only on the answer to the latest press of that end', () => {
+        requestsMock.putRequest.mockReturnValueOnce('req-a').mockReturnValueOnce('req-b');
+        ping('port');
+        ping('port');
+        reply('req-a', 500);
+        expect(state('port')).toEqual(['pending']);
+        reply('req-b', 200);
+        expect(state('port')).toEqual(['ok']);
+      });
+
+      it('stays silent when beeps are turned off', () => {
+        const options = runtimeMock.options;
+        runtimeMock.options = () => ({ ...WidgetRacerLineViewComponent.DEFAULT_CONFIG, playBeeps: false });
+        try {
+          ping('port');
+          reply('req-1', 200);
+          expect(state('port')).toEqual(['ok']);
+          expect(soundMock.playTone).not.toHaveBeenCalled();
+        } finally {
+          runtimeMock.options = options;
+        }
+      });
     });
 
     /**

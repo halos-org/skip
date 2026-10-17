@@ -17,6 +17,7 @@ import {WidgetRuntimeDirective} from '../../core/directives/widget-runtime.direc
 import {WidgetStreamsDirective} from '../../core/directives/widget-streams.directive';
 import {IPathArray, IWidgetSvcConfig} from '../../core/interfaces/widgets-interface';
 import {CanvasService} from '../../core/services/canvas.service';
+import { SoundService } from '../../core/services/sound.service';
 import {getColors} from '../../core/utils/themeColors.utils';
 import {DashboardService} from '../../core/services/dashboard.service';
 import {SignalkRequestsService} from '../../core/services/signalk-requests.service';
@@ -55,6 +56,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private readonly signalk = inject(SignalkRequestsService);
   private readonly unitsService = inject(UnitsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly sound = inject(SoundService);
 
   // Static config from legacy defaultConfig
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -598,17 +600,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
 
   private beep(frequency = 440, duration = 100) {
     if (!this.runtime.options()?.playBeeps) return;
-    const AudioCtx = (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
-    const audioCtx = new AudioCtx();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.type = 'sine';
-    oscillator.frequency.value = frequency;
-    gainNode.gain.value = 0.1;
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + duration / 1000);
+    this.sound.playTone(frequency, duration);
   }
 
   ngOnDestroy(): void {

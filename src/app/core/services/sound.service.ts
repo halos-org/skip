@@ -91,6 +91,34 @@ export class SoundService {
     });
   }
 
+  /**
+   * Play a plain sine tone, for a short acknowledgement that needs no sound file. `delayMs`
+   * schedules it on the context's own clock, so a run of tones keeps its rhythm.
+   *
+   * Never throws: a tone is a courtesy, and audio is blocked often enough - autoplay
+   * policy, no output device, a sandboxed embed - that it must not take down the caller,
+   * which is often a PUT-result handler whose outcome a throw would swallow.
+   */
+  playTone(frequency: number, durationMs: number, gain = 0.1, delayMs = 0): void {
+    try {
+      const ctx = this.ensureContext();
+      if (!ctx) return;
+      this.resume(ctx);
+      const start = ctx.currentTime + delayMs / 1000;
+      const oscillator = ctx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = gain;
+      oscillator.connect(gainNode).connect(ctx.destination);
+      oscillator.onended = () => oscillator.disconnect();
+      oscillator.start(start);
+      oscillator.stop(start + durationMs / 1000);
+    } catch {
+      /* no audio available */
+    }
+  }
+
   private play(buffer: AudioBuffer, gain: number, loop: boolean): AudioBufferSourceNode {
     const ctx = this.ctx as AudioContext;
     const source = ctx.createBufferSource();

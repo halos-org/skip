@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   input,
@@ -13,6 +14,7 @@ import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.dir
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
 import { SignalkRequestsService } from '../../core/services/signalk-requests.service';
 import { DashboardService } from '../../core/services/dashboard.service';
+import { SoundService } from '../../core/services/sound.service';
 import type { IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
@@ -20,10 +22,18 @@ import {
   IRacerLineViewData,
   NO_VMG,
   RacerLineViewComponent,
+  TEndFeedback,
+  TLineEnd,
   TLineViewAction,
   TVmgName,
   VMG_NAMES
 } from './racer-line-view/racer-line-view.component';
+
+/** How long a ping waits for the plugin's answer before it is shown as failed. */
+const PING_REPLY_TIMEOUT_MS = 5000;
+/** How long a settled ping's colour stays on its end: a failure longer, to be noticed. */
+const PING_OK_HOLD_MS = 1500;
+const PING_ERROR_HOLD_MS = 3000;
 
 /**
  * The start line, drawn at full frame.
@@ -55,6 +65,7 @@ export class WidgetRacerLineViewComponent {
   protected readonly runtime = inject(WidgetRuntimeDirective);
   private readonly streams = inject(WidgetStreamsDirective);
   private readonly signalk = inject(SignalkRequestsService);
+  private readonly sound = inject(SoundService);
   protected readonly dashboard = inject(DashboardService);
 
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -67,6 +78,7 @@ export class WidgetRacerLineViewComponent {
     showLineLabel: false,
     showTimeToLine: true,
     showTimeToBurn: true,
+    playBeeps: true,
     color: 'contrast',
     paths: {
       // The plugin publishes one object at navigation.racing.lines holding both the
@@ -78,7 +90,7 @@ export class WidgetRacerLineViewComponent {
         source: 'default',
         pathType: 'object',
         pathRequired: false,
-        isPathConfigurable: false,
+        isPathConfigurable: false, hideFromConfig: true,
         enableTimeout: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null
@@ -89,7 +101,7 @@ export class WidgetRacerLineViewComponent {
         source: 'default',
         pathType: 'object',
         pathRequired: false,
-        isPathConfigurable: false,
+        isPathConfigurable: false, hideFromConfig: true,
         enableTimeout: false,
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null
@@ -97,21 +109,26 @@ export class WidgetRacerLineViewComponent {
       portPath: {
         description: 'Position of the port (pin) end of the start line',
         path: 'self.navigation.racing.startLinePort',
-        source: 'default', pathType: 'object', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'object', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         showPathSkUnitsFilter: false, pathSkUnitsFilter: null,
         enableTimeout: false
       },
       stbPath: {
         description: 'Position of the starboard (boat) end of the start line',
         path: 'self.navigation.racing.startLineStb',
-        source: 'default', pathType: 'object', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'object', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         showPathSkUnitsFilter: false, pathSkUnitsFilter: null,
         enableTimeout: false
       },
+      // Position, COG and SOG are the boat's own navigation, and the one place a boat with
+      // two GPSs can feed the drawing a mix: the server's source priorities are set per
+      // path, so a priority given to position alone lets the other GPS's COG and SOG
+      // through. These three take a path and a source of their own to override that; the
+      // plugin's paths below have a single publisher and are hidden from the settings.
       positionPath: {
         description: 'Position of the vessel',
         path: 'self.navigation.position',
-        source: 'default', pathType: 'object', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'object', pathRequired: false, isPathConfigurable: true,
         showPathSkUnitsFilter: false, pathSkUnitsFilter: null,
         // This and the four below are live navigation, published continuously, so they
         // take the stale-data TTL: a frozen boat on the drawing reads as a live one. The
@@ -138,7 +155,7 @@ export class WidgetRacerLineViewComponent {
       cogPath: {
         description: 'Course over ground (true) of the vessel',
         path: 'self.navigation.courseOverGroundTrue',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: true,
         convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         enableTimeout: true
@@ -147,7 +164,7 @@ export class WidgetRacerLineViewComponent {
         // Kept in m/s: the projections are metres on the ground, not a readout.
         description: 'Speed over ground of the vessel',
         path: 'self.navigation.speedOverGround',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: true,
         convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         enableTimeout: true
@@ -155,7 +172,7 @@ export class WidgetRacerLineViewComponent {
       lineLengthPath: {
         description: 'Length of the start line',
         path: 'self.navigation.racing.startLineLength',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         // Follows the server's unit preference for the path. Whatever that resolves to is
         // the unit the whole drawing measures in - see lengthUnit - so the line and the
         // approach legs always agree, whichever unit the server hands back.
@@ -166,7 +183,7 @@ export class WidgetRacerLineViewComponent {
       lineBearingPath: {
         description: 'Bearing of the start line',
         path: 'self.navigation.racing.startLineBearing',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad',
         enableTimeout: false
@@ -174,7 +191,7 @@ export class WidgetRacerLineViewComponent {
       ttlPath: {
         description: 'Time to sail to the start line in seconds',
         path: 'self.navigation.racing.timeToLine',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 's', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 's',
         // Published continuously while the plugin is computing it, so it takes the
@@ -184,7 +201,7 @@ export class WidgetRacerLineViewComponent {
       ttbPath: {
         description: 'Time to delay before sailing to the start line in seconds',
         path: 'self.navigation.racing.timeToBurn',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 's', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 's',
         // Published continuously while the plugin is computing it, so it takes the
@@ -194,7 +211,7 @@ export class WidgetRacerLineViewComponent {
       ttsPath: {
         description: 'Time to the start in seconds',
         path: 'self.navigation.racing.timeToStart',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 's', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 's',
         // Not continuous, unlike the other two: the plugin publishes the time to start
@@ -213,14 +230,14 @@ export class WidgetRacerLineViewComponent {
         // doubles as the running flag.
         description: 'Time of the start',
         path: 'self.navigation.racing.startTime',
-        source: 'default', pathType: 'Date', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'Date', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         enableTimeout: false
       },
       boatLengthPath: {
         // Drawn to the same scale as the line, so the triangle is the vessel's real size.
         description: 'Overall length of the vessel',
         path: 'self.design.length.overall',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 'm', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm',
         enableTimeout: false
@@ -231,7 +248,7 @@ export class WidgetRacerLineViewComponent {
         // from signalk-racer 1.3.0; derived locally when it is absent.
         description: 'VMG the perpendicular leg of the time to line is divided by',
         path: 'self.navigation.racing.effectiveVmg.toLine',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         enableTimeout: false
@@ -239,7 +256,7 @@ export class WidgetRacerLineViewComponent {
       effectiveVmgAlongLinePath: {
         description: 'VMG the along-line leg of the time to line is divided by',
         path: 'self.navigation.racing.effectiveVmg.alongLine',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         enableTimeout: false
@@ -247,7 +264,7 @@ export class WidgetRacerLineViewComponent {
       vmgToCourseSidePath: {
         description: 'Best VMG across the line towards the course side',
         path: 'self.navigation.racing.bestVmg.toCourseSide',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         // Fixed, like its three siblings below: vmgUnit() formats all four from this one
         // key, so a path that followed the server's speed preference on its own would
         // label the other three wrongly.
@@ -258,7 +275,7 @@ export class WidgetRacerLineViewComponent {
       vmgToPortEndPath: {
         description: 'Best VMG along the line towards the port end (pin)',
         path: 'self.navigation.racing.bestVmg.toPortEnd',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         enableTimeout: false
@@ -266,7 +283,7 @@ export class WidgetRacerLineViewComponent {
       vmgToStbEndPath: {
         description: 'Best VMG along the line towards the starboard end (boat)',
         path: 'self.navigation.racing.bestVmg.toStbEnd',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         enableTimeout: false
@@ -274,7 +291,7 @@ export class WidgetRacerLineViewComponent {
       vmgFromCourseSidePath: {
         description: 'Best VMG back across the line from the course side',
         path: 'self.navigation.racing.bestVmg.fromCourseSide',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
         convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm/s',
         enableTimeout: false
@@ -417,9 +434,62 @@ export class WidgetRacerLineViewComponent {
     }
   }
 
+  /**
+   * How each end's last ping is going, for the drawing to show on its target: 'pending'
+   * from the press until the plugin answers, then 'ok' or 'error' for a moment, then back
+   * to 'idle'. A ping is the one press here whose effect cannot be seen - the boat is
+   * already sitting on the end it just set - so without this a press that worked and one
+   * that never arrived look the same.
+   */
+  protected readonly endFeedback = signal<Record<TLineEnd, TEndFeedback>>({ port: 'idle', stb: 'idle' });
+  /** The request each end is waiting on; a reply to an older one is ignored. */
+  private readonly endRequest: Record<TLineEnd, string | null> = { port: null, stb: null };
+  private readonly endTimer: Record<TLineEnd, ReturnType<typeof setTimeout> | null> = { port: null, stb: null };
+
   /** Put an end of the line on the boat's current position. */
-  protected setLineEnd(end: 'port' | 'stb'): void {
-    this.signalk.putRequest('navigation.racing.setStartLine', { end, position: 'bow' }, this.id());
+  protected setLineEnd(end: TLineEnd): void {
+    this.showEndFeedback(end, 'pending', PING_REPLY_TIMEOUT_MS);
+    const requestId = this.signalk.putRequest('navigation.racing.setStartLine',
+      { end, position: 'bow' }, this.id());
+    this.endRequest[end] = requestId;
+    // Not sent at all: no reply is coming to settle it.
+    if (requestId == null) this.settleEnd(end, false);
+  }
+
+  /** The plugin's answer to a ping, or the lack of one. */
+  private settleEnd(end: TLineEnd, ok: boolean): void {
+    this.endRequest[end] = null;
+    this.showEndFeedback(end, ok ? 'ok' : 'error', ok ? PING_OK_HOLD_MS : PING_ERROR_HOLD_MS);
+    if (!this.cfg().playBeeps) return;
+    // Loud enough to carry on deck: one high pip for done, two low ones for not.
+    if (ok) {
+      this.sound.playTone(880, 150, 0.3);
+    } else {
+      this.sound.playTone(220, 200, 0.3);
+      this.sound.playTone(220, 200, 0.3, 300);
+    }
+  }
+
+  /**
+   * Show a state on an end's target, and what follows it after `holdMs`: a pending ping
+   * that has heard nothing by then has failed, and a settled one goes back to idle.
+   */
+  private showEndFeedback(end: TLineEnd, state: TEndFeedback, holdMs: number): void {
+    const timer = this.endTimer[end];
+    if (timer) clearTimeout(timer);
+    this.endFeedback.update(f => ({ ...f, [end]: state }));
+    this.endTimer[end] = setTimeout(() => {
+      this.endTimer[end] = null;
+      if (state === 'pending') this.settleEnd(end, false);
+      else this.endFeedback.update(f => ({ ...f, [end]: 'idle' }));
+    }, holdMs);
+  }
+
+  private settleRequest(requestId: string, statusCode: number | null): void {
+    for (const end of ['port', 'stb'] as const) {
+      if (this.endRequest[end] === requestId) this.settleEnd(end, statusCode === 200);
+    }
+    this.settleLineName(requestId, statusCode);
   }
 
   /**
@@ -534,7 +604,13 @@ export class WidgetRacerLineViewComponent {
     // 202 is held back by the service until the final answer, so every result seen here
     // is settled.
     this.signalk.subscribeRequest().pipe(takeUntilDestroyed()).subscribe(result => {
-      if (result.widgetUUID === this.id()) this.settleLineName(result.requestId, result.statusCode);
+      if (result.widgetUUID === this.id()) this.settleRequest(result.requestId, result.statusCode);
+    });
+    inject(DestroyRef).onDestroy(() => {
+      for (const end of ['port', 'stb'] as const) {
+        const timer = this.endTimer[end];
+        if (timer) clearTimeout(timer);
+      }
     });
 
     effect(() => {
