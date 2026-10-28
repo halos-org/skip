@@ -16,6 +16,12 @@
   box-sizing: border-box;
 }
 
+.instrument {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .sea-horizon {
   display: block;
   width: 100%;
@@ -102,12 +108,29 @@
     fill: #05090b;
     opacity: 0.66;
   }
+}
 
-  text {
-    fill: #c9d1d4;
-    font-size: 13px;
+// Size container over the SVG so 4.33cqmin is the old 13-unit face size (13/300),
+// with a 10px floor so a phone tile stays readable. The label may overflow the window.
+.no-data-label {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  pointer-events: none;
+
+  .label {
+    position: absolute;
+    left: 50%;
+    // Caps of the old SVG text: baseline at cy - 22 (128/300), cap height about 9.3.
+    top: 41.1%;
+    transform: translate(-50%, -50%);
+    color: #c9d1d4;
+    font-family: Roboto, sans-serif;
+    font-size: max(10px, 4.33cqmin);
     font-weight: 700;
-    letter-spacing: 1.6px;
+    letter-spacing: 0.123em;
+    line-height: 1;
+    white-space: nowrap;
   }
 }
 

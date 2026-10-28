@@ -453,6 +453,20 @@ describe('WidgetSeaHorizonComponent dial geometry', () => {
     expect(h.component.boatTransform()).toContain('translate(0 0.00) rotate(0.00 150 150)');
     expect(h.component.noData()).toBe(true);
   });
+
+  it('renders NO DATA as HTML text with a readable floor, not as SVG text', () => {
+    const h = mount(baseConfig());
+    const root = h.fixture.nativeElement as HTMLElement;
+    const label = root.querySelector('.no-data-label .label');
+    expect(label?.textContent).toContain('NO DATA');
+    expect(root.querySelector('.no-data text')).toBeNull();
+    expect(root.querySelector('.no-data circle')).not.toBeNull();
+
+    h.emit('gaugePitchPath', 1);
+    h.emit('gaugeRollPath', 1);
+    h.fixture.detectChanges();
+    expect(root.querySelector('.no-data-label')).toBeNull();
+  });
 });
 
 describe('WidgetSeaHorizonComponent heel bands', () => {
