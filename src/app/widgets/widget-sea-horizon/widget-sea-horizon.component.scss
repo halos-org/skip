@@ -121,8 +121,9 @@
   .label {
     position: absolute;
     left: 50%;
-    // Caps of the old SVG text: baseline at cy - 22 (128/300), cap height about 9.3.
-    top: 41.1%;
+    // Caps of the old SVG text sit at 41.1% of the square dial (baseline cy-22, cap height about 9.3).
+    // The dial is centered in the tile, so a tall tile uses the smaller side rather than the full height.
+    top: calc(50% - 8.9cqmin);
     transform: translate(-50%, -50%);
     color: #c9d1d4;
     font-family: Roboto, sans-serif;
