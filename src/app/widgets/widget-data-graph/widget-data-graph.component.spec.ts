@@ -210,7 +210,11 @@ describe('WidgetDataGraphComponent', () => {
 
   interface AxisState {
     type?: string;
-    ticks?: { mirror?: boolean; padding?: number; textStrokeColor?: string; textStrokeWidth?: number; color?: string };
+    time?: { displayFormats?: Record<string, string> };
+    ticks?: {
+      mirror?: boolean; padding?: number; textStrokeColor?: string; textStrokeWidth?: number;
+      color?: string; maxTicksLimit?: number; precision?: number;
+    };
     grid?: { display?: boolean; drawTicks?: boolean };
     title?: { display?: boolean };
   }
@@ -277,6 +281,20 @@ describe('WidgetDataGraphComponent', () => {
       expect(axis?.grid?.display).toBe(true);
       expect(axis?.grid?.drawTicks).toBe(false);
     }
+
+    // One object is spread into both orientations. A one-sided edit would pass a test that only
+    // reads the horizontal graph.
+    const timeAxis = readAxis(verticalChart ? 'y' : 'x');
+    const valueAxis = readAxis(verticalChart ? 'x' : 'y');
+    expect(timeAxis?.time?.displayFormats).toEqual({
+      hour: `k:mm''`,
+      minute: `mm''`,
+      second: `ss"`,
+      millisecond: 'SSS'
+    });
+    expect(valueAxis?.ticks?.maxTicksLimit).toBe(8);
+    expect(valueAxis?.ticks?.precision).toBe(1);
+    expect(timeAxis?.ticks?.maxTicksLimit).toBeUndefined();
   });
 
   it('rebuilds the chart when the orientation is toggled', async () => {
