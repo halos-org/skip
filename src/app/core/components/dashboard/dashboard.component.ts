@@ -11,7 +11,8 @@ import { DialogService } from '../../services/dialog.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 import { uiEventService } from '../../services/uiEvent.service';
-import { isBlockingOverlayOpen } from '../../utils/hotkey-target.util';
+import { isBlockingOverlayOpen, isButtonActivationTarget, isInteractiveKeyTarget } from '../../utils/hotkey-target.util';
+import { assignFreshWidgetIds, cloneWidgetSnapshot } from '../../utils/dashboard-widgets.util';
 import { WidgetDescription, WidgetService } from '../../services/widget.service';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { Router } from '@angular/router';
@@ -432,6 +433,23 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.cancelLayoutChanges();
   }
 
+  /**
+   * Enter commits an in-progress layout edit. Same guards as Esc, plus the keys
+   * Enter already belongs to: a modifier chord, a text field, and a focused
+   * button (Done would save twice, Cancel would cancel and save).
+   */
+  @HostListener('document:keydown.enter', ['$event'])
+  protected onEnterKey(event: Event): void {
+    const keyEvent = event as KeyboardEvent;
+    if (keyEvent.key !== 'Enter') return;
+    if (keyEvent.ctrlKey || keyEvent.altKey || keyEvent.metaKey || keyEvent.shiftKey) return;
+    if (this.dashboard.isDashboardStatic()) return;
+    if (this._uiEvent.isDragging()) return;
+    if (isBlockingOverlayOpen()) return;
+    if (isInteractiveKeyTarget(event.target) || isButtonActivationTarget(event.target)) return;
+    this.saveLayoutChanges();
+  }
+
   protected onEmptyAreaTap(e: Event | CustomEvent): void {
     if (this.dashboard.isDashboardStatic() || (e as CustomEvent).detail === undefined) return;
     if (this._addDialogOpen) return; // an add dialog is already up
@@ -749,19 +767,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const source: NgGridStackWidget = node;
     const widgetProps = source.input?.widgetProperties;
     if (!widgetProps) return;
-    const ID = UUID.create();
-    const newItem = {
-      w: source.w, h: source.h,
-      id: ID,
-      selector: source.selector,
-      input: {
-        widgetProperties: {
-          type: widgetProps.type,
-          uuid: ID,
-          config: cloneDeep(widgetProps.config)
-        }
-      }
-    } as NgGridStackWidget;
+    const newItem = cloneWidgetSnapshot(source);
+    assignFreshWidgetIds(newItem);
 
     const grid = this._gridstack().grid;
     if (!grid) return;
@@ -785,20 +792,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const widgetProps = clipboard?.input?.widgetProperties;
     if (!clipboard || !widgetProps?.type) return;
 
-    const ID = UUID.create();
-    const newItem = {
-      w: clipboard.w,
-      h: clipboard.h,
-      id: ID,
-      selector: clipboard.selector,
-      input: {
-        widgetProperties: {
-          type: widgetProps.type,
-          uuid: ID,
-          config: cloneDeep(widgetProps.config)
-        }
-      }
-    } as NgGridStackWidget;
+    const newItem = cloneWidgetSnapshot(clipboard);
+    assignFreshWidgetIds(newItem);
 
     if (typeof x === 'number' && typeof y === 'number') {
       newItem.x = x;
