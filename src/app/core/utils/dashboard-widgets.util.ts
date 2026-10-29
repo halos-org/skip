@@ -1,4 +1,4 @@
-import type { NgGridStackWidget } from 'gridstack/dist/angular';
+import type { NgGridStackNode, NgGridStackWidget } from 'gridstack/dist/angular';
 import cloneDeep from 'lodash-es/cloneDeep';
 import { UUID } from './uuid.util';
 
@@ -16,37 +16,36 @@ export function* allWidgets(entries: readonly NgGridStackWidget[]): Generator<Ng
   }
 }
 
-/** A value that can live in a saved dashboard: no DOM nodes, functions, or class instances. */
-function isJsonSafe(value: unknown): boolean {
-  if (value == null || typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
-    return true;
-  }
-  if (Array.isArray(value)) return value.every(isJsonSafe);
-  if (typeof value === 'object') {
-    if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-    return Object.values(value).every(isJsonSafe);
-  }
-  return false;
-}
-
 /**
- * A copy of a widget node for duplicate, clipboard, and paste. The root omits `x`, `y`, and `id`
- * so the page can place it and {@link assignFreshWidgetIds} can name it. Nested children keep
- * their place inside the group, including id, until that walk rewrites them. Config is deep-copied.
- * Live grid objects, DOM nodes, and `autoOpenOptionsOnCreate` are left out.
+ * A copy of a widget node for duplicate, clipboard, and paste. The root omits `x`, `y`, `id`, and
+ * its min/max size limits so the page can place it and {@link assignFreshWidgetIds} can name it.
+ * Nested children keep their place and limits inside the group, including id, until that walk
+ * rewrites them. Config is deep-copied. Live grid objects, DOM nodes, grid options other than
+ * `children`, and `autoOpenOptionsOnCreate` are left out.
  */
 export function cloneWidgetSnapshot(source: NgGridStackWidget): NgGridStackWidget {
   return cloneWidgetNode(source, false);
 }
 
-function cloneWidgetNode(source: NgGridStackWidget, keepPlacement: boolean): NgGridStackWidget {
+/**
+ * A group's current children. A live node's `subGridOpts.children` is the list it was loaded with
+ * and gridstack never updates it, so a live group is read from its sub-grid the way `grid.save` does.
+ */
+function groupChildren(source: NgGridStackWidget): NgGridStackWidget[] | undefined {
+  const subGrid = (source as NgGridStackNode).subGrid;
+  if (subGrid) return subGrid.save(false, false, undefined, source.w) as NgGridStackWidget[];
+  const children = source.subGridOpts?.children;
+  return Array.isArray(children) ? children : undefined;
+}
+
+function cloneWidgetNode(source: NgGridStackWidget, isNestedChild: boolean): NgGridStackWidget {
   const props = source.input?.widgetProperties;
   const snapshot: NgGridStackWidget = {
     w: source.w,
     h: source.h,
     selector: source.selector
   };
-  if (keepPlacement) {
+  if (isNestedChild) {
     if (source.id != null) snapshot.id = source.id;
     if (source.x != null) snapshot.x = source.x;
     if (source.y != null) snapshot.y = source.y;
@@ -64,20 +63,9 @@ function cloneWidgetNode(source: NgGridStackWidget, keepPlacement: boolean): NgG
       }
     };
   }
-  const opts = source.subGridOpts;
-  if (opts) {
-    const { children, ...rest } = opts;
-    const safeRest: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(rest)) {
-      if (isJsonSafe(value)) safeRest[key] = cloneDeep(value);
-    }
-    const clonedChildren = Array.isArray(children)
-      ? children.map(child => cloneWidgetNode(child as NgGridStackWidget, true))
-      : undefined;
-    snapshot.subGridOpts = {
-      ...safeRest,
-      ...(clonedChildren ? { children: clonedChildren } : {})
-    } as NgGridStackWidget['subGridOpts'];
+  if (source.subGridOpts) {
+    const children = groupChildren(source);
+    snapshot.subGridOpts = children ? { children: children.map(child => cloneWidgetNode(child, true)) } : {};
   }
   return snapshot;
 }

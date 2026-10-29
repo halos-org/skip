@@ -22,29 +22,52 @@ describe('allWidgets', () => {
 });
 
 describe('cloneWidgetSnapshot', () => {
-  it('copies a nested child and does not share its config', () => {
-    const source: NgGridStackWidget = {
-      w: 4, h: 4, selector: 'group-widget',
-      input: { widgetProperties: { type: 'group-widget', uuid: 'g', config: { displayName: 'Group' } } },
-      subGridOpts: {
-        column: 12,
-        children: [{
-          id: 'c', w: 1, h: 1, selector: 'widget-host2',
-          input: { widgetProperties: { type: 'widget-numeric', uuid: 'c', config: { displayName: 'Child' } } }
-        }]
-      }
-    };
-    const copy = cloneWidgetSnapshot({ ...source, x: 2, y: 3, id: 'g' });
+  const leaf = (id: string, extra: Partial<NgGridStackWidget> = {}): NgGridStackWidget => ({
+    id, w: 1, h: 1, selector: 'widget-host2',
+    input: { widgetProperties: { type: 'widget-numeric', uuid: id, config: { displayName: id } } },
+    ...extra
+  });
+  const group = (children: NgGridStackWidget[]): NgGridStackWidget => ({
+    w: 4, h: 4, selector: 'group-widget',
+    input: { widgetProperties: { type: 'group-widget', uuid: 'g', config: { displayName: 'Group' } } },
+    subGridOpts: { column: 4, row: 4, maxRow: 4, children }
+  });
+  const withLiveChildren = (node: NgGridStackWidget, live: NgGridStackWidget[]): NgGridStackWidget =>
+    ({ ...node, subGrid: { save: () => live } }) as unknown as NgGridStackWidget;
+
+  it('drops the root placement but keeps a nested child placement, size limits and id', () => {
+    const source = group([leaf('c', { x: 2, y: 1, minW: 2 })]);
+    const copy = cloneWidgetSnapshot({ ...source, x: 2, y: 3, id: 'g', minW: 3 });
     const child = copy.subGridOpts?.children?.[0];
     expect(copy.x).toBeUndefined();
     expect(copy.y).toBeUndefined();
     expect(copy.id).toBeUndefined();
-    expect(child?.id).toBe('c');
+    expect(copy.minW).toBeUndefined();
+    expect(child).toMatchObject({ id: 'c', x: 2, y: 1, minW: 2 });
     expect(child?.input?.widgetProperties.uuid).toBe('c');
-    expect(child?.input?.widgetProperties.config).toEqual({ displayName: 'Child' });
+  });
+
+  it('deep-copies a nested child config', () => {
+    const source = group([leaf('c')]);
+    const copy = cloneWidgetSnapshot(source);
     source.subGridOpts!.children![0].input!.widgetProperties.config.displayName = 'Mutated';
-    expect(child?.input?.widgetProperties.config.displayName).toBe('Child');
-    expect(copy.subGridOpts).toMatchObject({ column: 12 });
+    expect(copy.subGridOpts?.children?.[0]?.input?.widgetProperties.config.displayName).toBe('c');
+  });
+
+  it('copies a live group from its sub-grid, not the load-time children list', () => {
+    const source = withLiveChildren(group([leaf('stale')]), [leaf('a', { x: 0, y: 0 }), leaf('b', { x: 1, y: 0 })]);
+    const copy = cloneWidgetSnapshot(source);
+    expect(copy.subGridOpts?.children?.map(c => c.id)).toEqual(['a', 'b']);
+  });
+
+  it('copies a stored group from its saved children list', () => {
+    const copy = cloneWidgetSnapshot(group([leaf('saved')]));
+    expect(copy.subGridOpts?.children?.map(c => c.id)).toEqual(['saved']);
+  });
+
+  it('keeps only the children of the group grid options', () => {
+    const copy = cloneWidgetSnapshot(group([leaf('c')]));
+    expect(Object.keys(copy.subGridOpts ?? {})).toEqual(['children']);
   });
 });
 
