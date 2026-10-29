@@ -110,8 +110,9 @@
   }
 }
 
-// Size container over the SVG so 4.33cqmin is the old 13-unit face size (13/300),
-// with a 10px floor so a phone tile stays readable. The label may overflow the window.
+// Size container over the SVG: the square dial's side is the tile's smaller side, so
+// 4.33cqmin is 13 of its 300 viewBox units. The 10px floor keeps a phone tile readable;
+// there the label may overflow the window.
 .no-data-label {
   position: absolute;
   inset: 0;
@@ -121,8 +122,8 @@
   .label {
     position: absolute;
     left: 50%;
-    // Caps of the old SVG text sit at 41.1% of the square dial (baseline cy-22, cap height about 9.3).
-    // The dial is centered in the tile, so a tall tile uses the smaller side rather than the full height.
+    // Caps centred 8.9cqmin (26.7 viewBox units) above the dial centre. The dial is centred in
+    // the tile and its side is the smaller dimension, so a tall tile keeps the label on the dial.
     top: calc(50% - 8.9cqmin);
     transform: translate(-50%, -50%);
     color: #c9d1d4;

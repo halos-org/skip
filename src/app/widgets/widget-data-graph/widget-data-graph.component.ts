@@ -309,7 +309,8 @@ export class WidgetDataGraphComponent implements OnDestroy {
     const insideGrid = { display: true, drawTicks: false, color: theme.contrastDimmer };
     const valueRange = this.valueAxisRange(cfg);
     const axisColor = this.getThemeColors().averageChartLine;
-    // Shared by both orientations. The branches differ only in axis key, type, display and position.
+    // Shared by both orientations. The branches differ in axis key, type, display and position,
+    // and the vertical time axis also sets empty suggestedMin/suggestedMax.
     const realtimeTime = {
       unit: seriesConfig.timeScaleFormat as TimeUnit,
       minUnit: "second" as const,
