@@ -308,6 +308,35 @@ export class WidgetDataGraphComponent implements OnDestroy {
     };
     const insideGrid = { display: true, drawTicks: false, color: theme.contrastDimmer };
     const valueRange = this.valueAxisRange(cfg);
+    const axisColor = this.getThemeColors().averageChartLine;
+    // Shared by both orientations. The branches differ in axis key, type, display and position,
+    // and the vertical time axis also sets empty suggestedMin/suggestedMax.
+    const realtimeTime = {
+      unit: seriesConfig.timeScaleFormat as TimeUnit,
+      minUnit: "second" as const,
+      round: "second" as const,
+      displayFormats: {
+        // eslint-disable-next-line no-useless-escape
+        hour: `k:mm\''`,
+        // eslint-disable-next-line no-useless-escape
+        minute: `mm\''`,
+        second: `ss"`,
+        millisecond: "SSS"
+      }
+    };
+    const timeTicks = {
+      ...insideTicks,
+      autoSkip: true,
+      color: axisColor,
+      major: { enabled: true }
+    };
+    const valueTicks = {
+      ...insideTicks,
+      maxTicksLimit: 8,
+      precision: cfg.numDecimal,
+      color: axisColor,
+      major: { enabled: true }
+    };
 
     if (cfg.verticalChart) {
       this.lineChartOptions.scales = {
@@ -317,27 +346,8 @@ export class WidgetDataGraphComponent implements OnDestroy {
           position: "right",
           suggestedMin: "",
           suggestedMax: "",
-          time: {
-            unit: seriesConfig.timeScaleFormat as TimeUnit,
-            minUnit: "second",
-            round: "second",
-            displayFormats: {
-              // eslint-disable-next-line no-useless-escape
-              hour: `k:mm\''`,
-              // eslint-disable-next-line no-useless-escape
-              minute: `mm\''`,
-              second: `ss"`,
-              millisecond: "SSS"
-            },
-          },
-          ticks: {
-            ...insideTicks,
-            autoSkip: true,
-            color: this.getThemeColors().averageChartLine,
-            major: {
-              enabled: true
-            }
-          },
+          time: realtimeTime,
+          ticks: timeTicks,
           grid: { ...insideGrid }
         },
         x: {
@@ -347,15 +357,7 @@ export class WidgetDataGraphComponent implements OnDestroy {
           ...valueRange,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
-          ticks: {
-            ...insideTicks,
-            maxTicksLimit: 8,
-            precision: cfg.numDecimal,
-            color: this.getThemeColors().averageChartLine,
-            major: {
-              enabled: true,
-            }
-          },
+          ticks: valueTicks,
           grid: { ...insideGrid }
         }
       }
@@ -364,27 +366,8 @@ export class WidgetDataGraphComponent implements OnDestroy {
         x: {
           type: "realtime",
           display: cfg.showTimeScale,
-          time: {
-            unit: seriesConfig.timeScaleFormat as TimeUnit,
-            minUnit: "second",
-            round: "second",
-            displayFormats: {
-              // eslint-disable-next-line no-useless-escape
-              hour: `k:mm\''`,
-              // eslint-disable-next-line no-useless-escape
-              minute: `mm\''`,
-              second: `ss"`,
-              millisecond: "SSS"
-            },
-          },
-          ticks: {
-            ...insideTicks,
-            autoSkip: true,
-            color: this.getThemeColors().averageChartLine,
-            major: {
-              enabled: true
-            }
-          },
+          time: realtimeTime,
+          ticks: timeTicks,
           grid: { ...insideGrid }
         },
         y: {
@@ -393,15 +376,7 @@ export class WidgetDataGraphComponent implements OnDestroy {
           ...valueRange,
           beginAtZero: cfg.startScaleAtZero,
           reverse: cfg.inverseYAxis,
-          ticks: {
-            ...insideTicks,
-            maxTicksLimit: 8,
-            precision: cfg.numDecimal,
-            color: this.getThemeColors().averageChartLine,
-            major: {
-              enabled: true,
-            }
-          },
+          ticks: valueTicks,
           grid: { ...insideGrid }
         }
       }

@@ -27,6 +27,7 @@ interface DashboardComponentPrivateApi {
 
 interface DashboardEscApi {
     onEscapeKey: () => void;
+    onEnterKey: (event: KeyboardEvent) => void;
     loadDashboard: (id: number | null) => void;
 }
 
@@ -184,6 +185,101 @@ describe('DashboardComponent', () => {
             vi.spyOn(component as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             expect(mockDashboardService.notifyLayoutEditCanceled).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('Enter saves layout edit', () => {
+        const enter = (target?: EventTarget | null, extras: Partial<KeyboardEvent> = {}): KeyboardEvent =>
+            ({
+                key: 'Enter',
+                target: target ?? document,
+                ctrlKey: false,
+                altKey: false,
+                metaKey: false,
+                shiftKey: false,
+                ...extras
+            }) as KeyboardEvent;
+
+        it('commits the edit when editing and no overlay is open', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            (component as unknown as DashboardEscApi).onEnterKey(enter());
+            expect(privateApi._gridstack().grid.save).toHaveBeenCalledWith(false, false);
+            expect(mockDashboardService.setStaticDashboard).toHaveBeenCalledWith(true);
+            expect(mockDashboardService.notifyLayoutEditSaved).toHaveBeenCalledTimes(1);
+        });
+
+        it('does nothing when the dashboard is not in edit mode', () => {
+            mockDashboardService.isDashboardStatic.set(true);
+            (component as unknown as DashboardEscApi).onEnterKey(enter());
+            expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
+        });
+
+        it('yields to an open modal overlay', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            const backdrop = document.createElement('div');
+            backdrop.className = 'cdk-overlay-backdrop';
+            document.body.appendChild(backdrop);
+            try {
+                (component as unknown as DashboardEscApi).onEnterKey(enter());
+                expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
+            } finally {
+                backdrop.remove();
+            }
+        });
+
+        it('does not save while a widget drag is in progress', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            (TestBed.inject(uiEventService) as unknown as { isDragging: { set: (v: boolean) => void } }).isDragging.set(true);
+            (component as unknown as DashboardEscApi).onEnterKey(enter());
+            expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
+        });
+
+        it('does not save from a text field, a focused button, or a modifier chord', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            const api = component as unknown as DashboardEscApi;
+            api.onEnterKey(enter(document.createElement('input')));
+            api.onEnterKey(enter(document.createElement('button')));
+            const roleButton = document.createElement('div');
+            roleButton.setAttribute('role', 'button');
+            api.onEnterKey(enter(roleButton));
+            api.onEnterKey(enter(document, { shiftKey: true }));
+            expect(mockDashboardService.notifyLayoutEditSaved).not.toHaveBeenCalled();
+        });
+
+        it('saves via a real Enter keydown (HostListener wiring)', () => {
+            mockDashboardService.isDashboardStatic.set(false);
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            expect(mockDashboardService.notifyLayoutEditSaved).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('entering edit mode', () => {
+        it('blurs a focused control inside the grid, so Enter saves instead of clicking it', () => {
+            fixture.detectChanges();
+            const grid = (fixture.nativeElement as HTMLElement).querySelector('gridstack')!;
+            const widgetButton = document.createElement('button');
+            grid.appendChild(widgetButton);
+            widgetButton.focus();
+            expect(document.activeElement).toBe(widgetButton);
+
+            mockDashboardService.isDashboardStatic.set(false);
+            TestBed.tick();
+
+            expect(document.activeElement).not.toBe(widgetButton);
+            widgetButton.remove();
+        });
+
+        it('leaves focus outside the grid alone', () => {
+            fixture.detectChanges();
+            const toolbarButton = document.createElement('button');
+            document.body.appendChild(toolbarButton);
+            toolbarButton.focus();
+
+            mockDashboardService.isDashboardStatic.set(false);
+            TestBed.tick();
+
+            expect(document.activeElement).toBe(toolbarButton);
+            toolbarButton.remove();
         });
     });
 
@@ -376,6 +472,98 @@ describe('DashboardComponent', () => {
 
         const pastedWidget = vi.mocked(gridMock.grid.addWidget).mock.lastCall![0];
         expect(pastedWidget.input.widgetProperties.autoOpenOptionsOnCreate).toBeUndefined();
+    });
+
+    it('keeps a duplicated group widget\'s children under fresh ids', () => {
+        const childConfig = { displayName: 'Child' };
+        const item = {
+            gridstackNode: {
+                w: 3,
+                h: 4,
+                selector: 'group-widget',
+                input: {
+                    widgetProperties: {
+                        type: 'group-widget',
+                        uuid: 'group-src',
+                        config: { displayName: 'Group' }
+                    }
+                },
+                subGridOpts: {
+                    children: [{
+                        id: 'child-src',
+                        w: 1,
+                        h: 1,
+                        selector: 'widget-host2',
+                        input: {
+                            widgetProperties: {
+                                type: 'widget-numeric',
+                                uuid: 'child-src',
+                                config: childConfig
+                            }
+                        }
+                    }]
+                }
+            }
+        };
+
+        (component as unknown as {
+            duplicateWidget: (node: unknown) => void;
+        }).duplicateWidget(item);
+
+        const duplicated = vi.mocked(gridMock.grid.addWidget).mock.lastCall![0];
+        const child = duplicated.subGridOpts.children[0];
+        expect(duplicated.input.widgetProperties.uuid).toBe(duplicated.id);
+        expect(duplicated.input.widgetProperties.uuid).not.toBe('group-src');
+        expect(child.id).not.toBe('child-src');
+        expect(child.input.widgetProperties.uuid).toBe(child.id);
+        expect(child.input.widgetProperties.config).toEqual({ displayName: 'Child' });
+        expect(child.input.widgetProperties.config).not.toBe(childConfig);
+        expect(duplicated.input.widgetProperties.autoOpenOptionsOnCreate).toBeUndefined();
+    });
+
+    it('keeps a pasted group widget\'s children under fresh ids', () => {
+        mockDashboardService.isDashboardStatic.set(false);
+        mockDashboardService.widgetClipboard.set({
+            w: 3,
+            h: 4,
+            selector: 'group-widget',
+            input: {
+                widgetProperties: {
+                    type: 'group-widget',
+                    uuid: 'clipboard',
+                    config: { displayName: 'Group' }
+                }
+            },
+            subGridOpts: {
+                children: [{
+                    id: 'child-src',
+                    w: 1,
+                    h: 1,
+                    selector: 'widget-host2',
+                    input: {
+                        widgetProperties: {
+                            type: 'widget-numeric',
+                            uuid: 'child-src',
+                            config: { displayName: 'Child' }
+                        }
+                    }
+                }]
+            }
+        });
+
+        (component as unknown as {
+            pasteCopiedWidget: (x?: number, y?: number) => void;
+        }).pasteCopiedWidget(1, 1);
+
+        const pasted = vi.mocked(gridMock.grid.addWidget).mock.lastCall![0];
+        const child = pasted.subGridOpts.children[0];
+        expect(pasted.x).toBe(1);
+        expect(pasted.y).toBe(1);
+        expect(pasted.input.widgetProperties.uuid).toBe(pasted.id);
+        expect(pasted.input.widgetProperties.uuid).not.toBe('clipboard');
+        expect(child.id).not.toBe('child-src');
+        expect(child.input.widgetProperties.uuid).toBe(child.id);
+        expect(child.input.widgetProperties.config.displayName).toBe('Child');
     });
 
     it('should not add a widget when add-widget dialog is canceled', () => {

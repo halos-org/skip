@@ -12,6 +12,7 @@ import { EmbedModeService } from './embed-mode.service';
 import { StorageService } from './storage.service';
 import { AuthenticationService } from './authentication.service';
 import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
+import { assignFreshWidgetIds, cloneWidgetSnapshot } from '../utils/dashboard-widgets.util';
 
 /** An optional rule that auto-shows a page when a Signal K path reaches a value. */
 export interface IPageSwitchTrigger {
@@ -300,8 +301,8 @@ export class DashboardService {
    * Behavior:
    * - Deep clones the source dashboard (including its widget configuration).
    * - Generates a new UUID for the duplicated dashboard itself.
-   * - Generates a new UUID for every widget AND updates each widget's
-   *   input.widgetProperties.uuid to keep internal references consistent.
+   * - Generates a new UUID for every widget, including children nested under
+   *   `subGridOpts`, and updates each widget's input.widgetProperties.uuid.
    * - Name and icon are replaced with the provided values (icon defaults to 'dashboard-dashboard' if empty).
    *
    * Safety / Validation:
@@ -332,14 +333,11 @@ export class DashboardService {
     delete newDashboard.trigger;
 
     if (Array.isArray(newDashboard.configuration)) {
-      newDashboard.configuration.forEach((widget: NgGridStackWidget) => {
-        if (widget && widget.input?.widgetProperties) {
-          widget.id = UUID.create();
-          widget.input.widgetProperties.uuid = widget.id;
-        } else {
-          console.error("[Dashboard Service] Widget configuration is missing required properties:", widget);
-        }
-      });
+      for (const widget of newDashboard.configuration) {
+        assignFreshWidgetIds(widget, invalid => {
+          console.error("[Dashboard Service] Widget configuration is missing required properties:", invalid);
+        });
+      }
     } else {
       console.error("[Dashboard Service] Dashboard configuration is not an array:", newDashboard.configuration);
       newDashboard.configuration = [];
@@ -529,18 +527,11 @@ export class DashboardService {
     const type = widgetProps?.type;
     if (!type) return;
 
-    this.widgetClipboard.set({
-      w: node.w,
-      h: node.h,
-      selector: node.selector,
-      input: {
-        widgetProperties: {
-          type,
-          uuid: 'clipboard',
-          config: cloneDeep(widgetProps.config)
-        }
-      }
-    } as NgGridStackWidget);
+    const snapshot = cloneWidgetSnapshot(node);
+    const copied = snapshot.input?.widgetProperties;
+    if (!copied) return;
+    copied.uuid = 'clipboard';
+    this.widgetClipboard.set(snapshot);
   }
 
   /**

@@ -1,3 +1,4 @@
+<div class="instrument">
 <svg
   class="sea-horizon"
   viewBox="0 0 300 300"
@@ -273,7 +274,6 @@
     @if (noData()) {
       <g class="no-data">
         <circle [attr.cx]="cx" [attr.cy]="cy" [attr.r]="winR" />
-        <text [attr.x]="cx" [attr.y]="cy - 22" text-anchor="middle">NO DATA</text>
       </g>
     }
 
@@ -302,3 +302,10 @@
     <path class="glass" [attr.d]="glassPath" [attr.fill]="url().glass" />
   </g>
 </svg>
+@if (noData()) {
+  <!-- HTML, not SVG text: a 13-unit glyph in the 300-unit viewBox is about 3px on a phone tile. -->
+  <div class="no-data-label" aria-hidden="true">
+    <span class="label">NO DATA</span>
+  </div>
+}
+</div>

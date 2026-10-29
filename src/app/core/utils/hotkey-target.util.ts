@@ -2,8 +2,8 @@
  * The bare keys the app's global hotkey listener acts on, in `KeyboardEvent.key`
  * form: page nav (←/→) and e/f/n (edit/fullscreen/night). Single source for the
  * global shell hotkeys — the listener lowercases these to match its normalized
- * filter. Esc-cancels-edit is deliberately NOT here: it is component-local and
- * registered separately in dashboard.component.ts.
+ * filter. Esc-cancels-edit and Enter-saves-edit are deliberately NOT here: they
+ * are component-local and registered separately in dashboard.component.ts.
  */
 export const HOTKEY_KEYS = ['ArrowLeft', 'ArrowRight', 'e', 'f', 'n'] as const;
 
@@ -29,6 +29,16 @@ export function isInteractiveKeyTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   if ((target as HTMLElement).isContentEditable) return true;
   return target.closest(INTERACTIVE_TARGET_SELECTOR) !== null;
+}
+
+/**
+ * True when Enter would activate the focused control. Not part of
+ * {@link isInteractiveKeyTarget}: a focused button must still let e/f/n through,
+ * but a document-level Enter handler would otherwise save and activate together.
+ */
+export function isButtonActivationTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return target.closest('button, [role="button"]') !== null;
 }
 
 /**
