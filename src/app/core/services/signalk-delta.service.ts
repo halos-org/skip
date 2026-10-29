@@ -285,15 +285,16 @@ export class SignalKDeltaService implements OnDestroy {
       console.log('[Delta Service] WebSocket terminated due to socket error');
       this.streamEndpoint.message = "WebSocket error";
       this.streamEndpoint.state = StreamStatus.Error;
-
-      // Notify ConnectionStateMachine of WebSocket error
-      this.connectionStateMachine.onWebSocketError('WebSocket connection lost');
-
-      // A drop may mean the session cookie expired; re-check loginStatus so session state (and
-      // the UI) reflect a server-side logout. WS reconnect attempts are driven separately by the
-      // connection state machine.
-      void this.auth.refreshLoginStatus();
     }
+
+    // Skip's own closes never get here, so this one is a connection loss even when clean: Signal K
+    // server closes cleanly on a missed heartbeat, e.g. after the device slept.
+    this.connectionStateMachine.onWebSocketError('WebSocket connection lost');
+
+    // A drop may mean the session cookie expired; re-check loginStatus so session state (and
+    // the UI) reflect a server-side logout. WS reconnect attempts are driven separately by the
+    // connection state machine.
+    void this.auth.refreshLoginStatus();
     this.streamEndpoint$.next(this.streamEndpoint);
   }
 

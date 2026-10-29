@@ -107,6 +107,7 @@ describe('SignalKDeltaService', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('should be created', () => {
@@ -182,15 +183,19 @@ describe('SignalKDeltaService', () => {
       expect(service.streamEndpoint$.getValue()).toEqual({ state: 'Error', message: 'WebSocket error' });
     });
 
-    it('does not re-check loginStatus on a clean close', () => {
-      const { service, auth } = setupWithEndpoint();
+    // Signal K server closes cleanly on a missed heartbeat; socket.close() without a code arrives
+    // as 1005, an explicit normal close as 1000.
+    it.each([1000, 1005])('treats a clean close (code %i) of the current socket as a connection loss', code => {
+      const { service, auth, csm } = setupWithEndpoint();
       service.connectWS('test');
       FakeWebSocket.instances[0].serverOpen();
       auth.refreshLoginStatus.mockClear();
 
-      FakeWebSocket.instances[0].serverClose(true);
+      FakeWebSocket.instances[0].serverClose(true, code);
 
-      expect(auth.refreshLoginStatus).not.toHaveBeenCalled();
+      expect(csm.onWebSocketError).toHaveBeenCalledTimes(1);
+      expect(auth.refreshLoginStatus).toHaveBeenCalled();
+      expect(service.streamEndpoint$.getValue()).toEqual({ state: 'Disconnected', message: 'WebSocket closed' });
     });
   });
 
@@ -256,6 +261,98 @@ describe('SignalKDeltaService', () => {
 
       expect(csm.onWebSocketError).not.toHaveBeenCalled();
       expect(service.streamEndpoint$.getValue()).toEqual({ state: 'Disconnected', message: 'Not connected' });
+    });
+
+    it('ignores a clean close of a socket closed by a disconnection', () => {
+      const { service, auth, csm } = setupWithEndpoint();
+      service.connectWS('test');
+      const [a] = FakeWebSocket.instances;
+      a.serverOpen();
+
+      csm.state$.next(ConnectionState.Disconnected);
+      auth.refreshLoginStatus.mockClear();
+      a.serverClose(true);
+
+      expect(csm.onWebSocketError).not.toHaveBeenCalled();
+      expect(auth.refreshLoginStatus).not.toHaveBeenCalled();
+      expect(FakeWebSocket.instances).toHaveLength(1);
+    });
+
+    it('ignores a clean close of a socket closed on destroy', () => {
+      const { service, csm } = setupWithEndpoint();
+      service.connectWS('test');
+      const [a] = FakeWebSocket.instances;
+      a.serverOpen();
+
+      service.ngOnDestroy();
+      a.serverClose(true);
+
+      expect(a.closeRequested).toBe(true);
+      expect(csm.onWebSocketError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reconnect after a clean close (real ConnectionStateMachine)', () => {
+    const RETRY_DELAY_MS = 2000;
+
+    function setupConnected() {
+      const auth = new AuthStub();
+      const conn = new ConnStub();
+      conn.serverServiceEndpoint$.next({ state: EndpointStatus.Connected, WsServiceUrl: WS_URL });
+      TestBed.configureTestingModule({
+        providers: [
+          SignalKDeltaService,
+          { provide: AuthenticationService, useValue: auth },
+          { provide: SignalKConnectionService, useValue: conn },
+        ]
+      });
+      const service = TestBed.inject(SignalKDeltaService);
+      const csm = TestBed.inject(ConnectionStateMachine);
+      csm.enableWebSocketMode();
+      csm.startHTTPDiscovery();
+      csm.onHTTPDiscoverySuccess();
+      FakeWebSocket.instances[0].serverOpen();
+      return { service, csm };
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('moves to WebSocketRetrying and the scheduled retry opens exactly one new socket', () => {
+      const { csm } = setupConnected();
+      expect(csm.currentState).toBe(ConnectionState.Connected);
+
+      FakeWebSocket.instances[0].serverClose(true, 1005);
+
+      expect(csm.currentState).toBe(ConnectionState.WebSocketRetrying);
+      expect(FakeWebSocket.instances).toHaveLength(1);
+
+      vi.advanceTimersByTime(RETRY_DELAY_MS);
+      expect(FakeWebSocket.instances).toHaveLength(2);
+
+      FakeWebSocket.instances[1].serverOpen();
+      expect(csm.currentState).toBe(ConnectionState.Connected);
+      vi.advanceTimersByTime(RETRY_DELAY_MS * 10);
+      expect(FakeWebSocket.instances).toHaveLength(2);
+    });
+
+    it('does not open a second socket when the app resumes while the retry is pending', () => {
+      const { csm } = setupConnected();
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+
+      FakeWebSocket.instances[0].serverClose(true, 1005);
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      expect(csm.currentState).toBe(ConnectionState.WebSocketRetrying);
+      expect(FakeWebSocket.instances).toHaveLength(1);
+
+      vi.advanceTimersByTime(RETRY_DELAY_MS);
+      expect(FakeWebSocket.instances).toHaveLength(2);
     });
   });
 
