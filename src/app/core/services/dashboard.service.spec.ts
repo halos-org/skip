@@ -11,6 +11,7 @@ import { EmbedModeService } from './embed-mode.service';
 import { StorageService } from './storage.service';
 import { AuthenticationService } from './authentication.service';
 import { of } from 'rxjs';
+import { allWidgets } from '../utils/dashboard-widgets.util';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -420,6 +421,31 @@ describe('DashboardService', () => {
       expect(consoleError).toHaveBeenCalled();
     });
 
+    it('re-ids widgets nested in a group and leaves the source ids', () => {
+      const grandchild = makeWidget('gc');
+      const inner = makeWidget('inner');
+      inner.selector = 'group-widget';
+      inner.input!.widgetProperties.type = 'group-widget';
+      inner.subGridOpts = { children: [grandchild] };
+      const group = makeWidget('group');
+      group.selector = 'group-widget';
+      group.input!.widgetProperties.type = 'group-widget';
+      group.subGridOpts = { children: [makeWidget('child'), inner] };
+      setup([makeDashboard('d-src', 'Source', [group])]);
+
+      service.duplicate(0, 'Copy', 'icon');
+
+      const sourceIds = [...allWidgets(widgetsOf(service.dashboards()[0]))].map(widget => widget.id);
+      expect(sourceIds).toEqual(['group', 'child', 'inner', 'gc']);
+      const copied = [...allWidgets(widgetsOf(service.dashboards()[1]))];
+      const copyIds = copied.map(widget => widget.id);
+      expect(new Set(copyIds).size).toBe(copyIds.length);
+      expect(copyIds.filter(id => sourceIds.includes(id))).toEqual([]);
+      for (const widget of copied) {
+        expect(widget.input?.widgetProperties.uuid).toBe(widget.id);
+      }
+    });
+
     it('keeps the original widget id when widgetProperties are missing', () => {
       setup([makeDashboard('d-src', 'Source', [{ id: 'w-bare', w: 1, h: 1, selector: 'widget-host2' }])]);
       service.duplicate(0, 'Copy', 'icon');
@@ -623,6 +649,20 @@ describe('DashboardService', () => {
       expect(service.widgetClipboard()!.input!.widgetProperties.config.displayName).toBe('w-src');
       service.clearWidgetClipboard();
       expect(service.widgetClipboard()).toBeNull();
+    });
+
+    it('keeps group children on the clipboard without adopting their ids as the parent', () => {
+      const node = makeWidget('w-src');
+      node.selector = 'group-widget';
+      node.subGridOpts = { children: [makeWidget('child')] };
+      service.setWidgetClipboardFromNode(node);
+      const stored = service.widgetClipboard();
+      expect(stored?.input?.widgetProperties.uuid).toBe('clipboard');
+      expect(stored?.subGridOpts?.children?.[0].id).toBe('child');
+      expect(stored?.subGridOpts?.children?.[0].input?.widgetProperties.uuid).toBe('child');
+      const sourceChild = node.subGridOpts!.children![0];
+      sourceChild.input!.widgetProperties.config.displayName = 'mutated';
+      expect(stored?.subGridOpts?.children?.[0].input?.widgetProperties.config.displayName).toBe('child');
     });
 
     it('ignores nodes without a widget type', () => {

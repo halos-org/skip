@@ -34,7 +34,7 @@ In edit mode, widgets show dashed outlines, and the toolbar swaps to an "Editing
 - Move a widget (drag)
 - Resize a widget (drag edges/corners)
 - Configure, duplicate, or delete a widget (tap it → action menu; Delete asks to confirm)
-- **Save** changes (Done) or **discard** them (Cancel, or press **Esc**) — both are in the toolbar while editing
+- **Save** changes (Done, or press **Enter**) or **discard** them (Cancel, or press **Esc**). Both are in the toolbar while editing
 
 >**Tip:** If you can’t add a widget, free up space by resizing or moving existing ones first.
 

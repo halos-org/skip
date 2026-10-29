@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HOTKEY_KEYS, isInteractiveKeyTarget, isBlockingOverlayOpen } from './hotkey-target.util';
+import { HOTKEY_KEYS, isButtonActivationTarget, isInteractiveKeyTarget, isBlockingOverlayOpen } from './hotkey-target.util';
 
 function el(html: string): HTMLElement {
   const host = document.createElement('div');
@@ -40,6 +40,23 @@ describe('isInteractiveKeyTarget', () => {
     expect(isInteractiveKeyTarget(el('<button>go</button>'))).toBe(false);
     expect(isInteractiveKeyTarget(document)).toBe(false);
     expect(isInteractiveKeyTarget(null)).toBe(false);
+  });
+});
+
+describe('isButtonActivationTarget', () => {
+  it('is true for a button and a role=button, including a nested target', () => {
+    expect(isButtonActivationTarget(el('<button>Done</button>'))).toBe(true);
+    expect(isButtonActivationTarget(el('<div role="button">Done</div>'))).toBe(true);
+    const host = document.createElement('div');
+    host.innerHTML = '<button><span id="icon">x</span></button>';
+    expect(isButtonActivationTarget(host.querySelector('#icon'))).toBe(true);
+  });
+
+  it('is false for text fields and targets that do not activate on Enter', () => {
+    expect(isButtonActivationTarget(el('<input>'))).toBe(false);
+    expect(isButtonActivationTarget(el('<div>x</div>'))).toBe(false);
+    expect(isButtonActivationTarget(document)).toBe(false);
+    expect(isButtonActivationTarget(null)).toBe(false);
   });
 });
 

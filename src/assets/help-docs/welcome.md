@@ -7,7 +7,7 @@ Skip supports touch, mouse, and keyboard input across devices.
 | Move between pages   | Swipe left or right          | Scroll horizontally                   | <kbd>←</kbd>/<kbd>→</kbd> (Left/Right Arrow)       |
 | Jump to a page       | Tap its icon in the toolbar  | Click its icon in the toolbar         | —                                                 |
 | Enter page edit mode | Tap the edit button          | Click the edit button                 | <kbd>E</kbd>                                       |
-| Save page edit       | Tap the Done button          | Click the Done button                 | —                                                 |
+| Save page edit       | Tap the Done button          | Click the Done button                 | <kbd>Enter</kbd>                                  |
 | Cancel page edit     | Tap the Cancel button        | Click the Cancel button               | <kbd>Esc</kbd>                                     |
 | Toggle Fullscreen    | —                            | Click the fullscreen button           | <kbd>F</kbd>                                       |
 | Toggle Night mode    | Tap the night-mode button    | Click the night-mode button           | <kbd>N</kbd>                                       |

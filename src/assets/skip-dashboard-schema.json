@@ -582,7 +582,7 @@
     "configVersion": 25,
     "optionUnitsRule": "Skip receives every Signal K number in SI, and every widget option that holds a measured quantity is stored in SI. The numeric options that configure the widget itself are the exception; meta.widgetSettingUnits gives their units. A widget's optionUnits maps an option, named by its dotted path inside the widget config, to the unit it is stored in; for an array option the unit applies to each element. A unit written as 'SI unit of <slot>' is the Signal K SI unit of the path that path slot (or path option) points at, such as K for a temperature. A scale bound set to null is unset: the widget uses the path's own display scale, a slider uses 0 to 1, and a data graph scales itself.",
     "schemaVersion": 1,
-    "skipVersion": "1.6.0",
+    "skipVersion": "1.6.1",
     "widgetSettingUnits": {
       "dataTimeout": "s",
       "gauge.damping": "s",

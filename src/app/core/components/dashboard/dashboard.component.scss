@@ -43,6 +43,12 @@
   gap: 10px;
   cursor: pointer;
   z-index: 100;
+
+  // The FAB's own focus state layer is near-invisible, and Tab lands on Cancel first.
+  button:focus-visible {
+    outline: 3px solid var(--mat-sys-on-surface);
+    outline-offset: 3px;
+  }
 }
 .cancel {
   @include mat.fab-overrides((
