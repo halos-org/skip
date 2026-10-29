@@ -1563,6 +1563,35 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
             { path: 'env.slow', source: 'default', pathType: 'number', dataTimeoutMs: updateInterval * 2 }
         ]);
     });
+
+    it('keeps the 5s floor when updateInterval is under 5s', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.mid', source: null, pathType: 'number', updateInterval: 4000,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const hits: (number | null)[] = [];
+        directive.observe('p', u => hits.push((u.data.value as number | null) ?? null));
+        const subj = dataSvc.subjects.get('env.mid|default')!;
+        subj.next({ data: { value: 3, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        // The 4s sample lands while the reading is still live. A dead path then nulls at the
+        // 5s floor, not at two sample periods.
+        await vi.advanceTimersByTimeAsync(4000);
+        expect(hits.at(-1)).toBe(3);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(4999);
+        expect(hits.at(-1)).toBe(3);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(hits.at(-1)).toBeNull();
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.mid', source: 'default', pathType: 'number', dataTimeoutMs: 5000 }
+        ]);
+    });
 });
 
 /**

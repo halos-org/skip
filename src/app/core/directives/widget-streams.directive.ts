@@ -13,11 +13,11 @@ const FIXED_DATA_TIMEOUT_MS = 5000;
 
 /**
  * Stale window for the sampled stream. The timeout watches deliveries, not the raw sensor, so a
- * sample period at or above the fixed TTL would expire between healthy samples (#618). Two periods
- * leaves room for one on-time sample. Faster widgets keep the fixed 5s floor.
+ * sample period at or above the fixed TTL would expire between healthy samples. Two periods leave
+ * room for one on-time sample. A shorter period keeps the 5s floor.
  */
 function staleDataTimeoutMs(sampleMs: number): number {
-  return Math.max(FIXED_DATA_TIMEOUT_MS, sampleMs * 2);
+  return sampleMs >= FIXED_DATA_TIMEOUT_MS ? sampleMs * 2 : FIXED_DATA_TIMEOUT_MS;
 }
 
 /** The subset of a path config that decides which reading a subscription delivers. */
@@ -137,7 +137,7 @@ export class WidgetRepointTracker {
  *   measure for a display slot (the stored `convertUnitTo` until meta resolves), the fixed
  *   `convertUnitTo` for a structural slot. A widget converts only where it formats text, maps to a
  *   scale or sets an SVG attribute, with `UnitsService.convertToUnit(measure, value)`
- * - Optional stale-data timeout (gated by the enableTimeout flag; 5s TTL, or two sample periods when the widget samples slower than that) + retry handling
+ * - Optional stale-data timeout (gated by the enableTimeout flag; 5s TTL, or two sample periods when the sample period is at least that long) + retry handling
  * - Path validation: null/undefined/empty paths, and paths with a malformed `#` pointer, trigger cleanup
  * - Pointer paths (`path#/field`) acquire and time out on the Signal K path and deliver the field
  * - Signature tracking: per-path (path + pathType + convertUnitTo + source + bootstrap null and invalid-sample policies); the widget-level update cadence lives in the root signature
@@ -356,7 +356,7 @@ export class WidgetStreamsDirective implements OnDestroy {
     if (enableTimeout) {
       // The timeout unsubscribes before timeoutPathObservable's null can travel back through this
       // pipeline, and retry waits out retryDelay, so the widget would keep the last reading for
-      // another 5s (#709). Hand it the null now. Remember the last delivery so the null keeps that
+      // another 5s. Hand it the null now. Remember the last delivery so the null keeps that
       // reading's state and unit. A path that drops invalid samples must not see it: the null is
       // emitted below that filter, and the replay on retry is what the filter already drops.
       let lastUpdate: IPathUpdate | undefined;
