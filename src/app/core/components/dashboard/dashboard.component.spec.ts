@@ -253,6 +253,36 @@ describe('DashboardComponent', () => {
         });
     });
 
+    describe('entering edit mode', () => {
+        it('blurs a focused control inside the grid, so Enter saves instead of clicking it', () => {
+            fixture.detectChanges();
+            const grid = (fixture.nativeElement as HTMLElement).querySelector('gridstack')!;
+            const widgetButton = document.createElement('button');
+            grid.appendChild(widgetButton);
+            widgetButton.focus();
+            expect(document.activeElement).toBe(widgetButton);
+
+            mockDashboardService.isDashboardStatic.set(false);
+            TestBed.tick();
+
+            expect(document.activeElement).not.toBe(widgetButton);
+            widgetButton.remove();
+        });
+
+        it('leaves focus outside the grid alone', () => {
+            fixture.detectChanges();
+            const toolbarButton = document.createElement('button');
+            document.body.appendChild(toolbarButton);
+            toolbarButton.focus();
+
+            mockDashboardService.isDashboardStatic.set(false);
+            TestBed.tick();
+
+            expect(document.activeElement).toBe(toolbarButton);
+            toolbarButton.remove();
+        });
+    });
+
     describe('layout-edit FABs', () => {
         function stubLoad(): ReturnType<typeof vi.spyOn> {
             return vi.spyOn(component as unknown as DashboardEscApi, 'loadDashboard').mockImplementation(() => undefined);

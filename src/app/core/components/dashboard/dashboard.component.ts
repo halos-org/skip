@@ -150,6 +150,18 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       });
     });
 
+    // Widget content stays live in edit mode, so a widget control focused before editing
+    // (an autopilot +10) would take the Enter meant to save and send a real command.
+    effect(() => {
+      if (this.dashboard.isDashboardStatic()) return;
+      untracked(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && this._pageSlide()?.nativeElement.contains(active)) {
+          active.blur();
+        }
+      });
+    });
+
     // Reload the grid when the active page's index OR identity changes. Tracking identity —
     // not just the index — catches a structural page op that swaps the page occupying the
     // current index (deleting the active page leaves the index unchanged but pointing at a
