@@ -1345,10 +1345,10 @@ class TtlFakeDataService {
 
     timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
         this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
-        // Mirror the real DataService: a TTL timeout resets the timed-out source's value to null.
-        this.subjects.get(this.keyFor(path, source))?.next(
-            { data: { value: null, timestamp: null }, state: 'normal' } as IPathUpdate
-        );
+        // Mirror the real DataService: the value is nulled and the alarm state is left as it was.
+        const subject = this.subjects.get(this.keyFor(path, source));
+        if (!subject) return;
+        subject.next({ data: { value: null, timestamp: null }, state: subject.getValue().state } as IPathUpdate);
     }
 }
 
@@ -1390,10 +1390,13 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
 
         dataSvc.subjects.get('self.navigation.position|default')!.next(
             { data: { value: { latitude: 60.08, longitude: 21.97 }, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
-        // The 5 s TTL counts from the sample of the value above and delivers the reset null then.
-        // The extra wait still covers the retry resubscribe.
-        await vi.advanceTimersByTimeAsync(12000);
+        // The reading arrives on the 1s sample. The 5s TTL then nulls the field and the whole value,
+        // which a check only at 12s would also pass if the null still waited for the retry.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(lat.at(-1)).toBe(60.08);
+        expect(whole.at(-1)).toEqual({ latitude: 60.08, longitude: 21.97 });
 
+        await vi.advanceTimersByTimeAsync(5000);
         expect(dataSvc.timeoutCalls.map(c => c.path)).toContain('self.navigation.position');
         expect(dataSvc.timeoutCalls.every(c => c.path === 'self.navigation.position')).toBe(true);
         expect(lat.at(-1)).toBeNull();
@@ -1472,38 +1475,48 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
     it('delivers the timeout null when the 5s TTL elapses, before the retry delay (#709)', async () => {
         vi.useFakeTimers();
         vi.spyOn(console, 'log');
+        const units = TestBed.inject(UnitsService) as unknown as FakeUnitsService;
+        units.pathMeasures.set('env.dead', 'x10');
+        units.pathDurationFormats.set('env.dead', 'HH:MM:SS');
         directive.setStreamsConfig(makeCfg({
             path: 'env.dead', source: null, pathType: 'number', updateInterval: 1000,
-            suppressBootstrapNull: true, enableTimeout: true,
-            convertUnitTo: 'x10', showConvertUnitTo: false
+            suppressBootstrapNull: true, enableTimeout: true, convertUnitTo: 'x10'
         }));
         const start = Date.now();
-        const hits: { t: number; value: number | null; measure?: string; state: string }[] = [];
+        const hits: { t: number; value: number | null; measure?: string; durationFormat?: string; state: string }[] = [];
         directive.observe('p', u => hits.push({
             t: Date.now() - start,
             value: (u.data.value as number | null) ?? null,
             measure: u.data.measure,
+            durationFormat: u.data.durationFormat,
             state: u.state
         }));
 
-        dataSvc.subjects.get('env.dead|default')!.next(
-            { data: { value: 12, timestamp: new Date() }, state: 'alarm' } as IPathUpdate);
+        const subj = dataSvc.subjects.get('env.dead|default')!;
+        subj.next({ data: { value: 12, timestamp: new Date() }, state: 'alarm' } as IPathUpdate);
         // The value also rides the first sample tick. The TTL counts from that last delivery.
         await vi.advanceTimersByTimeAsync(1000);
-        expect(hits).toEqual([
-            { t: 0, value: 12, measure: 'x10', state: 'alarm' },
-            { t: 1000, value: 12, measure: 'x10', state: 'alarm' }
-        ]);
+        const live = { t: 0, value: 12, measure: 'x10', durationFormat: 'HH:MM:SS', state: 'alarm' };
+        expect(hits).toEqual([live, { ...live, t: 1000 }]);
 
         await vi.advanceTimersByTimeAsync(4999);
-        expect(hits.at(-1)).toEqual({ t: 1000, value: 12, measure: 'x10', state: 'alarm' });
+        expect(hits.at(-1)).toEqual({ ...live, t: 1000 });
         expect(dataSvc.timeoutCalls).toEqual([]);
 
         await vi.advanceTimersByTimeAsync(1);
-        expect(hits.at(-1)).toEqual({ t: 6000, value: null, measure: 'x10', state: 'alarm' });
+        const reset = { value: null, measure: 'x10', durationFormat: 'HH:MM:SS', state: 'alarm' };
+        expect(hits.at(-1)).toEqual({ t: 6000, ...reset });
         expect(dataSvc.timeoutCalls).toEqual([
             { path: 'env.dead', source: 'default', pathType: 'number', dataTimeoutMs: 5000 }
         ]);
+
+        // The retry resubscribes after 5s and must not complete the stream. The replayed null keeps
+        // the alarm, and a sample that arrives after that still reaches the widget.
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(hits.at(-1)).toEqual({ t: 11000, ...reset });
+        subj.next({ data: { value: 42, timestamp: new Date() }, state: 'alarm' } as IPathUpdate);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(hits.at(-1)).toEqual({ t: 12000, value: 42, measure: 'x10', durationFormat: 'HH:MM:SS', state: 'alarm' });
     });
 
     it('keeps a live reading when updateInterval exceeds 5s, and nulls it once the path goes quiet (#618)', async () => {
