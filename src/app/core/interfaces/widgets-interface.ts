@@ -256,8 +256,9 @@ export interface IWidgetSvcConfig {
    */
   enableTimeout?: boolean;
   /**
-   * Inert: no longer read at runtime. The stale-data TTL is a fixed 5s constant; whether a widget
-   * applies it is the enableTimeout flag. Retained on stored configs to avoid a config-shape change.
+   * Inert: no longer read at runtime. The stale-data TTL is 5s, or two sample periods when the
+   * widget samples slower than that. Whether a widget applies it is the enableTimeout flag.
+   * Retained on stored configs to avoid a config-shape change.
    */
   dataTimeout?: number;
   /**

@@ -1390,8 +1390,8 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
 
         dataSvc.subjects.get('self.navigation.position|default')!.next(
             { data: { value: { latitude: 60.08, longitude: 21.97 }, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
-        // The 5 s TTL counts from the 1 s sample of the value above; the reset null arrives on the
-        // resubscribe 5 s after that.
+        // The 5 s TTL counts from the sample of the value above and delivers the reset null then.
+        // The extra wait still covers the retry resubscribe.
         await vi.advanceTimersByTimeAsync(12000);
 
         expect(dataSvc.timeoutCalls.map(c => c.path)).toContain('self.navigation.position');
@@ -1463,10 +1463,92 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
         await vi.advanceTimersByTimeAsync(60);
         expect(hits.at(-1)).toBe(7);
 
-        // The fixed 5 s TTL fires, then the 5 s retry resubscribes and replays the reset null.
+        // The fixed 5 s TTL delivers the reset null, and the later retry replays it.
         await vi.advanceTimersByTimeAsync(10100);
         expect(dataSvc.timeoutCalls.length).toBeGreaterThanOrEqual(1);
         expect(hits.at(-1)).toBeNull();
+    });
+
+    it('delivers the timeout null when the 5s TTL elapses, before the retry delay (#709)', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.dead', source: null, pathType: 'number', updateInterval: 1000,
+            suppressBootstrapNull: true, enableTimeout: true,
+            convertUnitTo: 'x10', showConvertUnitTo: false
+        }));
+        const start = Date.now();
+        const hits: { t: number; value: number | null; measure?: string; state: string }[] = [];
+        directive.observe('p', u => hits.push({
+            t: Date.now() - start,
+            value: (u.data.value as number | null) ?? null,
+            measure: u.data.measure,
+            state: u.state
+        }));
+
+        dataSvc.subjects.get('env.dead|default')!.next(
+            { data: { value: 12, timestamp: new Date() }, state: 'alarm' } as IPathUpdate);
+        // The value also rides the first sample tick. The TTL counts from that last delivery.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(hits).toEqual([
+            { t: 0, value: 12, measure: 'x10', state: 'alarm' },
+            { t: 1000, value: 12, measure: 'x10', state: 'alarm' }
+        ]);
+
+        await vi.advanceTimersByTimeAsync(4999);
+        expect(hits.at(-1)).toEqual({ t: 1000, value: 12, measure: 'x10', state: 'alarm' });
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(hits.at(-1)).toEqual({ t: 6000, value: null, measure: 'x10', state: 'alarm' });
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.dead', source: 'default', pathType: 'number', dataTimeoutMs: 5000 }
+        ]);
+    });
+
+    it('keeps a live reading when updateInterval exceeds 5s, and nulls it once the path goes quiet (#618)', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        const updateInterval = 6000;
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.slow', source: null, pathType: 'number', updateInterval,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const start = Date.now();
+        const hits: { t: number; value: number | null }[] = [];
+        directive.observe('p', u => hits.push({
+            t: Date.now() - start,
+            value: (u.data.value as number | null) ?? null
+        }));
+        const subj = dataSvc.subjects.get('env.slow|default')!;
+        const emit = (value: number) => subj.next(
+            { data: { value, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        let value = 1;
+        emit(value);
+        // A sample in the middle of each period, then the period's sample tick. Three periods
+        // is long enough for the old 5s TTL to fire between samples of a healthy sensor.
+        for (let period = 0; period < 3; period++) {
+            await vi.advanceTimersByTimeAsync(updateInterval / 2);
+            value += 1;
+            emit(value);
+            await vi.advanceTimersByTimeAsync(updateInterval / 2);
+            expect(hits.at(-1)?.value).toBe(value);
+            expect(dataSvc.timeoutCalls).toEqual([]);
+        }
+
+        const lastLive = hits.at(-1)!;
+        // One quiet sample period leaves the last reading up. The stale window is two periods
+        // once that is longer than the fixed 5s TTL.
+        await vi.advanceTimersByTimeAsync(updateInterval);
+        expect(hits.at(-1)).toEqual(lastLive);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(updateInterval);
+        expect(hits.at(-1)).toEqual({ t: lastLive.t + updateInterval * 2, value: null });
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.slow', source: 'default', pathType: 'number', dataTimeoutMs: updateInterval * 2 }
+        ]);
     });
 });
 
