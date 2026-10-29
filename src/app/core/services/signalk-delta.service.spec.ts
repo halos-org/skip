@@ -1,10 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { SignalKDeltaService } from './signalk-delta.service';
 import { AuthenticationService } from './authentication.service';
 import { EndpointStatus, SignalKConnectionService } from './signalk-connection.service';
-import { ConnectionStateMachine } from './connection-state-machine.service';
+import { ConnectionState, ConnectionStateMachine } from './connection-state-machine.service';
 import { ISignalKDeltaMessage, ISignalKUpdateMessage, ISignalKDataValueUpdate, ISignalKMeta, ISkMetadata } from '../interfaces/signalk-interfaces';
 import { IPathValueData, IMeta } from '../interfaces/app-interfaces';
 
@@ -29,11 +29,48 @@ class CsmStub {
   currentState = 'HTTPConnected';
 }
 
+/**
+ * Stands in for the browser WebSocket, which rxjs reads from the global scope when a
+ * WebSocketSubject is constructed. Tests deliver the server side of the handshake by hand.
+ */
+class FakeWebSocket {
+  static instances: FakeWebSocket[] = [];
+  readyState = 0;
+  closeRequested = false;
+  onopen: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+
+  constructor(public url: string) {
+    FakeWebSocket.instances.push(this);
+  }
+
+  send(): void { /* noop */ }
+
+  close(): void {
+    this.closeRequested = true;
+    this.readyState = 2;
+  }
+
+  serverOpen(): void {
+    this.readyState = 1;
+    this.onopen?.(new Event('open'));
+  }
+
+  serverClose(wasClean: boolean, code = wasClean ? 1000 : 1006): void {
+    this.readyState = 3;
+    this.onclose?.(new CloseEvent('close', { wasClean, code }));
+  }
+}
+
 interface DeltaInternals {
   buildWebSocketUrl(): string;
   processWebsocketMessage(message: ISignalKDeltaMessage): void;
   handleStreamFrame(frame: unknown): void;
 }
+
+const WS_URL = 'ws://host/signalk/v1/stream';
 
 function setup() {
   const auth = new AuthStub();
@@ -51,9 +88,25 @@ function setup() {
   return { service, auth, conn, csm };
 }
 
+/** Service with a known WebSocket endpoint and the call history of construction cleared. */
+function setupWithEndpoint() {
+  const ctx = setup();
+  ctx.conn.serverServiceEndpoint$.next({ state: EndpointStatus.Connected, WsServiceUrl: WS_URL });
+  ctx.auth.refreshLoginStatus.mockClear();
+  ctx.csm.onWebSocketConnected.mockClear();
+  ctx.csm.onWebSocketError.mockClear();
+  return ctx;
+}
+
 describe('SignalKDeltaService', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
+    FakeWebSocket.instances = [];
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('should be created', () => {
@@ -104,34 +157,105 @@ describe('SignalKDeltaService', () => {
     });
   });
 
-  describe('loginStatus re-probe on WS open', () => {
-    it('re-probes loginStatus when the WebSocket opens so a reconnected session self-heals', () => {
-      const { service, auth } = setup();
-      auth.refreshLoginStatus.mockClear();
+  describe('current socket events', () => {
+    it('reports an open of the current socket and re-probes loginStatus so a reconnected session self-heals', () => {
+      const { service, auth, csm } = setupWithEndpoint();
+      service.connectWS('test');
 
-      service.socketWSOpenEvent$.next({} as Event);
+      FakeWebSocket.instances[0].serverOpen();
 
+      expect(csm.onWebSocketConnected).toHaveBeenCalledTimes(1);
       expect(auth.refreshLoginStatus).toHaveBeenCalled();
+      expect(service.streamEndpoint$.getValue().state).toBe('Connected');
     });
-  });
 
-  describe('loginStatus re-check on WS drop', () => {
-    it('re-checks loginStatus on a non-clean close', () => {
-      const { service, auth } = setup();
+    it('reports an unclean close of the current socket and re-checks loginStatus', () => {
+      const { service, auth, csm } = setupWithEndpoint();
+      service.connectWS('test');
+      FakeWebSocket.instances[0].serverOpen();
       auth.refreshLoginStatus.mockClear();
 
-      service.socketWSCloseEvent$.next({ wasClean: false } as CloseEvent);
+      FakeWebSocket.instances[0].serverClose(false);
 
+      expect(csm.onWebSocketError).toHaveBeenCalledTimes(1);
       expect(auth.refreshLoginStatus).toHaveBeenCalled();
+      expect(service.streamEndpoint$.getValue()).toEqual({ state: 'Error', message: 'WebSocket error' });
     });
 
     it('does not re-check loginStatus on a clean close', () => {
-      const { service, auth } = setup();
+      const { service, auth } = setupWithEndpoint();
+      service.connectWS('test');
+      FakeWebSocket.instances[0].serverOpen();
       auth.refreshLoginStatus.mockClear();
 
-      service.socketWSCloseEvent$.next({ wasClean: true } as CloseEvent);
+      FakeWebSocket.instances[0].serverClose(true);
 
       expect(auth.refreshLoginStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('events from replaced or intentionally closed sockets', () => {
+    it('ignores a clean close of a replaced socket that arrives after the new socket opened', () => {
+      const { service, csm } = setupWithEndpoint();
+      service.connectWS('test');
+      const [a] = FakeWebSocket.instances;
+      a.serverOpen();
+
+      csm.state$.next(ConnectionState.WebSocketConnecting);
+      const b = FakeWebSocket.instances[1];
+      b.serverOpen();
+      csm.onWebSocketConnected.mockClear();
+      a.serverClose(true);
+
+      expect(a.closeRequested).toBe(true);
+      expect(service.streamEndpoint$.getValue().state).toBe('Connected');
+      expect(csm.onWebSocketError).not.toHaveBeenCalled();
+    });
+
+    it('ignores the late open of a socket replaced while still connecting', () => {
+      const { service, csm } = setupWithEndpoint();
+      service.connectWS('test');
+      const [a] = FakeWebSocket.instances;
+
+      csm.state$.next(ConnectionState.WebSocketConnecting);
+      a.serverOpen();
+
+      expect(a.closeRequested).toBe(true);
+      expect(csm.onWebSocketConnected).not.toHaveBeenCalled();
+      expect(service.streamEndpoint$.getValue().state).toBe('Connecting');
+
+      FakeWebSocket.instances[1].serverOpen();
+
+      expect(csm.onWebSocketConnected).toHaveBeenCalledTimes(1);
+      expect(service.streamEndpoint$.getValue().state).toBe('Connected');
+    });
+
+    it('ignores an unclean close of a replaced socket', () => {
+      const { service, auth, csm } = setupWithEndpoint();
+      service.connectWS('test');
+      const [a] = FakeWebSocket.instances;
+      a.serverOpen();
+
+      csm.state$.next(ConnectionState.WebSocketConnecting);
+      auth.refreshLoginStatus.mockClear();
+      a.serverClose(false);
+
+      expect(csm.onWebSocketError).not.toHaveBeenCalled();
+      expect(auth.refreshLoginStatus).not.toHaveBeenCalled();
+      expect(service.streamEndpoint$.getValue().state).toBe('Connecting');
+    });
+
+    it('ignores an unclean close of a socket closed by a disconnection', () => {
+      const { service, csm } = setupWithEndpoint();
+      service.connectWS('test');
+      const [a] = FakeWebSocket.instances;
+      a.serverOpen();
+
+      csm.state$.next(ConnectionState.Disconnected);
+      a.serverClose(false);
+
+      expect(csm.onWebSocketError).not.toHaveBeenCalled();
+      expect(service.streamEndpoint$.getValue()).toEqual({ state: 'Disconnected', message: 'Not connected' });
     });
   });
 
