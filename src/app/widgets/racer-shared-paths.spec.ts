@@ -32,7 +32,7 @@ describe('racer widgets: shared state paths', () => {
   ];
 
   /**
-   * None of the three should offer "Blank the reading after 5s without data". Everything
+   * None of the three should offer the "Blank the reading after 5s without data" option. Everything
    * they show is either a countdown the plugin keeps publishing or a line it publishes
    * once, so blanking it is never right - and the option only exists in the dialog
    * because the config declares the key.
