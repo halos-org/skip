@@ -78,9 +78,7 @@ export class SignalKDeltaService implements OnDestroy {
   private SubscriptionType = "self";
   private readonly WS_CONNECTION_SUBSCRIBE = "?subscribe=";
   private readonly WS_CONNECTION_META = "&sendMeta=all"; // default but we could use none + specific paths in the future
-  private socketWS$: WebSocketSubject<object>;
-  public socketWSCloseEvent$ = new Subject<CloseEvent>();
-  public socketWSOpenEvent$ = new Subject<Event>();
+  private socketWS$: WebSocketSubject<object> | null = null;
 
   private server = inject(SignalKConnectionService);
   private auth = inject(AuthenticationService);
@@ -139,47 +137,6 @@ export class SignalKDeltaService implements OnDestroy {
         }
       });
 
-    // WebSocket Open Event Handling
-    this.socketWSOpenEvent$
-      .pipe(takeUntilDestroyed(this._destroyRef))
-      .subscribe(() => {
-        this.streamEndpoint.message = "Connected";
-        this.streamEndpoint.state = StreamStatus.Connected;
-        console.log("[Delta Service] WebSocket connected");
-        this.streamEndpoint$.next(this.streamEndpoint);
-
-        // Notify ConnectionStateMachine of successful WebSocket connection
-        this.connectionStateMachine.onWebSocketConnected();
-
-        // The reconnected upgrade re-authenticated with the same session cookie; re-probe loginStatus
-        // so a session left stale by a failed probe during the drop self-heals without a page reload.
-        void this.auth.refreshLoginStatus();
-      });
-
-    // WebSocket closed Event Handling
-    this.socketWSCloseEvent$
-      .pipe(takeUntilDestroyed(this._destroyRef))
-      .subscribe(event => {
-        if (event.wasClean) {
-          console.log('[Delta Service] WebSocket closed cleanly');
-          this.streamEndpoint.message = "WebSocket closed";
-          this.streamEndpoint.state = StreamStatus.Disconnected;
-        } else {
-          console.log('[Delta Service] WebSocket terminated due to socket error');
-          this.streamEndpoint.message = "WebSocket error";
-          this.streamEndpoint.state = StreamStatus.Error;
-
-          // Notify ConnectionStateMachine of WebSocket error
-          this.connectionStateMachine.onWebSocketError('WebSocket connection lost');
-
-          // A drop may mean the session cookie expired; re-check loginStatus so session state (and
-          // the UI) reflect a server-side logout. WS reconnect attempts are driven separately by the
-          // connection state machine.
-          void this.auth.refreshLoginStatus();
-        }
-        this.streamEndpoint$.next(this.streamEndpoint);
-      });
-
     // Listen for visibility (app suspend, background or screenlock) change events
     fromEvent(document, 'visibilitychange')
       .pipe(takeUntilDestroyed(this._destroyRef))
@@ -204,9 +161,10 @@ export class SignalKDeltaService implements OnDestroy {
     console.log(`[Delta Service] ${reason}: WebSocket opening...`);
     this.streamEndpoint$.next(this.streamEndpoint);
 
-    this.socketWS$ = this.getNewWebSocket();
+    const socket = this.getNewWebSocket();
+    this.socketWS$ = socket;
 
-    this.socketWS$.pipe(takeUntilDestroyed(this._destroyRef))
+    socket.pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe({
         next: msgWS => this.handleStreamFrame(msgWS),
         error: err => {
@@ -279,24 +237,79 @@ export class SignalKDeltaService implements OnDestroy {
   }
 
   /**
-   * Handles connection arguments and links socket Open/Close Observers
+   * Handles connection arguments and links the socket's Open/Close Observers. rxjs reports every
+   * open and close, including those of a socket Skip has already replaced or closed, so each
+   * observer acts only while its own socket is still the current one.
    */
   private getNewWebSocket(): WebSocketSubject<object> {
-    return webSocket({
+    const socket: WebSocketSubject<object> = webSocket({
       url: this.buildWebSocketUrl(),
-      closeObserver: this.socketWSCloseEvent$,
-      openObserver: this.socketWSOpenEvent$
-    })
+      openObserver: {
+        next: () => {
+          if (socket === this.socketWS$) {
+            this.onSocketOpen();
+          }
+        }
+      },
+      closeObserver: {
+        next: (event: CloseEvent) => {
+          if (socket === this.socketWS$) {
+            this.onSocketClose(event);
+          }
+        }
+      }
+    });
+    return socket;
+  }
+
+  private onSocketOpen(): void {
+    this.streamEndpoint.message = "Connected";
+    this.streamEndpoint.state = StreamStatus.Connected;
+    console.log("[Delta Service] WebSocket connected");
+    this.streamEndpoint$.next(this.streamEndpoint);
+
+    // Notify ConnectionStateMachine of successful WebSocket connection
+    this.connectionStateMachine.onWebSocketConnected();
+
+    // The reconnected upgrade re-authenticated with the same session cookie; re-probe loginStatus
+    // so a session left stale by a failed probe during the drop self-heals without a page reload.
+    void this.auth.refreshLoginStatus();
+  }
+
+  private onSocketClose(event: CloseEvent): void {
+    if (event.wasClean) {
+      console.log('[Delta Service] WebSocket closed cleanly');
+      this.streamEndpoint.message = "WebSocket closed";
+      this.streamEndpoint.state = StreamStatus.Disconnected;
+    } else {
+      console.log('[Delta Service] WebSocket terminated due to socket error');
+      this.streamEndpoint.message = "WebSocket error";
+      this.streamEndpoint.state = StreamStatus.Error;
+    }
+
+    // Skip's own closes never get here, so this one is a connection loss even when clean: Signal K
+    // server closes cleanly on a missed heartbeat, e.g. after the device slept.
+    this.connectionStateMachine.onWebSocketError('WebSocket connection lost');
+
+    // A drop may mean the session cookie expired; re-check loginStatus so session state (and
+    // the UI) reflect a server-side logout. WS reconnect attempts are driven separately by the
+    // connection state machine.
+    void this.auth.refreshLoginStatus();
+    this.streamEndpoint$.next(this.streamEndpoint);
   }
 
   /**
   * Close Signal K server data stream WebSocket
   */
   public closeWS(reason: string) {
-    if (this.socketWS$) {
+    const socket = this.socketWS$;
+    if (socket) {
       this.streamEndpoint.state = StreamStatus.Closing; // internal - no need to push to Observers
       console.log("[Delta Service] " + reason + ": WebSocket closing...");
-      this.socketWS$.complete();
+      // Dropping the reference first marks the close as intentional: the socket stops being
+      // current, so its own late open and close events are ignored.
+      this.socketWS$ = null;
+      socket.complete();
     }
   }
 
@@ -478,8 +491,5 @@ export class SignalKDeltaService implements OnDestroy {
 
     this._vesselSelfUrn$.complete();
     this.streamEndpoint$.complete();
-    this.socketWSOpenEvent$.complete();
-    this.socketWSCloseEvent$.complete();
-    this.socketWS$?.complete();
   }
 }

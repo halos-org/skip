@@ -282,5 +282,49 @@ describe('AuthenticationService', () => {
       expect(await firstValueFrom(service.loginStatus$)).toBeNull();
       httpTesting.verify();
     });
+
+    function expectTwoLoginStatusRequests(httpTesting: HttpTestingController) {
+      const reqs = httpTesting.match(req => req.url.endsWith('/skServer/loginStatus'));
+      expect(reqs.length).toBe(2);
+      return reqs;
+    }
+
+    it('overlapping probes: a superseded probe answering last does not overwrite the newer verdict', async () => {
+      const service = createService();
+      const httpTesting = TestBed.inject(HttpTestingController);
+
+      const older = service.refreshLoginStatus();
+      const newer = service.refreshLoginStatus();
+      const [olderReq, newerReq] = expectTwoLoginStatusRequests(httpTesting);
+
+      newerReq.flush({ status: 'notLoggedIn' });
+      expect(await newer).toEqual({ status: 'notLoggedIn' });
+
+      olderReq.flush({ status: 'loggedIn', userLevel: 'admin' });
+      expect(await older).toEqual({ status: 'notLoggedIn' });
+
+      expect(await firstValueFrom(service.isLoggedIn$)).toBe(false);
+      expect(await firstValueFrom(service.isUserSession$)).toBe(false);
+      httpTesting.verify();
+    });
+
+    it('overlapping probes: a superseded probe failing authoritatively last does not clear the newer session', async () => {
+      const service = createService();
+      const httpTesting = TestBed.inject(HttpTestingController);
+
+      const older = service.refreshLoginStatus();
+      const newer = service.refreshLoginStatus();
+      const [olderReq, newerReq] = expectTwoLoginStatusRequests(httpTesting);
+
+      newerReq.flush({ status: 'loggedIn', userLevel: 'admin' });
+      await newer;
+
+      olderReq.flush('down', { status: 503, statusText: 'Service Unavailable' });
+      expect(await older).toEqual({ status: 'loggedIn', userLevel: 'admin' });
+
+      expect(await firstValueFrom(service.isLoggedIn$)).toBe(true);
+      expect(await firstValueFrom(service.canWriteUserData$)).toBe(true);
+      httpTesting.verify();
+    });
   });
 });
