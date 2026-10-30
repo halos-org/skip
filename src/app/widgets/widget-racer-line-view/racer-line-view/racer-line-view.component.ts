@@ -72,8 +72,8 @@ const MIN_EFFECTIVE_VMG = 0.514444;
 
 /**
  * How old the last fix may be and still judge the gun, when the position has timed out
- * by then. The stale-data TTL is 5s and its retry another 5s, so this covers one missed
- * retry; a fix lost for longer than that says nothing about the start.
+ * by then. The position goes stale at its 5s TTL; 15s still covers that plus the retry
+ * that follows. A fix lost for longer than that says nothing about the start.
  */
 const LAST_FIX_AT_GUN_MS = 15000;
 

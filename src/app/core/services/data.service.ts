@@ -1142,12 +1142,13 @@ export class DataService implements OnDestroy {
    * @param {string} pathType The type of the timing-out source's value (string, Date, number, multiple, etc)
    * @param {number} dataTimeoutMs The timing-out widget's TTL window in ms; the path counts as
    *   all-silent (and its siblings/default get cross-cleared) when nothing has fed it within it.
+   * @returns Whether the timing-out source's own value was reset to null.
    * @memberof SignalKDataService
    */
-  public timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
-    if (!['string', 'Date', 'number', 'multiple', 'object'].includes(pathType)) return;
+  public timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): boolean {
+    if (!['string', 'Date', 'number', 'multiple', 'object'].includes(pathType)) return false;
     const registrations = this._pathRegisterByPath.get(path);
-    if (!registrations) return;
+    if (!registrations) return false;
 
     const direct = registrations.find(registration => registration.source === source);
     if (direct) {
@@ -1163,11 +1164,12 @@ export class DataService implements OnDestroy {
     // enableTimeout:false widget on it would stay frozen forever (the original #254 bug).
     const lastObserved = this._lastObservedByPath.get(path);
     const allSilent = lastObserved === undefined || Date.now() - lastObserved >= dataTimeoutMs;
-    if (!allSilent) return;
+    if (!allSilent) return direct !== undefined;
 
     for (const registration of registrations.filter(registration => registration.source !== source)) {
       this.resetRegistrationValue(registration);
     }
+    return direct !== undefined;
   }
 
   public getNotificationMsgObservable(): Observable<ISignalKDataValueUpdate> {

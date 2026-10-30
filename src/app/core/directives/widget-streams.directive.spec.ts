@@ -50,8 +50,9 @@ class FakeDataService {
         return { data$, release };
     }
 
-    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
+    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): boolean {
         this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
+        return true;
     }
 
     getPathMetaObservable(path: string): Observable<ISkMetadata | null> {
@@ -1343,12 +1344,15 @@ class TtlFakeDataService {
         return { data$: this.subscribePath(path, source), release: () => undefined };
     }
 
-    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
+    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): boolean {
         this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
-        // Mirror the real DataService: a TTL timeout resets the timed-out source's value to null.
-        this.subjects.get(this.keyFor(path, source))?.next(
-            { data: { value: null, timestamp: null }, state: 'normal' } as IPathUpdate
-        );
+        // Mirror the real DataService: only these types are reset, the value is nulled and the alarm
+        // state is left as it was.
+        if (!['string', 'Date', 'number', 'multiple', 'object'].includes(pathType)) return false;
+        const subject = this.subjects.get(this.keyFor(path, source));
+        if (!subject) return false;
+        subject.next({ data: { value: null, timestamp: null }, state: subject.getValue().state } as IPathUpdate);
+        return true;
     }
 }
 
@@ -1390,10 +1394,13 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
 
         dataSvc.subjects.get('self.navigation.position|default')!.next(
             { data: { value: { latitude: 60.08, longitude: 21.97 }, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
-        // The 5 s TTL counts from the 1 s sample of the value above; the reset null arrives on the
-        // resubscribe 5 s after that.
-        await vi.advanceTimersByTimeAsync(12000);
+        // The reading arrives on the 1s sample. The 5s TTL then nulls the field and the whole value,
+        // which a check only at 12s would also pass if the null still waited for the retry.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(lat.at(-1)).toBe(60.08);
+        expect(whole.at(-1)).toEqual({ latitude: 60.08, longitude: 21.97 });
 
+        await vi.advanceTimersByTimeAsync(5000);
         expect(dataSvc.timeoutCalls.map(c => c.path)).toContain('self.navigation.position');
         expect(dataSvc.timeoutCalls.every(c => c.path === 'self.navigation.position')).toBe(true);
         expect(lat.at(-1)).toBeNull();
@@ -1463,10 +1470,175 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
         await vi.advanceTimersByTimeAsync(60);
         expect(hits.at(-1)).toBe(7);
 
-        // The fixed 5 s TTL fires, then the 5 s retry resubscribes and replays the reset null.
+        // The fixed 5 s TTL delivers the reset null, and the later retry replays it.
         await vi.advanceTimersByTimeAsync(10100);
         expect(dataSvc.timeoutCalls.length).toBeGreaterThanOrEqual(1);
         expect(hits.at(-1)).toBeNull();
+    });
+
+    it('delivers the timeout null when the 5s TTL elapses, before the retry delay (#709)', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        const units = TestBed.inject(UnitsService) as unknown as FakeUnitsService;
+        units.pathMeasures.set('env.dead', 'x10');
+        units.pathDurationFormats.set('env.dead', 'HH:MM:SS');
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.dead', source: null, pathType: 'number', updateInterval: 1000,
+            suppressBootstrapNull: true, enableTimeout: true, convertUnitTo: 'x10'
+        }));
+        const start = Date.now();
+        const hits: { t: number; value: number | null; measure?: string; durationFormat?: string; state: string }[] = [];
+        directive.observe('p', u => hits.push({
+            t: Date.now() - start,
+            value: (u.data.value as number | null) ?? null,
+            measure: u.data.measure,
+            durationFormat: u.data.durationFormat,
+            state: u.state
+        }));
+
+        const subj = dataSvc.subjects.get('env.dead|default')!;
+        subj.next({ data: { value: 12, timestamp: new Date() }, state: 'alarm' } as IPathUpdate);
+        // The value also rides the first sample tick. The TTL counts from that last delivery.
+        await vi.advanceTimersByTimeAsync(1000);
+        const live = { t: 0, value: 12, measure: 'x10', durationFormat: 'HH:MM:SS', state: 'alarm' };
+        expect(hits).toEqual([live, { ...live, t: 1000 }]);
+
+        await vi.advanceTimersByTimeAsync(4999);
+        expect(hits.at(-1)).toEqual({ ...live, t: 1000 });
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        const reset = { value: null, measure: 'x10', durationFormat: 'HH:MM:SS', state: 'alarm' };
+        expect(hits.at(-1)).toEqual({ t: 6000, ...reset });
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.dead', source: 'default', pathType: 'number', dataTimeoutMs: 5000 }
+        ]);
+
+        // The retry resubscribes after 5s and must not complete the stream. The replayed null keeps
+        // the alarm, and a sample that arrives after that still reaches the widget.
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(hits.at(-1)).toEqual({ t: 11000, ...reset });
+        subj.next({ data: { value: 42, timestamp: new Date() }, state: 'alarm' } as IPathUpdate);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(hits.at(-1)).toEqual({ t: 12000, value: 42, measure: 'x10', durationFormat: 'HH:MM:SS', state: 'alarm' });
+    });
+
+    it('keeps a live reading when updateInterval exceeds 5s, and nulls it once the path goes quiet (#618)', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        const updateInterval = 6000;
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.slow', source: null, pathType: 'number', updateInterval,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const start = Date.now();
+        const hits: { t: number; value: number | null }[] = [];
+        directive.observe('p', u => hits.push({
+            t: Date.now() - start,
+            value: (u.data.value as number | null) ?? null
+        }));
+        const subj = dataSvc.subjects.get('env.slow|default')!;
+        const emit = (value: number) => subj.next(
+            { data: { value, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        let value = 1;
+        emit(value);
+        // A sample in the middle of each period, then the period's sample tick. Three periods
+        // is long enough for the old 5s TTL to fire between samples of a healthy sensor.
+        for (let period = 0; period < 3; period++) {
+            await vi.advanceTimersByTimeAsync(updateInterval / 2);
+            value += 1;
+            emit(value);
+            await vi.advanceTimersByTimeAsync(updateInterval / 2);
+            expect(hits.at(-1)?.value).toBe(value);
+            expect(dataSvc.timeoutCalls).toEqual([]);
+        }
+
+        const lastLive = hits.at(-1)!;
+        // One quiet sample period leaves the last reading up. The stale window is two periods
+        // once that is longer than the fixed 5s TTL.
+        await vi.advanceTimersByTimeAsync(updateInterval);
+        expect(hits.at(-1)).toEqual(lastLive);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(updateInterval);
+        expect(hits.at(-1)).toEqual({ t: lastLive.t + updateInterval * 2, value: null });
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.slow', source: 'default', pathType: 'number', dataTimeoutMs: updateInterval * 2 }
+        ]);
+    });
+
+    it('uses two sample periods from an updateInterval of exactly 5s', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.edge', source: null, pathType: 'number', updateInterval: 5000,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const hits: (number | null)[] = [];
+        directive.observe('p', u => hits.push((u.data.value as number | null) ?? null));
+        dataSvc.subjects.get('env.edge|default')!.next(
+            { data: { value: 4, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        // The sample tick at 5s delivers the reading; a 5s window would expire 5s after that.
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(hits.at(-1)).toBe(4);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(hits.at(-1)).toBeNull();
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.edge', source: 'default', pathType: 'number', dataTimeoutMs: 10000 }
+        ]);
+    });
+
+    // DataService does not reset a boolean path, so the retry replays the last state. A null from the
+    // directive would make the widget alternate between that state and null on every retry.
+    it('keeps the last value through a TTL timeout on a path type DataService does not reset', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'switch.state', source: null, pathType: 'boolean', updateInterval: 500,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const hits: unknown[] = [];
+        directive.observe('p', u => hits.push(u.data.value));
+        dataSvc.subjects.get('switch.state|default')!.next(
+            { data: { value: true, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        await vi.advanceTimersByTimeAsync(20000);
+        expect(dataSvc.timeoutCalls.length).toBeGreaterThanOrEqual(2);
+        expect(hits.length).toBeGreaterThan(0);
+        expect(hits.every(v => v === true)).toBe(true);
+    });
+
+    it('keeps the 5s floor when updateInterval is under 5s', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.mid', source: null, pathType: 'number', updateInterval: 4000,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const hits: (number | null)[] = [];
+        directive.observe('p', u => hits.push((u.data.value as number | null) ?? null));
+        const subj = dataSvc.subjects.get('env.mid|default')!;
+        subj.next({ data: { value: 3, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        // The 4s sample lands while the reading is still live. A dead path then nulls at the
+        // 5s floor, not at two sample periods.
+        await vi.advanceTimersByTimeAsync(4000);
+        expect(hits.at(-1)).toBe(3);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(4999);
+        expect(hits.at(-1)).toBe(3);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(hits.at(-1)).toBeNull();
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.mid', source: 'default', pathType: 'number', dataTimeoutMs: 5000 }
+        ]);
     });
 });
 

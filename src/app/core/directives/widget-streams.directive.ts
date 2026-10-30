@@ -2,14 +2,23 @@ import { Directive, DestroyRef, OnDestroy, inject, signal } from '@angular/core'
 import { DataService, IPathUpdate } from '../services/data.service';
 import { UnitsService } from '../services/units.service';
 import { IWidgetSvcConfig, DEFAULT_WIDGET_UPDATE_INTERVAL_MS } from '../interfaces/widgets-interface';
-import { Observable, Observer, Subject, delayWhen, filter, map, retryWhen, sampleTime, tap, throwError, timeout, timer, takeUntil, take, merge, combineLatest, distinctUntilChanged, Subscription } from 'rxjs';
+import { Observable, Observer, Subject, concat, delayWhen, filter, map, of, retryWhen, sampleTime, tap, throwError, timeout, timer, takeUntil, take, merge, combineLatest, distinctUntilChanged, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatJsonPointer, type Path } from '@jsonjoy.com/json-pointer';
 import { States } from '../interfaces/signalk-interfaces';
 import { parsePointer, resolvePointer, splitPointerPath } from '../utils/pointer-path.util';
 
-/** Fixed stale-data TTL (ms) applied to every widget whose enableTimeout is on; not user-configurable. */
+/** Fixed stale-data TTL (ms) applied when a widget samples faster than this; not user-configurable. */
 const FIXED_DATA_TIMEOUT_MS = 5000;
+
+/**
+ * Stale window for the sampled stream. The timeout watches deliveries, not the raw sensor, so a
+ * sample period at or above the fixed TTL would expire between healthy samples. Two periods leave
+ * room for one on-time sample. A shorter period keeps the 5s floor.
+ */
+function staleDataTimeoutMs(sampleMs: number): number {
+  return sampleMs >= FIXED_DATA_TIMEOUT_MS ? sampleMs * 2 : FIXED_DATA_TIMEOUT_MS;
+}
 
 /** The subset of a path config that decides which reading a subscription delivers. */
 interface IPathIdentity {
@@ -128,7 +137,7 @@ export class WidgetRepointTracker {
  *   measure for a display slot (the stored `convertUnitTo` until meta resolves), the fixed
  *   `convertUnitTo` for a structural slot. A widget converts only where it formats text, maps to a
  *   scale or sets an SVG attribute, with `UnitsService.convertToUnit(measure, value)`
- * - Optional stale-data timeout (gated by the enableTimeout flag; fixed 5s TTL) + retry handling
+ * - Optional stale-data timeout (gated by the enableTimeout flag; 5s TTL, or two sample periods when the sample period is at least that long) + retry handling
  * - Path validation: null/undefined/empty paths, and paths with a malformed `#` pointer, trigger cleanup
  * - Pointer paths (`path#/field`) acquire and time out on the Signal K path and deliver the field
  * - Signature tracking: per-path (path + pathType + convertUnitTo + source + bootstrap null and invalid-sample policies); the widget-level update cadence lives in the root signature
@@ -261,15 +270,14 @@ export class WidgetStreamsDirective implements OnDestroy {
     // looking live. Per-path `false` still wins over a widget-level `true`.
     const enableTimeout = pathCfg.enableTimeout !== false
       && (pathCfg.enableTimeout === true || !!cfg.enableTimeout);
-    const dataTimeout = FIXED_DATA_TIMEOUT_MS;
-    const retryDelay = 5000;
-    const timeoutErrorMsg = `[Widget] ${cfg.displayName} - ${dataTimeout / 1000} second data update timeout reached for `;
-    const retryErrorMsg = `[Widget] ${cfg.displayName} - Retrying in ${retryDelay / 1000} seconds`;
-
     const pathType = pathCfg.pathType;
     const suppressBootstrapNull = !!pathCfg.suppressBootstrapNull;
     let sample = Number(cfg.updateInterval);
     if (!Number.isFinite(sample) || sample <= 0) sample = DEFAULT_WIDGET_UPDATE_INTERVAL_MS;
+    const dataTimeout = staleDataTimeoutMs(sample);
+    const retryDelay = 5000;
+    const timeoutErrorMsg = `[Widget] ${cfg.displayName} - ${dataTimeout / 1000} second data update timeout reached for `;
+    const retryErrorMsg = `[Widget] ${cfg.displayName} - Retrying in ${retryDelay / 1000} seconds`;
     // Structural paths keep their widget-owned fixed unit; display paths follow the server's
     // resolved measure (which can change when displayUnits meta arrives after first subscribe).
     const isStructural = pathCfg.showConvertUnitTo === false;
@@ -346,13 +354,35 @@ export class WidgetStreamsDirective implements OnDestroy {
       }
     }
     if (enableTimeout) {
+      // The timeout unsubscribes before timeoutPathObservable's null can travel back through this
+      // pipeline, and retry waits out retryDelay, so the widget would keep the last reading for
+      // another 5s. Hand it the null now, but only when DataService nulled the stored value too, or
+      // the retry would replay the old reading and the widget would alternate between the two.
+      // Remember the last delivery so the null keeps that reading's state and unit. A path that drops
+      // invalid samples must not see it: the null is emitted below that filter, and the replay on
+      // retry is what the filter already drops.
+      let lastUpdate: IPathUpdate | undefined;
       data$ = data$.pipe(
+        tap(update => { lastUpdate = update; }),
         timeout({
           each: dataTimeout,
-          with: () => throwError(() => {
+          with: () => {
             console.log(timeoutErrorMsg + basePath);
-            this.dataService.timeoutPathObservable(basePath, effectiveSource, pathType, dataTimeout);
-          })
+            const reset = this.dataService.timeoutPathObservable(basePath, effectiveSource, pathType, dataTimeout);
+            if (!reset || pathCfg.dropInvalidSamples || !lastUpdate) {
+              return throwError(() => undefined);
+            }
+            const resetUpdate: IPathUpdate = {
+              data: {
+                value: null,
+                timestamp: null,
+                measure: lastUpdate.data.measure,
+                durationFormat: lastUpdate.data.durationFormat
+              },
+              state: lastUpdate.state
+            };
+            return concat(of(resetUpdate), throwError(() => undefined));
+          }
         }),
         retryWhen(error => error.pipe(
           tap(() => console.log(retryErrorMsg)),
