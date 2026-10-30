@@ -33,7 +33,7 @@ import { NotificationOverlayService } from './core/services/notification-overlay
 import { DialogService } from './core/services/dialog.service';
 import { resolveBrowserTabTitle } from './core/utils/browser-tab-title.util';
 import { HOTKEY_KEYS, isInteractiveKeyTarget, isBlockingOverlayOpen } from './core/utils/hotkey-target.util';
-import { skipsPersistentUpgrade } from './core/utils/config-migration.util';
+import { cannotWriteProfile } from './core/utils/config-migration.util';
 import { LATEST_APP_CONFIG_VERSION } from './core/constants/config-versions.const';
 
 const MOUSE_PEEK_THROTTLE_MS = 250;
@@ -114,7 +114,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       // reloads the app), nor surface the manual upgrade-instructions dialog. Defer both to a
       // full-app session. Any session storage refuses writes from is in the same position — it
       // cannot rewrite the config, and the instructions ask for actions it cannot take.
-      if (skipsPersistentUpgrade(this._embedMode, this._storage)) {
+      if (cannotWriteProfile(this._embedMode, this._storage)) {
         return;
       }
       if (this.settings.configUpgrade()) {
@@ -143,7 +143,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       const resets = this.settings.siScaleResets();
       if (!resets.length || this._siScaleResetsShown || !this._firstNavigationEnded()) return;
-      if (skipsPersistentUpgrade(this._embedMode, this._storage) || this.settings.configUpgrade() || this.upgrade.upgrading()) return;
+      if (cannotWriteProfile(this._embedMode, this._storage) || this.settings.configUpgrade() || this.upgrade.upgrading()) return;
       this._siScaleResetsShown = true;
       untracked(() => this._dialog.openSiScaleResetsDialog(resets))
         .pipe(takeUntilDestroyed(this._destroyRef))
@@ -219,14 +219,25 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
     effect(() => {
       const issue = this.bootstrapIssue();
-      // Under embed the create-config prompt is suppressed: its 'Create' action writes a default
-      // config (settings.resetSettings()), which read-only embed must never offer. Embed renders the
-      // degraded/empty state instead.
+      // The bootstrap creates the slot itself on a first run, so this is reached when the user's
+      // config file exists without the slot (a profile deleted or renamed on another device, or a
+      // file the server cannot parse), or when the create failed. Under embed nothing is shown.
       if (issue.reason !== 'missing-shared-config' || this.missingConfigPromptShown || this.embed()) {
         return;
       }
 
       this.missingConfigPromptShown = true;
+      // 'Create' writes a default config (settings.resetSettings()). The server would rebuild a file
+      // it cannot read around that one slot and drop every other profile in it, and a session that
+      // cannot write is refused, so neither is offered Create; each is told why it sees the defaults.
+      if (issue.unreadableConfigFile) {
+        this.toast.show('Skip could not read any profile from your stored configuration on the server, so it is showing the default dashboards and will not overwrite the file. Repair or remove the file on the server, then reload.', 0, true, 'warn');
+        return;
+      }
+      if (cannotWriteProfile(this._embedMode, this._storage)) {
+        this.toast.show('This account cannot save a configuration, so Skip is showing the default dashboards.', 0, true, 'warn');
+        return;
+      }
       const cfgName = issue.sharedConfigName || 'default';
       const ref = this.toast.show(
         `Server is reachable, but no shared configuration '${cfgName}' exists for this user. Create a default configuration now?`,

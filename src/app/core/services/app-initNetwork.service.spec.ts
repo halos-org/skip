@@ -89,6 +89,8 @@ describe('AppNetworkInitService', () => {
         waitUntilReady: vi.fn().mockResolvedValue(true),
         getConfig: vi.fn().mockResolvedValue(validRemoteConfig()),
         listConfigs: vi.fn().mockResolvedValue([]),
+        userConfigFileState: vi.fn().mockResolvedValue('absent'),
+        refuseUserConfigWrites: vi.fn(),
         setConfig: vi.fn().mockResolvedValue(undefined),
         canPersist: vi.fn().mockReturnValue(true),
         bootstrapRemoteContext: vi.fn()
@@ -114,6 +116,8 @@ describe('AppNetworkInitService', () => {
         mockConnectionStateMachine.startWebSocketConnection.mockClear();
         mockStorage.getConfig.mockReset().mockResolvedValue(validRemoteConfig());
         mockStorage.listConfigs.mockReset().mockResolvedValue([]);
+        mockStorage.userConfigFileState.mockReset().mockResolvedValue('absent');
+        mockStorage.refuseUserConfigWrites.mockClear();
         mockStorage.bootstrapRemoteContext.mockClear();
         mockStorage.setConfig.mockClear();
         mockStorage.canPersist.mockClear().mockReturnValue(true);
@@ -746,14 +750,18 @@ describe('AppNetworkInitService', () => {
             expect(mockSsoRedirect.resetBudget).toHaveBeenCalled();
         });
 
-        it('logged-in with an appless 200 {} config raises missing-shared-config, not a clean bootstrap', async () => {
+        // The server answers a missing slot with 404, so a 200 without `app` is a slot that exists
+        // in an existing file: it is reported, never overwritten.
+        it('logged-in with an appless 200 {} config keeps the recovery and does not overwrite the slot', async () => {
             mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
             mockStorage.getConfig.mockResolvedValue({} as IConfig);
+            mockStorage.userConfigFileState.mockResolvedValue('readable');
 
             await service.initNetworkServices();
 
-            expect(latestIssue().reason).toBe('missing-shared-config');
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
             expect(mockStorage.bootstrapRemoteContext).not.toHaveBeenCalled();
+            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', sharedConfigName: 'default' });
             expect(mockSsoRedirect.resetBudget).not.toHaveBeenCalled();
         });
 
@@ -766,13 +774,149 @@ describe('AppNetworkInitService', () => {
             expect(mockConnectionStateMachine.startWebSocketConnection).not.toHaveBeenCalled();
         });
 
-        it('classifies a genuine storage 404 as missing-shared-config (recovery toast reachable)', async () => {
+        // A signed-in writer whose slot does not exist is on its first run: there is nothing to
+        // recover, so the slot is created rather than offered.
+        it('creates a missing slot (404) from the defaults for a session that can write', async () => {
             mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
             mockStorage.getConfig.mockRejectedValue({ status: 404 });
 
             await service.initNetworkServices();
 
+            expect(mockStorage.setConfig).toHaveBeenCalledTimes(1);
+            // The file version is passed explicitly: storage has no context yet to default it from.
+            expect(mockStorage.setConfig.mock.calls[0][0]).toBe('user');
+            expect(mockStorage.setConfig.mock.calls[0][1]).toBe('default');
+            expect(mockStorage.setConfig.mock.calls[0][3]).toBe(REMOTE_CONFIG_FILE_VERSION);
+            expect(mockStorage.bootstrapRemoteContext).toHaveBeenCalledWith(expect.objectContaining({
+                sharedConfigName: 'default',
+                initConfig: mockStorage.setConfig.mock.calls[0][2]
+            }));
+            expect(latestIssue()).toEqual({ reason: 'none' });
+            expect(latestStatus()).not.toBe('degraded');
+        });
+
+        // A created slot holds the shipped defaults, not this device's identity, so a device still
+        // carrying its identity in the legacy local appConfig must lift it from there.
+        it('keeps the legacy remote-control identity when it creates the slot', async () => {
+            localStorage.setItem('skip.connectionConfig', JSON.stringify({
+                configVersion: 12, skipUUID: 'test-uuid', signalKUrl: 'http://localhost', proxyEnabled: false,
+                signalKSubscribeAll: false, sharedConfigName: 'default', isRemoteControl: false, instanceName: ''
+            }));
+            localStorage.setItem('skip.appConfig', JSON.stringify({ isRemoteControl: true, instanceName: 'Mast' }));
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.setConfig).toHaveBeenCalledTimes(1);
+            expect(storedConn()?.configVersion).toBe(13);
+            expect(storedConn()?.isRemoteControl).toBe(true);
+            expect(storedConn()?.instanceName).toBe('Mast');
+            localStorage.removeItem('skip.appConfig');
+        });
+
+        it('keeps the missing-shared-config recovery when the session cannot write', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+            mockStorage.canPersist.mockReturnValue(false);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(mockStorage.bootstrapRemoteContext).not.toHaveBeenCalled();
             expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
+        });
+
+        it('never creates a slot from an embed', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+            mockEmbed.embed.mockReturnValue(true);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(latestIssue().reason).toBe('missing-shared-config');
+        });
+
+        // A missing slot in an existing file is not a first run: the profile was deleted or renamed
+        // on another device, or the server could not parse the file (it then answers every slot read
+        // with a 404, and a write would replace the whole file). Those keep the recovery.
+        it('does not create a slot missing from an existing config file', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+            mockStorage.userConfigFileState.mockResolvedValue('readable');
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.userConfigFileState).toHaveBeenCalledWith(REMOTE_CONFIG_FILE_VERSION);
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
+        });
+
+        // The server answers a slot read with 404 and lists no slots for a file it cannot parse; a
+        // write would replace the whole file, so the recovery must not offer one.
+        it('marks an existing config file that lists no slots as unreadable', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+            mockStorage.userConfigFileState.mockResolvedValue('unreadable');
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(mockStorage.refuseUserConfigWrites).toHaveBeenCalled();
+            expect(latestIssue()).toEqual({
+                reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default', unreadableConfigFile: true
+            });
+        });
+
+        it('does not mark a config file that lists other slots as unreadable', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+            mockStorage.userConfigFileState.mockResolvedValue('readable');
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.refuseUserConfigWrites).not.toHaveBeenCalled();
+            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
+        });
+
+        it('does not create a slot when the config file listing fails', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+            mockStorage.userConfigFileState.mockRejectedValue({ status: 500 });
+            const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(latestIssue().reason).toBe('missing-shared-config');
+            error.mockRestore();
+        });
+
+        it('reports an appless 200 it does not create without a status code', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockResolvedValue({} as IConfig);
+            mockStorage.canPersist.mockReturnValue(false);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', sharedConfigName: 'default' });
+            expect(latestStatus()).toBe('degraded');
+        });
+
+        it('keeps the missing-shared-config recovery when creating the slot fails', async () => {
+            mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
+            mockStorage.getConfig.mockRejectedValue({ status: 404 });
+            mockStorage.setConfig.mockRejectedValueOnce(new Error('write refused'));
+            const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.bootstrapRemoteContext).not.toHaveBeenCalled();
+            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
+            expect(latestStatus()).toBe('degraded');
+            error.mockRestore();
         });
 
         it('classifies a discovery 404 as unknown — config recovery must not be offered', async () => {
@@ -941,6 +1085,24 @@ describe('AppNetworkInitService', () => {
             mockAuth.refreshLoginStatus.mockImplementation(async () => { isLoggedIn$.next(true); return { status: 'loggedIn' }; });
         }
 
+        // The override is listed, so it exists; a body without `app` there is a hand-edited slot an
+        // ephemeral session must not replace.
+        it('never creates or overwrites the slot of an override', async () => {
+            seedPersistedConnConfig('default');
+            loginAs();
+            mockEmbed.profile.mockReturnValue('day');
+            mockStorage.listConfigs.mockResolvedValue([
+                { scope: 'user', name: 'default' },
+                { scope: 'user', name: 'day' }
+            ]);
+            mockStorage.getConfig.mockResolvedValue({ dashboards: [] } as unknown as IConfig);
+
+            await service.initNetworkServices();
+
+            expect(mockStorage.setConfig).not.toHaveBeenCalled();
+            expect(latestIssue().reason).toBe('missing-shared-config');
+        });
+
         it('threads a valid, existing override into getConfig + bootstrap without persisting it', async () => {
             seedPersistedConnConfig('default');
             loginAs();
@@ -990,7 +1152,7 @@ describe('AppNetworkInitService', () => {
             warn.mockRestore();
         });
 
-        it('no override: the persisted default still drives the 404 missing-shared-config recovery', async () => {
+        it('no override: a 404 on the persisted slot creates that slot', async () => {
             seedPersistedConnConfig('default');
             loginAs();
             mockStorage.getConfig.mockRejectedValue({ status: 404 });
@@ -998,7 +1160,7 @@ describe('AppNetworkInitService', () => {
             await service.initNetworkServices();
 
             expect(mockStorage.listConfigs).not.toHaveBeenCalled();
-            expect(latestIssue()).toEqual({ reason: 'missing-shared-config', statusCode: 404, sharedConfigName: 'default' });
+            expect(mockStorage.setConfig.mock.calls[0].slice(0, 2)).toEqual(['user', 'default']);
         });
 
         // The boot saves the loaded dashboards back, so a conversion here would reach the slot
