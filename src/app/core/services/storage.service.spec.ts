@@ -396,6 +396,74 @@ describe('StorageService — applicationData URLs & scope (characterization)', (
     ]);
   });
 
+  // The server lists the version files in the user's app directory (404 when there is none). A file
+  // it cannot parse still appears there, but its slot listing comes back empty.
+  describe('userConfigFileState', () => {
+    it('is absent when the user has no directory for the app (404)', async () => {
+      const { service } = setup();
+      const p = service.userConfigFileState(11);
+      http.expectOne(`${ENDPOINT}user/skip`).flush('', { status: 404, statusText: 'Not Found' });
+      await expect(p).resolves.toBe('absent');
+    });
+
+    it('is absent when the directory holds only other file versions', async () => {
+      const { service } = setup();
+      const p = service.userConfigFileState(11);
+      http.expectOne(`${ENDPOINT}user/skip`).flush(['9.0.0']);
+      await expect(p).resolves.toBe('absent');
+    });
+
+    it('is readable when the file lists slots', async () => {
+      const { service } = setup();
+      const p = service.userConfigFileState(11);
+      http.expectOne(`${ENDPOINT}user/skip`).flush(['9.0.0', '11.0.0']);
+      await tick();
+      http.expectOne(`${ENDPOINT}user/skip/11/?keys=true`).flush(['helm']);
+      await expect(p).resolves.toBe('readable');
+    });
+
+    it('is unreadable when the file lists no slots', async () => {
+      const { service } = setup();
+      const p = service.userConfigFileState(11);
+      http.expectOne(`${ENDPOINT}user/skip`).flush(['11.0.0']);
+      await tick();
+      http.expectOne(`${ENDPOINT}user/skip/11/?keys=true`).flush([]);
+      await expect(p).resolves.toBe('unreadable');
+    });
+
+    // Not knowing whether the file can be read must not lead to a write that could replace it.
+    it('is unreadable when the slot listing fails', async () => {
+      const { service } = setup();
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const p = service.userConfigFileState(11);
+      http.expectOne(`${ENDPOINT}user/skip`).flush(['11.0.0']);
+      await tick();
+      http.expectOne(`${ENDPOINT}user/skip/11/?keys=true`).flush('', { status: 500, statusText: 'Server Error' });
+      await expect(p).resolves.toBe('unreadable');
+    });
+
+    it('rejects when the directory listing fails other than 404', async () => {
+      const { service } = setup();
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const p = service.userConfigFileState(11);
+      http.expectOne(`${ENDPOINT}user/skip`).flush('', { status: 500, statusText: 'Server Error' });
+      await expect(p).rejects.toBeTruthy();
+    });
+  });
+
+  describe('refuseUserConfigWrites', () => {
+    it('turns canPersist off and refuses a full-file write', async () => {
+      const { service } = setup({ loggedIn: true });
+      expect(service.canPersist()).toBe(true);
+
+      service.refuseUserConfigWrites();
+
+      expect(service.canPersist()).toBe(false);
+      await expect(service.setConfig('user', 'default', blankConfig())).rejects.toThrow(/read-only/);
+      http.expectNone(() => true);
+    });
+  });
+
   it('getConfig GETs the scoped, versioned, named URL and returns a deep clone', async () => {
     const { service } = setup();
     const p = service.getConfig('user', 'default');
