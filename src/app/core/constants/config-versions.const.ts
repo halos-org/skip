@@ -21,6 +21,8 @@ export const REMOTE_CONFIG_FILE_VERSION = 11;
  * stamp this: each pins its own output version so that bumping this constant cannot silently
  * re-label old migration output as current — add a chained migration step instead.
  */
+// TODO: the next bump also renames the persisted chart- and dataset-named config keys and widget
+// types, in the same migration step: https://github.com/halos-org/skip/issues/592
 export const LATEST_APP_CONFIG_VERSION = 25;
 
 /**
