@@ -770,7 +770,7 @@ describe('AppComponent — embed mode chrome', () => {
 // toggleable EmbedModeService. (#216 E6)
 describe('AppComponent — embed read-only invariants (#216 E6)', () => {
   async function render(opts: { embed: boolean; configUpgrade?: boolean; configVersion?: number; canPersist?: boolean }) {
-    const bootstrapIssue$ = new BehaviorSubject<{ reason: string; sharedConfigName?: string }>({ reason: 'none' });
+    const bootstrapIssue$ = new BehaviorSubject<{ reason: string; sharedConfigName?: string; unreadableConfigFile?: boolean }>({ reason: 'none' });
     const appNetworkInitServiceStub = {
       bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
       bootstrapIssue$,
@@ -930,6 +930,27 @@ describe('AppComponent — embed read-only invariants (#216 E6)', () => {
     bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default' });
     TestBed.tick();
     expect(toast.show).not.toHaveBeenCalled();
+  });
+
+  // Create writes the slot, which a session that cannot write is refused; it is told why the
+  // dashboard is the default one instead.
+  it('tells a session that cannot write why it sees the defaults, without offering Create', async () => {
+    const { toast, bootstrapIssue$ } = await render({ embed: false, canPersist: false });
+    toast.show.mockClear();
+    bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default' });
+    TestBed.tick();
+    expect(toast.show).toHaveBeenCalledTimes(1);
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('cannot save a configuration'), 0, true, 'warn');
+  });
+
+  // Create would make the server replace the whole file it could not read.
+  it('does not offer Create for a config file the server could not read', async () => {
+    const { toast, bootstrapIssue$ } = await render({ embed: false });
+    toast.show.mockClear();
+    bootstrapIssue$.next({ reason: 'missing-shared-config', sharedConfigName: 'default', unreadableConfigFile: true });
+    TestBed.tick();
+    expect(toast.show).toHaveBeenCalledTimes(1);
+    expect(toast.show).toHaveBeenCalledWith(expect.stringContaining('could not read'), 0, true, 'warn');
   });
 
   it('shows the missing-shared-config create prompt in the full app (not embed)', async () => {
