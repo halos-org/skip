@@ -796,6 +796,19 @@ describe('DashboardService', () => {
       expect(service.isDashboardStatic()).toBe(true);
     });
 
+    // A signed-in session whose config slot does not exist yet renders the seeded defaults, and
+    // every save is refused until the slot is created. An edit there could only be lost.
+    it('stays locked while no config slot is loaded, even for a session that can write', () => {
+      storageBootstrapped = false;
+      setup();
+
+      expect(service.isReadOnlySession()).toBe(true);
+      service.toggleStaticDashboard();
+      expect(service.isDashboardStatic()).toBe(true);
+      service.setStaticDashboard(false);
+      expect(service.isDashboardStatic()).toBe(true);
+    });
+
     it('does NOT persist demand from an anonymous read-only view of a shared config (#551)', () => {
       storageReadOnly = true;
       setup();

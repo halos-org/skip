@@ -61,14 +61,17 @@ export class DashboardService {
   /**
    * Sessions whose layout edits could never be persisted: the chromeless embed, and any session
    * storage refuses writes from — an anonymous visitor, a signed-in `readonly` user, or a shared
-   * read-only config. One predicate, so a guard and an affordance cannot pick different halves.
+   * read-only config — and a session whose bootstrap loaded no config slot, such as one whose slot
+   * does not exist yet and shows the seeded defaults until the user creates it. One predicate, so a
+   * guard and an affordance cannot pick different halves.
    *
    * A signal rather than a method: the toolbar hides its edit controls off this, and the session's
    * write capability changes at runtime (a loginStatus re-probe on WebSocket reopen), which a plain
    * method call in an OnPush template would not pick up.
    */
   public readonly isReadOnlySession = computed(() =>
-    this._embedMode.embed() || !this._canWriteUserData() || this._storage.isReadOnlyContext());
+    this._embedMode.embed() || !this._canWriteUserData() || this._storage.isReadOnlyContext()
+    || !this._storage.isRemoteContextBootstrapped());
   public widgetClipboard = signal<NgGridStackWidget | null>(null);
 
   public readonly layoutEditSaved = signal<number>(0);
