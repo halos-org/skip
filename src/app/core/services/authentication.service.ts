@@ -48,6 +48,9 @@ export class AuthenticationService {
   private _loginStatus$ = new BehaviorSubject<ILoginStatus | null>(null);
   public loginStatus$ = this._loginStatus$.asObservable();
 
+  // Socket open and close both fire probes, so they can overlap; only the latest-issued one may apply.
+  private loginStatusProbeSeq = 0;
+
   /** Latest parsed loginStatus, read synchronously (e.g. by the SSO redirect). Null until refreshed. */
   public get loginStatusValue(): ILoginStatus | null {
     return this._loginStatus$.getValue();
@@ -84,17 +87,19 @@ export class AuthenticationService {
    * OIDC descriptors for the bootstrap redirect). An authoritative answer — a not-logged-in verdict,
    * a non-2xx response, or an unparseable body — clears the session and returns null; a transport-layer
    * failure (unreachable server or timeout) instead preserves the last known-good status so a transient
-   * drop cannot wedge a live cookie session into a false logged-out state. The request targets the served
+   * drop cannot wedge a live cookie session into a false logged-out state. A probe superseded by a later
+   * call applies nothing and returns the current status. The request targets the served
    * origin — the effective Signal K origin equals `window.location.origin` by definition — not the
    * post-discovery `/signalk/v1` base.
    */
   public async refreshLoginStatus(): Promise<ILoginStatus | null> {
     const url = window.location.origin + loginStatusPath;
+    const probe = ++this.loginStatusProbeSeq;
     try {
       const raw = await lastValueFrom(this.http.get<ILoginStatus>(url, { withCredentials: true }).pipe(timeout(loginStatusTimeoutMs)));
-      return this.applyLoginStatus(raw);
+      return probe === this.loginStatusProbeSeq ? this.applyLoginStatus(raw) : this.loginStatusValue;
     } catch (error) {
-      if (this.isTransportFailure(error)) {
+      if (probe !== this.loginStatusProbeSeq || this.isTransportFailure(error)) {
         // A transient blip carries no logout verdict: keep the last known-good session so a brief
         // connectivity drop cannot wedge the UI logged-out until a manual reload.
         return this.loginStatusValue;
