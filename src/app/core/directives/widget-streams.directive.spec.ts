@@ -50,8 +50,9 @@ class FakeDataService {
         return { data$, release };
     }
 
-    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
+    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): boolean {
         this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
+        return true;
     }
 
     getPathMetaObservable(path: string): Observable<ISkMetadata | null> {
@@ -1343,12 +1344,15 @@ class TtlFakeDataService {
         return { data$: this.subscribePath(path, source), release: () => undefined };
     }
 
-    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): void {
+    timeoutPathObservable(path: string, source: string, pathType: string, dataTimeoutMs: number): boolean {
         this.timeoutCalls.push({ path, source, pathType, dataTimeoutMs });
-        // Mirror the real DataService: the value is nulled and the alarm state is left as it was.
+        // Mirror the real DataService: only these types are reset, the value is nulled and the alarm
+        // state is left as it was.
+        if (!['string', 'Date', 'number', 'multiple', 'object'].includes(pathType)) return false;
         const subject = this.subjects.get(this.keyFor(path, source));
-        if (!subject) return;
+        if (!subject) return false;
         subject.next({ data: { value: null, timestamp: null }, state: subject.getValue().state } as IPathUpdate);
+        return true;
     }
 }
 
@@ -1562,6 +1566,50 @@ describe('WidgetStreamsDirective TTL value reset (#1069)', () => {
         expect(dataSvc.timeoutCalls).toEqual([
             { path: 'env.slow', source: 'default', pathType: 'number', dataTimeoutMs: updateInterval * 2 }
         ]);
+    });
+
+    it('uses two sample periods from an updateInterval of exactly 5s', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'env.edge', source: null, pathType: 'number', updateInterval: 5000,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const hits: (number | null)[] = [];
+        directive.observe('p', u => hits.push((u.data.value as number | null) ?? null));
+        dataSvc.subjects.get('env.edge|default')!.next(
+            { data: { value: 4, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        // The sample tick at 5s delivers the reading; a 5s window would expire 5s after that.
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(hits.at(-1)).toBe(4);
+        expect(dataSvc.timeoutCalls).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(hits.at(-1)).toBeNull();
+        expect(dataSvc.timeoutCalls).toEqual([
+            { path: 'env.edge', source: 'default', pathType: 'number', dataTimeoutMs: 10000 }
+        ]);
+    });
+
+    // DataService does not reset a boolean path, so the retry replays the last state. A null from the
+    // directive would make the widget alternate between that state and null on every retry.
+    it('keeps the last value through a TTL timeout on a path type DataService does not reset', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'log');
+        directive.setStreamsConfig(makeCfg({
+            path: 'switch.state', source: null, pathType: 'boolean', updateInterval: 500,
+            suppressBootstrapNull: true, enableTimeout: true
+        }));
+        const hits: unknown[] = [];
+        directive.observe('p', u => hits.push(u.data.value));
+        dataSvc.subjects.get('switch.state|default')!.next(
+            { data: { value: true, timestamp: new Date() }, state: 'normal' } as IPathUpdate);
+
+        await vi.advanceTimersByTimeAsync(20000);
+        expect(dataSvc.timeoutCalls.length).toBeGreaterThanOrEqual(2);
+        expect(hits.length).toBeGreaterThan(0);
+        expect(hits.every(v => v === true)).toBe(true);
     });
 
     it('keeps the 5s floor when updateInterval is under 5s', async () => {

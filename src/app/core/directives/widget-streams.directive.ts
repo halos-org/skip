@@ -356,9 +356,11 @@ export class WidgetStreamsDirective implements OnDestroy {
     if (enableTimeout) {
       // The timeout unsubscribes before timeoutPathObservable's null can travel back through this
       // pipeline, and retry waits out retryDelay, so the widget would keep the last reading for
-      // another 5s. Hand it the null now. Remember the last delivery so the null keeps that
-      // reading's state and unit. A path that drops invalid samples must not see it: the null is
-      // emitted below that filter, and the replay on retry is what the filter already drops.
+      // another 5s. Hand it the null now, but only when DataService nulled the stored value too, or
+      // the retry would replay the old reading and the widget would alternate between the two.
+      // Remember the last delivery so the null keeps that reading's state and unit. A path that drops
+      // invalid samples must not see it: the null is emitted below that filter, and the replay on
+      // retry is what the filter already drops.
       let lastUpdate: IPathUpdate | undefined;
       data$ = data$.pipe(
         tap(update => { lastUpdate = update; }),
@@ -366,11 +368,11 @@ export class WidgetStreamsDirective implements OnDestroy {
           each: dataTimeout,
           with: () => {
             console.log(timeoutErrorMsg + basePath);
-            this.dataService.timeoutPathObservable(basePath, effectiveSource, pathType, dataTimeout);
-            if (pathCfg.dropInvalidSamples || !lastUpdate) {
+            const reset = this.dataService.timeoutPathObservable(basePath, effectiveSource, pathType, dataTimeout);
+            if (!reset || pathCfg.dropInvalidSamples || !lastUpdate) {
               return throwError(() => undefined);
             }
-            const reset: IPathUpdate = {
+            const resetUpdate: IPathUpdate = {
               data: {
                 value: null,
                 timestamp: null,
@@ -379,7 +381,7 @@ export class WidgetStreamsDirective implements OnDestroy {
               },
               state: lastUpdate.state
             };
-            return concat(of(reset), throwError(() => undefined));
+            return concat(of(resetUpdate), throwError(() => undefined));
           }
         }),
         retryWhen(error => error.pipe(

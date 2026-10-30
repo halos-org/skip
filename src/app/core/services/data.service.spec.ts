@@ -774,7 +774,7 @@ describe('DataService', () => {
       .subscribe(update => updates.push(update));
 
     const countBefore = updates.length;
-    service.timeoutPathObservable('self.navigation.position', 'default', 'boolean', 5000);
+    expect(service.timeoutPathObservable('self.navigation.position', 'default', 'boolean', 5000)).toBe(false);
 
     expect(updates.length).toBe(countBefore);
     expect(updates.every(update => update !== undefined)).toBe(true);
@@ -796,7 +796,7 @@ describe('DataService', () => {
     expect(latest!.data.value).toEqual({ latitude: 59.5, longitude: 22.5 });
 
     // The position widget's path is object-typed; a user-enabled data timeout must still blank it.
-    service.timeoutPathObservable('self.navigation.position', 'default', 'object', 5000);
+    expect(service.timeoutPathObservable('self.navigation.position', 'default', 'object', 5000)).toBe(true);
 
     expect(latest!.data.value).toBeNull();
   });
