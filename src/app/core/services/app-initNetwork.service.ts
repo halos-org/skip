@@ -15,7 +15,7 @@ import { DefaultConnectionConfig } from '../../../default-config/config.blank.co
 import { buildDefaultConfig } from '../../../default-config/config.default.factory';
 import { isValidConfigShape } from '../utils/config-shape.util';
 import { dashboardsRequireRemoteContexts } from '../utils/remote-context-demand.util';
-import { CONSOLE_MIGRATION_SINK, ConfigMigrationResult, migrateConfig, skipsPersistentUpgrade } from '../utils/config-migration.util';
+import { CONSOLE_MIGRATION_SINK, ConfigMigrationResult, migrateConfig, cannotWriteProfile } from '../utils/config-migration.util';
 import { cloneDeep } from 'lodash-es';
 import { compare } from 'compare-versions';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
@@ -52,6 +52,11 @@ export interface IBootstrapIssue {
   statusCode?: number;
   sharedConfigName?: string;
   cause?: TAuthBlockedCause;
+  /**
+   * `missing-shared-config` only: the user's config file exists but lists no slots, which is how the
+   * server answers for a file it cannot parse. Writing a slot would replace the whole file.
+   */
+  unreadableConfigFile?: boolean;
   /** The version an unsupported server reported, and the minimum it fell short of. */
   serverVersion?: string;
   requiredVersion?: string;
@@ -220,6 +225,8 @@ export class AppNetworkInitService implements OnDestroy {
       // slot). The remote-control migration must then ignore the loaded (ephemeral) config and take
       // the device identity from its own persisted source instead.
       let ephemeralOverrideActive = false;
+      // True when this boot created the slot from the shipped defaults, which hold no device identity.
+      let slotCreated = false;
       if (this.isLoggedIn) {
         // Wait for storage to be fully ready before accessing it
         const storageReady = await this.storage.waitUntilReady();
@@ -230,30 +237,34 @@ export class AppNetworkInitService implements OnDestroy {
           // back to the persisted per-device profile when absent/invalid/unknown.
           const effectiveSharedConfigName = await this.resolveEffectiveSharedConfigName();
           ephemeralOverrideActive = effectiveSharedConfigName !== this.config.sharedConfigName;
+          let missingStatusCode: number | undefined;
+          let unreadableConfigFile = false;
           try {
             remoteConfig = await this.storage.getConfig('user', effectiveSharedConfigName, REMOTE_CONFIG_FILE_VERSION);
           } catch (error) {
             // Only a 404 from the config fetch itself means "no shared configuration"; 404s from
             // earlier bootstrap steps (e.g. /signalk/ discovery) must not offer config recovery.
-            if (error?.status === 404) {
-              startupDegraded = true;
-              this._bootstrapIssue$.next({
-                reason: 'missing-shared-config',
-                statusCode: 404,
-                sharedConfigName: this.config.sharedConfigName
-              });
-              this._bootstrapStatus$.next('degraded');
-              return;
+            if (error?.status !== 404) {
+              throw error;
             }
-            throw error;
+            missingStatusCode = 404;
+          }
+          // A slot that was never written 404s; a 200 without `app` is a slot that exists but holds no
+          // usable config. createMissingSlot writes only when the user has no config file at all, so it
+          // never overwrites either. An override names a listed slot, so it is never created.
+          if (!remoteConfig?.app && !ephemeralOverrideActive) {
+            const outcome = await this.createMissingSlot(effectiveSharedConfigName);
+            remoteConfig = outcome.config;
+            slotCreated = remoteConfig !== null;
+            unreadableConfigFile = outcome.unreadableConfigFile;
           }
           if (!remoteConfig?.app) {
-            // A slot that was never written 404s, handled above; an appless 200 is the other shape
-            // "no shared configuration yet" arrives in, so it lands in the same degraded state.
             startupDegraded = true;
             this._bootstrapIssue$.next({
               reason: 'missing-shared-config',
-              sharedConfigName: this.config.sharedConfigName
+              ...(missingStatusCode !== undefined && { statusCode: missingStatusCode }),
+              sharedConfigName: this.config.sharedConfigName,
+              ...(unreadableConfigFile && { unreadableConfigFile })
             });
             this._bootstrapStatus$.next('degraded');
             return;
@@ -263,7 +274,7 @@ export class AppNetworkInitService implements OnDestroy {
           // it as a view: one that gains write access later must not save that stamp over dashboards
           // no upgrade has touched.
           let migratedInMemory = false;
-          if (skipsPersistentUpgrade(this.embedMode, this.storage)) {
+          if (cannotWriteProfile(this.embedMode, this.storage)) {
             const result = this.migrateProfileInMemory(remoteConfig);
             remoteConfig = result.config;
             migratedInMemory = result.migrated;
@@ -281,12 +292,12 @@ export class AppNetworkInitService implements OnDestroy {
       // Lift remote-control identity to the per-device connectionConfig (once). Identity comes from
       // the loaded profile, else the legacy local appConfig blob, else identity defaults. An
       // ephemeral `?profile` override is excluded as a source — the device must never adopt the
-      // ephemeral slot's identity as its own.
+      // ephemeral slot's identity as its own — and so is a slot this boot just created from the defaults.
       // An anonymous session has no authoritative profile to lift the remote-control identity from,
       // and the migration is one-shot: running it here would stamp the connection config as migrated
       // with identity defaults, so the real identity in the user's profile could never be lifted.
       if (outcome !== 'anonymous') {
-        this.migrateRemoteControlToDevice(remoteConfig, ephemeralOverrideActive);
+        this.migrateRemoteControlToDevice(slotCreated ? null : remoteConfig, ephemeralOverrideActive);
       }
 
       this._bootstrapIssue$.next({ reason: 'none' });
@@ -376,6 +387,40 @@ export class AppNetworkInitService implements OnDestroy {
       initConfig,
       readOnly: true
     });
+  }
+
+  /**
+   * A signed-in session whose config file does not exist yet is on its first run: create its slot
+   * from the shipped defaults. A slot missing from an existing file is not a first run (the profile
+   * was deleted or renamed on another device, or the server could not parse the file, in which case
+   * it answers every slot read with a 404 and a write would replace the whole file), so it keeps the
+   * missing-config recovery, as do a session that must not write and a failed check or write. A file
+   * the server cannot read is reported as unreadable, and every further write of this session is
+   * refused, since any write would replace the whole file.
+   */
+  private async createMissingSlot(name: string): Promise<{ config: IConfig | null; unreadableConfigFile: boolean }> {
+    const kept = { config: null, unreadableConfigFile: false };
+    if (cannotWriteProfile(this.embedMode, this.storage)) {
+      return kept;
+    }
+    const config = buildDefaultConfig();
+    try {
+      const fileState = await this.storage.userConfigFileState(REMOTE_CONFIG_FILE_VERSION);
+      if (fileState === 'unreadable') {
+        this.storage.refuseUserConfigWrites();
+        return { config: null, unreadableConfigFile: true };
+      }
+      if (fileState === 'readable') {
+        return kept;
+      }
+      // Passed explicitly: storage has no file version before the bootstrap context is set.
+      await this.storage.setConfig('user', name, config, REMOTE_CONFIG_FILE_VERSION);
+    } catch (error) {
+      console.error(`[AppInit Network Service] Could not create the missing configuration '${name}':`, error);
+      return kept;
+    }
+    console.log(`[AppInit Network Service] Created the missing configuration '${name}' from the defaults.`);
+    return { config, unreadableConfigFile: false };
   }
 
   /**

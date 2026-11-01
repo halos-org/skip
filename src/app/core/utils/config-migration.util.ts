@@ -371,12 +371,12 @@ export class ConfigTooOldError extends Error {
 }
 
 /**
- * Whether a session renders its profile without the persistent upgrade: the chromeless embed, which
- * must never rewrite a slot, and any session storage refuses writes from. AppComponent skips the
- * upgrade for such a session and the bootstrap migrates its profile in memory instead; one predicate,
- * so a session is never migrated twice or rendered unmigrated.
+ * Whether a session must not write its profile slot: the chromeless embed, which must never rewrite
+ * a slot, and any session storage refuses writes from. Such a session gets no persistent upgrade
+ * (the bootstrap migrates its profile in memory instead, so it is never migrated twice or rendered
+ * unmigrated), no automatic creation of a missing slot, and no Create prompt.
  */
-export function skipsPersistentUpgrade(embedMode: { embed(): boolean }, storage: { canPersist(): boolean }): boolean {
+export function cannotWriteProfile(embedMode: { embed(): boolean }, storage: { canPersist(): boolean }): boolean {
   return embedMode.embed() || !storage.canPersist();
 }
 

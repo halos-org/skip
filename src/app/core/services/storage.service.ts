@@ -58,6 +58,7 @@ export class StorageService {
   private InitConfig: IConfig | null = null;
   private _isRemoteContextBootstrapped = false;
   private _isReadOnlyContext = false;
+  private _userConfigUnreadable = false;
   public storageServiceReady$ = new BehaviorSubject<boolean>(false);
   private _networkStatus: IEndpointStatus | undefined = undefined;
   // Instrumentation toggle
@@ -215,7 +216,7 @@ export class StorageService {
    * global shared config into whatever user slot its bootstrap name happens to match.
    */
   public canPersist(): boolean {
-    return this._auth.canWriteUserData() && !this._isReadOnlyContext;
+    return this._auth.canWriteUserData() && !this._isReadOnlyContext && !this._userConfigUnreadable;
   }
 
   /**
@@ -278,6 +279,47 @@ export class StorageService {
       const timer = window.setTimeout(() => finish(false), timeoutMs);
     });
   }
+
+  /**
+   * The state of the signed-in user's config file at `fileVersion` on the server. The server lists
+   * the files in the user's directory for the app (404 when there is none), and a file it cannot
+   * parse still appears there; a slot read then answers 404 and the file's slot listing comes back
+   * empty, which is why an empty listing reads as `unreadable`. A failed slot listing reads the same
+   * way: not knowing whether the file can be read must not lead to a write that could replace it.
+   */
+  public async userConfigFileState(fileVersion: number): Promise<'absent' | 'readable' | 'unreadable'> {
+    this.ensureReady();
+    const dirUrl = `${this.serverEndpoint}user/${SERVER_CONFIG_APPID}`;
+    let files: string[];
+    try {
+      files = await lastValueFrom(this.http.get<string[]>(dirUrl).pipe(timeout(REMOTE_CONFIG_TIMEOUT_MS)));
+    } catch (error) {
+      if ((error as HttpErrorResponse)?.status === 404) {
+        return 'absent';
+      }
+      this.handleError(error as HttpErrorResponse); // throws
+    }
+    if (!files.includes(`${fileVersion}.0.0`)) {
+      return 'absent';
+    }
+    try {
+      const slots = await lastValueFrom(
+        this.http.get<string[]>(`${dirUrl}/${fileVersion}/?keys=true`).pipe(timeout(REMOTE_CONFIG_TIMEOUT_MS)));
+      return slots.length > 0 ? 'readable' : 'unreadable';
+    } catch (error) {
+      this.logError(error as HttpErrorResponse);
+      return 'unreadable';
+    }
+  }
+
+  /**
+   * Refuses every further write for this session: its config file exists but cannot be read, and the
+   * server rebuilds a file it cannot parse around whatever slot is written, dropping every other one.
+   */
+  public refuseUserConfigWrites(): void {
+    this._userConfigUnreadable = true;
+  }
+
 
   /**
    * Retrieves server Application Data config lists for Skip in both Global
