@@ -134,13 +134,10 @@ function restoreFixedPaths(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): vo
 }
 
 /**
- * Take back from the widget's defaults how each of its path slots is offered for editing.
+ * Use the widget's defaults for `isPathConfigurable` and `hideFromConfig` on every path.
  *
- * `isPathConfigurable` and `hideFromConfig` are the widget's decision about what its
- * options dialog shows, never something the user set - but like the wiring they ride in
- * the saved snapshot, and because the saved value wins the merge, a widget that later
- * opens a fixed slot up (or hides one) would change only for new widgets, while every
- * one already on a dashboard kept the dialog it was placed with.
+ * These flags decide what the options dialog shows for a path. They belong to the widget,
+ * not the user, so the widget's current definition must win over any copy in a saved config.
  */
 function restoreSlotPresentation(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): void {
   if (!merged.paths || !base.paths) return;

@@ -120,10 +120,7 @@ describe('WidgetRuntimeDirective config merge', () => {
     expect(merged?.paths?.['p'].convertUnitTo).toBe('m');
   });
 
-  /**
-   * Whether a slot is offered for editing is the widget's call, not a saved choice: a
-   * widget that opens a fixed path up has to reach the copies already on a dashboard.
-   */
+  /** Whether the options dialog offers a path is the widget's decision, so a saved config cannot override it. */
   it('takes how a slot is offered from the defaults', () => {
     const merged = build(
       { paths: {
