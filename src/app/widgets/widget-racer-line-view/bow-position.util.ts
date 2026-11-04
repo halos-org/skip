@@ -109,13 +109,13 @@ function destination(lat: number, lon: number, distance: number, bearing: number
 /**
  * The bow, from a position and where that position is on the hull: `fromBow` metres along the
  * heading, then `|fromCenter|` metres across to the centreline - to port when the position is to
- * starboard of it. Without a heading the position is returned unchanged, as racer does.
+ * starboard of it. Without a heading (or with a non-finite one) the position is returned unchanged, as racer does.
  *
  * @param heading True heading, else COG, in radians.
  */
 export function bowPosition(lat: number, lon: number, heading: number | null, offsets: IHullOffsets): { latitude: number; longitude: number } {
   const { fromBow, fromCenter } = offsets;
-  if (heading == null || (!fromBow && !fromCenter)) return { latitude: lat, longitude: lon };
+  if (!finite(heading) || (!fromBow && !fromCenter)) return { latitude: lat, longitude: lon };
   let bow = { latitude: lat, longitude: lon };
   if (fromBow) bow = destination(bow.latitude, bow.longitude, fromBow, heading);
   if (fromCenter) {
@@ -126,8 +126,9 @@ export function bowPosition(lat: number, lon: number, heading: number | null, of
 
 /**
  * The map from an N2K address source to its CAN name source, built from `GET /signalk/v1/api/sources`
- * the way the server's `buildSrcToCanonicalMap` does: for each provider `label` and each device key
- * `src`, `${label}.${src}` maps to `${label}.${canName}` where the device has a CAN name.
+ * the way the server's `buildSrcToCanonicalMap` does: for each provider key `label` (the top-level
+ * key, which is also the first part of a `$source`) and each device key `src`, `${label}.${src}` maps
+ * to `${label}.${canName}` where the device has a CAN name.
  */
 export function canonicalSourceMap(sources: unknown): Map<string, string> {
   const map = new Map<string, string>();

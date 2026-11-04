@@ -148,7 +148,8 @@
             [class.error]="endFeedback().port === 'error'"
             [attr.x]="ends.port.x - ends.port.size / 2" [attr.y]="ends.port.y - ends.port.size / 2"
             [attr.width]="ends.port.size" [attr.height]="ends.port.size" [attr.rx]="ends.port.rx"
-            role="button" tabindex="0" [attr.aria-label]="ends.port.title"
+            role="button" tabindex="0" [attr.aria-label]="endLabel(ends.port.title, endFeedback().port)"
+            [attr.aria-busy]="endFeedback().port === 'pending' ? 'true' : null"
             (click)="endPressed.emit('port')"
             (keydown.enter)="endPressed.emit('port')"
             (keydown.space)="endPressed.emit('port')">
@@ -160,7 +161,8 @@
             [class.error]="endFeedback().stb === 'error'"
             [attr.x]="ends.stb.x - ends.stb.size / 2" [attr.y]="ends.stb.y - ends.stb.size / 2"
             [attr.width]="ends.stb.size" [attr.height]="ends.stb.size" [attr.rx]="ends.stb.rx"
-            role="button" tabindex="0" [attr.aria-label]="ends.stb.title"
+            role="button" tabindex="0" [attr.aria-label]="endLabel(ends.stb.title, endFeedback().stb)"
+            [attr.aria-busy]="endFeedback().stb === 'pending' ? 'true' : null"
             (click)="endPressed.emit('stb')"
             (keydown.enter)="endPressed.emit('stb')"
             (keydown.space)="endPressed.emit('stb')">

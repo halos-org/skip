@@ -140,6 +140,15 @@ describe('WidgetRuntimeDirective config merge', () => {
     expect(merged?.paths?.['shown'].hideFromConfig).toBeUndefined();
   });
 
+  /** A hidden fixed path has no source control in the dialog, so a saved source cannot be changed back. */
+  it('takes a hidden fixed path’s source from the defaults', () => {
+    const merged = build(
+      { paths: { p: { description: 'P', path: 'self.p', source: 'default', pathType: 'object', isPathConfigurable: false, hideFromConfig: true } } },
+      { paths: { p: { description: 'P', path: 'self.p', source: 'racer.1', pathType: 'object', isPathConfigurable: false } } }
+    );
+    expect(merged?.paths?.['p'].source).toBe('default');
+  });
+
   it('keeps the saved unit where the widget exposes it for editing', () => {
     const merged = build(
       { paths: { p: { description: 'P', path: 'self.len', source: 'default', pathType: 'number', isPathConfigurable: false, convertUnitTo: 'm', showConvertUnitTo: true } } },

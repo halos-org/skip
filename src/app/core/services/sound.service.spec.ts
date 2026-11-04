@@ -181,6 +181,17 @@ describe('SoundService', () => {
       expect(first.disconnect).toHaveBeenCalled();
     });
 
+    it('schedules a tone on the context clock once playback has advanced', () => {
+      stubWebAudio();
+      const svc = new SoundService();
+      svc.playTone(880, 150);
+      ctx().currentTime = 10;
+      svc.playTone(220, 200, 0.3, 300);
+      const second = ctx().oscillators[1];
+      expect(second.start).toHaveBeenCalledWith(10.3);
+      expect(second.stop).toHaveBeenCalledWith(10.5);
+    });
+
     it('swallows a failure to play a tone rather than throwing into the caller', () => {
       vi.stubGlobal('AudioContext', class { constructor() { throw new Error('blocked'); } });
       const svc = new SoundService();

@@ -45,6 +45,12 @@ export type TLineEnd = 'port' | 'stb';
  */
 export type TEndFeedback = 'idle' | 'pending' | 'ok' | 'error';
 
+const END_FEEDBACK_SPOKEN: Record<Exclude<TEndFeedback, 'idle'>, string> = {
+  pending: 'setting',
+  ok: 'set',
+  error: 'failed'
+};
+
 export type TLineViewAction =
   | { kind: 'mode' }
   | { kind: 'browse'; step: -1 | 1 }
@@ -284,6 +290,11 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   public endPressed = output<TLineEnd>();
   /** How each end's last ping is going, shown on its target. */
   public endFeedback = input<Record<TLineEnd, TEndFeedback>>({ port: 'idle', stb: 'idle' });
+
+  /** An end target's accessible name: its title, and how its ping is going, which otherwise only colour shows. */
+  protected endLabel(title: string, feedback: TEndFeedback): string {
+    return feedback === 'idle' ? title : `${title}: ${END_FEEDBACK_SPOKEN[feedback]}`;
+  }
   /** Everything else a control in the drawing asks for. */
   public action = output<TLineViewAction>();
   /** The named lines the plugin knows, the one in use, and the one being browsed. */

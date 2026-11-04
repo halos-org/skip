@@ -500,10 +500,16 @@ export class WidgetRacerLineViewComponent {
   protected readonly endFeedback = signal<Record<TLineEnd, TEndFeedback>>({ port: 'idle', stb: 'idle' });
   /** The request each end is waiting on; a reply to an older one is ignored. */
   private readonly endRequest: Record<TLineEnd, string | null> = { port: null, stb: null };
+  /**
+   * The request each end gave up waiting on. The plugin may still set the end after the
+   * timeout, and a late success must not be left showing as a failure.
+   */
+  private readonly lateRequest: Record<TLineEnd, string | null> = { port: null, stb: null };
   private readonly endTimer: Record<TLineEnd, ReturnType<typeof setTimeout> | null> = { port: null, stb: null };
 
   /** Put an end of the line on the boat's current position. */
   protected setLineEnd(end: TLineEnd): void {
+    this.lateRequest[end] = null;
     this.showEndFeedback(end, 'pending', PING_REPLY_TIMEOUT_MS);
     const requestId = this.signalk.putRequest('navigation.racing.setStartLine',
       { end, position: 'bow' }, this.id());
@@ -536,14 +542,22 @@ export class WidgetRacerLineViewComponent {
     this.endFeedback.update(f => ({ ...f, [end]: state }));
     this.endTimer[end] = setTimeout(() => {
       this.endTimer[end] = null;
-      if (state === 'pending') this.settleEnd(end, false);
-      else this.endFeedback.update(f => ({ ...f, [end]: 'idle' }));
+      if (state === 'pending') {
+        this.lateRequest[end] = this.endRequest[end];
+        this.settleEnd(end, false);
+      } else this.endFeedback.update(f => ({ ...f, [end]: 'idle' }));
     }, holdMs);
   }
 
   private settleRequest(requestId: string, statusCode: number | null): void {
     for (const end of ['port', 'stb'] as const) {
-      if (this.endRequest[end] === requestId) this.settleEnd(end, statusCode === 200);
+      if (this.endRequest[end] === requestId) {
+        this.settleEnd(end, statusCode === 200);
+      } else if (this.lateRequest[end] === requestId) {
+        // Already shown as failed; only a success changes that.
+        this.lateRequest[end] = null;
+        if (statusCode === 200) this.settleEnd(end, true);
+      }
     }
     this.settleLineName(requestId, statusCode);
   }
@@ -609,9 +623,14 @@ export class WidgetRacerLineViewComponent {
       untracked(() => this.palette.set(getColors(cfg.color ?? 'contrast', theme)));
     });
 
+    // A path cleared in the options has no stream left to say it went away, so what it last
+    // delivered is cleared here: otherwise it stays on the drawing as a live reading.
     const num = (key: string, apply: (v: number | null, at: number | null) => void) => {
       effect(() => {
-        if (!this.pathsRecord[key]?.path) return;
+        if (!this.pathsRecord[key]?.path) {
+          untracked(() => apply(null, null));
+          return;
+        }
         untracked(() => this.streams.observe(key, pkt => {
           const value = pkt?.data?.value;
           const at = pkt?.data?.timestamp;
@@ -625,7 +644,10 @@ export class WidgetRacerLineViewComponent {
       apply: (pos: { latitude?: number | null; longitude?: number | null } | null,
         at: number | null) => void) => {
       effect(() => {
-        if (!this.pathsRecord[key]?.path) return;
+        if (!this.pathsRecord[key]?.path) {
+          untracked(() => apply(null, null));
+          return;
+        }
         untracked(() => this.streams.observe(key, pkt => {
           const value = pkt?.data?.value as
             { latitude?: number | null; longitude?: number | null } | null | undefined;

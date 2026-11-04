@@ -78,6 +78,7 @@ describe('bow position', () => {
     it('leaves the position alone without a heading or an offset', () => {
       expect(bowPosition(10, 20, null, { fromBow: 6, fromCenter: 0 })).toEqual({ latitude: 10, longitude: 20 });
       expect(bowPosition(10, 20, 1, { fromBow: null, fromCenter: null })).toEqual({ latitude: 10, longitude: 20 });
+      expect(bowPosition(10, 20, Infinity, { fromBow: 6, fromCenter: 0 })).toEqual({ latitude: 10, longitude: 20 });
     });
   });
 });

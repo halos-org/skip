@@ -253,6 +253,15 @@
   50% { fill-opacity: 0.1; }
 }
 
+// Without the motion the states stay apart: pending is still dashed, and failed still
+// has its heavy outline.
+@media (prefers-reduced-motion: reduce) {
+  .end-target.pending,
+  .end-target.error {
+    animation: none;
+  }
+}
+
 // Controls drawn into the SVG, so they sit beside the marks they act on and scale with
 // the drawing rather than with the browser's idea of a button.
 .control {

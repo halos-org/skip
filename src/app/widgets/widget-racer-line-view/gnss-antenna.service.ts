@@ -51,15 +51,19 @@ export class GnssAntennaService {
         switchMap(() => this.read(`${urls.v2}/vessels/self/sensors/gnss`)),
         switchMap(body => {
           const config = body as IGnssConfig | null;
-          this._config.set(config);
           // The map is only needed to match a configured antenna.
           const hasSensors = Array.isArray(config?.sensors) && config.sensors.length > 0;
-          return hasSensors && urls.v1 ? this.read(`${urls.v1}sources`) : of(null);
+          const sources$ = hasSensors && urls.v1 ? this.read(`${urls.v1}sources`) : of(null);
+          return sources$.pipe(map(sources => ({ config, sources })));
         })
-      ) : of(null)),
+      ) : of({ config: null, sources: null })),
       takeUntilDestroyed(this.destroyRef)
-    ).subscribe(sources => {
-      if (sources) this._sourceMap.set(canonicalSourceMap(sources));
+    ).subscribe(({ config, sources }) => {
+      // Published together, so a configuration is never matched against another poll's map.
+      // A map that could not be read is dropped rather than kept: after an N2K address is
+      // reassigned, a stale one would match the position to the wrong antenna.
+      this._config.set(config);
+      this._sourceMap.set(sources ? canonicalSourceMap(sources) : new Map());
     });
   }
 

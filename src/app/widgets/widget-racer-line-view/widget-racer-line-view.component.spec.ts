@@ -7,12 +7,14 @@ import { UnitsService } from '../../core/services/units.service';
 import { SignalkRequestsService, skRequest } from '../../core/services/signalk-requests.service';
 import { Subject } from 'rxjs';
 import { DashboardService } from '../../core/services/dashboard.service';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { RacerLineViewComponent } from './racer-line-view/racer-line-view.component';
 import { parsePointer } from '../../core/utils/pointer-path.util';
 import { SoundService } from '../../core/services/sound.service';
 import type { IWidgetPath } from '../../core/interfaces/widgets-interface';
+import { GnssAntennaService } from './gnss-antenna.service';
+import type { IGnssConfig } from './bow-position.util';
 
 /**
  * The widget subscribes and hands the values down; the drawing turns them into SVG. These tests
@@ -384,6 +386,34 @@ describe('WidgetRacerLineViewComponent', () => {
     feed({ gpsFromBowPath: 2, gpsFromCenterPath: 0 });
     expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(2, 3);
     expect(drawn().data().lat).toBeCloseTo(0, 9);
+  });
+
+  /**
+   * A position from an antenna in the server's GNSS configuration is at that antenna, or at
+   * midships while the server is replacing it - whatever sensors.gps says.
+   */
+  it('hands the drawing the bow from a configured antenna', () => {
+    const drawn = () => fixture.debugElement.query(By.directive(RacerLineViewComponent))
+      .componentInstance as unknown as { data: () => { lat: number | null; lon: number | null } };
+    const M_PER_DEG = 6371000 * Math.PI / 180;
+    const gnss = TestBed.inject(GnssAntennaService) as unknown as { _config: WritableSignal<IGnssConfig | null> };
+    const options = runtimeMock.options;
+    const base = WidgetRacerLineViewComponent.DEFAULT_CONFIG;
+    const paths = base.paths as Record<string, IWidgetPath>;
+    runtimeMock.options = () => ({ ...base, paths: { ...paths, positionPath: { ...paths['positionPath'], source: 'n2k.1' } } });
+    try {
+      const sensors = [{ $source: 'n2k.1', fromBow: 3, fromCenter: 0 }];
+      gnss._config.set({ correction: 'off', sensors, status: { mode: 'off', active: false } });
+      feed({ boatLengthPath: 12, gpsFromBowPath: 2, gpsFromCenterPath: 0, headingPath: Math.PI / 2 });
+      feed({ positionPath: { latitude: 0, longitude: 0 } });
+      expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(3, 3);
+      gnss._config.set({ correction: 'replace', sensors, status: { mode: 'replace', active: true } });
+      fixture.detectChanges();
+      expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(6, 3);
+    } finally {
+      runtimeMock.options = options;
+      gnss._config.set(null);
+    }
   });
 
   /**
@@ -1150,6 +1180,36 @@ describe('WidgetRacerLineViewComponent', () => {
         fixture.detectChanges();
         expect(state('port')).toEqual(['error']);
         expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+      });
+
+      it('turns a timed-out ping to success when the plugin answers late', () => {
+        ping('port');
+        vi.advanceTimersByTime(6000);
+        fixture.detectChanges();
+        expect(state('port')).toEqual(['error']);
+        reply('req-1', 200);
+        expect(state('port')).toEqual(['ok']);
+      });
+
+      it('leaves a timed-out ping failed on a late refusal', () => {
+        ping('port');
+        vi.advanceTimersByTime(6000);
+        fixture.detectChanges();
+        reply('req-1', 500);
+        expect(state('port')).toEqual(['error']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+      });
+
+      it('says how the ping is going to a screen reader', () => {
+        const label = () => target('stb').getAttribute('aria-label') ?? '';
+        const idle = label();
+        ping('stb');
+        expect(label()).not.toBe(idle);
+        expect(label().startsWith(idle)).toBe(true);
+        expect(target('stb').getAttribute('aria-busy')).toBe('true');
+        reply('req-1', 403);
+        expect(label()).toContain('failed');
+        expect(target('stb').getAttribute('aria-busy')).toBeNull();
       });
 
       it('fails at once a ping that could not be sent', () => {

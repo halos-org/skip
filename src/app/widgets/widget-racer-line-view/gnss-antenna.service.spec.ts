@@ -54,4 +54,18 @@ describe('GnssAntennaService', () => {
     http.expectOne(GNSS_URL).flush({ correction: 'off', sensors: [], status: { mode: 'off', active: false } });
     expect(service.config()?.correction).toBe('off');
   });
+
+  it('drops the source map when a later poll cannot read it', () => {
+    service.ensureStarted();
+    vi.advanceTimersByTime(0);
+    const config = { correction: 'replace', sensors: [{ $source: 'n2k.c1', fromBow: 1.5, fromCenter: 0 }], status: { mode: 'replace', active: true } };
+    http.expectOne(GNSS_URL).flush(config);
+    http.expectOne(SOURCES_URL).flush({ n2k: { label: 'n2k', 0: { n2k: { canName: 'c1' } } } });
+    expect(service.canonical('n2k.0')).toBe('n2k.c1');
+    vi.advanceTimersByTime(GNSS_POLL_INTERVAL_MS);
+    http.expectOne(GNSS_URL).flush(config);
+    http.expectOne(SOURCES_URL).flush('error', { status: 500, statusText: 'Server Error' });
+    expect(service.config()).toEqual(config);
+    expect(service.canonical('n2k.0')).toBe('n2k.0');
+  });
 });
