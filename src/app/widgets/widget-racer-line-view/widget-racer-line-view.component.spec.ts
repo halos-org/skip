@@ -369,6 +369,24 @@ describe('WidgetRacerLineViewComponent', () => {
   });
 
   /**
+   * racer measures from the bow, and the server may report the position anywhere on the hull,
+   * so the drawing is handed the bow worked out the way racer does it - here with nothing
+   * configured, the position taken as midships: half the length forward of it.
+   */
+  it('hands the drawing the bow, not the position as received', () => {
+    const drawn = () => fixture.debugElement.query(By.directive(RacerLineViewComponent))
+      .componentInstance as unknown as { data: () => { lat: number | null; lon: number | null } };
+    const M_PER_DEG = 6371000 * Math.PI / 180;
+    feed({ positionPath: { latitude: 0, longitude: 0 }, headingPath: Math.PI / 2 });
+    expect(drawn().data().lon).toBe(0);
+    feed({ boatLengthPath: 12 });
+    expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(6, 3);
+    feed({ gpsFromBowPath: 2, gpsFromCenterPath: 0 });
+    expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(2, 3);
+    expect(drawn().data().lat).toBeCloseTo(0, 9);
+  });
+
+  /**
    * Showing a usable run of the line comes before zooming in: ten boat lengths of it stay
    * in frame whatever that costs in scale. Measured on the line itself rather than on the
    * fitted span, which is mostly open water when the boat is standing off.

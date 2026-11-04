@@ -1710,8 +1710,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // The hull is drawn solid at the drawing's own scale, but with a minimum size set by MIN_HULL_DISPLAY_UNITS
     const boatMetres = this.boatLength() ?? this.DEFAULT_BOAT_METRES;
     const hullLength = (boatMetres * scale) < this.MIN_HULL_DISPLAY_UNITS ? this.MIN_HULL_DISPLAY_UNITS : boatMetres * scale;
-    // The fix is the bow, not the middle of the boat: that is where the Signalk reports the position
-    // to be, it is what the plugin measures its distance to the line from, and it
+    // The fix is the bow, not the middle of the boat: the host widget works the bow out from
+    // the reported position, it is what the plugin measures its distance to the line from, and it
     // is the end that decides whether you are over. So the hull is hung aft of the fix
     // rather than centred on it, which also makes a change of heading swing the stern
     // around a bow that stays put - what the boat actually does, and what stops the bow

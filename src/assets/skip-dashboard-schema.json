@@ -2202,6 +2202,34 @@
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
+          "gpsFromBowPath": {
+            "convertUnitTo": "m",
+            "description": "Distance of the GPS antenna aft of the bow",
+            "enableTimeout": false,
+            "hideFromConfig": true,
+            "isPathConfigurable": false,
+            "path": "self.sensors.gps.fromBow",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "m",
+            "pathType": "number",
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
+          "gpsFromCenterPath": {
+            "convertUnitTo": "m",
+            "description": "Distance of the GPS antenna from the centreline, positive to starboard",
+            "enableTimeout": false,
+            "hideFromConfig": true,
+            "isPathConfigurable": false,
+            "path": "self.sensors.gps.fromCenter",
+            "pathRequired": false,
+            "pathSkUnitsFilter": "m",
+            "pathType": "number",
+            "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
           "headingPath": {
             "convertUnitTo": "rad",
             "description": "True heading of the vessel",
@@ -2659,6 +2687,32 @@
           "pathRequired": false,
           "pathType": "number",
           "slot": "boatLengthPath",
+          "source": "default"
+        },
+        {
+          "defaultConvertUnitTo": "m",
+          "defaultPath": "self.sensors.gps.fromBow",
+          "description": "Distance of the GPS antenna aft of the bow",
+          "expectedSkUnit": "m",
+          "hideFromConfig": true,
+          "isPathConfigurable": false,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "number",
+          "slot": "gpsFromBowPath",
+          "source": "default"
+        },
+        {
+          "defaultConvertUnitTo": "m",
+          "defaultPath": "self.sensors.gps.fromCenter",
+          "description": "Distance of the GPS antenna from the centreline, positive to starboard",
+          "expectedSkUnit": "m",
+          "hideFromConfig": true,
+          "isPathConfigurable": false,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "number",
+          "slot": "gpsFromCenterPath",
           "source": "default"
         },
         {

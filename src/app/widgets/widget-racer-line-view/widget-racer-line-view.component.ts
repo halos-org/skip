@@ -15,6 +15,9 @@ import { WidgetStreamsDirective } from '../../core/directives/widget-streams.dir
 import { SignalkRequestsService } from '../../core/services/signalk-requests.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { SoundService } from '../../core/services/sound.service';
+import { DataService } from '../../core/services/data.service';
+import { GnssAntennaService } from '../../core/services/gnss-antenna.service';
+import { bowPosition, positionOffsets } from '../../core/utils/bow-position.util';
 import type { IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
@@ -66,6 +69,8 @@ export class WidgetRacerLineViewComponent {
   private readonly streams = inject(WidgetStreamsDirective);
   private readonly signalk = inject(SignalkRequestsService);
   private readonly sound = inject(SoundService);
+  private readonly data = inject(DataService);
+  private readonly gnss = inject(GnssAntennaService);
   protected readonly dashboard = inject(DashboardService);
 
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -126,6 +131,7 @@ export class WidgetRacerLineViewComponent {
       // through. These three take a path and a source of their own to override that; the
       // plugin's paths below have a single publisher and are hidden from the settings.
       positionPath: {
+        // Not necessarily the bow: the widget moves it there - see bow.
         description: 'Position of the vessel',
         path: 'self.navigation.position',
         source: 'default', pathType: 'object', pathRequired: false, isPathConfigurable: true,
@@ -242,6 +248,24 @@ export class WidgetRacerLineViewComponent {
         pathSkUnitsFilter: 'm',
         enableTimeout: false
       },
+      // Where the GPS is on the hull, for working out the bow when the server's GNSS
+      // configuration does not say - see bow.
+      gpsFromBowPath: {
+        description: 'Distance of the GPS antenna aft of the bow',
+        path: 'self.sensors.gps.fromBow',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
+        convertUnitTo: 'm', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm',
+        enableTimeout: false
+      },
+      gpsFromCenterPath: {
+        description: 'Distance of the GPS antenna from the centreline, positive to starboard',
+        path: 'self.sensors.gps.fromCenter',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false, hideFromConfig: true,
+        convertUnitTo: 'm', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm',
+        enableTimeout: false
+      },
       effectiveVmgToLinePath: {
         // What the plugin's time to line actually divides the perpendicular leg by:
         // the collected best, or the VMG being sailed now if that is better. Published
@@ -314,7 +338,39 @@ export class WidgetRacerLineViewComponent {
   private readonly ttb = signal<number | null>(null);
   protected readonly timeToLine = this.ttl.asReadonly();
   protected readonly timeToBurn = this.ttb.asReadonly();
-  protected readonly viewData = this.view.asReadonly();
+
+  /** The position as received, and the `$source` it came from; the view carries the bow instead. */
+  private readonly fix = signal<{ lat: number | null; lon: number | null; source: string | null }>(
+    { lat: null, lon: null, source: null });
+  private readonly gpsFromBow = signal<number | null>(null);
+  private readonly gpsFromCenter = signal<number | null>(null);
+
+  /**
+   * The bow, which the drawing takes the vessel's position to be.
+   *
+   * signalk-racer measures every distance to the line from the bow, and since server 2.31
+   * `navigation.position` may be the antenna or the server's midships reference point, so the
+   * bow is worked out exactly as racer does it (see bow-position.util.ts): otherwise the drawn
+   * boat and racer's numbers disagree by metres.
+   */
+  private readonly bow = computed<{ lat: number | null; lon: number | null }>(() => {
+    const { lat, lon, source } = this.fix();
+    if (lat == null || lon == null) return { lat, lon };
+    const d = this.view();
+    const offsets = positionOffsets({
+      source,
+      length: d.boatLength,
+      gnss: this.gnss.config(),
+      serverVersion: this.gnss.serverVersion(),
+      canonical: ref => this.gnss.canonical(ref),
+      gpsFromBow: this.gpsFromBow(),
+      gpsFromCenter: this.gpsFromCenter()
+    });
+    const bow = bowPosition(lat, lon, d.heading ?? d.cog, offsets);
+    return { lat: bow.latitude, lon: bow.longitude };
+  });
+
+  protected readonly viewData = computed<IRacerLineViewData>(() => ({ ...this.view(), ...this.bow() }));
 
   protected readonly palette = signal<{ color: string; dim: string; dimmer: string }>(
     { color: 'var(--skip-contrast-color)', dim: 'var(--skip-contrast-dim-color)',
@@ -530,6 +586,21 @@ export class WidgetRacerLineViewComponent {
     }
   }
 
+  /**
+   * The `$source` of the position just received: the configured one, or for the default
+   * source the one whose update is the latest - the streams do not carry it.
+   */
+  private positionSource(): string | null {
+    const config = this.pathsRecord['positionPath'];
+    if (!config?.path) return null;
+    if (config.source && config.source !== 'default') return config.source;
+    const item = this.data.getPathObject(config.path);
+    if (!item) return null;
+    const latest = Object.entries(item.sources)
+      .find(([, s]) => s.sourceTimestamp === item.pathTimestamp);
+    return latest?.[0] ?? item.defaultSource ?? null;
+  }
+
   constructor() {
     effect(() => {
       const cfg = this.runtime.options() ?? WidgetRacerLineViewComponent.DEFAULT_CONFIG;
@@ -571,8 +642,10 @@ export class WidgetRacerLineViewComponent {
       this.view.update(d => ({ ...d, portLat: pos?.latitude ?? null, portLon: pos?.longitude ?? null })));
     position('stbPath', (pos) =>
       this.view.update(d => ({ ...d, stbLat: pos?.latitude ?? null, stbLon: pos?.longitude ?? null })));
-    position('positionPath', (pos, at) =>
-      this.view.update(d => ({ ...d, lat: pos?.latitude ?? null, lon: pos?.longitude ?? null, fixTime: at })));
+    position('positionPath', (pos, at) => {
+      this.fix.set({ lat: pos?.latitude ?? null, lon: pos?.longitude ?? null, source: this.positionSource() });
+      this.view.update(d => ({ ...d, fixTime: at }));
+    });
     num('headingPath', v => this.view.update(d => ({ ...d, heading: v })));
     num('cogPath', v => this.view.update(d => ({ ...d, cog: v })));
     num('twdPath', v => this.view.update(d => ({ ...d, twd: v })));
@@ -591,6 +664,9 @@ export class WidgetRacerLineViewComponent {
     num('ttlPath', v => this.ttl.set(v));
     num('ttbPath', v => this.ttb.set(v));
     num('boatLengthPath', v => this.view.update(d => ({ ...d, boatLength: v })));
+    num('gpsFromBowPath', v => this.gpsFromBow.set(v));
+    num('gpsFromCenterPath', v => this.gpsFromCenter.set(v));
+    this.gnss.ensureStarted();
     num('effectiveVmgToLinePath', v => this.view.update(d => ({ ...d, effVmgToLine: v })));
     num('effectiveVmgAlongLinePath', v => this.view.update(d => ({ ...d, effVmgAlongLine: v })));
     // The collected bests still matter: they are the fallback the drawing derives its
