@@ -39,7 +39,7 @@ export class WidgetRuntimeDirective {
     if (base && user) {
       merged = merge(cloneDeep(base), cloneDeep(user));
       restoreFixedPaths(merged, base);
-      restoreSlotPresentation(merged, base);
+      restorePathPresentation(merged, base);
       dropRetiredWiring(merged, base);
     } else if (base && !user) {
       merged = cloneDeep(base);
@@ -139,11 +139,16 @@ function restoreFixedPaths(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): vo
  * These flags decide what the options dialog shows for a path. They belong to the widget,
  * not the user, so the widget's current definition must win over any copy in a saved config.
  */
-function restoreSlotPresentation(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): void {
+function restorePathPresentation(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): void {
   if (!merged.paths || !base.paths) return;
   for (const [key, basePath] of Object.entries(base.paths)) {
     const mergedPath = merged.paths[key];
     if (!basePath || !mergedPath) continue;
+    // The defaults' combination is copied whatever it is; what each one means for the path:
+    //   configurable, shown:     user picks path and source - the saved choices stand.
+    //   fixed, shown:            path from the defaults (restoreFixedPaths), source still the user's.
+    //   fixed, hidden:           internal wiring - path from the defaults, nothing in the dialog.
+    //   configurable, hidden:    not meaningful - saved path kept but nothing to edit it with.
     mergedPath.isPathConfigurable = basePath.isPathConfigurable;
     if (basePath.hideFromConfig === undefined) delete mergedPath.hideFromConfig;
     else mergedPath.hideFromConfig = basePath.hideFromConfig;
