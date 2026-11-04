@@ -63,9 +63,10 @@ describe('GnssAntennaService', () => {
     http.expectOne(SOURCES_URL).flush({ n2k: { label: 'n2k', 0: { n2k: { canName: 'c1' } } } });
     expect(service.canonical('n2k.0')).toBe('n2k.c1');
     vi.advanceTimersByTime(GNSS_POLL_INTERVAL_MS);
-    http.expectOne(GNSS_URL).flush(config);
+    const changed = { ...config, correction: 'off', status: { mode: 'off', active: false } };
+    http.expectOne(GNSS_URL).flush(changed);
     http.expectOne(SOURCES_URL).flush('error', { status: 500, statusText: 'Server Error' });
-    expect(service.config()).toEqual(config);
+    expect(service.config()).toEqual(changed);
     expect(service.canonical('n2k.0')).toBe('n2k.0');
   });
 });

@@ -207,4 +207,6 @@
       }
     </svg>
   </div>
+  <!-- Always present, so a screen reader is already watching it when a ping's state changes. -->
+  <div class="end-announcement" aria-live="polite" aria-atomic="true">{{ endAnnouncement() }}</div>
 </div>

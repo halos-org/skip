@@ -1212,6 +1212,15 @@ describe('WidgetRacerLineViewComponent', () => {
         expect(target('stb').getAttribute('aria-busy')).toBeNull();
       });
 
+      it('announces the ping through a live region that is there before it starts', () => {
+        const region = () => host().querySelector('.end-announcement[aria-live="polite"]');
+        expect(region()?.textContent?.trim()).toBe('');
+        ping('port');
+        expect(region()?.textContent?.trim()).toBe('Port end setting');
+        reply('req-1', 200);
+        expect(region()?.textContent?.trim()).toBe('Port end set');
+      });
+
       it('fails at once a ping that could not be sent', () => {
         requestsMock.putRequest.mockReturnValueOnce(null);
         ping('port');

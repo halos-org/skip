@@ -45,6 +45,8 @@ export type TLineEnd = 'port' | 'stb';
  */
 export type TEndFeedback = 'idle' | 'pending' | 'ok' | 'error';
 
+const END_SPOKEN: Record<TLineEnd, string> = { port: 'Port end', stb: 'Starboard end' };
+
 const END_FEEDBACK_SPOKEN: Record<Exclude<TEndFeedback, 'idle'>, string> = {
   pending: 'setting',
   ok: 'set',
@@ -295,6 +297,18 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   protected endLabel(title: string, feedback: TEndFeedback): string {
     return feedback === 'idle' ? title : `${title}: ${END_FEEDBACK_SPOKEN[feedback]}`;
   }
+
+  /**
+   * The same states, for the live region: a screen reader does not reliably announce a
+   * change to the name of the element that already has focus, and the reply comes later.
+   */
+  protected readonly endAnnouncement = computed<string>(() => {
+    const feedback = this.endFeedback();
+    return (['port', 'stb'] as const)
+      .filter(end => feedback[end] !== 'idle')
+      .map(end => `${END_SPOKEN[end]} ${END_FEEDBACK_SPOKEN[feedback[end] as Exclude<TEndFeedback, 'idle'>]}`)
+      .join('. ');
+  });
   /** Everything else a control in the drawing asks for. */
   public action = output<TLineViewAction>();
   /** The named lines the plugin knows, the one in use, and the one being browsed. */

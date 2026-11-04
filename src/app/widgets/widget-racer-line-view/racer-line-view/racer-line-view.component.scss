@@ -253,6 +253,16 @@
   50% { fill-opacity: 0.1; }
 }
 
+// Read out, not shown.
+.end-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 // Without the motion the states stay apart: pending is still dashed, and failed still
 // has its heavy outline.
 @media (prefers-reduced-motion: reduce) {
