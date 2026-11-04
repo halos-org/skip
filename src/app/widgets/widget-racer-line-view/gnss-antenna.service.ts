@@ -2,9 +2,9 @@ import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, map, of, switchMap, timeout, timer } from 'rxjs';
-import { SignalKConnectionService } from './signalk-connection.service';
-import { resolveSignalKV2ApiBaseUrl } from '../utils/signalk-plugin-url.util';
-import { canonicalSourceMap, IGnssConfig } from '../utils/bow-position.util';
+import { SignalKConnectionService } from '../../core/services/signalk-connection.service';
+import { resolveSignalKV2ApiBaseUrl } from '../../core/utils/signalk-plugin-url.util';
+import { canonicalSourceMap, IGnssConfig } from './bow-position.util';
 
 /** How often the configuration is read again: `status.active` changes when the heading drops out. */
 export const GNSS_POLL_INTERVAL_MS = 30_000;

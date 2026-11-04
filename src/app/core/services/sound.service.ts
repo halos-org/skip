@@ -96,8 +96,7 @@ export class SoundService {
    * schedules it on the context's own clock, so a run of tones keeps its rhythm.
    *
    * Never throws: a tone is a courtesy, and audio is blocked often enough - autoplay
-   * policy, no output device, a sandboxed embed - that it must not take down the caller,
-   * which is often a PUT-result handler whose outcome a throw would swallow.
+   * policy, no output device, a sandboxed embed - that it must not take down the caller.
    */
   playTone(frequency: number, durationMs: number, gain = 0.1, delayMs = 0): void {
     try {

@@ -3,7 +3,7 @@ import { HttpTestingController } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 import { GNSS_POLL_INTERVAL_MS, GnssAntennaService } from './gnss-antenna.service';
-import { SignalKConnectionService } from './signalk-connection.service';
+import { SignalKConnectionService } from '../../core/services/signalk-connection.service';
 
 describe('GnssAntennaService', () => {
   const GNSS_URL = 'http://boat/signalk/v2/api/vessels/self/sensors/gnss';

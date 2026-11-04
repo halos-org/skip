@@ -16,8 +16,8 @@ import { SignalkRequestsService } from '../../core/services/signalk-requests.ser
 import { DashboardService } from '../../core/services/dashboard.service';
 import { SoundService } from '../../core/services/sound.service';
 import { DataService } from '../../core/services/data.service';
-import { GnssAntennaService } from '../../core/services/gnss-antenna.service';
-import { bowPosition, positionOffsets } from '../../core/utils/bow-position.util';
+import { GnssAntennaService } from './gnss-antenna.service';
+import { bowPosition, positionOffsets } from './bow-position.util';
 import type { IWidgetPath, IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
 import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
@@ -543,9 +543,7 @@ export class WidgetRacerLineViewComponent {
 
   private settleRequest(requestId: string, statusCode: number | null): void {
     for (const end of ['port', 'stb'] as const) {
-      // A 304 is the plugin finding the end already where it was asked to go - a second
-      // press before the boat has moved - so it is as much a success as a 200.
-      if (this.endRequest[end] === requestId) this.settleEnd(end, statusCode === 200 || statusCode === 304);
+      if (this.endRequest[end] === requestId) this.settleEnd(end, statusCode === 200);
     }
     this.settleLineName(requestId, statusCode);
   }
