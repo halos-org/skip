@@ -1123,6 +1123,18 @@ describe('WidgetRacerLineViewComponent', () => {
         expect(state('port')).toEqual([]);
       });
 
+      it('takes a press again during the feedback, and a 304 for an unmoved boat as success', () => {
+        ping('port');
+        reply('req-1', 200);
+        requestsMock.putRequest.mockReturnValueOnce('req-2');
+        ping('port');
+        expect(state('port')).toEqual(['pending']);
+        reply('req-2', 304);
+        expect(state('port')).toEqual(['ok']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+        expect(soundMock.playTone.mock.calls.every(([f]) => (f as number) > 440)).toBe(true);
+      });
+
       it('turns to failure and sounds twice, low, on anything else', () => {
         ping('stb');
         reply('req-1', 403);

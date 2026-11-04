@@ -10,6 +10,7 @@ import { ToastService } from './toast.service';
 const deltaStatusCodes: Record<number, string> = {
   200: "The request was successful.",
   202: "Request accepted and pending completion.",
+  304: "Nothing to change: already as requested.",
   400: "Something is wrong with the client's request.",
   401: "Login failed. Your User ID or Password is incorrect.",
   403: "DENIED: Authorization with R/W or Admin permission level is required to send commands. Configure Sign In credential.",
@@ -19,7 +20,8 @@ const deltaStatusCodes: Record<number, string> = {
   504: "Timeout on the server side trying to carry out the request."
 }
 // Codes dispatched as recognized responses; anything else raises the unknown-status error toast.
-const handledStatusCodes = new Set([200, 202, 400, 401, 403, 405, 500, 502, 504]);
+// 304 is a request that changed nothing because nothing needed changing: dispatched quietly.
+const handledStatusCodes = new Set([200, 202, 304, 400, 401, 403, 405, 500, 502, 504]);
 // Server-side failures surfaced to the user as an error toast carrying their description.
 const serverErrorStatusCodes = new Set([500, 502, 504]);
 export interface skRequest {

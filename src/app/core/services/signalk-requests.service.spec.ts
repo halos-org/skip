@@ -160,6 +160,18 @@ describe('SignalkRequestsService', () => {
     expect(received[0].statusCodeDescription).toBe('Something went wrong carrying out the request on the server.');
   });
 
+  it('dispatches a 304 quietly: nothing needed changing', () => {
+    const received: skRequest[] = [];
+    service.subscribeRequest().subscribe(r => received.push(r));
+
+    const requestId = service.putRequest('navigation.racing.setStartLine', { end: 'port' }, 'widget-1')!;
+    requestUpdates$.next({ requestId, state: 'COMPLETED', statusCode: 304, message: 'unchanged line end' });
+
+    expect(toastShow).not.toHaveBeenCalled();
+    expect(received).toHaveLength(1);
+    expect(received[0].statusCode).toBe(304);
+  });
+
   it('reports a truly unknown status code as unknown yet still dispatches it', () => {
     const received: skRequest[] = [];
     service.subscribeRequest().subscribe(r => received.push(r));

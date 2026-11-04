@@ -543,7 +543,9 @@ export class WidgetRacerLineViewComponent {
 
   private settleRequest(requestId: string, statusCode: number | null): void {
     for (const end of ['port', 'stb'] as const) {
-      if (this.endRequest[end] === requestId) this.settleEnd(end, statusCode === 200);
+      // A 304 is the plugin finding the end already where it was asked to go - a second
+      // press before the boat has moved - so it is as much a success as a 200.
+      if (this.endRequest[end] === requestId) this.settleEnd(end, statusCode === 200 || statusCode === 304);
     }
     this.settleLineName(requestId, statusCode);
   }
