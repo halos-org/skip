@@ -255,6 +255,8 @@ interface IScene {
   editEnds: {
     port: { x: number; y: number; size: number; rx: number; title: string };
     stb: { x: number; y: number; size: number; rx: number; title: string };
+    /** Shown but not pressable: with no line in use, a ping would bring one back unasked. */
+    disabled: boolean;
   } | null;
   /** Every control in this mode: the mode button, and whatever the mode itself offers. */
   controls: ISceneButton[];
@@ -562,7 +564,7 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // to draw something to press.
     if (!geo) return this.editing() || !this.lineActive() ? this.placeholderScene() : null;
 
-    const W = this.vbWidth(), margin = this.VB_MARGIN;
+    const W = this.vbWidth();
     // The band the drawing gets: below the title, with room above the line kept clear
     // for the length and heading label that sits there.
     const yMin = this.bandYMin();
@@ -582,13 +584,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     if (editMode) {
       // Working on the line is about hitting the right end, not about where the boat
       // lies, so the line takes the full width and nothing else is drawn. The ends are
-      // held clear of the sides by whatever sits around them: a touch target on the
-      // setting screen, a ring of adjust buttons on the other.
-      const inset = this.mode() === 2
-        ? Math.max(ctrl * 1.55, this.END_SIZE_MAX * 0.54 + ctrl) + 4
-        : this.mode() === 3
-          ? Math.max(margin, this.END_SIZE_MAX * 0.54)
-          : Math.max(margin, targetRadius) * 1.3;
+      // held clear of the sides by whatever sits around them - see editInset.
+      const inset = this.editInset(ctrl, targetRadius);
       scale = (W - 2 * inset) / Math.max(geo.length, 1);
       sx = (a: number) => W / 2 - (a - geo.length / 2) * scale;
       const editY = this.editLineY(ctrl, targetRadius);
@@ -665,7 +662,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
       const size = targetRadius * 2, rx = this.controlRadius(size);
       scene.editEnds = {
         port: { x: portX, y: lineY, size, rx, title: 'Set the port (pin) end here' },
-        stb: { x: stbX, y: lineY, size, rx, title: 'Set the starboard (boat) end here' }
+        stb: { x: stbX, y: lineY, size, rx, title: 'Set the starboard (boat) end here' },
+        disabled: false
       };
       this.buildLinePicker(scene, W, lineY, ctrl, Math.abs(stbX - portX));
     } else if (this.mode() === 3) {
@@ -732,6 +730,20 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
       ? Math.max(ctrl * 1.45, this.END_SIZE_MAX * 0.42 + ctrl)
       : targetRadius;
     return Math.max(this.VB_HEIGHT * 0.3, this.VB_TOP_BAND + 4 + clearance);
+  }
+
+  /**
+   * How far the ends sit in from the sides while the line is being worked on: clear of
+   * whatever sits around them, a touch target on the setting screen, a ring of adjust
+   * buttons on the next. Shared with the placeholder, so a line coming or going does not
+   * move the ends - or the targets on them - under the finger.
+   */
+  private editInset(ctrl: number, targetRadius: number): number {
+    return this.mode() === 2
+      ? Math.max(ctrl * 1.55, this.END_SIZE_MAX * 0.54 + ctrl) + 4
+      : this.mode() === 3
+        ? Math.max(this.VB_MARGIN, this.END_SIZE_MAX * 0.54)
+        : Math.max(this.VB_MARGIN, targetRadius) * 1.3;
   }
 
   /**
@@ -1139,15 +1151,14 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
    */
   private placeholderScene(): IScene {
     const W = this.vbWidth();
-    // The same targets edit mode uses on a real line, at the same inset: a target centred
+    // The same targets edit mode uses on a real line, at the same place: a target centred
     // on an end runs a radius past it and has to stay in frame.
     const radius = Math.min(W, this.VB_HEIGHT) * 0.11;
-    const lineY = this.editLineY(this.controlSize(W), radius);
-    const inset = Math.max(this.VB_MARGIN, radius);
+    const ctrl = this.controlSize(W);
+    const lineY = this.editLineY(ctrl, radius);
+    const inset = this.editInset(ctrl, radius);
     // Port (pin) to the left and starboard (committee boat) to the right, as ever.
     const portX = inset, stbX = W - inset;
-
-    const ctrl = this.controlSize(W);
 
     const scene: IScene = {
       portX, stbX, lineY,
@@ -1170,7 +1181,9 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
         stb: {
           x: stbX, y: lineY, size: radius * 2, rx: this.controlRadius(radius * 2),
           title: 'Set the starboard (boat) end here'
-        }
+        },
+        // An unset line in use is set by pinging its ends; one not in use is chosen first.
+        disabled: !this.lineActive()
       }
     };
     // With no line drawn, the picker is the way to bring one back.

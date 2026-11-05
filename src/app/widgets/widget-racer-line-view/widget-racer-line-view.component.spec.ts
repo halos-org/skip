@@ -1274,6 +1274,31 @@ describe('WidgetRacerLineViewComponent', () => {
       expect(control('Use the Default line'), 'no button for the browsed line').toBeTruthy();
     });
 
+    /**
+     * A line coming or going must not move the ends, or the targets on them, from under
+     * the finger: the placeholder puts them where a real line would be.
+     */
+    it('keeps the ends where they are whether or not there is a line', () => {
+      // To the hundredth of a unit: the two are worked out along different float paths.
+      const at = (...v: (string | null)[]) => v.map(n => Number(n).toFixed(2));
+      const ends = () => [...svg()!.querySelectorAll('.end-target')]
+        .map(t => at(t.getAttribute('x'), t.getAttribute('y')));
+      for (const m of [1, 2] as const) {
+        setMode(m);
+        const unset = ends();
+        aLine(0.00035, 0.00030);
+        if (m === 1) expect(ends(), 'the targets moved').toEqual(unset);
+        const line = svg()!.querySelector('.start-line:not(.undefined)')!;
+        const placeholder = () => svg()!.querySelector('.start-line.undefined');
+        expect(placeholder()).toBeNull();
+        const drawn = at(line.getAttribute('x1'), line.getAttribute('x2'));
+        feeds.get('lineLengthPath')?.({ data: { value: null } });
+        fixture.detectChanges();
+        expect(at(placeholder()!.getAttribute('x1'), placeholder()!.getAttribute('x2')),
+          `the line changed length on screen ${m}`).toEqual(drawn);
+      }
+    });
+
     /** A line in use with no ends is said in the one spot under the line, not named as well. */
     it('says an unset line under the line, in place of its name', () => {
       setMode(1);
@@ -1433,12 +1458,18 @@ describe('WidgetRacerLineViewComponent', () => {
         expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeTruthy();
       });
 
-      it('keeps the ends and the picker to press with no line drawn', () => {
+      it('keeps the picker but not the ends to press with no line drawn', () => {
         aLine(0.00035, 0.00030);
         linesFeed(false);
         setMode(1);
         expect(lineName()).toBe('No line');
-        expect(svg()?.querySelectorAll('.end-target')).toHaveLength(2);
+        // Shown, so the screen keeps its shape, but a ping would bring a line back unasked.
+        const targets = [...svg()!.querySelectorAll<SVGElement>('.end-target')];
+        expect(targets).toHaveLength(2);
+        expect(targets.every(t => t.getAttribute('aria-disabled') === 'true')).toBe(true);
+        targets[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(requestsMock.putRequest).not.toHaveBeenCalledWith(
+          'navigation.racing.setStartLine', expect.anything(), expect.anything());
         expect(control('Use the Race 1 line')).toBeTruthy();
         // Nothing that acts on the line itself.
         setMode(2);

@@ -197,16 +197,18 @@ describe('WidgetRacerLineComponent', () => {
       'navigation.racing.setStartLineName', { active: false }, 'racer-line-test');
   });
 
-  it('offers no adjustments while no line is in use', () => {
+  // Setting an end would bring the line back unasked, so it is chosen first.
+  it('offers no adjustments or end setting while no line is in use', () => {
     feed('lineActivePath', false);
+    setMode(1);
+    const ends = [...host().querySelectorAll<HTMLButtonElement>('button')].filter(b => /End$/.test(b.textContent?.trim() ?? ''));
+    expect(ends).toHaveLength(2);
+    expect(ends.every(b => b.disabled), 'an end can be set with no line in use').toBe(true);
     for (const mode of [2, 3]) {
       setMode(mode);
       const adjust = [...host().querySelectorAll<HTMLButtonElement>('button')].filter(b => b.classList.contains('port-button') || b.classList.contains('starboard-button'));
       expect(adjust).toHaveLength(4);
       expect(adjust.every(b => b.disabled), `mode ${mode} adjusts a line not in use`).toBe(true);
     }
-    // Setting an end brings the line back, so those stay.
-    setMode(1);
-    expect([...host().querySelectorAll<HTMLButtonElement>('button')].every(b => !b.disabled)).toBe(true);
   });
 });

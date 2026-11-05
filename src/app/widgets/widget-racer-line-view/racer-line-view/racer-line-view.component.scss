@@ -234,6 +234,13 @@
     animation: end-ping-error 0.5s steps(1, end) 6;
   }
 
+  // Shown so the screen keeps its shape, but plainly not something to press.
+  &.disabled {
+    cursor: default;
+    fill: var(--skip-grey-color);
+    fill-opacity: 0.15;
+  }
+
   // As with the controls: reachable and operable from the keyboard, but with no ring
   // left behind on the one last pressed.
   &:focus,

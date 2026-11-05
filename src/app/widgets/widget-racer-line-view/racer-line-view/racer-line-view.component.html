@@ -142,30 +142,32 @@
         <!-- Setting an end: a target over each, larger than the mark it covers, so the
              end can be hit even when the drawn mark is small. -->
         @if (s.editEnds; as ends) {
-          <rect class="end-target port"
+          <rect class="end-target port" [class.disabled]="ends.disabled"
             [class.pending]="endFeedback().port === 'pending'"
             [class.ok]="endFeedback().port === 'ok'"
             [class.error]="endFeedback().port === 'error'"
             [attr.x]="ends.port.x - ends.port.size / 2" [attr.y]="ends.port.y - ends.port.size / 2"
             [attr.width]="ends.port.size" [attr.height]="ends.port.size" [attr.rx]="ends.port.rx"
-            role="button" tabindex="0" [attr.aria-label]="endLabel(ends.port.title, endFeedback().port)"
+            role="button" [attr.tabindex]="ends.disabled ? -1 : 0" [attr.aria-disabled]="ends.disabled || null"
+            [attr.aria-label]="endLabel(ends.port.title, endFeedback().port)"
             [attr.aria-busy]="endFeedback().port === 'pending' ? 'true' : null"
-            (click)="endPressed.emit('port')"
-            (keydown.enter)="endPressed.emit('port')"
-            (keydown.space)="endPressed.emit('port')">
+            (click)="ends.disabled || endPressed.emit('port')"
+            (keydown.enter)="ends.disabled || endPressed.emit('port')"
+            (keydown.space)="ends.disabled || endPressed.emit('port')">
             <title>{{ ends.port.title }}</title>
           </rect>
-          <rect class="end-target stb"
+          <rect class="end-target stb" [class.disabled]="ends.disabled"
             [class.pending]="endFeedback().stb === 'pending'"
             [class.ok]="endFeedback().stb === 'ok'"
             [class.error]="endFeedback().stb === 'error'"
             [attr.x]="ends.stb.x - ends.stb.size / 2" [attr.y]="ends.stb.y - ends.stb.size / 2"
             [attr.width]="ends.stb.size" [attr.height]="ends.stb.size" [attr.rx]="ends.stb.rx"
-            role="button" tabindex="0" [attr.aria-label]="endLabel(ends.stb.title, endFeedback().stb)"
+            role="button" [attr.tabindex]="ends.disabled ? -1 : 0" [attr.aria-disabled]="ends.disabled || null"
+            [attr.aria-label]="endLabel(ends.stb.title, endFeedback().stb)"
             [attr.aria-busy]="endFeedback().stb === 'pending' ? 'true' : null"
-            (click)="endPressed.emit('stb')"
-            (keydown.enter)="endPressed.emit('stb')"
-            (keydown.space)="endPressed.emit('stb')">
+            (click)="ends.disabled || endPressed.emit('stb')"
+            (keydown.enter)="ends.disabled || endPressed.emit('stb')"
+            (keydown.space)="ends.disabled || endPressed.emit('stb')">
             <title>{{ ends.stb.title }}</title>
           </rect>
         }

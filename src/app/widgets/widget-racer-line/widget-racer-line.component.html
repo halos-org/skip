@@ -12,9 +12,9 @@
         <div class="boat-container"><span class="label label-bias boat">{{ stbBiasValue() }}</span></div>
       }
       @case (1) {
-        <button mat-flat-button class="button port-button" matTooltip="Set the port(pin) end of the line to the current position"
+        <button mat-flat-button [disabled]="!lineActive()" class="button port-button" matTooltip="Set the port(pin) end of the line to the current position"
           (click)="setLineEnd('port')"><span class="label label-wide">Port End</span></button>
-        <button mat-flat-button class="button starboard-button" matTooltip="Set the starboard(boat) end of the line to the current position"
+        <button mat-flat-button [disabled]="!lineActive()" class="button starboard-button" matTooltip="Set the starboard(boat) end of the line to the current position"
           (click)="setLineEnd('stb')"><span class="label label-wide">Stbd End</span></button>
       }
       @case (2) {
