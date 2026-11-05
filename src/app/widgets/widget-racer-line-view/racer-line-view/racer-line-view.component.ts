@@ -192,6 +192,8 @@ interface ISceneButton {
   action: TLineViewAction;
   /** Accent fill - the mode button, and a line name that can be selected. */
   accent: boolean;
+  /** A toggle that is on: the line in use, whose press stops using it. */
+  pressed?: boolean;
 }
 
 /**
@@ -315,6 +317,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   public lines = input<string[]>(['Default']);
   public currentLine = input<string>('Default');
   public browsedLine = input<string>('Default');
+  /** Whether the current line is in use; one that is not is drawn as no line at all. */
+  public lineActive = input<boolean>(true);
   /** Countdowns to show in the corner; null hides that one. */
   public timeToLine = input<number | null>(null);
   public timeToBurn = input<number | null>(null);
@@ -544,7 +548,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // The plugin nulls the length when the line is lost, while the end positions keep
     // their last published latitude/longitude, so the length is what says there is a
     // line. Only its presence is used - the drawing measures the line itself.
-    this.lineLength() == null ? null : lineGeometry(
+    // A line not in use is published as nulls, but the drawing does not wait for them.
+    !this.lineActive() || this.lineLength() == null ? null : lineGeometry(
       this.latLon(this.portLat(), this.portLon()),
       this.latLon(this.stbLat(), this.stbLon()),
       this.latLon(this.lat(), this.lon())
@@ -553,8 +558,9 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   /** The whole drawing, in viewBox units. Null when there is no line to draw. */
   protected readonly scene = computed<IScene | null>(() => {
     const geo = this.geometry();
-    // Watching an unset line draws nothing; editing one has to draw something to press.
-    if (!geo) return this.editing() ? this.placeholderScene() : null;
+    // Watching an unset line draws nothing, and one not in use says so; editing either has
+    // to draw something to press.
+    if (!geo) return this.editing() || !this.lineActive() ? this.placeholderScene() : null;
 
     const W = this.vbWidth(), margin = this.VB_MARGIN;
     // The band the drawing gets: below the title, with room above the line kept clear
@@ -777,14 +783,14 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   /**
    * Browse the named lines the plugin knows, under the line itself.
    *
-   * The line in use is a label, because pressing it would do nothing; any other is a
-   * button, because pressing it is how you switch to it. So the control says what it
-   * will do by whether it looks pressable, and the row does not change size as you
-   * step through the names.
+   * Every name is a button. Any line but the one in use is an accent one, because
+   * pressing it is how you switch to it; the line in use is a toggle shown on, because
+   * pressing it stops using it - and then it is an accent one again, to use it once
+   * more. The row does not change size as you step through the names.
    */
   private buildLinePicker(scene: IScene, W: number, lineY: number, ctrl: number,
     lineWidth: number): void {
-    const isCurrent = this.browsedLine() === this.currentLine();
+    const inUse = this.lineActive() && this.browsedLine() === this.currentLine();
     // Sized for the longest name there is, so stepping through them does not walk the
     // prev and next buttons along the screen under the finger pressing them.
     const longest = this.lines().reduce((a, b) => (b.length > a.length ? b : a), '');
@@ -820,16 +826,13 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
       title: 'Show the next named line', action: { kind: 'browse', step: 1 }, accent: false
     });
 
-    if (isCurrent) {
-      scene.nameLabel = { x: W / 2, y: y + font * 0.35, text: name, fontSize: font };
-    } else {
-      scene.controls.push({
-        x: W / 2, y, w: nameW, h: ctrl, rx: this.controlRadius(ctrl),
-        glyph: null, text: name, fontSize: font,
-        // The title carries the whole name even when the button cannot show it.
-        title: `Use the ${full} line`, action: { kind: 'choose' }, accent: true
-      });
-    }
+    scene.controls.push({
+      x: W / 2, y, w: nameW, h: ctrl, rx: this.controlRadius(ctrl),
+      glyph: null, text: name, fontSize: font,
+      // The title carries the whole name even when the button cannot show it.
+      title: inUse ? `Stop using the ${full} line` : `Use the ${full} line`,
+      action: { kind: 'choose' }, accent: !inUse, pressed: inUse
+    });
   }
 
   /** A name cut to fit, with an ellipsis standing for what was taken off. */
@@ -1114,6 +1117,9 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
    * either waypoint is missing it publishes startLinePort, startLineStb and the length
    * as null as a set, so an end that does exist is indistinguishable from one that does
    * not; the scene keeps the flags per end for a plugin that one day distinguishes them.
+   *
+   * A line not in use is drawn the same way while watching, labelled 'No line' and with
+   * nothing to press, so it reads as switched off rather than as the widget being blank.
    */
   private placeholderScene(): IScene {
     const W = this.vbWidth();
@@ -1125,10 +1131,10 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // Port (pin) to the left and starboard (committee boat) to the right, as ever.
     const portX = inset, stbX = W - inset;
 
-    const label = 'Line not set';
+    const label = this.lineActive() ? 'Line not set' : 'No line';
     const font = Math.min(this.LABEL_FONT, (W - 8) / (label.length * 0.51));
 
-    return {
+    const scene: IScene = {
       portX, stbX, lineY,
       ends: this.buildEnds(stbX, lineY, (stbX - portX) / this.PLACEHOLDER_METRES),
       labelVisible: true,
@@ -1137,7 +1143,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
       label, labelX: W / 2, labelY: lineY - font * 0.5, labelFont: font,
       projections: [], boat: null, guides: [], legs: [], gun: null, wind: null,
       controls: [], nameLabel: null, vmgPad: null,
-      editEnds: {
+      // Pressable only on a screen that edits: watching, there is nothing to press.
+      editEnds: !this.editing() ? null : {
         port: {
           x: portX, y: lineY, size: radius * 2, rx: this.controlRadius(radius * 2),
           title: 'Set the port (pin) end here'
@@ -1148,6 +1155,9 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
         }
       }
     };
+    // With no line drawn, the picker is the way to bring one back.
+    if (this.mode() === 1) this.buildLinePicker(scene, W, lineY, this.controlSize(W), stbX - portX);
+    return scene;
   }
 
   /**

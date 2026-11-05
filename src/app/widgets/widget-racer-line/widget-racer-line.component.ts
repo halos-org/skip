@@ -134,6 +134,19 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null
       },
+      // And '/active': whether the current line is in use. A plugin before 1.3.9 does not
+      // publish it, and its line is always in use.
+      lineActivePath: {
+        description: 'Whether the current named start line is in use',
+        path: 'self.navigation.racing.lines',
+        source: 'default',
+        pathType: 'object',
+        pathRequired: false,
+        isPathConfigurable: false,
+        enableTimeout: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null
+      },
       ttlPath: {
         description: 'Time to sail to the start line in seconds',
         path: 'self.navigation.racing.timeToLine',
@@ -194,6 +207,8 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private displayLineIndex = 0;
   private lines: string[] = [];
   private startLineName: string | null = null;
+  /** Whether the current line is in use; the adjustments need one. */
+  protected lineActive = signal<boolean>(true);
   protected portBiasValue = signal<string>('');
   protected lineLengthValue = signal<string>('');
   protected stbBiasValue = signal<string>('');
@@ -267,6 +282,16 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         }
         this.draw();
       }, '/startLineName'));
+    });
+
+    // Observe whether the line is in use
+    effect(() => {
+      const cfg = this.runtime.options(); if (!cfg) return;
+      const pathCfg = (cfg.paths as IPathArray | undefined)?.['lineActivePath'];
+      if (!pathCfg?.path) return;
+      untracked(() => this.streams.observe('lineActivePath', pkt => {
+        this.lineActive.set(pkt?.data?.value !== false);
+      }, '/active'));
     });
 
     // Observe lines
@@ -402,15 +427,17 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     return this.lines[this.displayLineIndex] || 'Default';
   }
 
+  /** Whether the displayed line is the one in use: selected, and not stopped. */
   public isDisplayLineCurrent(): boolean {
-    return this.getDisplayLineName() === (this.startLineName || 'Default');
+    return this.lineActive() && this.getDisplayLineName() === (this.startLineName || 'Default');
   }
 
+  /** Use the named line; the one in use is a toggle, and pressing it stops using it. */
   public setStartLine(name: string) {
     const startLineName = (name === 'Default' || !name) ? null : name;
     this.signalk.putRequest(
       'navigation.racing.setStartLineName',
-      { startLineName },
+      this.isDisplayLineCurrent() ? { active: false } : { startLineName },
       this.id()
     );
     this.mode.set(0);

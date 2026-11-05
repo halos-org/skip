@@ -308,6 +308,15 @@
     stroke: none;
   }
 
+  // The line in use, in the orange the Racer Line widget marks it with.
+  &.pressed rect {
+    fill: var(--skip-orange-color);
+  }
+
+  &.pressed text {
+    fill: var(--skip-on-orange-color);
+  }
+
   // No focus ring. These are drawn controls in a glanceable instrument, and a ring left
   // behind on the last one pressed reads as state the widget does not have. They stay
   // keyboard-reachable and keyboard-operable; only the indicator is gone.

@@ -1955,6 +1955,17 @@
             "showPathSkUnitsFilter": true,
             "source": "default"
           },
+          "lineActivePath": {
+            "description": "Whether the current named start line is in use",
+            "enableTimeout": false,
+            "isPathConfigurable": false,
+            "path": "self.navigation.racing.lines",
+            "pathRequired": false,
+            "pathSkUnitsFilter": null,
+            "pathType": "object",
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
           "lineBiasPath": {
             "convertUnitTo": "m",
             "description": "Bias of the start line to starboard end",
@@ -2106,6 +2117,19 @@
           "source": "default"
         },
         {
+          "defaultConvertUnitTo": null,
+          "defaultPath": "self.navigation.racing.lines",
+          "description": "Whether the current named start line is in use",
+          "expectedSkUnit": null,
+          "hideFromConfig": false,
+          "isPathConfigurable": false,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "object",
+          "slot": "lineActivePath",
+          "source": "default"
+        },
+        {
           "defaultConvertUnitTo": "s",
           "defaultPath": "self.navigation.racing.timeToLine",
           "description": "Time to sail to the start line in seconds",
@@ -2240,6 +2264,18 @@
             "pathSkUnitsFilter": "rad",
             "pathType": "number",
             "showConvertUnitTo": false,
+            "showPathSkUnitsFilter": false,
+            "source": "default"
+          },
+          "lineActivePath": {
+            "description": "Whether the current named start line is in use",
+            "enableTimeout": false,
+            "hideFromConfig": true,
+            "isPathConfigurable": false,
+            "path": "self.navigation.racing.lines",
+            "pathRequired": false,
+            "pathSkUnitsFilter": null,
+            "pathType": "object",
             "showPathSkUnitsFilter": false,
             "source": "default"
           },
@@ -2505,6 +2541,19 @@
           "pathRequired": false,
           "pathType": "object",
           "slot": "linesPath",
+          "source": "default"
+        },
+        {
+          "defaultConvertUnitTo": null,
+          "defaultPath": "self.navigation.racing.lines",
+          "description": "Whether the current named start line is in use",
+          "expectedSkUnit": null,
+          "hideFromConfig": true,
+          "isPathConfigurable": false,
+          "pathOptions": null,
+          "pathRequired": false,
+          "pathType": "object",
+          "slot": "lineActivePath",
           "source": "default"
         },
         {

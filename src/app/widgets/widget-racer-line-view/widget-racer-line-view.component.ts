@@ -32,6 +32,12 @@ import {
   VMG_NAMES
 } from './racer-line-view/racer-line-view.component';
 
+/** Which line is selected, and whether it is in use. */
+interface ILineChoice {
+  name: string | null;
+  active: boolean;
+}
+
 /** How long a ping waits for the plugin's answer before it is shown as failed. */
 const PING_REPLY_TIMEOUT_MS = 5000;
 /** How long a settled ping's colour stays on its end: a failure longer, to be noticed. */
@@ -102,6 +108,19 @@ export class WidgetRacerLineViewComponent {
       },
       linesPath: {
         description: 'The known named lines',
+        path: 'self.navigation.racing.lines',
+        source: 'default',
+        pathType: 'object',
+        pathRequired: false,
+        isPathConfigurable: false, hideFromConfig: true,
+        enableTimeout: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null
+      },
+      // The same object again, for '/active': whether the selected line is in use. A plugin
+      // before 1.3.9 does not publish it, and its line is always in use.
+      lineActivePath: {
+        description: 'Whether the current named start line is in use',
         path: 'self.navigation.racing.lines',
         source: 'default',
         pathType: 'object',
@@ -420,9 +439,10 @@ export class WidgetRacerLineViewComponent {
   /** Which best VMG the adjust buttons act on; null while none is chosen. */
   protected readonly selectedVmg = signal<TVmgName | null>(null);
 
-  /** The named lines the plugin knows, and which is current. */
+  /** The named lines the plugin knows, which is current, and whether it is in use. */
   private readonly lines = signal<string[]>(['Default']);
   private readonly startLineName = signal<string | null>(null);
+  protected readonly lineActive = signal<boolean>(true);
   protected readonly lineNames = computed<string[]>(() => this.lines());
   protected readonly currentLineName = computed<string>(() => this.startLineName() || 'Default');
 
@@ -458,7 +478,9 @@ export class WidgetRacerLineViewComponent {
         break;
       }
       case 'choose':
-        this.selectLine(this.browsedLine());
+        // The line in use is a toggle: pressing it again stops using it.
+        if (this.lineActive() && this.browsedLine() === this.currentLineName()) this.deactivateLine();
+        else this.selectLine(this.browsedLine());
         break;
       case 'adjust':
         this.signalk.putRequest('navigation.racing.setStartLine',
@@ -573,30 +595,43 @@ export class WidgetRacerLineViewComponent {
    */
   protected selectLine(name: string): void {
     const selectedName = name === 'Default' ? null : name;
-    const previous = this.startLineName();
     const requestId = this.signalk.putRequest('navigation.racing.setStartLineName',
       {startLineName: selectedName}, this.id());
     if (requestId != null) {
-      this.pendingLineName = { requestId, previous, shown: selectedName };
-      this.startLineName.set(selectedName);
+      this.showLineChoice(requestId, { name: selectedName, active: true });
       this.browsed.set(name);
     }
   }
 
+  /** Stop using the current line, keeping it selected; selecting any line uses it again. */
+  protected deactivateLine(): void {
+    const requestId = this.signalk.putRequest('navigation.racing.setStartLineName',
+      { active: false }, this.id());
+    if (requestId != null) this.showLineChoice(requestId, { name: this.startLineName(), active: false });
+  }
+
+  private showLineChoice(requestId: string, shown: ILineChoice): void {
+    this.pendingLineName = { requestId, previous: { name: this.startLineName(), active: this.lineActive() }, shown };
+    this.startLineName.set(shown.name);
+    this.lineActive.set(shown.active);
+  }
+
   /**
-   * The line switch shown ahead of the plugin's answer. A switch the plugin refuses is
-   * never republished - nothing changed - so without taking the name back it would sit
-   * over the previous line's geometry for good.
+   * The line choice shown ahead of the plugin's answer. A choice the plugin refuses is
+   * never republished - nothing changed - so without taking it back it would sit over the
+   * previous line's geometry for good.
    */
-  private pendingLineName: { requestId: string; previous: string | null; shown: string | null } | null = null;
+  private pendingLineName: { requestId: string; previous: ILineChoice; shown: ILineChoice } | null = null;
 
   private settleLineName(requestId: string, statusCode: number | null): void {
     const pending = this.pendingLineName;
     if (!pending || pending.requestId !== requestId) return;
     this.pendingLineName = null;
     // Only undone while it is still what is showing: the stream may already have moved on.
-    if (statusCode !== 200 && this.startLineName() === pending.shown) {
-      this.startLineName.set(pending.previous);
+    if (statusCode !== 200 && this.startLineName() === pending.shown.name
+      && this.lineActive() === pending.shown.active) {
+      this.startLineName.set(pending.previous.name);
+      this.lineActive.set(pending.previous.active);
     }
   }
 
@@ -715,6 +750,12 @@ export class WidgetRacerLineViewComponent {
       if (!this.pathsRecord['startLineNamePath']?.path) return;
       untracked(() => this.streams.observe('startLineNamePath', pkt =>
         this.startLineName.set((pkt?.data?.value as string) ?? null), '/startLineName'));
+    });
+
+    effect(() => {
+      if (!this.pathsRecord['lineActivePath']?.path) return;
+      untracked(() => this.streams.observe('lineActivePath', pkt =>
+        this.lineActive.set(pkt?.data?.value !== false), '/active'));
     });
 
     effect(() => {

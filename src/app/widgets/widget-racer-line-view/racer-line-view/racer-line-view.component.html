@@ -119,8 +119,8 @@
              Each is a rounded rect with a glyph or a word in it, sized in viewBox units
              so the controls scale with the widget. -->
         @for (b of s.controls; track $index) {
-          <g class="control" [class.accent]="b.accent" role="button" tabindex="0"
-            [attr.aria-label]="b.title"
+          <g class="control" [class.accent]="b.accent" [class.pressed]="b.pressed" role="button" tabindex="0"
+            [attr.aria-label]="b.title" [attr.aria-pressed]="b.pressed ?? null"
             (click)="action.emit(b.action)"
             (keydown.enter)="action.emit(b.action)"
             (keydown.space)="action.emit(b.action)">

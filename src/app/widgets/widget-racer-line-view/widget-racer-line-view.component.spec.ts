@@ -1251,22 +1251,26 @@ describe('WidgetRacerLineViewComponent', () => {
       });
     });
 
+    /** The name of the line shown as in use: the picker's toggle that is on. */
+    const inUse = () => svg()?.querySelector('.control.pressed text')?.textContent?.trim() ?? null;
+
     /**
-     * The line in use is a label and any other is a button, so the control says whether
-     * pressing it will do anything.
+     * The line in use is a toggle shown on and any other is an accent button, so the
+     * control says what pressing it will do.
      */
-    it('browses the named lines, showing the one in use as a label', () => {
+    it('browses the named lines, showing the one in use as on', () => {
       aLine(0.00035, 0.00030);
       // The directive extracts the sub-field before the callback, so a test feeds the
       // extracted value — the whole navigation.racing.lines object never reaches here.
       feeds.get('linesPath')?.({ data: { value: [{ startLineName: 'Race 1' }, { startLineName: 'Race 2' }] } });
       feeds.get('startLineNamePath')?.({ data: { value: 'Race 2' } });
       setMode(1);
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Race 2');
-      expect(control('Use the'), 'the line in use offered itself as a button').toBeFalsy();
+      expect(inUse()).toBe('Race 2');
+      expect(control('Stop using the Race 2 line')?.getAttribute('aria-pressed')).toBe('true');
+      expect(control('Use the'), 'the line in use offered to be used').toBeFalsy();
 
       press('Show the next named line');
-      expect(svg()?.querySelector('.name-label')).toBeNull();
+      expect(inUse()).toBeNull();
       expect(control('Use the Default line'), 'no button for the browsed line').toBeTruthy();
     });
 
@@ -1279,8 +1283,8 @@ describe('WidgetRacerLineViewComponent', () => {
       press('Use the Default line');
       expect(requestsMock.putRequest).toHaveBeenCalledWith(
         'navigation.racing.setStartLineName', { startLineName: null }, 'racer-line-view-test');
-      // Default is a cleared name, not the literal word, and the control is now a label.
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      // Default is a cleared name, not the literal word, and the control is now on.
+      expect(inUse()).toBe('Default');
     });
 
     /**
@@ -1294,14 +1298,14 @@ describe('WidgetRacerLineViewComponent', () => {
       setMode(1);
       press('Show the next named line');
       press('Use the Default line');
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      expect(inUse()).toBe('Default');
 
       requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 400,
         widgetUUID: 'racer-line-view-test' });
       fixture.detectChanges();
       expect(control('Use the Default line'), 'the refused line still reads as current').toBeTruthy();
       press('Show the next named line');
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Race 1');
+      expect(inUse()).toBe('Race 1');
     });
 
     it('keeps the name when the plugin accepts the switch', () => {
@@ -1314,7 +1318,7 @@ describe('WidgetRacerLineViewComponent', () => {
       requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 200,
         widgetUUID: 'racer-line-view-test' });
       fixture.detectChanges();
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      expect(inUse()).toBe('Default');
     });
 
     it('lets the stream win over a refusal that arrives after it', () => {
@@ -1331,7 +1335,89 @@ describe('WidgetRacerLineViewComponent', () => {
       fixture.detectChanges();
       // Browsed round to Default, it reads as the line in use: the stream's, not undone.
       press('Show the next named line');
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      expect(inUse()).toBe('Default');
+    });
+
+    /**
+     * signalk-racer 1.3.9 can stop using a line while keeping it selected. The line in use
+     * is a toggle, so pressing it again is how; any line, the same one included, brings
+     * one back.
+     */
+    describe('a line not in use', () => {
+      const linesFeed = (active?: boolean) => {
+        feeds.get('linesPath')?.({ data: { value: [{ startLineName: 'Race 1' }] } });
+        feeds.get('startLineNamePath')?.({ data: { value: 'Race 1' } });
+        feeds.get('lineActivePath')?.({ data: { value: active } });
+        fixture.detectChanges();
+      };
+      // The placeholder greys a line across the frame; a real one is not marked undefined.
+      const lineLabel = () => svg()?.querySelector('.line-label')?.textContent?.trim();
+
+      it('is stopped by pressing the line in use', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(true);
+        setMode(1);
+        press('Stop using the Race 1 line');
+        expect(requestsMock.putRequest).toHaveBeenCalledWith(
+          'navigation.racing.setStartLineName', { active: false }, 'racer-line-view-test');
+        // Shown at once: no line drawn, nothing on, and the same line offered again.
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeNull();
+        expect(inUse()).toBeNull();
+        expect(control('Use the Race 1 line')).toBeTruthy();
+      });
+
+      it('is brought back by selecting it again', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(false);
+        setMode(1);
+        press('Use the Race 1 line');
+        expect(requestsMock.putRequest).toHaveBeenCalledWith(
+          'navigation.racing.setStartLineName', { startLineName: 'Race 1' }, 'racer-line-view-test');
+        expect(inUse()).toBe('Race 1');
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeTruthy();
+      });
+
+      it('is taken back when the plugin refuses to stop it', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(true);
+        setMode(1);
+        press('Stop using the Race 1 line');
+        requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 400,
+          widgetUUID: 'racer-line-view-test' });
+        fixture.detectChanges();
+        expect(inUse()).toBe('Race 1');
+      });
+
+      it('follows a line stopped from elsewhere, and says so while watching', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(true);
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeTruthy();
+        linesFeed(false);
+        // The ends are still the old line's until the plugin's nulls land: not drawn.
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeNull();
+        expect(lineLabel()).toBe('No line');
+        expect(svg()?.querySelector('.end-target'), 'watching offers nothing to press').toBeNull();
+      });
+
+      it('is in use when an older plugin does not say', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(undefined);
+        setMode(1);
+        expect(inUse()).toBe('Race 1');
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeTruthy();
+      });
+
+      it('keeps the ends and the picker to press with no line drawn', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(false);
+        setMode(1);
+        expect(lineLabel()).toBe('No line');
+        expect(svg()?.querySelectorAll('.end-target')).toHaveLength(2);
+        expect(control('Use the Race 1 line')).toBeTruthy();
+        // Nothing that acts on the line itself.
+        setMode(2);
+        expect(control('Lengthen the line')).toBeFalsy();
+      });
     });
 
     /**
