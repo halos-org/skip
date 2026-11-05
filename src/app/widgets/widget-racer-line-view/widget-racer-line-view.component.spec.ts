@@ -1274,6 +1274,14 @@ describe('WidgetRacerLineViewComponent', () => {
       expect(control('Use the Default line'), 'no button for the browsed line').toBeTruthy();
     });
 
+    /** A line in use with no ends is said in the one spot under the line, not named as well. */
+    it('says an unset line under the line, in place of its name', () => {
+      setMode(1);
+      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Line not set');
+      expect(svg()?.querySelector('.line-label'), 'said twice, above the line too').toBeNull();
+      expect(svg()?.querySelectorAll('.name-label')).toHaveLength(1);
+    });
+
     /** The toggle alone does not say which line is in use, so it is named under the line. */
     it('names the line in use under the line, above the picker, whichever is browsed', () => {
       aLine(0.00035, 0.00030);

@@ -838,10 +838,13 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  /** The line in use, or 'No line', named under the line within `width`. */
+  /**
+   * What is under the line, named within `width`: the line in use, 'No line' when none is,
+   * or 'Line not set' when the one in use has no ends yet. One spot, so only one is said.
+   */
   private lineNameLabel(W: number, lineY: number, ctrl: number, width: number): IScene['nameLabel'] {
     const fontSize = ctrl * 0.55;
-    const text = this.lineActive() ? this.currentLine() : 'No line';
+    const text = !this.lineActive() ? 'No line' : this.geometry() ? this.currentLine() : 'Line not set';
     return {
       x: W / 2, y: lineY + ctrl * 0.95, fontSize,
       text: this.truncate(text, Math.max(1, Math.floor(width / (fontSize * 0.62))))
@@ -1144,21 +1147,19 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // Port (pin) to the left and starboard (committee boat) to the right, as ever.
     const portX = inset, stbX = W - inset;
 
-    const label = 'Line not set';
-    const font = Math.min(this.LABEL_FONT, (W - 8) / (label.length * 0.51));
     const ctrl = this.controlSize(W);
 
     const scene: IScene = {
       portX, stbX, lineY,
       ends: this.buildEnds(stbX, lineY, (stbX - portX) / this.PLACEHOLDER_METRES),
-      // A line not in use is not unset: it is named 'No line' under the line instead.
-      labelVisible: this.lineActive(),
+      // Said under the line instead, where the line in use is named.
+      labelVisible: false,
       lineStatus: null,
       portUndefined: true, stbUndefined: true,
-      label, labelX: W / 2, labelY: lineY - font * 0.5, labelFont: font,
+      label: '', labelX: W / 2, labelY: lineY, labelFont: this.LABEL_FONT,
       projections: [], boat: null, guides: [], legs: [], gun: null, wind: null,
       controls: [],
-      nameLabel: this.lineActive() ? null : this.lineNameLabel(W, lineY, ctrl, W - 8),
+      nameLabel: this.lineNameLabel(W, lineY, ctrl, W - 8),
       vmgPad: null,
       // Pressable only on a screen that edits: watching, there is nothing to press.
       editEnds: !this.editing() ? null : {
