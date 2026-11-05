@@ -1274,6 +1274,22 @@ describe('WidgetRacerLineViewComponent', () => {
       expect(control('Use the Default line'), 'no button for the browsed line').toBeTruthy();
     });
 
+    /** The toggle alone does not say which line is in use, so it is named under the line. */
+    it('names the line in use under the line, above the picker, whichever is browsed', () => {
+      aLine(0.00035, 0.00030);
+      feeds.get('linesPath')?.({ data: { value: [{ startLineName: 'Race 1' }] } });
+      setMode(1);
+      const name = () => svg()!.querySelector('.name-label')!;
+      expect(name().textContent?.trim()).toBe('Default');
+      press('Show the next named line');
+      expect(name().textContent?.trim(), 'followed the browsed line').toBe('Default');
+      const lineY = Number(svg()!.querySelector('.start-line')!.getAttribute('y1'));
+      const pickerTop = Number(control('Use the Race 1 line')!.querySelector('rect')!.getAttribute('y'));
+      const y = Number(name().getAttribute('y'));
+      expect(y).toBeGreaterThan(lineY);
+      expect(y, 'the name runs into the picker').toBeLessThanOrEqual(pickerTop);
+    });
+
     it('selects the browsed line, and shows it as the current one at once', () => {
       aLine(0.00035, 0.00030);
       feeds.get('linesPath')?.({ data: { value: [{ startLineName: 'Race 1' }] } });
@@ -1351,7 +1367,7 @@ describe('WidgetRacerLineViewComponent', () => {
         fixture.detectChanges();
       };
       // The placeholder greys a line across the frame; a real one is not marked undefined.
-      const lineLabel = () => svg()?.querySelector('.line-label')?.textContent?.trim();
+      const lineName = () => svg()?.querySelector('.name-label')?.textContent?.trim();
 
       it('is stopped by pressing the line in use', () => {
         aLine(0.00035, 0.00030);
@@ -1364,6 +1380,8 @@ describe('WidgetRacerLineViewComponent', () => {
         expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeNull();
         expect(inUse()).toBeNull();
         expect(control('Use the Race 1 line')).toBeTruthy();
+        expect(lineName()).toBe('No line');
+        expect(svg()?.querySelector('.line-label'), 'said twice, above the line too').toBeNull();
       });
 
       it('is brought back by selecting it again', () => {
@@ -1395,7 +1413,7 @@ describe('WidgetRacerLineViewComponent', () => {
         linesFeed(false);
         // The ends are still the old line's until the plugin's nulls land: not drawn.
         expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeNull();
-        expect(lineLabel()).toBe('No line');
+        expect(lineName()).toBe('No line');
         expect(svg()?.querySelector('.end-target'), 'watching offers nothing to press').toBeNull();
       });
 
@@ -1411,7 +1429,7 @@ describe('WidgetRacerLineViewComponent', () => {
         aLine(0.00035, 0.00030);
         linesFeed(false);
         setMode(1);
-        expect(lineLabel()).toBe('No line');
+        expect(lineName()).toBe('No line');
         expect(svg()?.querySelectorAll('.end-target')).toHaveLength(2);
         expect(control('Use the Race 1 line')).toBeTruthy();
         // Nothing that acts on the line itself.
