@@ -852,11 +852,11 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
 
   /**
    * What is under the line, named within `width`: the line in use, 'No line' when none is,
-   * or 'Line not set' when the one in use has no ends yet. One spot, so only one is said.
+   * or 'End(s) not set' when the one in use has no ends yet. One spot, so only one is said.
    */
   private lineNameLabel(W: number, lineY: number, ctrl: number, width: number): IScene['nameLabel'] {
     const fontSize = ctrl * 0.55;
-    const text = !this.lineActive() ? 'No line' : this.geometry() ? this.currentLine() : 'Line not set';
+    const text = !this.lineActive() ? 'No line' : this.geometry() ? this.currentLine() : 'End(s) not set';
     return {
       x: W / 2, y: lineY + ctrl * 0.95, fontSize,
       text: this.truncate(text, Math.max(1, Math.floor(width / (fontSize * 0.62))))

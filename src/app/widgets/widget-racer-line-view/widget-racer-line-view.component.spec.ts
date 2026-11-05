@@ -1302,7 +1302,7 @@ describe('WidgetRacerLineViewComponent', () => {
     /** A line in use with no ends is said in the one spot under the line, not named as well. */
     it('says an unset line under the line, in place of its name', () => {
       setMode(1);
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Line not set');
+      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('End(s) not set');
       expect(svg()?.querySelector('.line-label'), 'said twice, above the line too').toBeNull();
       expect(svg()?.querySelectorAll('.name-label')).toHaveLength(1);
     });
