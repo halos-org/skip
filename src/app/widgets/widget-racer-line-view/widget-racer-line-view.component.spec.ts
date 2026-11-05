@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WidgetRacerLineViewComponent } from './widget-racer-line-view.component';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { WidgetStreamsDirective } from '../../core/directives/widget-streams.directive';
@@ -7,10 +7,14 @@ import { UnitsService } from '../../core/services/units.service';
 import { SignalkRequestsService, skRequest } from '../../core/services/signalk-requests.service';
 import { Subject } from 'rxjs';
 import { DashboardService } from '../../core/services/dashboard.service';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { RacerLineViewComponent } from './racer-line-view/racer-line-view.component';
 import { parsePointer } from '../../core/utils/pointer-path.util';
+import { SoundService } from '../../core/services/sound.service';
+import type { IWidgetPath } from '../../core/interfaces/widgets-interface';
+import { GnssAntennaService } from './gnss-antenna.service';
+import type { IGnssConfig } from './bow-position.util';
 
 /**
  * The widget subscribes and hands the values down; the drawing turns them into SVG. These tests
@@ -38,6 +42,7 @@ describe('WidgetRacerLineViewComponent', () => {
   // Only the lock state is read, and a locked dashboard is the state the controls are
   // usable in; unlocked covers them with the drag overlay.
   const dashboardMock = { isDashboardStatic: signal(true) };
+  const soundMock = { playTone: vi.fn() };
   const unitsMock: Partial<UnitsService> = {
     convertToUnit: vi.fn((_unit: string, value: number) => value),
     getUnitDisplaySymbol: vi.fn((measure: string | null | undefined) => measure ?? '')
@@ -46,6 +51,7 @@ describe('WidgetRacerLineViewComponent', () => {
   beforeEach(async () => {
     feeds = new Map();
     requestsMock.putRequest.mockClear();
+    soundMock.playTone.mockClear();
     const streamsMock = {
       // The real directive throws on a pointer that is not RFC 6901 ('lines' instead of
       // '/lines'), and a mock that takes anything hides it: the widget's effect dies, the
@@ -66,7 +72,8 @@ describe('WidgetRacerLineViewComponent', () => {
         { provide: WidgetStreamsDirective, useValue: streamsMock },
         { provide: UnitsService, useValue: unitsMock },
         { provide: SignalkRequestsService, useValue: requestsMock },
-        { provide: DashboardService, useValue: dashboardMock }
+        { provide: DashboardService, useValue: dashboardMock },
+        { provide: SoundService, useValue: soundMock }
       ]
     }).compileComponents();
 
@@ -76,6 +83,23 @@ describe('WidgetRacerLineViewComponent', () => {
     set('type', 'widget-racer-line-view');
     set('theme', null);
     fixture.detectChanges();
+  });
+
+  /**
+   * The server's source priorities are per path, so a boat with two GPSs can have its
+   * position from one and its COG and SOG from the other. The three navigation paths take
+   * a path and source of their own to override that; the plugin's paths have one
+   * publisher, and showing twenty of them would bury the three that matter.
+   */
+  it('offers the boat\u2019s navigation for configuration, and hides the plugin\u2019s paths', () => {
+    const paths = WidgetRacerLineViewComponent.DEFAULT_CONFIG.paths as Record<string, IWidgetPath>;
+    const configurable = Object.keys(paths).filter(k => paths[k].isPathConfigurable);
+    expect(configurable.sort()).toEqual(['cogPath', 'positionPath', 'sogPath']);
+    const shown = Object.keys(paths).filter(k => !paths[k].hideFromConfig);
+    expect(shown.sort()).toEqual(['cogPath', 'headingPath', 'positionPath', 'sogPath', 'twdPath']);
+    for (const key of Object.keys(paths).filter(k => paths[k].path?.startsWith('self.navigation.racing.'))) {
+      expect(paths[key].hideFromConfig, `${key} is offered`).toBe(true);
+    }
   });
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
@@ -344,6 +368,52 @@ describe('WidgetRacerLineViewComponent', () => {
     expect(stbX).toBeLessThanOrEqual(width);
     // ...and it is drawn further apart than a fit holding both ends could manage.
     expect(Math.abs(stbX - portX)).toBeGreaterThan(width);
+  });
+
+  /**
+   * racer measures from the bow, and the server may report the position anywhere on the hull,
+   * so the drawing is handed the bow worked out the way racer does it - here with nothing
+   * configured, the position taken as midships: half the length forward of it.
+   */
+  it('hands the drawing the bow, not the position as received', () => {
+    const drawn = () => fixture.debugElement.query(By.directive(RacerLineViewComponent))
+      .componentInstance as unknown as { data: () => { lat: number | null; lon: number | null } };
+    const M_PER_DEG = 6371000 * Math.PI / 180;
+    feed({ positionPath: { latitude: 0, longitude: 0 }, headingPath: Math.PI / 2 });
+    expect(drawn().data().lon).toBe(0);
+    feed({ boatLengthPath: 12 });
+    expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(6, 3);
+    feed({ gpsFromBowPath: 2, gpsFromCenterPath: 0 });
+    expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(2, 3);
+    expect(drawn().data().lat).toBeCloseTo(0, 9);
+  });
+
+  /**
+   * A position from an antenna in the server's GNSS configuration is at that antenna, or at
+   * midships while the server is replacing it - whatever sensors.gps says.
+   */
+  it('hands the drawing the bow from a configured antenna', () => {
+    const drawn = () => fixture.debugElement.query(By.directive(RacerLineViewComponent))
+      .componentInstance as unknown as { data: () => { lat: number | null; lon: number | null } };
+    const M_PER_DEG = 6371000 * Math.PI / 180;
+    const gnss = TestBed.inject(GnssAntennaService) as unknown as { _config: WritableSignal<IGnssConfig | null> };
+    const options = runtimeMock.options;
+    const base = WidgetRacerLineViewComponent.DEFAULT_CONFIG;
+    const paths = base.paths as Record<string, IWidgetPath>;
+    runtimeMock.options = () => ({ ...base, paths: { ...paths, positionPath: { ...paths['positionPath'], source: 'n2k.1' } } });
+    try {
+      const sensors = [{ $source: 'n2k.1', fromBow: 3, fromCenter: 0 }];
+      gnss._config.set({ correction: 'off', sensors, status: { mode: 'off', active: false } });
+      feed({ boatLengthPath: 12, gpsFromBowPath: 2, gpsFromCenterPath: 0, headingPath: Math.PI / 2 });
+      feed({ positionPath: { latitude: 0, longitude: 0 } });
+      expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(3, 3);
+      gnss._config.set({ correction: 'replace', sensors, status: { mode: 'replace', active: true } });
+      fixture.detectChanges();
+      expect(drawn().data().lon! * M_PER_DEG).toBeCloseTo(6, 3);
+    } finally {
+      runtimeMock.options = options;
+      gnss._config.set(null);
+    }
   });
 
   /**
@@ -1042,22 +1112,215 @@ describe('WidgetRacerLineViewComponent', () => {
     });
 
     /**
-     * The line in use is a label and any other is a button, so the control says whether
-     * pressing it will do anything.
+     * A ping changes nothing on screen - the boat is already on the end it sets - so the
+     * target itself has to say the press was taken, and then what the plugin made of it.
      */
-    it('browses the named lines, showing the one in use as a label', () => {
+    describe('ping feedback', () => {
+      const target = (end: 'port' | 'stb') =>
+        svg()!.querySelector<SVGElement>(`.end-target.${end}`)!;
+      const ping = (end: 'port' | 'stb') => {
+        target(end).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        fixture.detectChanges();
+      };
+      const reply = (requestId: string, statusCode: number) => {
+        requestResults.next({ requestId, state: 'COMPLETED', statusCode, widgetUUID: 'racer-line-view-test' });
+        fixture.detectChanges();
+      };
+      const state = (end: 'port' | 'stb') =>
+        ['pending', 'ok', 'error'].filter(c => target(end).classList.contains(c));
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        aLine(0.00035, 0.00030);
+        setEditing(true);
+      });
+      afterEach(() => vi.useRealTimers());
+
+      it('shows the press at once, neutral, with no sound until the plugin answers', () => {
+        ping('port');
+        expect(state('port')).toEqual(['pending']);
+        expect(state('stb')).toEqual([]);
+        expect(soundMock.playTone).not.toHaveBeenCalled();
+      });
+
+      it('turns to success and pips once on a 200, then clears', () => {
+        ping('port');
+        reply('req-1', 200);
+        expect(state('port')).toEqual(['ok']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(1);
+        vi.advanceTimersByTime(2000);
+        fixture.detectChanges();
+        expect(state('port')).toEqual([]);
+      });
+
+      it('takes a press again during the feedback', () => {
+        ping('port');
+        reply('req-1', 200);
+        requestsMock.putRequest.mockReturnValueOnce('req-2');
+        ping('port');
+        expect(state('port')).toEqual(['pending']);
+        reply('req-2', 200);
+        expect(state('port')).toEqual(['ok']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+        expect(soundMock.playTone.mock.calls.every(([f]) => (f as number) > 440)).toBe(true);
+      });
+
+      it('turns to failure and sounds twice, low, on anything else', () => {
+        ping('stb');
+        reply('req-1', 403);
+        expect(state('stb')).toEqual(['error']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+        const [frequency] = soundMock.playTone.mock.calls[0] as [number];
+        expect(frequency).toBeLessThan(440);
+      });
+
+      it('fails a ping that is never answered', () => {
+        ping('port');
+        vi.advanceTimersByTime(6000);
+        fixture.detectChanges();
+        expect(state('port')).toEqual(['error']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+      });
+
+      it('turns a timed-out ping to success when the plugin answers late', () => {
+        ping('port');
+        vi.advanceTimersByTime(6000);
+        fixture.detectChanges();
+        expect(state('port')).toEqual(['error']);
+        reply('req-1', 200);
+        expect(state('port')).toEqual(['ok']);
+      });
+
+      it('leaves a timed-out ping failed on a late refusal', () => {
+        ping('port');
+        vi.advanceTimersByTime(6000);
+        fixture.detectChanges();
+        reply('req-1', 500);
+        expect(state('port')).toEqual(['error']);
+        expect(soundMock.playTone).toHaveBeenCalledTimes(2);
+      });
+
+      it('says how the ping is going to a screen reader', () => {
+        const label = () => target('stb').getAttribute('aria-label') ?? '';
+        const idle = label();
+        ping('stb');
+        expect(label()).not.toBe(idle);
+        expect(label().startsWith(idle)).toBe(true);
+        expect(target('stb').getAttribute('aria-busy')).toBe('true');
+        reply('req-1', 403);
+        expect(label()).toContain('failed');
+        expect(target('stb').getAttribute('aria-busy')).toBeNull();
+      });
+
+      it('announces the ping through a live region that is there before it starts', () => {
+        const region = () => host().querySelector('.end-announcement[aria-live="polite"]');
+        expect(region()?.textContent?.trim()).toBe('');
+        ping('port');
+        expect(region()?.textContent?.trim()).toBe('Port end setting');
+        reply('req-1', 200);
+        expect(region()?.textContent?.trim()).toBe('Port end set');
+      });
+
+      it('fails at once a ping that could not be sent', () => {
+        requestsMock.putRequest.mockReturnValueOnce(null);
+        ping('port');
+        expect(state('port')).toEqual(['error']);
+      });
+
+      it('settles only on the answer to the latest press of that end', () => {
+        requestsMock.putRequest.mockReturnValueOnce('req-a').mockReturnValueOnce('req-b');
+        ping('port');
+        ping('port');
+        reply('req-a', 500);
+        expect(state('port')).toEqual(['pending']);
+        reply('req-b', 200);
+        expect(state('port')).toEqual(['ok']);
+      });
+
+      it('stays silent when beeps are turned off', () => {
+        const options = runtimeMock.options;
+        runtimeMock.options = () => ({ ...WidgetRacerLineViewComponent.DEFAULT_CONFIG, playBeeps: false });
+        try {
+          ping('port');
+          reply('req-1', 200);
+          expect(state('port')).toEqual(['ok']);
+          expect(soundMock.playTone).not.toHaveBeenCalled();
+        } finally {
+          runtimeMock.options = options;
+        }
+      });
+    });
+
+    /** The name of the line shown as in use: the picker's toggle that is on. */
+    const inUse = () => svg()?.querySelector('.control.pressed text')?.textContent?.trim() ?? null;
+
+    /**
+     * The line in use is a toggle shown on and any other is an accent button, so the
+     * control says what pressing it will do.
+     */
+    it('browses the named lines, showing the one in use as on', () => {
       aLine(0.00035, 0.00030);
       // The directive extracts the sub-field before the callback, so a test feeds the
       // extracted value — the whole navigation.racing.lines object never reaches here.
       feeds.get('linesPath')?.({ data: { value: [{ startLineName: 'Race 1' }, { startLineName: 'Race 2' }] } });
       feeds.get('startLineNamePath')?.({ data: { value: 'Race 2' } });
       setMode(1);
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Race 2');
-      expect(control('Use the'), 'the line in use offered itself as a button').toBeFalsy();
+      expect(inUse()).toBe('Race 2');
+      expect(control('Stop using the Race 2 line')?.getAttribute('aria-pressed')).toBe('true');
+      expect(control('Use the'), 'the line in use offered to be used').toBeFalsy();
 
       press('Show the next named line');
-      expect(svg()?.querySelector('.name-label')).toBeNull();
+      expect(inUse()).toBeNull();
       expect(control('Use the Default line'), 'no button for the browsed line').toBeTruthy();
+    });
+
+    /**
+     * A line coming or going must not move the ends, or the targets on them, from under
+     * the finger: the placeholder puts them where a real line would be.
+     */
+    it('keeps the ends where they are whether or not there is a line', () => {
+      // To the hundredth of a unit: the two are worked out along different float paths.
+      const at = (...v: (string | null)[]) => v.map(n => Number(n).toFixed(2));
+      const ends = () => [...svg()!.querySelectorAll('.end-target')]
+        .map(t => at(t.getAttribute('x'), t.getAttribute('y')));
+      for (const m of [1, 2] as const) {
+        setMode(m);
+        const unset = ends();
+        aLine(0.00035, 0.00030);
+        if (m === 1) expect(ends(), 'the targets moved').toEqual(unset);
+        const line = svg()!.querySelector('.start-line:not(.undefined)')!;
+        const placeholder = () => svg()!.querySelector('.start-line.undefined');
+        expect(placeholder()).toBeNull();
+        const drawn = at(line.getAttribute('x1'), line.getAttribute('x2'));
+        feeds.get('lineLengthPath')?.({ data: { value: null } });
+        fixture.detectChanges();
+        expect(at(placeholder()!.getAttribute('x1'), placeholder()!.getAttribute('x2')),
+          `the line changed length on screen ${m}`).toEqual(drawn);
+      }
+    });
+
+    /** A line in use with no ends is said in the one spot under the line, not named as well. */
+    it('says an unset line under the line, in place of its name', () => {
+      setMode(1);
+      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('End(s) not set');
+      expect(svg()?.querySelector('.line-label'), 'said twice, above the line too').toBeNull();
+      expect(svg()?.querySelectorAll('.name-label')).toHaveLength(1);
+    });
+
+    /** The toggle alone does not say which line is in use, so it is named under the line. */
+    it('names the line in use under the line, above the picker, whichever is browsed', () => {
+      aLine(0.00035, 0.00030);
+      feeds.get('linesPath')?.({ data: { value: [{ startLineName: 'Race 1' }] } });
+      setMode(1);
+      const name = () => svg()!.querySelector('.name-label')!;
+      expect(name().textContent?.trim()).toBe('Default');
+      press('Show the next named line');
+      expect(name().textContent?.trim(), 'followed the browsed line').toBe('Default');
+      const lineY = Number(svg()!.querySelector('.start-line')!.getAttribute('y1'));
+      const pickerTop = Number(control('Use the Race 1 line')!.querySelector('rect')!.getAttribute('y'));
+      const y = Number(name().getAttribute('y'));
+      expect(y).toBeGreaterThan(lineY);
+      expect(y, 'the name runs into the picker').toBeLessThanOrEqual(pickerTop);
     });
 
     it('selects the browsed line, and shows it as the current one at once', () => {
@@ -1069,8 +1332,8 @@ describe('WidgetRacerLineViewComponent', () => {
       press('Use the Default line');
       expect(requestsMock.putRequest).toHaveBeenCalledWith(
         'navigation.racing.setStartLineName', { startLineName: null }, 'racer-line-view-test');
-      // Default is a cleared name, not the literal word, and the control is now a label.
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      // Default is a cleared name, not the literal word, and the control is now on.
+      expect(inUse()).toBe('Default');
     });
 
     /**
@@ -1084,14 +1347,14 @@ describe('WidgetRacerLineViewComponent', () => {
       setMode(1);
       press('Show the next named line');
       press('Use the Default line');
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      expect(inUse()).toBe('Default');
 
       requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 400,
         widgetUUID: 'racer-line-view-test' });
       fixture.detectChanges();
       expect(control('Use the Default line'), 'the refused line still reads as current').toBeTruthy();
       press('Show the next named line');
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Race 1');
+      expect(inUse()).toBe('Race 1');
     });
 
     it('keeps the name when the plugin accepts the switch', () => {
@@ -1104,7 +1367,7 @@ describe('WidgetRacerLineViewComponent', () => {
       requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 200,
         widgetUUID: 'racer-line-view-test' });
       fixture.detectChanges();
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      expect(inUse()).toBe('Default');
     });
 
     it('lets the stream win over a refusal that arrives after it', () => {
@@ -1121,7 +1384,97 @@ describe('WidgetRacerLineViewComponent', () => {
       fixture.detectChanges();
       // Browsed round to Default, it reads as the line in use: the stream's, not undone.
       press('Show the next named line');
-      expect(svg()?.querySelector('.name-label')?.textContent?.trim()).toBe('Default');
+      expect(inUse()).toBe('Default');
+    });
+
+    /**
+     * signalk-racer 1.3.9 can stop using a line while keeping it selected. The line in use
+     * is a toggle, so pressing it again is how; any line, the same one included, brings
+     * one back.
+     */
+    describe('a line not in use', () => {
+      const linesFeed = (active?: boolean) => {
+        feeds.get('linesPath')?.({ data: { value: [{ startLineName: 'Race 1' }] } });
+        feeds.get('startLineNamePath')?.({ data: { value: 'Race 1' } });
+        feeds.get('lineActivePath')?.({ data: { value: active } });
+        fixture.detectChanges();
+      };
+      // The placeholder greys a line across the frame; a real one is not marked undefined.
+      const lineName = () => svg()?.querySelector('.name-label')?.textContent?.trim();
+
+      it('is stopped by pressing the line in use', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(true);
+        setMode(1);
+        press('Stop using the Race 1 line');
+        expect(requestsMock.putRequest).toHaveBeenCalledWith(
+          'navigation.racing.setStartLineName', { active: false }, 'racer-line-view-test');
+        // Shown at once: no line drawn, nothing on, and the same line offered again.
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeNull();
+        expect(inUse()).toBeNull();
+        expect(control('Use the Race 1 line')).toBeTruthy();
+        expect(lineName()).toBe('No line');
+        expect(svg()?.querySelector('.line-label'), 'said twice, above the line too').toBeNull();
+      });
+
+      it('is brought back by selecting it again', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(false);
+        setMode(1);
+        press('Use the Race 1 line');
+        expect(requestsMock.putRequest).toHaveBeenCalledWith(
+          'navigation.racing.setStartLineName', { startLineName: 'Race 1' }, 'racer-line-view-test');
+        expect(inUse()).toBe('Race 1');
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeTruthy();
+      });
+
+      it('is taken back when the plugin refuses to stop it', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(true);
+        setMode(1);
+        press('Stop using the Race 1 line');
+        requestResults.next({ requestId: 'req-1', state: 'COMPLETED', statusCode: 400,
+          widgetUUID: 'racer-line-view-test' });
+        fixture.detectChanges();
+        expect(inUse()).toBe('Race 1');
+      });
+
+      it('follows a line stopped from elsewhere, and says so while watching', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(true);
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeTruthy();
+        linesFeed(false);
+        // The ends are still the old line's until the plugin's nulls land: not drawn.
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeNull();
+        expect(lineName()).toBe('No line');
+        expect(svg()?.querySelector('.end-target'), 'watching offers nothing to press').toBeNull();
+      });
+
+      it('is in use when an older plugin does not say', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(undefined);
+        setMode(1);
+        expect(inUse()).toBe('Race 1');
+        expect(svg()?.querySelector('.start-line:not(.undefined)')).toBeTruthy();
+      });
+
+      it('keeps the picker but not the ends to press with no line drawn', () => {
+        aLine(0.00035, 0.00030);
+        linesFeed(false);
+        setMode(1);
+        expect(lineName()).toBe('No line');
+        // Shown, so the screen keeps its shape, but a ping would bring a line back unasked.
+        const targets = [...svg()!.querySelectorAll<SVGElement>('.end-target')];
+        expect(targets).toHaveLength(2);
+        expect(targets.every(t => t.getAttribute('aria-disabled') === 'true')).toBe(true);
+        targets[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(requestsMock.putRequest).not.toHaveBeenCalledWith(
+          'navigation.racing.setStartLine', expect.anything(), expect.anything());
+        expect(control('Use the Race 1 line')).toBeTruthy();
+        // Nothing that acts on the line itself.
+        setMode(2);
+        expect(control('Lengthen the line')).toBeFalsy();
+      });
     });
 
     /**

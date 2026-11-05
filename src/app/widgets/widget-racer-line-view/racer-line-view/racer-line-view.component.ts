@@ -36,6 +36,23 @@ export const VMG_TITLE: Record<TVmgName, string> = {
  * are - they belong beside the line ends and under the line - and the host owns what they
  * mean, so the geometry and the Signal K requests stay in separate places.
  */
+/** An end of the line. */
+export type TLineEnd = 'port' | 'stb';
+
+/**
+ * Where an end's last ping has got to: sent and waiting, answered either way, or nothing
+ * to show. The host owns it, since only the host sees the plugin's answer.
+ */
+export type TEndFeedback = 'idle' | 'pending' | 'ok' | 'error';
+
+const END_SPOKEN: Record<TLineEnd, string> = { port: 'Port end', stb: 'Starboard end' };
+
+const END_FEEDBACK_SPOKEN: Record<Exclude<TEndFeedback, 'idle'>, string> = {
+  pending: 'setting',
+  ok: 'set',
+  error: 'failed'
+};
+
 export type TLineViewAction =
   | { kind: 'mode' }
   | { kind: 'browse'; step: -1 | 1 }
@@ -175,6 +192,8 @@ interface ISceneButton {
   action: TLineViewAction;
   /** Accent fill - the mode button, and a line name that can be selected. */
   accent: boolean;
+  /** A toggle that is on: the line in use, whose press stops using it. */
+  pressed?: boolean;
 }
 
 /**
@@ -236,6 +255,8 @@ interface IScene {
   editEnds: {
     port: { x: number; y: number; size: number; rx: number; title: string };
     stb: { x: number; y: number; size: number; rx: number; title: string };
+    /** Shown but not pressable: with no line in use, a ping would bring one back unasked. */
+    disabled: boolean;
   } | null;
   /** Every control in this mode: the mode button, and whatever the mode itself offers. */
   controls: ISceneButton[];
@@ -272,13 +293,34 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
    */
   public mode = input<0 | 1 | 2 | 3>(0);
   /** Which end was pressed, for the host to act on. */
-  public endPressed = output<'port' | 'stb'>();
+  public endPressed = output<TLineEnd>();
+  /** How each end's last ping is going, shown on its target. */
+  public endFeedback = input<Record<TLineEnd, TEndFeedback>>({ port: 'idle', stb: 'idle' });
+
+  /** An end target's accessible name: its title, and how its ping is going, which otherwise only colour shows. */
+  protected endLabel(title: string, feedback: TEndFeedback): string {
+    return feedback === 'idle' ? title : `${title}: ${END_FEEDBACK_SPOKEN[feedback]}`;
+  }
+
+  /**
+   * The same states, for the live region: a screen reader does not reliably announce a
+   * change to the name of the element that already has focus, and the reply comes later.
+   */
+  protected readonly endAnnouncement = computed<string>(() => {
+    const feedback = this.endFeedback();
+    return (['port', 'stb'] as const)
+      .filter(end => feedback[end] !== 'idle')
+      .map(end => `${END_SPOKEN[end]} ${END_FEEDBACK_SPOKEN[feedback[end] as Exclude<TEndFeedback, 'idle'>]}`)
+      .join('. ');
+  });
   /** Everything else a control in the drawing asks for. */
   public action = output<TLineViewAction>();
   /** The named lines the plugin knows, the one in use, and the one being browsed. */
   public lines = input<string[]>(['Default']);
   public currentLine = input<string>('Default');
   public browsedLine = input<string>('Default');
+  /** Whether the current line is in use; one that is not is drawn as no line at all. */
+  public lineActive = input<boolean>(true);
   /** Countdowns to show in the corner; null hides that one. */
   public timeToLine = input<number | null>(null);
   public timeToBurn = input<number | null>(null);
@@ -508,7 +550,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // The plugin nulls the length when the line is lost, while the end positions keep
     // their last published latitude/longitude, so the length is what says there is a
     // line. Only its presence is used - the drawing measures the line itself.
-    this.lineLength() == null ? null : lineGeometry(
+    // A line not in use is published as nulls, but the drawing does not wait for them.
+    !this.lineActive() || this.lineLength() == null ? null : lineGeometry(
       this.latLon(this.portLat(), this.portLon()),
       this.latLon(this.stbLat(), this.stbLon()),
       this.latLon(this.lat(), this.lon())
@@ -517,10 +560,11 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   /** The whole drawing, in viewBox units. Null when there is no line to draw. */
   protected readonly scene = computed<IScene | null>(() => {
     const geo = this.geometry();
-    // Watching an unset line draws nothing; editing one has to draw something to press.
-    if (!geo) return this.editing() ? this.placeholderScene() : null;
+    // Watching an unset line draws nothing, and one not in use says so; editing either has
+    // to draw something to press.
+    if (!geo) return this.editing() || !this.lineActive() ? this.placeholderScene() : null;
 
-    const W = this.vbWidth(), margin = this.VB_MARGIN;
+    const W = this.vbWidth();
     // The band the drawing gets: below the title, with room above the line kept clear
     // for the length and heading label that sits there.
     const yMin = this.bandYMin();
@@ -540,13 +584,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     if (editMode) {
       // Working on the line is about hitting the right end, not about where the boat
       // lies, so the line takes the full width and nothing else is drawn. The ends are
-      // held clear of the sides by whatever sits around them: a touch target on the
-      // setting screen, a ring of adjust buttons on the other.
-      const inset = this.mode() === 2
-        ? Math.max(ctrl * 1.55, this.END_SIZE_MAX * 0.54 + ctrl) + 4
-        : this.mode() === 3
-          ? Math.max(margin, this.END_SIZE_MAX * 0.54)
-          : Math.max(margin, targetRadius) * 1.3;
+      // held clear of the sides by whatever sits around them - see editInset.
+      const inset = this.editInset(ctrl, targetRadius);
       scale = (W - 2 * inset) / Math.max(geo.length, 1);
       sx = (a: number) => W / 2 - (a - geo.length / 2) * scale;
       const editY = this.editLineY(ctrl, targetRadius);
@@ -623,16 +662,15 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
       const size = targetRadius * 2, rx = this.controlRadius(size);
       scene.editEnds = {
         port: { x: portX, y: lineY, size, rx, title: 'Set the port (pin) end here' },
-        stb: { x: stbX, y: lineY, size, rx, title: 'Set the starboard (boat) end here' }
+        stb: { x: stbX, y: lineY, size, rx, title: 'Set the starboard (boat) end here' },
+        disabled: false
       };
       this.buildLinePicker(scene, W, lineY, ctrl, Math.abs(stbX - portX));
     } else if (this.mode() === 3) {
       this.buildVmgPad(scene, W, lineY, ctrl);
     } else if (this.mode() === 2) {
       this.buildEndAdjusters(scene, portX, stbX, lineY, ctrl);
-      scene.nameLabel = {
-        x: W / 2, y: lineY + ctrl * 0.95, text: this.currentLine(), fontSize: ctrl * 0.55
-      };
+      scene.nameLabel = this.lineNameLabel(W, lineY, ctrl, W - 8);
     } else if (boat) {
       this.buildZone(scene, geo, sx, sy, W, scale);
       this.buildApproach(scene, geo, sx, sy, scale, W);
@@ -695,6 +733,20 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
+   * How far the ends sit in from the sides while the line is being worked on: clear of
+   * whatever sits around them, a touch target on the setting screen, a ring of adjust
+   * buttons on the next. Shared with the placeholder, so a line coming or going does not
+   * move the ends - or the targets on them - under the finger.
+   */
+  private editInset(ctrl: number, targetRadius: number): number {
+    return this.mode() === 2
+      ? Math.max(ctrl * 1.55, this.END_SIZE_MAX * 0.54 + ctrl) + 4
+      : this.mode() === 3
+        ? Math.max(this.VB_MARGIN, this.END_SIZE_MAX * 0.54)
+        : Math.max(this.VB_MARGIN, targetRadius) * 1.3;
+  }
+
+  /**
    * Side of a control, in viewBox units. Sized off the drawing rather than fixed, so a
    * control is the same fraction of a widget whatever the widget's size, and stays a
    * usable target on a phone-sized tile.
@@ -741,14 +793,17 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   /**
    * Browse the named lines the plugin knows, under the line itself.
    *
-   * The line in use is a label, because pressing it would do nothing; any other is a
-   * button, because pressing it is how you switch to it. So the control says what it
-   * will do by whether it looks pressable, and the row does not change size as you
-   * step through the names.
+   * Every name is a button. Any line but the one in use is an accent one, because
+   * pressing it is how you switch to it; the line in use is a toggle shown on, because
+   * pressing it stops using it - and then it is an accent one again, to use it once
+   * more. The row does not change size as you step through the names.
+   *
+   * A toggle alone does not say clearly which line is in use, so its name - or 'No line'
+   * - is written under the line, above the row, where the adjust screen names it too.
    */
   private buildLinePicker(scene: IScene, W: number, lineY: number, ctrl: number,
     lineWidth: number): void {
-    const isCurrent = this.browsedLine() === this.currentLine();
+    const inUse = this.lineActive() && this.browsedLine() === this.currentLine();
     // Sized for the longest name there is, so stepping through them does not walk the
     // prev and next buttons along the screen under the finger pressing them.
     const longest = this.lines().reduce((a, b) => (b.length > a.length ? b : a), '');
@@ -770,7 +825,9 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     const fits = Math.max(1, Math.floor((nameW - ctrl * 0.6) / (font * 0.62) + 1e-6));
     const full = this.browsedLine();
     const name = this.truncate(full, fits);
-    const y = lineY + ctrl * 1.5;
+    scene.nameLabel = this.lineNameLabel(W, lineY, ctrl, Math.max(lineWidth, nameW));
+    // Below the name, clear of it.
+    const y = lineY + ctrl * 2.1;
     const step = nameW / 2 + gap;
 
     scene.controls.push({
@@ -784,16 +841,26 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
       title: 'Show the next named line', action: { kind: 'browse', step: 1 }, accent: false
     });
 
-    if (isCurrent) {
-      scene.nameLabel = { x: W / 2, y: y + font * 0.35, text: name, fontSize: font };
-    } else {
-      scene.controls.push({
-        x: W / 2, y, w: nameW, h: ctrl, rx: this.controlRadius(ctrl),
-        glyph: null, text: name, fontSize: font,
-        // The title carries the whole name even when the button cannot show it.
-        title: `Use the ${full} line`, action: { kind: 'choose' }, accent: true
-      });
-    }
+    scene.controls.push({
+      x: W / 2, y, w: nameW, h: ctrl, rx: this.controlRadius(ctrl),
+      glyph: null, text: name, fontSize: font,
+      // The title carries the whole name even when the button cannot show it.
+      title: inUse ? `Stop using the ${full} line` : `Use the ${full} line`,
+      action: { kind: 'choose' }, accent: !inUse, pressed: inUse
+    });
+  }
+
+  /**
+   * What is under the line, named within `width`: the line in use, 'No line' when none is,
+   * or 'End(s) not set' when the one in use has no ends yet. One spot, so only one is said.
+   */
+  private lineNameLabel(W: number, lineY: number, ctrl: number, width: number): IScene['nameLabel'] {
+    const fontSize = ctrl * 0.55;
+    const text = !this.lineActive() ? 'No line' : this.geometry() ? this.currentLine() : 'End(s) not set';
+    return {
+      x: W / 2, y: lineY + ctrl * 0.95, fontSize,
+      text: this.truncate(text, Math.max(1, Math.floor(width / (fontSize * 0.62))))
+    };
   }
 
   /** A name cut to fit, with an ellipsis standing for what was taken off. */
@@ -1078,30 +1145,35 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
    * either waypoint is missing it publishes startLinePort, startLineStb and the length
    * as null as a set, so an end that does exist is indistinguishable from one that does
    * not; the scene keeps the flags per end for a plugin that one day distinguishes them.
+   *
+   * A line not in use is drawn the same way while watching, named 'No line' under it and
+   * with nothing to press, so it reads as switched off rather than as the widget being blank.
    */
   private placeholderScene(): IScene {
     const W = this.vbWidth();
-    // The same targets edit mode uses on a real line, at the same inset: a target centred
+    // The same targets edit mode uses on a real line, at the same place: a target centred
     // on an end runs a radius past it and has to stay in frame.
     const radius = Math.min(W, this.VB_HEIGHT) * 0.11;
-    const lineY = this.editLineY(this.controlSize(W), radius);
-    const inset = Math.max(this.VB_MARGIN, radius);
+    const ctrl = this.controlSize(W);
+    const lineY = this.editLineY(ctrl, radius);
+    const inset = this.editInset(ctrl, radius);
     // Port (pin) to the left and starboard (committee boat) to the right, as ever.
     const portX = inset, stbX = W - inset;
 
-    const label = 'Line not set';
-    const font = Math.min(this.LABEL_FONT, (W - 8) / (label.length * 0.51));
-
-    return {
+    const scene: IScene = {
       portX, stbX, lineY,
       ends: this.buildEnds(stbX, lineY, (stbX - portX) / this.PLACEHOLDER_METRES),
-      labelVisible: true,
+      // Said under the line instead, where the line in use is named.
+      labelVisible: false,
       lineStatus: null,
       portUndefined: true, stbUndefined: true,
-      label, labelX: W / 2, labelY: lineY - font * 0.5, labelFont: font,
+      label: '', labelX: W / 2, labelY: lineY, labelFont: this.LABEL_FONT,
       projections: [], boat: null, guides: [], legs: [], gun: null, wind: null,
-      controls: [], nameLabel: null, vmgPad: null,
-      editEnds: {
+      controls: [],
+      nameLabel: this.lineNameLabel(W, lineY, ctrl, W - 8),
+      vmgPad: null,
+      // Pressable only on a screen that edits: watching, there is nothing to press.
+      editEnds: !this.editing() ? null : {
         port: {
           x: portX, y: lineY, size: radius * 2, rx: this.controlRadius(radius * 2),
           title: 'Set the port (pin) end here'
@@ -1109,9 +1181,14 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
         stb: {
           x: stbX, y: lineY, size: radius * 2, rx: this.controlRadius(radius * 2),
           title: 'Set the starboard (boat) end here'
-        }
+        },
+        // An unset line in use is set by pinging its ends; one not in use is chosen first.
+        disabled: !this.lineActive()
       }
     };
+    // With no line drawn, the picker is the way to bring one back.
+    if (this.mode() === 1) this.buildLinePicker(scene, W, lineY, ctrl, stbX - portX);
+    return scene;
   }
 
   /**
@@ -1699,8 +1776,8 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // The hull is drawn solid at the drawing's own scale, but with a minimum size set by MIN_HULL_DISPLAY_UNITS
     const boatMetres = this.boatLength() ?? this.DEFAULT_BOAT_METRES;
     const hullLength = (boatMetres * scale) < this.MIN_HULL_DISPLAY_UNITS ? this.MIN_HULL_DISPLAY_UNITS : boatMetres * scale;
-    // The fix is the bow, not the middle of the boat: that is where the Signalk reports the position
-    // to be, it is what the plugin measures its distance to the line from, and it
+    // The fix is the bow, not the middle of the boat: the host widget works the bow out from
+    // the reported position, it is what the plugin measures its distance to the line from, and it
     // is the end that decides whether you are over. So the hull is hung aft of the fix
     // rather than centred on it, which also makes a change of heading swing the stern
     // around a bow that stays put - what the boat actually does, and what stops the bow

@@ -154,11 +154,61 @@ describe('WidgetRacerLineComponent', () => {
       'navigation.racing.setStartLine', payload, 'racer-line-test');
   });
 
+  const feed = (key: string, value: unknown) => {
+    const call = streamsMock.observe.mock.calls.find(([k]) => k === key);
+    expect(call, `nothing observed ${key}`).toBeTruthy();
+    call![1]({ data: { value } });
+    fixture.detectChanges();
+  };
+
   it('sets the displayed line as the current one', () => {
+    feed('startLineNamePath', 'Race 1');
     requestsMock.putRequest.mockClear();
     setMode(4);
     clickControl('Default');
     expect(requestsMock.putRequest).toHaveBeenCalledWith(
       'navigation.racing.setStartLineName', { startLineName: null }, 'racer-line-test');
+  });
+
+  // signalk-racer 1.3.9 can stop using a line while keeping it selected.
+  it('stops using the line in use when it is pressed', () => {
+    requestsMock.putRequest.mockClear();
+    setMode(4);
+    clickControl('Default');
+    expect(requestsMock.putRequest).toHaveBeenCalledWith(
+      'navigation.racing.setStartLineName', { active: false }, 'racer-line-test');
+  });
+
+  it('uses a stopped line again when it is pressed', () => {
+    feed('lineActivePath', false);
+    requestsMock.putRequest.mockClear();
+    setMode(4);
+    clickControl('Default');
+    expect(requestsMock.putRequest).toHaveBeenCalledWith(
+      'navigation.racing.setStartLineName', { startLineName: null }, 'racer-line-test');
+  });
+
+  it('treats a plugin that does not say as in use', () => {
+    feed('lineActivePath', undefined);
+    requestsMock.putRequest.mockClear();
+    setMode(4);
+    clickControl('Default');
+    expect(requestsMock.putRequest).toHaveBeenCalledWith(
+      'navigation.racing.setStartLineName', { active: false }, 'racer-line-test');
+  });
+
+  // Setting an end would bring the line back unasked, so it is chosen first.
+  it('offers no adjustments or end setting while no line is in use', () => {
+    feed('lineActivePath', false);
+    setMode(1);
+    const ends = [...host().querySelectorAll<HTMLButtonElement>('button')].filter(b => /End$/.test(b.textContent?.trim() ?? ''));
+    expect(ends).toHaveLength(2);
+    expect(ends.every(b => b.disabled), 'an end can be set with no line in use').toBe(true);
+    for (const mode of [2, 3]) {
+      setMode(mode);
+      const adjust = [...host().querySelectorAll<HTMLButtonElement>('button')].filter(b => b.classList.contains('port-button') || b.classList.contains('starboard-button'));
+      expect(adjust).toHaveLength(4);
+      expect(adjust.every(b => b.disabled), `mode ${mode} adjusts a line not in use`).toBe(true);
+    }
   });
 });

@@ -17,6 +17,7 @@ import {WidgetRuntimeDirective} from '../../core/directives/widget-runtime.direc
 import {WidgetStreamsDirective} from '../../core/directives/widget-streams.directive';
 import {IPathArray, IWidgetSvcConfig} from '../../core/interfaces/widgets-interface';
 import {CanvasService} from '../../core/services/canvas.service';
+import { SoundService } from '../../core/services/sound.service';
 import {getColors} from '../../core/utils/themeColors.utils';
 import {DashboardService} from '../../core/services/dashboard.service';
 import {SignalkRequestsService} from '../../core/services/signalk-requests.service';
@@ -55,6 +56,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private readonly signalk = inject(SignalkRequestsService);
   private readonly unitsService = inject(UnitsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly sound = inject(SoundService);
 
   // Static config from legacy defaultConfig
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
@@ -132,6 +134,19 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         showPathSkUnitsFilter: false,
         pathSkUnitsFilter: null
       },
+      // And '/active': whether the current line is in use. A plugin before 1.3.9 does not
+      // publish it, and its line is always in use.
+      lineActivePath: {
+        description: 'Whether the current named start line is in use',
+        path: 'self.navigation.racing.lines',
+        source: 'default',
+        pathType: 'object',
+        pathRequired: false,
+        isPathConfigurable: false,
+        enableTimeout: false,
+        showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null
+      },
       ttlPath: {
         description: 'Time to sail to the start line in seconds',
         path: 'self.navigation.racing.timeToLine',
@@ -192,6 +207,8 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private displayLineIndex = 0;
   private lines: string[] = [];
   private startLineName: string | null = null;
+  /** Whether the current line is in use; the adjustments need one. */
+  protected lineActive = signal<boolean>(true);
   protected portBiasValue = signal<string>('');
   protected lineLengthValue = signal<string>('');
   protected stbBiasValue = signal<string>('');
@@ -265,6 +282,16 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         }
         this.draw();
       }, '/startLineName'));
+    });
+
+    // Observe whether the line is in use
+    effect(() => {
+      const cfg = this.runtime.options(); if (!cfg) return;
+      const pathCfg = (cfg.paths as IPathArray | undefined)?.['lineActivePath'];
+      if (!pathCfg?.path) return;
+      untracked(() => this.streams.observe('lineActivePath', pkt => {
+        this.lineActive.set(pkt?.data?.value !== false);
+      }, '/active'));
     });
 
     // Observe lines
@@ -400,15 +427,17 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     return this.lines[this.displayLineIndex] || 'Default';
   }
 
+  /** Whether the displayed line is the one in use: selected, and not stopped. */
   public isDisplayLineCurrent(): boolean {
-    return this.getDisplayLineName() === (this.startLineName || 'Default');
+    return this.lineActive() && this.getDisplayLineName() === (this.startLineName || 'Default');
   }
 
+  /** Use the named line; the one in use is a toggle, and pressing it stops using it. */
   public setStartLine(name: string) {
     const startLineName = (name === 'Default' || !name) ? null : name;
     this.signalk.putRequest(
       'navigation.racing.setStartLineName',
-      { startLineName },
+      this.isDisplayLineCurrent() ? { active: false } : { startLineName },
       this.id()
     );
     this.mode.set(0);
@@ -598,17 +627,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
 
   private beep(frequency = 440, duration = 100) {
     if (!this.runtime.options()?.playBeeps) return;
-    const AudioCtx = (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
-    const audioCtx = new AudioCtx();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.type = 'sine';
-    oscillator.frequency.value = frequency;
-    gainNode.gain.value = 0.1;
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + duration / 1000);
+    this.sound.playTone(frequency, duration);
   }
 
   ngOnDestroy(): void {

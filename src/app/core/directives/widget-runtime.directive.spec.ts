@@ -120,6 +120,35 @@ describe('WidgetRuntimeDirective config merge', () => {
     expect(merged?.paths?.['p'].convertUnitTo).toBe('m');
   });
 
+  /** Whether the options dialog offers a path is the widget's decision, so a saved config cannot override it. */
+  it('takes how a slot is offered from the defaults', () => {
+    const merged = build(
+      { paths: {
+        opened: { description: 'P', path: 'self.cog', source: 'default', pathType: 'number', isPathConfigurable: true },
+        hidden: { description: 'Q', path: 'self.q', source: 'default', pathType: 'number', isPathConfigurable: false, hideFromConfig: true },
+        shown: { description: 'R', path: 'self.r', source: 'default', pathType: 'number', isPathConfigurable: false }
+      } },
+      { paths: {
+        opened: { description: 'P', path: 'self.cog', source: 'gps2', pathType: 'number', isPathConfigurable: false },
+        hidden: { description: 'Q', path: 'self.q', source: 'default', pathType: 'number', isPathConfigurable: false },
+        shown: { description: 'R', path: 'self.r', source: 'default', pathType: 'number', isPathConfigurable: false, hideFromConfig: true }
+      } }
+    );
+    expect(merged?.paths?.['opened'].isPathConfigurable).toBe(true);
+    expect(merged?.paths?.['opened'].source).toBe('gps2');
+    expect(merged?.paths?.['hidden'].hideFromConfig).toBe(true);
+    expect(merged?.paths?.['shown'].hideFromConfig).toBeUndefined();
+  });
+
+  /** A hidden fixed path has no source control in the dialog, so a saved source cannot be changed back. */
+  it('takes a hidden fixed path’s source from the defaults', () => {
+    const merged = build(
+      { paths: { p: { description: 'P', path: 'self.p', source: 'default', pathType: 'object', isPathConfigurable: false, hideFromConfig: true } } },
+      { paths: { p: { description: 'P', path: 'self.p', source: 'racer.1', pathType: 'object', isPathConfigurable: false } } }
+    );
+    expect(merged?.paths?.['p'].source).toBe('default');
+  });
+
   it('keeps the saved unit where the widget exposes it for editing', () => {
     const merged = build(
       { paths: { p: { description: 'P', path: 'self.len', source: 'default', pathType: 'number', isPathConfigurable: false, convertUnitTo: 'm', showConvertUnitTo: true } } },

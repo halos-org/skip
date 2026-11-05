@@ -119,8 +119,8 @@
              Each is a rounded rect with a glyph or a word in it, sized in viewBox units
              so the controls scale with the widget. -->
         @for (b of s.controls; track $index) {
-          <g class="control" [class.accent]="b.accent" role="button" tabindex="0"
-            [attr.aria-label]="b.title"
+          <g class="control" [class.accent]="b.accent" [class.pressed]="b.pressed" role="button" tabindex="0"
+            [attr.aria-label]="b.title" [attr.aria-pressed]="b.pressed ?? null"
             (click)="action.emit(b.action)"
             (keydown.enter)="action.emit(b.action)"
             (keydown.space)="action.emit(b.action)">
@@ -142,22 +142,32 @@
         <!-- Setting an end: a target over each, larger than the mark it covers, so the
              end can be hit even when the drawn mark is small. -->
         @if (s.editEnds; as ends) {
-          <rect class="end-target port"
+          <rect class="end-target port" [class.disabled]="ends.disabled"
+            [class.pending]="endFeedback().port === 'pending'"
+            [class.ok]="endFeedback().port === 'ok'"
+            [class.error]="endFeedback().port === 'error'"
             [attr.x]="ends.port.x - ends.port.size / 2" [attr.y]="ends.port.y - ends.port.size / 2"
             [attr.width]="ends.port.size" [attr.height]="ends.port.size" [attr.rx]="ends.port.rx"
-            role="button" tabindex="0" [attr.aria-label]="ends.port.title"
-            (click)="endPressed.emit('port')"
-            (keydown.enter)="endPressed.emit('port')"
-            (keydown.space)="endPressed.emit('port')">
+            role="button" [attr.tabindex]="ends.disabled ? -1 : 0" [attr.aria-disabled]="ends.disabled || null"
+            [attr.aria-label]="endLabel(ends.port.title, endFeedback().port)"
+            [attr.aria-busy]="endFeedback().port === 'pending' ? 'true' : null"
+            (click)="ends.disabled || endPressed.emit('port')"
+            (keydown.enter)="ends.disabled || endPressed.emit('port')"
+            (keydown.space)="ends.disabled || endPressed.emit('port')">
             <title>{{ ends.port.title }}</title>
           </rect>
-          <rect class="end-target stb"
+          <rect class="end-target stb" [class.disabled]="ends.disabled"
+            [class.pending]="endFeedback().stb === 'pending'"
+            [class.ok]="endFeedback().stb === 'ok'"
+            [class.error]="endFeedback().stb === 'error'"
             [attr.x]="ends.stb.x - ends.stb.size / 2" [attr.y]="ends.stb.y - ends.stb.size / 2"
             [attr.width]="ends.stb.size" [attr.height]="ends.stb.size" [attr.rx]="ends.stb.rx"
-            role="button" tabindex="0" [attr.aria-label]="ends.stb.title"
-            (click)="endPressed.emit('stb')"
-            (keydown.enter)="endPressed.emit('stb')"
-            (keydown.space)="endPressed.emit('stb')">
+            role="button" [attr.tabindex]="ends.disabled ? -1 : 0" [attr.aria-disabled]="ends.disabled || null"
+            [attr.aria-label]="endLabel(ends.stb.title, endFeedback().stb)"
+            [attr.aria-busy]="endFeedback().stb === 'pending' ? 'true' : null"
+            (click)="ends.disabled || endPressed.emit('stb')"
+            (keydown.enter)="ends.disabled || endPressed.emit('stb')"
+            (keydown.space)="ends.disabled || endPressed.emit('stb')">
             <title>{{ ends.stb.title }}</title>
           </rect>
         }
@@ -199,4 +209,6 @@
       }
     </svg>
   </div>
+  <!-- Always present, so a screen reader is already watching it when a ping's state changes. -->
+  <div class="end-announcement" aria-live="polite" aria-atomic="true">{{ endAnnouncement() }}</div>
 </div>

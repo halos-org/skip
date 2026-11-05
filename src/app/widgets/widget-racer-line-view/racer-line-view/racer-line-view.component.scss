@@ -202,11 +202,80 @@
     fill: var(--skip-starboard-color);
   }
 
+  // A ping's progress, after the side colours so it wins over them. Pending is neutral -
+  // the press registered, nothing is known yet - and the answer is told by more than
+  // colour, since the port end's red is already close to the alarm's: done is solid -
+  // green at the starboard end, a dark red at the port end, so each keeps its side's
+  // colour - and failed is a blinking outline.
+  &.pending {
+    fill: var(--skip-grey-color);
+    stroke: var(--skip-contrast-color);
+    stroke-width: 3;
+    stroke-dasharray: 8 6;
+    animation: end-ping-pending 0.8s ease-in-out infinite alternate;
+  }
+
+  &.ok {
+    fill: var(--skip-green-color);
+    fill-opacity: 0.85;
+    stroke: var(--skip-green-color);
+    stroke-width: 4;
+
+    &.port {
+      fill: color-mix(in srgb, var(--skip-port-color) 55%, black);
+      stroke: color-mix(in srgb, var(--skip-port-color) 55%, black);
+    }
+  }
+
+  &.error {
+    fill: var(--skip-zone-alarm-color);
+    stroke: var(--skip-zone-alarm-color);
+    stroke-width: 6;
+    animation: end-ping-error 0.5s steps(1, end) 6;
+  }
+
+  // Shown so the screen keeps its shape, but plainly not something to press.
+  &.disabled {
+    cursor: default;
+    fill: var(--skip-grey-color);
+    fill-opacity: 0.15;
+  }
+
   // As with the controls: reachable and operable from the keyboard, but with no ring
   // left behind on the one last pressed.
   &:focus,
   &:focus-visible {
     outline: none;
+  }
+}
+
+@keyframes end-ping-pending {
+  from { fill-opacity: 0.25; }
+  to { fill-opacity: 0.7; }
+}
+
+// Alternates the fill on and off, the outline staying, so the target never vanishes.
+@keyframes end-ping-error {
+  0% { fill-opacity: 0.85; }
+  50% { fill-opacity: 0.1; }
+}
+
+// Read out, not shown.
+.end-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+// Without the motion the states stay apart: pending is still dashed, and failed still
+// has its heavy outline.
+@media (prefers-reduced-motion: reduce) {
+  .end-target.pending,
+  .end-target.error {
+    animation: none;
   }
 }
 
@@ -244,6 +313,15 @@
   &.accent .control-glyph {
     fill: var(--skip-on-blue-color);
     stroke: none;
+  }
+
+  // The line in use, in the orange the Racer Line widget marks it with.
+  &.pressed rect {
+    fill: var(--skip-orange-color);
+  }
+
+  &.pressed text {
+    fill: var(--skip-on-orange-color);
   }
 
   // No focus ring. These are drawn controls in a glanceable instrument, and a ring left

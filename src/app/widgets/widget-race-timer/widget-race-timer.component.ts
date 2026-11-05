@@ -4,6 +4,7 @@ import { Subscription } from 'rxjs';
 import { TimersService } from '../../core/services/timers.service';
 import { States } from '../../core/interfaces/signalk-interfaces';
 import { CanvasService } from '../../core/services/canvas.service';
+import { SoundService } from '../../core/services/sound.service';
 import { MatButtonModule } from '@angular/material/button';
 import { WidgetRuntimeDirective } from '../../core/directives/widget-runtime.directive';
 import { IWidgetSvcConfig } from '../../core/interfaces/widgets-interface';
@@ -27,6 +28,7 @@ export class WidgetRaceTimerComponent implements AfterViewInit, OnDestroy {
   private readonly timers = inject(TimersService);
   private readonly canvas = inject(CanvasService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly sound = inject(SoundService);
   /** Active subscription to the shared race timer; replaced on re-arm, torn down on destroy. */
   private timerSub?: Subscription;
 
@@ -200,21 +202,8 @@ export class WidgetRaceTimerComponent implements AfterViewInit, OnDestroy {
     }
   }
   protected beep(frequency = 440, duration = 100) {
-    if (this.runtime.options()?.playBeeps) {
-      const audioCtx = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      oscillator.type = 'sine';
-      oscillator.frequency.value = frequency; // Hz
-      gainNode.gain.value = 0.1; // volume
-
-      oscillator.start();
-      oscillator.stop(audioCtx.currentTime + duration / 1000);
-    }
+    if (!this.runtime.options()?.playBeeps) return;
+    this.sound.playTone(frequency, duration);
   }
 
   ngOnDestroy() {

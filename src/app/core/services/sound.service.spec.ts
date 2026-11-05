@@ -17,6 +17,16 @@ class FakeGain {
   disconnect = vi.fn();
 }
 
+class FakeOscillator {
+  type = 'square';
+  frequency = { value: 0 };
+  onended: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn();
+  disconnect = vi.fn();
+  connect = vi.fn((node: unknown) => node);
+}
+
 class FakeAudioContext {
   static instances: FakeAudioContext[] = [];
   static autoResume = true;
@@ -27,11 +37,13 @@ class FakeAudioContext {
   destination = {};
   onstatechange: (() => void) | null = null;
   sources: FakeSource[] = [];
+  oscillators: FakeOscillator[] = [];
 
   constructor() { FakeAudioContext.instances.push(this); }
 
   createBufferSource(): FakeSource { const s = new FakeSource(); this.sources.push(s); return s; }
   createGain(): FakeGain { return new FakeGain(); }
+  createOscillator(): FakeOscillator { const o = new FakeOscillator(); this.oscillators.push(o); return o; }
   decodeAudioData = vi.fn(async () => {
     if (FakeAudioContext.decodeFailures > 0) { FakeAudioContext.decodeFailures--; throw new Error('decode failed'); }
     return {} as AudioBuffer;
@@ -62,7 +74,7 @@ describe('SoundService', () => {
   describe('without Web Audio support', () => {
     it('is inert: no context, no throw', () => {
       const svc = new SoundService();
-      expect(() => { svc.playLoop('alarm'); svc.playOnce('notification', 0.3); svc.stopLoop(); }).not.toThrow();
+      expect(() => { svc.playLoop('alarm'); svc.playOnce('notification', 0.3); svc.playTone(440, 100); svc.stopLoop(); }).not.toThrow();
       expect(FakeAudioContext.instances).toHaveLength(0);
       expect(svc.blocked()).toBe(false);
     });
@@ -150,6 +162,40 @@ describe('SoundService', () => {
       expect(source.loop).toBe(false);
       source.onended?.();
       expect(source.disconnect).toHaveBeenCalled();
+    });
+
+    it('plays a tone on the shared context, scheduled after its delay', () => {
+      stubWebAudio();
+      const svc = new SoundService();
+      svc.playTone(880, 150);
+      svc.playTone(220, 200, 0.3, 300);
+      expect(FakeAudioContext.instances).toHaveLength(1);
+      const [first, second] = ctx().oscillators;
+      expect(first.type).toBe('sine');
+      expect(first.frequency.value).toBe(880);
+      expect(first.start).toHaveBeenCalledWith(0);
+      expect(first.stop).toHaveBeenCalledWith(0.15);
+      expect(second.start).toHaveBeenCalledWith(0.3);
+      expect(second.stop).toHaveBeenCalledWith(0.5);
+      first.onended?.();
+      expect(first.disconnect).toHaveBeenCalled();
+    });
+
+    it('schedules a tone on the context clock once playback has advanced', () => {
+      stubWebAudio();
+      const svc = new SoundService();
+      svc.playTone(880, 150);
+      ctx().currentTime = 10;
+      svc.playTone(220, 200, 0.3, 300);
+      const second = ctx().oscillators[1];
+      expect(second.start).toHaveBeenCalledWith(10.3);
+      expect(second.stop).toHaveBeenCalledWith(10.5);
+    });
+
+    it('swallows a failure to play a tone rather than throwing into the caller', () => {
+      vi.stubGlobal('AudioContext', class { constructor() { throw new Error('blocked'); } });
+      const svc = new SoundService();
+      expect(() => svc.playTone(600, 20)).not.toThrow();
     });
   });
 });

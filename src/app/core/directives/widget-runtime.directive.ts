@@ -39,6 +39,7 @@ export class WidgetRuntimeDirective {
     if (base && user) {
       merged = merge(cloneDeep(base), cloneDeep(user));
       restoreFixedPaths(merged, base);
+      restorePathPresentation(merged, base);
       dropRetiredWiring(merged, base);
     } else if (base && !user) {
       merged = cloneDeep(base);
@@ -104,7 +105,10 @@ export class WidgetRuntimeDirective {
  * the stored value is still a choice the user made from the list.
  *
  * Only the wiring is restored. `source` is left as stored because the data source stays
- * editable on a fixed path. `showConvertUnitTo` IS restored: it is not a user setting but
+ * editable on a fixed path - unless the path is also hidden from the options dialog
+ * (`hideFromConfig`), where nothing can edit it, so a stored source is just as stale a
+ * snapshot as the path and would leave the widget reading a source that may not publish
+ * it. `showConvertUnitTo` IS restored: it is not a user setting but
  * the widget's decision about whether the path follows the server's unit preference or
  * keeps the widget's own unit, and a widget that gets that wrong ships a value in the wrong
  * scale.
@@ -127,8 +131,31 @@ function restoreFixedPaths(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): vo
     mergedPath.pathType = basePath.pathType;
     mergedPath.enableTimeout = basePath.enableTimeout;
     mergedPath.dropInvalidSamples = basePath.dropInvalidSamples;
+    if (basePath.hideFromConfig) mergedPath.source = basePath.source;
     mergedPath.showConvertUnitTo = basePath.showConvertUnitTo;
     if (basePath.showConvertUnitTo === false) mergedPath.convertUnitTo = basePath.convertUnitTo;
+  }
+}
+
+/**
+ * Use the widget's defaults for `isPathConfigurable` and `hideFromConfig` on every path.
+ *
+ * These flags decide what the options dialog shows for a path. They belong to the widget,
+ * not the user, so the widget's current definition must win over any copy in a saved config.
+ */
+function restorePathPresentation(merged: IWidgetSvcConfig, base: IWidgetSvcConfig): void {
+  if (!merged.paths || !base.paths) return;
+  for (const [key, basePath] of Object.entries(base.paths)) {
+    const mergedPath = merged.paths[key];
+    if (!basePath || !mergedPath) continue;
+    // The defaults' combination is copied whatever it is; what each one means for the path:
+    //   configurable, shown:     user picks path and source - the saved choices stand.
+    //   fixed, shown:            path from the defaults (restoreFixedPaths), source still the user's.
+    //   fixed, hidden:           internal wiring - path and source from the defaults, nothing in the dialog.
+    //   configurable, hidden:    not meaningful - saved path kept but nothing to edit it with.
+    mergedPath.isPathConfigurable = basePath.isPathConfigurable;
+    if (basePath.hideFromConfig === undefined) delete mergedPath.hideFromConfig;
+    else mergedPath.hideFromConfig = basePath.hideFromConfig;
   }
 }
 
