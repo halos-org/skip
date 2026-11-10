@@ -8,6 +8,7 @@ import { AppService } from '../../services/app-service';
 import { ChromeVisibilityService, CHROME_HOVER_DWELL_MS } from '../../services/chrome-visibility.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { DialogService } from '../../services/dialog.service';
+import { EmbedModeService } from '../../services/embed-mode.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { SettingsService } from '../../services/settings.service';
 import { uiEventService } from '../../services/uiEvent.service';
@@ -42,6 +43,7 @@ const uiEvent = {
 const app = { isNightMode: signal(false), toggleDayNightMode: vi.fn(), toggleNightMode: vi.fn(), appVersion: signal('1.0.0') };
 const settings = { autoNightMode: signal(false) };
 const dialog = { openNotifications: vi.fn() };
+const embed = signal(false);
 const router = { navigate: vi.fn(), events: EMPTY };
 const alarmCount = signal(0);
 const notifications = {
@@ -70,6 +72,7 @@ describe('ToolbarComponent', () => {
     app.isNightMode.set(false);
     settings.autoNightMode.set(false);
     alarmCount.set(0);
+    embed.set(false);
 
     TestBed.configureTestingModule({
       imports: [ToolbarComponent],
@@ -83,6 +86,7 @@ describe('ToolbarComponent', () => {
         { provide: NotificationsService, useValue: notifications },
         { provide: Router, useValue: router },
         { provide: MatBottomSheet, useValue: bottomSheet },
+        { provide: EmbedModeService, useValue: { embed } },
       ],
     });
   });
@@ -256,6 +260,19 @@ describe('ToolbarComponent', () => {
     chrome.revealed.set(true);
     init();
     expect(el.querySelector('.toolbar-host')!.classList.contains('revealed')).toBe(true);
+  });
+
+  // A pinned toolbar in the Freeboard side panel: every menu destination but Help refuses to open
+  // under embed, while page switching and notifications are what the panel needs.
+  it('leaves the app menu out under embed and keeps page navigation and notifications', () => {
+    embed.set(true);
+    dashboard.isReadOnlySession.set(true);
+    init();
+
+    expect(byLabel('Open menu')).toBeNull();
+    expect(el.querySelector('page-nav-control')).not.toBeNull();
+    expect(byLabel('Notifications')).not.toBeNull();
+    expect(byLabel('Edit page')).toBeNull();
   });
 
   describe('pinned (#606)', () => {

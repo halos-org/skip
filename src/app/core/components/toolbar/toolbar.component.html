@@ -24,9 +24,11 @@
       @if (isEditing()) {
         <span class="editing-label"><mat-icon>edit</mat-icon>Editing layout</span>
       } @else {
-        <button mat-icon-button aria-label="Open menu" [matMenuTriggerFor]="appMenu">
-          <mat-icon>menu</mat-icon>
-        </button>
+        @if (!embed()) {
+          <button mat-icon-button aria-label="Open menu" [matMenuTriggerFor]="appMenu">
+            <mat-icon>menu</mat-icon>
+          </button>
+        }
         @if (fullscreenSupported()) {
           <button
             mat-icon-button

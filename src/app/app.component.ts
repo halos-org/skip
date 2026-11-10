@@ -64,7 +64,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   protected readonly chrome = inject(ChromeVisibilityService);
   private readonly _embedMode = inject(EmbedModeService);
   private readonly _storage = inject(StorageService);
-  /** True in the chromeless embed render mode; the shell template unmounts the toolbar when set. */
+  /** True in the chromeless embed render mode; the shell template unmounts the toolbar unless it is pinned. */
   protected readonly embed = this._embedMode.embed;
   private readonly _dialog = inject(DialogService);
   public readonly settings = inject(SettingsService);

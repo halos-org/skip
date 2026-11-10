@@ -16,7 +16,7 @@
   (pointerdown)="onShellPointerDown($event)"
   (mousemove)="onMouseActivity()"
 >
-  @if (dashboardVisible() && !embed()) {
+  @if (dashboardVisible() && (!embed() || settings.pinToolbar())) {
     <app-toolbar />
   }
   <router-outlet class="router-outlet-container" />
