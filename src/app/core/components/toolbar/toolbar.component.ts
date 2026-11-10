@@ -13,6 +13,7 @@ import { AppService } from '../../services/app-service';
 import { SettingsService } from '../../services/settings.service';
 import { DialogService } from '../../services/dialog.service';
 import { NotificationsService } from '../../services/notifications.service';
+import { EmbedModeService } from '../../services/embed-mode.service';
 import { RouterOverlayNavigationService } from '../../services/router-overlay-navigation.service';
 import { PageNavControlComponent } from '../page-nav-control/page-nav-control.component';
 import { PageManagerBottomSheetComponent } from '../page-manager-bottom-sheet/page-manager-bottom-sheet.component';
@@ -48,6 +49,8 @@ export class ToolbarComponent implements OnDestroy {
   private readonly dashboard = inject(DashboardService);
   /** Hides the page-management and edit affordances in a session whose edits could never be saved. */
   protected readonly readOnly = this.dashboard.isReadOnlySession;
+  /** Settings, Connection and Remote Control refuse to open under embed, so the menu is left out. */
+  protected readonly embed = inject(EmbedModeService).embed;
   protected readonly uiEvent = inject(uiEventService);
   private readonly app = inject(AppService);
   private readonly settings = inject(SettingsService);

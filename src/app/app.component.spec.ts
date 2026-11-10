@@ -699,7 +699,7 @@ describe('AppComponent — toolbar settings effect against the real visibility s
 // EmbedModeService, which the main suite does not stub. Under embed the toolbar is unmounted from
 // the DOM entirely (not CSS-hidden). (#216 E6)
 describe('AppComponent — embed mode chrome', () => {
-  async function render(embed: boolean, issue: IBootstrapIssue = { reason: 'none' }): Promise<ComponentFixture<AppComponent>> {
+  async function render(embed: boolean, issue: IBootstrapIssue = { reason: 'none' }, pinned = false): Promise<ComponentFixture<AppComponent>> {
     const appNetworkInitServiceStub = {
       bootstrapStatus$: new BehaviorSubject<'starting' | 'ready' | 'degraded'>('ready'),
       bootstrapIssue$: new BehaviorSubject<IBootstrapIssue>(issue),
@@ -739,6 +739,7 @@ describe('AppComponent — embed mode chrome', () => {
     // toolbar's own heavy dependency tree; the `app-toolbar` host element still marks its presence.
     TestBed.overrideComponent(ToolbarComponent, { set: { template: '<span class="stub-toolbar"></span>', imports: [] } });
     await TestBed.compileComponents();
+    vi.spyOn(TestBed.inject(SettingsService), 'pinToolbar').mockImplementation(() => pinned);
 
     const fixture = TestBed.createComponent(AppComponent);
     (fixture.componentInstance as unknown as { dashboardVisible: { set: (v: boolean) => void } }).dashboardVisible.set(true);
@@ -746,9 +747,17 @@ describe('AppComponent — embed mode chrome', () => {
     return fixture;
   }
 
+  afterEach(() => vi.restoreAllMocks());
+
   it('unmounts the toolbar from the DOM under embed even on a visible dashboard', async () => {
     const fixture = await render(true);
     expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).toBeNull();
+  });
+
+  // The Freeboard side panel embeds the whole app; a pinned toolbar is how its pages are switched.
+  it('mounts the toolbar under embed when it is pinned', async () => {
+    const fixture = await render(true, { reason: 'none' }, true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-toolbar')).not.toBeNull();
   });
 
   it('mounts the toolbar on a visible dashboard when not embedded', async () => {
